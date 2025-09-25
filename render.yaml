@@ -6,7 +6,7 @@ services:
     env: node
     rootDirectory: server
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node index.js
     healthCheckPath: /health
     envVars:
       - key: JWT_SECRET
