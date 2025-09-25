@@ -1,0 +1,14 @@
+# Render 服务配置
+
+services:
+  - type: web
+    name: jinza-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production

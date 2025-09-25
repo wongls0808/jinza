@@ -1,0 +1,86 @@
+## 快速开始
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 开发模式
+
+```bash
+npm run dev
+```
+
+### 构建项目
+
+```bash
+npm run build
+```
+
+### 预览构建结果
+
+```bash
+npm run preview
+```
+
+## 部署指南
+
+### 前端部署（Vercel）
+
+1. 在Vercel注册并连接到您的GitHub仓库
+2. 导入此项目
+3. 配置环境变量（如果需要）
+4. 部署项目
+
+### 后端部署（Render）
+
+1. 在Render注册并连接到您的后端代码仓库
+2. 创建新的Web Service
+3. 配置环境变量
+4. 部署服务
+
+## 开发指南
+
+### 新增页面
+
+1. 在`src/views`目录下创建新的Vue组件
+2. 在`src/router/index.ts`中添加新的路由配置
+3. 如果需要，在`src/stores/menu.ts`中添加相应的菜单项
+
+### 状态管理
+
+使用Pinia进行状态管理，在`src/stores`目录下定义store：
+
+```typescript
+// 示例：创建一个新的store
+import { defineStore } from 'pinia';
+
+export const useMyStore = defineStore('myStore', {
+  state: () => ({
+    // 状态定义
+  }),
+  getters: {
+    // 计算属性
+  },
+  actions: {
+    // 方法
+  }
+});
+```
+
+## 版本历史
+
+- **1.0.0** (2025-09-26): 初始版本发布
+
+## 贡献指南
+
+1. Fork本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建Pull Request
+
+## 许可证
+
+本项目使用MIT许可证 - 详见LICENSE文件
