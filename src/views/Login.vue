@@ -13,7 +13,12 @@
           <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="handleLogin" style="width: 100%;">登录</el-button>
+                <el-button type="primary" @click="handleLogin" :loading="loading" :disabled="loading">
+        登录
+      </el-button>
+      <el-button type="info" @click="goToDeploymentTest" plain>
+        测试部署
+      </el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -68,6 +73,11 @@ const handleLogin = () => {
       ElMessage.error('用户名或密码错误');
     }
   }, 1000);
+};
+
+// 跳转到部署测试页面
+const goToDeploymentTest = () => {
+  router.push('/deployment-test');
 };
 </script>
 

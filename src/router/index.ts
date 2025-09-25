@@ -79,6 +79,15 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/deployment-test',
+    name: 'DeploymentTest',
+    component: () => import('@/views/DeploymentTest.vue'),
+    meta: {
+      title: '部署测试',
+      requireAuth: false,
+    }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),
