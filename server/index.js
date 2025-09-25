@@ -90,14 +90,15 @@ const categories = [
 ];
 
 // 路由
-// 健康检查
-app.get('/health', (req, res) => {
+// 健康检查 - 同时支持根路径、/health和/api/health
+app.get(['/', '/health', '/api/health'], (req, res) => {
   res.status(200).json({
     code: 200,
     message: 'Server is running',
     data: {
       status: 'UP',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      path: req.path
     }
   });
 });

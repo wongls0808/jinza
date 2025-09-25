@@ -3,8 +3,12 @@ import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axio
 import { ElMessage } from 'element-plus';
 
 // 创建axios实例
+const baseURL = import.meta.env.VITE_API_BASE_URL as string;
+// 确保baseURL末尾没有/，以便后面可以正确拼接路径
+const normalizedBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL as string, // API的基础URL
+  baseURL: normalizedBaseURL, // API的基础URL
   timeout: 15000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json;charset=UTF-8'
@@ -84,24 +88,29 @@ service.interceptors.response.use(
   }
 );
 
+// 确保URL以/api开头
+const ensureApiPrefix = (url: string): string => {
+  return url.startsWith('/api') ? url : `/api${url}`;
+};
+
 // 封装GET请求
 export function get<T>(url: string, params?: any): Promise<T> {
-  return service.get(url, { params });
+  return service.get(ensureApiPrefix(url), { params });
 }
 
 // 封装POST请求
 export function post<T>(url: string, data?: any): Promise<T> {
-  return service.post(url, data);
+  return service.post(ensureApiPrefix(url), data);
 }
 
 // 封装PUT请求
 export function put<T>(url: string, data?: any): Promise<T> {
-  return service.put(url, data);
+  return service.put(ensureApiPrefix(url), data);
 }
 
 // 封装DELETE请求
 export function del<T>(url: string, params?: any): Promise<T> {
-  return service.delete(url, { params });
+  return service.delete(ensureApiPrefix(url), { params });
 }
 
 export default service;

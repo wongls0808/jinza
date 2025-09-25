@@ -99,11 +99,26 @@ const testBackendConnection = async () => {
   
   try {
     // 直接使用axios发起请求，避免request.ts中的拦截器处理
-    const response = await axios.get(`${apiBaseUrl}/health`);
+    // 尝试多种可能的健康检查路径
+    let response;
+    let endpoint = '';
+    
+    try {
+      endpoint = '/health';
+      response = await axios.get(`${apiBaseUrl}${endpoint}`);
+    } catch (e) {
+      try {
+        endpoint = '/api/health';
+        response = await axios.get(`${apiBaseUrl}${endpoint}`);
+      } catch (e) {
+        endpoint = '/';
+        response = await axios.get(`${apiBaseUrl}${endpoint}`);
+      }
+    }
     
     backendTestResult.value = {
       success: true,
-      message: '成功连接到后端服务',
+      message: `成功连接到后端服务 (${endpoint})`,
       data: response.data
     };
   } catch (err: any) {
@@ -125,10 +140,23 @@ const testLoginApi = async () => {
   
   try {
     // 使用预设的管理员账号
-    const response = await axios.post(`${apiBaseUrl}/login`, {
-      username: 'admin',
-      password: 'admin123'
-    });
+    // 尝试多种可能的登录路径
+    let response;
+    let endpoint = '';
+    
+    try {
+      endpoint = '/api/login';
+      response = await axios.post(`${apiBaseUrl}${endpoint}`, {
+        username: 'admin',
+        password: 'admin123'
+      });
+    } catch (e) {
+      endpoint = '/login';
+      response = await axios.post(`${apiBaseUrl}${endpoint}`, {
+        username: 'admin',
+        password: 'admin123'
+      });
+    }
     
     loginTestResult.value = {
       success: true,
