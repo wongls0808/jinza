@@ -70,11 +70,11 @@ const toggleFullscreen = () => {
 };
 
 const goToProfile = () => {
-  router.push('/profile');
+  ElMessageBox.alert('系统已简化，只保留首页', '提示');
 };
 
 const goToSettings = () => {
-  router.push('/dashboard/settings');
+  ElMessageBox.alert('系统已简化，只保留首页', '提示');
 };
 
 const handleLogout = () => {

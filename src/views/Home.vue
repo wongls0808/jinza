@@ -130,14 +130,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 import { 
   User, 
   Coin, 
   Briefcase, 
   Document, 
-  Plus, 
-  Share, 
+  RefreshRight, 
   Search, 
   Setting
 } from '@element-plus/icons-vue';
@@ -183,10 +183,9 @@ const chartPeriod = ref('week');
 
 // 快捷操作
 const quickActions = ref([
-  { label: '新增员工', icon: 'Plus', action: 'addEmployee' },
-  { label: '发起审批', icon: 'Share', action: 'startApproval' },
-  { label: '查询数据', icon: 'Search', action: 'searchData' },
-  { label: '系统设置', icon: 'Setting', action: 'systemSettings' }
+  { label: '刷新页面', icon: 'RefreshRight', action: 'refresh' },
+  { label: '查看信息', icon: 'Search', action: 'viewInfo' },
+  { label: '主题切换', icon: 'Setting', action: 'toggleTheme' }
 ]);
 
 // 近期任务
@@ -221,29 +220,26 @@ const getPriorityType = (priority: string) => {
 // 处理快捷操作
 const handleQuickAction = (action: any) => {
   switch(action.action) {
-    case 'addEmployee':
-      router.push('/dashboard/hr/employee/add');
+    case 'refresh':
+      window.location.reload();
       break;
-    case 'startApproval':
-      router.push('/dashboard/approval/new');
+    case 'viewInfo':
+      ElMessage.info('这是一个简化后的系统，只保留了首页');
       break;
-    case 'searchData':
-      router.push('/dashboard/reports');
-      break;
-    case 'systemSettings':
-      router.push('/dashboard/settings');
+    case 'toggleTheme':
+      ElMessage.success('主题切换功能即将上线');
       break;
   }
 };
 
 // 查看更多任务
 const handleMoreTasks = () => {
-  router.push('/dashboard/tasks');
+  ElMessage.info('任务管理功能已被简化');
 };
 
 // 查看更多公告
 const handleMoreAnnouncements = () => {
-  router.push('/dashboard/announcements');
+  ElMessage.info('公告管理功能已被简化');
 };
 
 // 初始化业务数据图表
@@ -408,7 +404,7 @@ const handleResize = () => {
 .dashboard-home {
   padding: 20px;
   background-color: #f0f2f5;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
 }
 
 .welcome-section, .data-charts, .quick-actions, .recent-section {
@@ -512,17 +508,5 @@ const handleResize = () => {
     width: 100% !important;
     margin-bottom: 15px;
   }
-}
-</style>
-}
-
-h1 {
-  font-size: 2.5rem;
-  color: #409EFF;
-  margin-bottom: 2rem;
-}
-
-.el-button {
-  min-width: 120px;
 }
 </style>
