@@ -521,12 +521,26 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
   }
 
   // 尝试上传到后端（/api/tenants/uploads）
+  ElMessage.info('正在上传图片，请稍候...');
   try {
     const form = new FormData();
     form.append('file', rawFile);
+    console.log(`上传图片: ${field}`, rawFile);
     const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     // 服务端返回结构：{ code:200, message:'上传成功', data: { url, mimetype } }
-    const url = res?.data?.url || null;
+    console.log('上传图片响应:', res);
+    
+    // 服务器返回的数据可能有不同格式，需要处理
+    let url = null;
+    if (res && typeof res === 'object') {
+      // 尝试从各种可能的数据结构中获取url
+      const data = (res as any).data;
+      if (data && typeof data === 'object') {
+        // 典型的 { code: 200, message: '上传成功', data: { url: '...' } } 格式
+        url = data.url || null;
+      }
+    }
+    
     if (url) {
       if (field === 'logo') editModel.value.logoData = url;
       if (field === 'seal') editModel.value.sealData = url;
@@ -534,9 +548,11 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
       ElMessage.success('文件上传成功');
       return;
     }
-    throw new Error('上传未返回 URL');
-  } catch (err) {
-    console.warn('上传失败，回退到 dataURL 存储', err);
+    throw new Error('上传未返回有效的URL');
+  } catch (err: any) {
+    console.error('上传失败，错误详情:', err);
+    const errorMsg = err?.response?.data?.message || err?.message || '未知错误';
+    
     // 回退到 dataURL（本地显示）
     const reader = new FileReader();
     reader.onload = () => {
@@ -546,7 +562,7 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
       if (field === 'signature') editModel.value.signatureData = data;
     };
     reader.readAsDataURL(rawFile);
-    ElMessage.warning('上传失败，已在本地预览（稍后可重试上传）');
+    ElMessage.warning(`上传失败 (${errorMsg})，已在本地预览（稍后可重试上传）`);
   }
 };
 
@@ -596,37 +612,66 @@ const onTemplateFileChange = async (uploadFile: UploadFile) => {
     return;
   }
 
+  ElMessage.info('正在上传模板文件，请稍候...');
   try {
     const form = new FormData();
     form.append('file', file);
+    console.log('上传模板文件:', file);
     const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-    const url = res?.data?.url || null;
+    console.log('上传模板响应:', res);
+    
+    // 服务器返回的数据可能有不同格式，需要处理
+    let url = null;
+    if (res && typeof res === 'object') {
+      // 尝试从各种可能的数据结构中获取url
+      const data = (res as any).data;
+      if (data && typeof data === 'object') {
+        url = data.url || null;
+      }
+    }
+    
     if (url) {
       currentTemplate.value.fileData = url;
       ElMessage.success('模板上传成功');
       return;
     }
-    throw new Error('上传未返回 URL');
-  } catch (err) {
-    console.warn('模板上传失败，回退到 dataURL', err);
+    throw new Error('上传未返回有效的URL');
+  } catch (err: any) {
+    console.error('模板上传失败，错误详情:', err);
+    const errorMsg = err?.response?.data?.message || err?.message || '未知错误';
+    
     const reader = new FileReader();
     reader.onload = () => {
       currentTemplate.value.fileData = reader.result as string;
     };
     reader.readAsDataURL(file);
-    ElMessage.warning('模板上传失败，已在本地预览（稍后可重试上传）');
+    ElMessage.warning(`模板上传失败 (${errorMsg})，已在本地预览`);
   }
 };
 
 const saveTemplate = () => {
-  if (!editModel.value.templates) editModel.value.templates = [];
-  const idx = editModel.value.templates.findIndex(t => t.id === currentTemplate.value.id);
-  if (idx >= 0) {
-    editModel.value.templates[idx] = { ...currentTemplate.value } as TemplateItem;
-  } else {
-    editModel.value.templates.push({ ...currentTemplate.value } as TemplateItem);
+  try {
+    if (!currentTemplate.value.name) {
+      ElMessage.warning('请输入模板名称');
+      return;
+    }
+    
+    if (!editModel.value.templates) editModel.value.templates = [];
+    
+    const idx = editModel.value.templates.findIndex(t => t.id === currentTemplate.value.id);
+    if (idx >= 0) {
+      editModel.value.templates[idx] = { ...currentTemplate.value } as TemplateItem;
+    } else {
+      editModel.value.templates.push({ ...currentTemplate.value } as TemplateItem);
+    }
+    
+    templateDialogVisible.value = false;
+    ElMessage.success('模板保存成功');
+    console.log('当前模板列表:', editModel.value.templates);
+  } catch (error) {
+    console.error('保存模板出错:', error);
+    ElMessage.error('保存模板失败，请重试');
   }
-  templateDialogVisible.value = false;
 };
 </script>
 
