@@ -48,35 +48,31 @@ const showError = (e: any) => {
   result.value = JSON.stringify({ status, url, data, message: msg }, null, 2);
 };
 
-const pingGet = async () => {
-  loadingGet.value = true;
+const endpoints = ['/ping'];
+
+const tryEndpoints = async (method: 'get' | 'post') => {
+  const loader = method === 'get' ? loadingGet : loadingPost;
+  loader.value = true;
   result.value = null;
   try {
-    pushLog('Attempting GET /ping');
-    const r = await get('/ping');
-    pushLog('GET /ping success');
-    result.value = JSON.stringify(r, null, 2);
-  } catch (e: any) {
-    showError(e);
-    ElMessage.error(e?.message || 'GET 请求失败');
+    for (const ep of endpoints) {
+      pushLog(`Attempting ${method.toUpperCase()} ${ep}`);
+      try {
+        const r = method === 'get' ? await get(ep) : await post(ep);
+        pushLog(`${method.toUpperCase()} ${ep} success`);
+        result.value = JSON.stringify(r, null, 2);
+        return;
+      } catch (innerErr: any) {
+        showError(innerErr);
+        // continue to next endpoint
+      }
+    }
+    ElMessage.error('所有尝试的端点均失败');
   } finally {
-    loadingGet.value = false;
+    loader.value = false;
   }
 };
 
-const pingPost = async () => {
-  loadingPost.value = true;
-  result.value = null;
-  try {
-    pushLog('Attempting POST /ping');
-    const r = await post('/ping');
-    pushLog('POST /ping success');
-    result.value = JSON.stringify(r, null, 2);
-  } catch (e: any) {
-    showError(e);
-    ElMessage.error(e?.message || 'POST 请求失败');
-  } finally {
-    loadingPost.value = false;
-  }
-};
+const pingGet = async () => tryEndpoints('get');
+const pingPost = async () => tryEndpoints('post');
 </script>

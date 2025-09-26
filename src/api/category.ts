@@ -13,7 +13,7 @@ export const useCategories = () => {
     error.value = '';
     
     try {
-      const response = await get<ApiResponse<Category[]>>('/api/categories');
+  const response = await get<ApiResponse<Category[]>>('/categories');
       
       if (response.code === 200) {
         categories.value = response.data;

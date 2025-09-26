@@ -14,7 +14,7 @@ export const useLogin = () => {
     error.value = '';
     
     try {
-      const response = await post<ApiResponse<LoginResult>>('/api/login', loginParams);
+  const response = await post<ApiResponse<LoginResult>>('/login', loginParams);
       
       if (response.code === 200) {
         // 保存token和用户信息
@@ -57,7 +57,7 @@ export const useUserInfo = () => {
     loading.value = true;
     
     try {
-      const response = await get<ApiResponse<User>>('/api/user/info');
+  const response = await get<ApiResponse<User>>('/me');
       
       if (response.code === 200) {
         userInfo.value = response.data;
