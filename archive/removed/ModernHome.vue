@@ -63,48 +63,7 @@
       </div>
     </div>
 
-    <!-- 信息卡片区域 -->
-    <div class="info-section">
-      <div class="info-column">
-        <div class="info-card">
-          <div class="info-header">
-            <h3>待办任务</h3>
-            <el-button type="primary" text>查看更多</el-button>
-          </div>
-          <el-table :data="recentTasks" style="width: 100%" size="large">
-            <el-table-column prop="title" label="任务名称" />
-            <el-table-column prop="priority" label="优先级" width="100">
-              <template #default="scope">
-                <el-tag :type="getPriorityType(scope.row.priority)" effect="light">
-                  {{ scope.row.priority }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="deadline" label="截止日期" width="120" />
-          </el-table>
-        </div>
-      </div>
-
-      <div class="info-column">
-        <div class="info-card">
-          <div class="info-header">
-            <h3>系统公告</h3>
-            <el-button type="primary" text>查看更多</el-button>
-          </div>
-          <el-timeline>
-            <el-timeline-item
-              v-for="(activity, index) in recentActivities"
-              :key="index"
-              :timestamp="activity.timestamp"
-              :type="activity.type"
-              :color="activity.type === 'warning' ? '#E6A23C' : ''"
-            >
-              {{ activity.content }}
-            </el-timeline-item>
-          </el-timeline>
-        </div>
-      </div>
-    </div>
+    <!-- 精简：仅保留欢迎、统计与功能菜单，移除冗余信息卡片 -->
   </div>
 </template>
 

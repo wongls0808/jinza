@@ -104,11 +104,18 @@ export const useMenuStore = defineStore('menu', () => {
   
   // 从路由生成菜单
   const generateMenusFromRoutes = () => {
-    // 从路由配置生成菜单
+    // 尝试找到 Dashboard 路由并使用其 children 生成菜单
     const dashboardRoute = router.getRoutes().find(route => route.name === 'Dashboard');
-    if (dashboardRoute && dashboardRoute.children) {
-      menuItems.value = generateMenuFromRoutes(dashboardRoute.children);
+    if (dashboardRoute && Array.isArray(dashboardRoute.children) && dashboardRoute.children.length > 0) {
+      // 生成子路由菜单，并确保 path 拼接基准为 /dashboard
+      const childrenMenus = generateMenuFromRoutes(dashboardRoute.children, '/dashboard');
+      menuItems.value = childrenMenus;
+      return;
     }
+
+    // 回退：直接使用顶层路由列表中的可见路由
+    const routes = router.getRoutes().filter(r => !r.meta?.hidden && r.path && r.name);
+    menuItems.value = generateMenuFromRoutes(routes, '');
   };
   
   // 根据权限过滤菜单
