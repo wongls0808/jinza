@@ -110,6 +110,10 @@
         </el-form-item>
         <el-form-item label="发票编码格式">
           <el-input v-model="currentTemplate.codeFormat" placeholder="例如：INV-{YYYY}{MM}-{SEQ:4}" />
+          <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+            <el-button size="mini" @click="generatePreview">生成示例编码</el-button>
+            <div style="font-size:12px; color:#666;">示例：<span style="font-weight:500">{{ currentTemplatePreview }}</span></div>
+          </div>
         </el-form-item>
         <el-form-item label="模板文件 (PNG)">
           <input type="file" accept="image/png" @change="onTemplateFileChange" />
@@ -180,6 +184,38 @@ const tenantFormRef = ref();
 
 const templateDialogVisible = ref(false);
 const currentTemplate = ref<TemplateItem>({ id: '', name: '', codeFormat: '', fileData: null });
+const currentTemplatePreview = ref<string>('');
+
+/**
+ * 生成编码预览，支持占位符：{YYYY},{MM},{DD},{SEQ:n}
+ */
+const formatInvoiceCode = (format: string, seq = 1) => {
+  const now = new Date();
+  const YYYY = now.getFullYear().toString();
+  const MM = (now.getMonth() + 1).toString().padStart(2, '0');
+  const DD = now.getDate().toString().padStart(2, '0');
+  let out = format || '';
+
+  out = out.replace(/\{YYYY\}/g, YYYY);
+  out = out.replace(/\{MM\}/g, MM);
+  out = out.replace(/\{DD\}/g, DD);
+
+  // {SEQ:n}
+  out = out.replace(/\{SEQ:(\d+)\}/g, (_m, digits) => {
+    const n = parseInt(digits, 10) || 4;
+    return seq.toString().padStart(n, '0');
+  });
+
+  return out;
+};
+
+const generatePreview = () => {
+  try {
+    currentTemplatePreview.value = formatInvoiceCode(currentTemplate.value.codeFormat || '', 1);
+  } catch (e) {
+    currentTemplatePreview.value = '';
+  }
+};
 
 const rules = {
   name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
