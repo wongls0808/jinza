@@ -79,7 +79,7 @@
                     :limit="1"
                     :show-file-list="false"
                     class="tenant-image-upload"
-                    :on-change="(file) => handleFileUpload(file, 'logo')"
+                    :on-change="(file: UploadFile) => handleFileUpload(file, 'logo')"
                   >
                     <div class="upload-area">
                       <div v-if="!editModel.logoData" class="upload-placeholder">
@@ -101,7 +101,7 @@
                     :limit="1"
                     :show-file-list="false"
                     class="tenant-image-upload"
-                    :on-change="(file) => handleFileUpload(file, 'seal')"
+                    :on-change="(file: UploadFile) => handleFileUpload(file, 'seal')"
                   >
                     <div class="upload-area">
                       <div v-if="!editModel.sealData" class="upload-placeholder">
@@ -123,7 +123,7 @@
                     :limit="1"
                     :show-file-list="false"
                     class="tenant-image-upload"
-                    :on-change="(file) => handleFileUpload(file, 'signature')"
+                    :on-change="(file: UploadFile) => handleFileUpload(file, 'signature')"
                   >
                     <div class="upload-area">
                       <div v-if="!editModel.signatureData" class="upload-placeholder">
@@ -335,6 +335,17 @@ interface TemplateItem {
   fileData?: string | null; // dataURL
 }
 
+// 定义上传文件类型接口
+interface UploadFile {
+  name: string;
+  percentage?: number;
+  raw: File;
+  size: number;
+  status: string;
+  uid: number;
+  url?: string;
+}
+
 interface Tenant {
   id: string;
   name: string;
@@ -483,7 +494,7 @@ const removeTenant = async (row: Tenant) => {
 };
 
 // 使用 El-Upload 组件处理文件上传
-const handleFileUpload = async (file: any, field: 'logo' | 'seal' | 'signature') => {
+const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'signature') => {
   if (!file || !file.raw) return;
   
   const rawFile = file.raw;
@@ -528,8 +539,15 @@ const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   
-  // 创建类似El-Upload格式的文件对象
-  await handleFileUpload({ raw: file }, field);
+  // 创建符合UploadFile类型的对象
+  const uploadFile: UploadFile = {
+    name: file.name,
+    raw: file,
+    size: file.size,
+    status: 'ready',
+    uid: Date.now(),
+  };
+  await handleFileUpload(uploadFile, field);
 };
 
 const goHome = () => {
@@ -552,7 +570,7 @@ const removeTemplate = (tpl: TemplateItem) => {
   editModel.value.templates = editModel.value.templates.filter(t => t.id !== tpl.id);
 };
 
-const onTemplateFileChange = async (uploadFile: any) => {
+const onTemplateFileChange = async (uploadFile: UploadFile) => {
   if (!uploadFile || !uploadFile.raw) return;
   
   const file = uploadFile.raw;
