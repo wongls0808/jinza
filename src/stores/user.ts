@@ -324,6 +324,84 @@ export const useUserStore = defineStore('user', () => {
     return tenants.value.find(t => t.id === user.value?.currentTenant);
   };
 
+  // ------- 用户管理（Mock CRUD） -------
+  // 本地维护一份模拟用户列表，供 UI 开发使用
+  const usersList = ref<User[]>([
+    {
+      id: 1,
+      username: 'admin',
+      nickname: '管理员',
+      status: 1,
+      roles: [1],
+      tenants: [1, 2],
+      currentTenant: null,
+      avatar: 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
+    },
+    {
+      id: 2,
+      username: 'test',
+      nickname: '测试用户',
+      status: 1,
+      roles: [2],
+      tenants: [1],
+      currentTenant: null,
+      avatar: 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
+    }
+  ]);
+
+  const fetchUsers = async (query?: { page?: number; pageSize?: number; keyword?: string }) => {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // 简单的过滤示例
+    let list = usersList.value.slice();
+    if (query?.keyword) {
+      const k = query.keyword.toLowerCase();
+      list = list.filter(u => (u.username || '').toLowerCase().includes(k) || (u.nickname || '').toLowerCase().includes(k));
+    }
+    return {
+      total: list.length,
+      items: list
+    };
+  };
+
+  const getUserById = async (id: number) => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return usersList.value.find(u => Number(u.id) === Number(id)) || null;
+  };
+
+  const createUser = async (payload: Partial<User>) => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const maxId = usersList.value.reduce((m, u) => Math.max(m, Number(u.id || 0)), 0);
+    const newUser: User = {
+      id: maxId + 1,
+      username: payload.username || `user${maxId + 1}`,
+      nickname: payload.nickname || payload.username || `用户${maxId + 1}`,
+      status: typeof payload.status === 'number' ? payload.status : 1,
+      roles: payload.roles || [],
+      tenants: payload.tenants || [],
+      currentTenant: payload.currentTenant || null,
+      avatar: payload.avatar || ''
+    } as User;
+    usersList.value.push(newUser);
+    return newUser;
+  };
+
+  const updateUser = async (id: number, payload: Partial<User>) => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const idx = usersList.value.findIndex(u => Number(u.id) === Number(id));
+    if (idx === -1) throw new Error('用户不存在');
+    usersList.value[idx] = { ...usersList.value[idx], ...payload } as User;
+    return usersList.value[idx];
+  };
+
+  const deleteUser = async (id: number) => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const idx = usersList.value.findIndex(u => Number(u.id) === Number(id));
+    if (idx === -1) throw new Error('用户不存在');
+    usersList.value.splice(idx, 1);
+    return true;
+  };
+
   return {
     token,
     user,
@@ -338,5 +416,13 @@ export const useUserStore = defineStore('user', () => {
     hasPermission,
     hasRole,
     getCurrentTenant
+    ,
+    // 用户管理 API
+    usersList,
+    fetchUsers,
+    getUserById,
+    createUser,
+    updateUser,
+    deleteUser
   };
 });
