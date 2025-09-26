@@ -84,10 +84,20 @@ export const useMenuStore = defineStore('menu', () => {
     {
       id: '1',
       title: '首页',
-      path: '/dashboard',
+      path: '/home',
       icon: 'HomeFilled'
     }
   ]);
+
+  // 顶部/主要模块 - 添加“基础设置”作为主模块入口
+  const mainModules: MenuItem[] = [
+    {
+      id: 'settings',
+      title: '基础设置',
+      path: '/settings',
+      icon: 'Setting'
+    }
+  ];
   
   // 根据权限过滤的菜单
   const filteredMenuItems = computed(() => {
@@ -98,6 +108,8 @@ export const useMenuStore = defineStore('menu', () => {
     if (userStore.hasRole && userStore.hasRole('admin')) {
       menus = [...menus, ...systemManagementMenus];
     }
+    // 添加主模块（如基础设置）到最前面
+    menus = [...mainModules, ...menus];
     
     return menus;
   });

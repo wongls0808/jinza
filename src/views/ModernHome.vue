@@ -13,11 +13,21 @@
           </div>
         </div>
         <div class="welcome-bg"></div>
-        </div>
       </div>
     </div>
 
-  </template>
+    <!-- 导航卡片菜单 -->
+    <section class="menu-section">
+      <div class="section-title">快速导航</div>
+      <CardMenu :menus="menuItems" />
+    </section>
+
+    <!-- 可选统计/图表区域（保留现有布局） -->
+    <section class="charts-section">
+      <div class="chart-wrapper" id="businessChart"></div>
+    </section>
+  </div>
+</template>
 
   <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue';

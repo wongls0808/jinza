@@ -206,16 +206,17 @@ const navigateTo = (menu: MenuItem) => {
   letter-spacing: 0.3px;
 }
 
-.menu-description {
-  margin: 8px 0 0;
-  font-size: 13px;
-  color: #888;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.5;
-}
+        .menu-description {
+          margin: 8px 0 0;
+          font-size: 13px;
+          color: #888;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          line-clamp: 2; /* standard property for compatibility */
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          line-height: 1.5;
+        }
 
 .menu-badge {
   position: absolute;
