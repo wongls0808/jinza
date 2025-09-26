@@ -8,7 +8,11 @@
     </div>
 
     <el-card>
-      <div class="list-area">
+        // 尝试上传到后端（/api/tenants/uploads）
+    try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });class="list-area">
         <el-table :data="tenants" style="width:100%;">
           <el-table-column prop="name" label="账套名称" />
           <el-table-column prop="code" label="账套代码" />
@@ -166,7 +170,7 @@ const tenants = ref<Tenant[]>([]);
 // Load tenants from backend on mount
 const loadTenants = async () => {
   try {
-    const res = await get<Tenant[]>('/tenants');
+    const res = await get<Tenant[]>('/api/tenants');
     tenants.value = Array.isArray(res) ? res : [];
   } catch (e) {
     console.error('加载账套失败', e);
@@ -243,11 +247,11 @@ const submitTenant = async () => {
       // If id exists on server, call PUT, otherwise POST
       const exists = tenants.value.find(t => t.id === editModel.value.id);
       if (exists) {
-        await put(`/tenants/${editModel.value.id}`, payload);
+        await put(`/api/tenants/${editModel.value.id}`, payload);
         // refresh local list
         await loadTenants();
       } else {
-        await post('/tenants', payload);
+        await post('/api/tenants', payload);
         await loadTenants();
       }
       editDialogVisible.value = false;
@@ -275,7 +279,7 @@ const submitTenant = async () => {
 
 const removeTenant = async (row: Tenant) => {
   try {
-    await del(`/tenants/${row.id}`);
+    await del(`/api/tenants/${row.id}`);
     await loadTenants();
     ElMessage.success('删除成功');
   } catch (err: any) {
