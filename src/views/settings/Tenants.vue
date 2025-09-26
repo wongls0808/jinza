@@ -130,6 +130,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { get, post, put, del } from '@/utils/request';
+import { ElMessage } from 'element-plus';
 
 interface TemplateItem {
   id: string;
@@ -213,8 +214,24 @@ const submitTenant = async () => {
         await loadTenants();
       }
       editDialogVisible.value = false;
-    } catch (e) {
-      console.error('保存账套失败', e);
+      ElMessage.success('保存成功');
+    } catch (err: any) {
+      console.error('保存账套失败', err);
+      // If backend endpoint not implemented (404) or network error, fallback to local save
+      const status = err?.response?.status;
+      if (status === 404 || err?.message?.includes('404') || err?.message?.includes('Not Found')) {
+        // fallback: local persist (keep UX) and inform the user
+        const idx = tenants.value.findIndex(t => t.id === editModel.value.id);
+        if (idx >= 0) {
+          tenants.value[idx] = { ...editModel.value } as Tenant;
+        } else {
+          tenants.value.push({ ...editModel.value } as Tenant);
+        }
+        editDialogVisible.value = false;
+        ElMessage.warning('后端接口未实现，已在本地保存显示（请在后端实现 /tenants 接口以持久化数据）');
+      } else {
+        ElMessage.error('保存失败，请稍后重试');
+      }
     }
   });
 };
@@ -223,8 +240,17 @@ const removeTenant = async (row: Tenant) => {
   try {
     await del(`/tenants/${row.id}`);
     await loadTenants();
-  } catch (e) {
-    console.error('删除账套失败', e);
+    ElMessage.success('删除成功');
+  } catch (err: any) {
+    console.error('删除账套失败', err);
+    const status = err?.response?.status;
+    if (status === 404 || err?.message?.includes('404') || err?.message?.includes('Not Found')) {
+      // fallback local delete
+      tenants.value = tenants.value.filter(t => t.id !== row.id);
+      ElMessage.warning('后端接口未实现，已在本地删除（请在后端实现 /tenants 接口以持久化删除）');
+    } else {
+      ElMessage.error('删除失败，请稍后重试');
+    }
   }
 };
 
