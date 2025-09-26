@@ -95,7 +95,21 @@ export const useMenuStore = defineStore('menu', () => {
       id: 'settings',
       title: '基础设置',
       path: '/settings',
-      icon: 'Setting'
+      icon: 'Setting',
+      children: [
+        {
+          id: 'settings-users',
+          title: '用户管理',
+          path: '/settings/users',
+          icon: 'User'
+        },
+        {
+          id: 'settings-tenants',
+          title: '账套配置',
+          path: '/settings/tenants',
+          icon: 'Office'
+        }
+      ]
     }
   ];
   
