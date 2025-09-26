@@ -1,34 +1,102 @@
 <template>
   <div class="settings-tenants">
     <div class="tenant-header">
-      <h2>账套配置</h2>
+      <div class="tenant-header-left">
+        <h2>账套配置</h2>
+        <el-input
+          v-model="searchQuery"
+          placeholder="搜索账套名称或代码"
+          prefix-icon="Search"
+          clearable
+          class="tenant-search"
+          @input="handleSearch"
+        />
+      </div>
       <div class="ops-area">
-        <el-button type="primary" @click="addTenant">新增账套</el-button>
+        <el-tooltip content="刷新数据" placement="top">
+          <el-button circle @click="loadTenants">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-button type="primary" @click="addTenant">
+          <el-icon><Plus /></el-icon>新增账套
+        </el-button>
         <el-button @click="goHome">返回导航页</el-button>
       </div>
     </div>
 
     <div class="tenant-cards">
-      <el-row :gutter="16">
-        <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="item in tenants" :key="item.id" class="tenant-card-col">
-          <el-card shadow="hover" class="tenant-card">
-            <div class="tenant-card-header">
-              <h3>{{ item.name }}</h3>
-              <p class="tenant-code">代码: {{ item.code }}</p>
+      <div v-if="isLoading" style="display: flex; flex-wrap: wrap; gap: 20px;">
+        <div v-for="i in 4" :key="i" style="width: 280px; height: 250px;">
+          <el-skeleton animated>
+            <template #template>
+              <el-skeleton-item variant="image" style="width: 100%; height: 80px;" />
+              <div style="padding: 14px;">
+                <el-skeleton-item variant="h3" style="width: 50%;" />
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
+                  <el-skeleton-item variant="text" style="margin-right: 16px;" />
+                  <el-skeleton-item variant="text" style="width: 30%;" />
+                </div>
+                <div style="margin-top: 16px;">
+                  <el-skeleton-item variant="text" />
+                  <el-skeleton-item variant="text" />
+                </div>
+              </div>
+            </template>
+          </el-skeleton>
+        </div>
+      </div>
+        
+      <div v-else-if="filteredTenants.length === 0" class="empty-state">
+        <el-empty :description="searchQuery ? '没有找到匹配的账套' : '暂无账套信息'">
+          <el-button type="primary" @click="addTenant" v-if="!searchQuery">新增账套</el-button>
+          <el-button @click="searchQuery = ''" v-else>清除搜索</el-button>
+        </el-empty>
+      </div>
+      
+      <el-row v-else :gutter="20">
+        <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="item in filteredTenants" :key="item.id" class="tenant-card-col">
+          <el-card shadow="hover" class="tenant-card" :body-style="{ padding: '0px' }">
+            <div class="tenant-card-top" :style="item.logoData ? 'height: 80px' : 'height: 40px'">
+              <div class="tenant-logo" v-if="item.logoData">
+                <img :src="item.logoData" alt="logo" />
+              </div>
             </div>
-            <div class="tenant-card-body">
-              <div class="tenant-info" v-if="item.registerNo"><label>注册号:</label> {{ item.registerNo }}</div>
-              <div class="tenant-info" v-if="item.taxNo"><label>税号:</label> {{ item.taxNo }}</div>
-              <div class="tenant-info" v-if="item.phone"><label>电话:</label> {{ item.phone }}</div>
-              <div class="tenant-info" v-if="item.email"><label>邮箱:</label> {{ item.email }}</div>
-              <div class="tenant-info" v-if="item.address"><label>地址:</label> {{ item.address }}</div>
-            </div>
-            <div class="tenant-logo" v-if="item.logoData">
-              <img :src="item.logoData" alt="logo" />
-            </div>
-            <div class="tenant-card-footer">
-              <el-button type="primary" size="small" @click="editTenant(item)">编辑</el-button>
-              <el-button type="danger" size="small" @click="removeTenant(item)">删除</el-button>
+            <div class="tenant-card-content">
+              <div class="tenant-card-header">
+                <h3>{{ item.name }}</h3>
+                <el-tag size="small" effect="light">{{ item.code }}</el-tag>
+              </div>
+              <div class="tenant-card-body">
+                <div class="tenant-info" v-if="item.registerNo"><i class="el-icon-document"></i>注册号: {{ item.registerNo }}</div>
+                <div class="tenant-info" v-if="item.taxNo"><i class="el-icon-collection-tag"></i>税号: {{ item.taxNo }}</div>
+                <div class="tenant-info" v-if="item.phone"><i class="el-icon-phone"></i>电话: {{ item.phone }}</div>
+                <div class="tenant-info" v-if="item.email"><i class="el-icon-message"></i>邮箱: {{ item.email }}</div>
+                <div class="tenant-info" v-if="item.address"><i class="el-icon-location"></i>地址: {{ item.address }}</div>
+              </div>
+              <div class="tenant-card-footer">
+                <el-tooltip content="编辑账套信息" placement="top" :hide-after="1500">
+                  <el-button type="primary" text @click="editTenant(item)">
+                    <el-icon><Edit /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip content="删除账套" placement="top" :hide-after="1500">
+                  <el-popconfirm
+                    title="确定要删除此账套吗？删除后不可恢复。"
+                    @confirm="removeTenant(item)"
+                    confirm-button-text="确认"
+                    cancel-button-text="取消"
+                    icon="Warning"
+                    icon-color="#F56C6C"
+                  >
+                    <template #reference>
+                      <el-button type="danger" text>
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </template>
+                  </el-popconfirm>
+                </el-tooltip>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -264,23 +332,42 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.tenant-header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
 .tenant-header h2 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 500;
+  font-size: 22px;
+  font-weight: 600;
   color: #303133;
+  white-space: nowrap;
+}
+
+.tenant-search {
+  width: 260px;
 }
 
 .ops-area {
   display: flex;
+  align-items: center;
   gap: 12px;
 }
 
 .tenant-cards {
   margin-top: 20px;
+}
+
+.empty-state {
+  margin: 48px 0;
+  text-align: center;
 }
 
 .tenant-card-col {
@@ -290,6 +377,9 @@
 .tenant-card {
   height: 100%;
   transition: all 0.3s;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .tenant-card:hover {
@@ -297,55 +387,74 @@
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
 }
 
+.tenant-card-top {
+  width: 100%;
+  background-color: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tenant-card-content {
+  padding: 16px;
+}
+
 .tenant-card-header {
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 12px;
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .tenant-card-header h3 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 18px;
   color: #303133;
-}
-
-.tenant-code {
-  margin: 0;
-  font-size: 14px;
-  color: #909399;
+  flex: 1;
 }
 
 .tenant-card-body {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .tenant-info {
-  margin-bottom: 6px;
-  font-size: 14px;
+  margin-bottom: 8px;
+  font-size: 13px;
   display: flex;
+  align-items: center;
+  color: #606266;
 }
 
-.tenant-info label {
+.tenant-info i {
+  margin-right: 6px;
+  font-size: 14px;
   color: #909399;
-  width: 60px;
 }
 
 .tenant-logo {
-  margin: 10px 0;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
 }
 
 .tenant-logo img {
-  max-width: 100px;
-  max-height: 80px;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
 .tenant-card-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 15px;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: auto;
   border-top: 1px solid #f0f0f0;
 }
 
@@ -369,12 +478,12 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { get, post, put, del } from '@/utils/request';
 import service from '@/utils/request';
 import { ElMessage } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, Refresh, Search } from '@element-plus/icons-vue';
 import imageCompression from 'browser-image-compression';
 
 interface TemplateItem {
@@ -419,10 +528,28 @@ interface Tenant {
 const router = useRouter();
 
 const tenants = ref<Tenant[]>([]);
+const searchQuery = ref('');
+const isLoading = ref(false);
+
+// 过滤后的账套列表
+const filteredTenants = computed(() => {
+  if (!searchQuery.value) return tenants.value;
+  const query = searchQuery.value.toLowerCase();
+  return tenants.value.filter(tenant => 
+    tenant.name.toLowerCase().includes(query) || 
+    (tenant.code && tenant.code.toLowerCase().includes(query))
+  );
+});
+
+// 搜索处理函数
+const handleSearch = () => {
+  console.log('搜索:', searchQuery.value);
+};
 
 // Load tenants from backend on mount
 const loadTenants = async () => {
   try {
+    isLoading.value = true;
     const res = await get<Tenant[] | { code: number; message: string; data: Tenant[] }>('/api/tenants');
     if (Array.isArray(res)) {
       tenants.value = res;
@@ -436,6 +563,9 @@ const loadTenants = async () => {
   } catch (e) {
     console.error('加载账套失败', e);
     tenants.value = [];
+    ElMessage.error('加载账套数据失败，请稍后重试');
+  } finally {
+    isLoading.value = false;
   }
 };
 
