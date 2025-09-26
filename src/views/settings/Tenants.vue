@@ -130,6 +130,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { get, post, put, del } from '@/utils/request';
+import service from '@/utils/request';
 import { ElMessage } from 'element-plus';
 
 interface TemplateItem {
@@ -254,22 +255,43 @@ const removeTenant = async (row: Tenant) => {
   }
 };
 
-const onFileChange = (e: Event, field: 'logo' | 'seal' | 'signature') => {
+const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
   const input = e.target as HTMLInputElement;
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   if (file.type !== 'image/png') {
-    alert('仅支持 PNG 格式的图片');
+    ElMessage.error('仅支持 PNG 格式的图片');
     return;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    const data = reader.result as string;
-    if (field === 'logo') editModel.value.logoData = data;
-    if (field === 'seal') editModel.value.sealData = data;
-    if (field === 'signature') editModel.value.signatureData = data;
-  };
-  reader.readAsDataURL(file);
+
+  // 尝试上传到后端（/api/tenants/uploads）
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await service.post('/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    // 服务端返回结构：{ code:200, message:'上传成功', data: { url, mimetype } }
+    const url = res?.data?.url || null;
+    if (url) {
+      if (field === 'logo') editModel.value.logoData = url;
+      if (field === 'seal') editModel.value.sealData = url;
+      if (field === 'signature') editModel.value.signatureData = url;
+      ElMessage.success('文件上传成功');
+      return;
+    }
+    throw new Error('上传未返回 URL');
+  } catch (err) {
+    console.warn('上传失败，回退到 dataURL 存储', err);
+    // 回退到 dataURL（本地显示）
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = reader.result as string;
+      if (field === 'logo') editModel.value.logoData = data;
+      if (field === 'seal') editModel.value.sealData = data;
+      if (field === 'signature') editModel.value.signatureData = data;
+    };
+    reader.readAsDataURL(file);
+    ElMessage.warning('上传失败，已在本地预览（稍后可重试上传）');
+  }
 };
 
 const goHome = () => {
@@ -292,19 +314,35 @@ const removeTemplate = (tpl: TemplateItem) => {
   editModel.value.templates = editModel.value.templates.filter(t => t.id !== tpl.id);
 };
 
-const onTemplateFileChange = (e: Event) => {
+const onTemplateFileChange = async (e: Event) => {
   const input = e.target as HTMLInputElement;
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   if (file.type !== 'image/png') {
-    alert('模板文件仅支持 PNG 格式（当前实现）');
+    ElMessage.error('模板文件仅支持 PNG 格式（当前实现）');
     return;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    currentTemplate.value.fileData = reader.result as string;
-  };
-  reader.readAsDataURL(file);
+
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await service.post('/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const url = res?.data?.url || null;
+    if (url) {
+      currentTemplate.value.fileData = url;
+      ElMessage.success('模板上传成功');
+      return;
+    }
+    throw new Error('上传未返回 URL');
+  } catch (err) {
+    console.warn('模板上传失败，回退到 dataURL', err);
+    const reader = new FileReader();
+    reader.onload = () => {
+      currentTemplate.value.fileData = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    ElMessage.warning('模板上传失败，已在本地预览（稍后可重试上传）');
+  }
 };
 
 const saveTemplate = () => {
