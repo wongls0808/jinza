@@ -8,11 +8,7 @@
     </div>
 
     <el-card>
-        // 尝试上传到后端（/api/tenants/uploads）
-    try {
-    const form = new FormData();
-    form.append('file', file);
-    const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });class="list-area">
+      <div class="list-area">
         <el-table :data="tenants" style="width:100%;">
           <el-table-column prop="name" label="账套名称" />
           <el-table-column prop="code" label="账套代码" />
@@ -308,7 +304,7 @@ const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await service.post('/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     // 服务端返回结构：{ code:200, message:'上传成功', data: { url, mimetype } }
     const url = res?.data?.url || null;
     if (url) {
@@ -366,7 +362,7 @@ const onTemplateFileChange = async (e: Event) => {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await service.post('/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     const url = res?.data?.url || null;
     if (url) {
       currentTemplate.value.fileData = url;
