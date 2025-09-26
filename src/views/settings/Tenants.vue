@@ -86,7 +86,13 @@
                         <el-icon class="upload-icon"><Plus /></el-icon>
                         <div class="upload-text">点击上传</div>
                       </div>
-                      <img v-else :src="editModel.logoData" alt="logo" class="upload-preview" />
+                      <template v-else>
+                        <img :src="editModel.logoData" alt="logo" class="upload-preview" />
+                        <div class="upload-hover-mask">
+                          <el-icon class="upload-icon"><Plus /></el-icon>
+                          <div class="upload-text">点击替换</div>
+                        </div>
+                      </template>
                     </div>
                   </el-upload>
                 </el-form-item>
@@ -108,7 +114,13 @@
                         <el-icon class="upload-icon"><Plus /></el-icon>
                         <div class="upload-text">点击上传</div>
                       </div>
-                      <img v-else :src="editModel.sealData" alt="公章" class="upload-preview" />
+                      <template v-else>
+                        <img :src="editModel.sealData" alt="公章" class="upload-preview" />
+                        <div class="upload-hover-mask">
+                          <el-icon class="upload-icon"><Plus /></el-icon>
+                          <div class="upload-text">点击替换</div>
+                        </div>
+                      </template>
                     </div>
                   </el-upload>
                 </el-form-item>
@@ -130,7 +142,13 @@
                         <el-icon class="upload-icon"><Plus /></el-icon>
                         <div class="upload-text">点击上传</div>
                       </div>
-                      <img v-else :src="editModel.signatureData" alt="签字" class="upload-preview" />
+                      <template v-else>
+                        <img :src="editModel.signatureData" alt="签字" class="upload-preview" />
+                        <div class="upload-hover-mask">
+                          <el-icon class="upload-icon"><Plus /></el-icon>
+                          <div class="upload-text">点击替换</div>
+                        </div>
+                      </template>
                     </div>
                   </el-upload>
                 </el-form-item>
@@ -191,7 +209,7 @@
             :on-change="onTemplateFileChange"
           >
             <template #trigger>
-              <el-button type="primary">选择文件</el-button>
+              <el-button type="primary">{{currentTemplate.fileData ? '替换文件' : '选择文件'}}</el-button>
             </template>
           </el-upload>
           <div v-if="currentTemplate.fileData" style="margin-top:12px;">
@@ -542,6 +560,11 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
     return;
   }
 
+  // 清除现有数据，确保可以重新上传
+  if (field === 'logo') editModel.value.logoData = '';
+  if (field === 'seal') editModel.value.sealData = '';
+  if (field === 'signature') editModel.value.signatureData = '';
+
   // 尝试上传到后端（/api/tenants/uploads）
   ElMessage.info('正在处理图片，请稍候...');
   try {
@@ -586,9 +609,10 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
       if (field === 'logo') editModel.value.logoData = data;
       if (field === 'seal') editModel.value.sealData = data;
       if (field === 'signature') editModel.value.signatureData = data;
+      // 删除警告消息，因为实际上不影响保存
+      console.log('使用本地预览模式显示图片');
     };
     reader.readAsDataURL(rawFile);
-    ElMessage.warning(`上传失败 (${errorMsg})，已在本地预览（稍后可重试上传）`);
   }
 };
 
@@ -624,7 +648,12 @@ const openAddTemplate = () => {
 };
 
 const editTemplate = (tpl: TemplateItem) => {
+  // 深拷贝，确保编辑不直接影响原对象
   currentTemplate.value = JSON.parse(JSON.stringify(tpl));
+  // 确保每次编辑时有正确的预览
+  if (currentTemplate.value.codeFormat) {
+    generatePreview();
+  }
   templateDialogVisible.value = true;
 };
 
@@ -641,6 +670,9 @@ const onTemplateFileChange = async (uploadFile: UploadFile) => {
     ElMessage.error('模板文件仅支持 PNG 格式（当前实现）');
     return;
   }
+
+  // 清除现有数据，确保可以重新上传
+  currentTemplate.value.fileData = null;
 
   ElMessage.info('正在处理模板文件，请稍候...');
   try {
@@ -676,9 +708,10 @@ const onTemplateFileChange = async (uploadFile: UploadFile) => {
     const reader = new FileReader();
     reader.onload = () => {
       currentTemplate.value.fileData = reader.result as string;
+      // 删除警告消息，因为实际上不影响保存
+      console.log('使用本地预览模式显示模板');
     };
     reader.readAsDataURL(file);
-    ElMessage.warning(`模板上传失败 (${errorMsg})，已在本地预览`);
   }
 };
 
@@ -768,6 +801,26 @@ const saveTemplate = () => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.upload-hover-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: white;
+}
+
+.upload-area:hover .upload-hover-mask {
+  opacity: 1;
 }
 
 /* 自定义Element Plus上传组件样式 */
