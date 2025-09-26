@@ -4,6 +4,11 @@ export interface MenuItem {
   path?: string;
   icon?: string;
   children?: MenuItem[];
+  description?: string;
+  badge?: number | string;
+  badgeType?: 'primary' | 'success' | 'warning' | 'danger' | 'info';
+  externalLink?: boolean;
+  permissions?: string[];
 }
 
 export interface MenuState {

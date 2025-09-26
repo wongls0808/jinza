@@ -31,7 +31,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'index',
         name: 'DashboardIndex',
-        component: () => import('@/views/Home.vue'),
+        component: () => import('@/views/ModernHome.vue'),
         meta: {
           title: '首页',
           requireAuth: true,
