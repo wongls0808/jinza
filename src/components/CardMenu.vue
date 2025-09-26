@@ -12,7 +12,12 @@
         :data-index="index"
         class="menu-card" 
         :class="{ 'menu-card-active': currentPath === menu.path }"
+        role="button"
+        :tabindex="menu.path ? 0 : -1"
+        :aria-label="`打开 ${menu.title}`"
         @click="navigateTo(menu)"
+        @keydown.enter.prevent="navigateTo(menu)"
+        @keydown.space.prevent="navigateTo(menu)"
       >
         <div class="menu-icon" :style="{ background: getMenuGradient(menu.id) }">
           <el-icon :size="24"><component :is="menu.icon || 'Menu'" /></el-icon>
@@ -111,6 +116,12 @@ const navigateTo = (menu: MenuItem) => {
   overflow: hidden;
   min-height: 110px;
   border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.menu-card:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.12);
+  transform: translateY(-6px);
 }
 
 .menu-card::before {

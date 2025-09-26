@@ -40,7 +40,12 @@
     <!-- 卡片式菜单 -->
     <div class="menu-section">
       <h2 class="section-title">功能菜单</h2>
-      <card-menu :menus="menuItems" />
+      <div v-if="isMenuLoading">
+        <el-skeleton :rows="2" animated />
+      </div>
+      <div v-else>
+        <card-menu :menus="menuItems" />
+      </div>
     </div>
 
     <!-- 数据图表区域 -->
@@ -109,7 +114,7 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useMenuStore } from '@/stores/menu';
 import CardMenu from '@/components/CardMenu.vue';
-import * as echarts from 'echarts';
+let echarts: typeof import('echarts') | null = null;
 import type { MenuItem } from '@/types/menu';
 
 const router = useRouter();
@@ -119,30 +124,26 @@ const menuStore = useMenuStore();
 // 用户信息
 const username = computed(() => userStore.user?.nickname || userStore.user?.username || '用户');
 
-// 菜单项
-const menuItems = ref<MenuItem[]>([]);
+// 菜单项（直接响应 store）
+const menuItems = computed(() => {
+  const sysMenus = menuStore.filteredMenuItems || [];
+  return sysMenus.map(menu => ({
+    ...menu,
+    description: getMenuDescription(menu.id),
+    badge: menu.id === 'system' ? 'NEW' : menu.badge,
+    badgeType: menu.id === 'system' ? 'success' : menu.badgeType
+  } as MenuItem));
+});
 
-// 加载菜单数据
-const loadMenuItems = () => {
-  // 获取系统菜单并转换为卡片格式
-  const sysMenus = menuStore.filteredMenuItems;
-  
-  // 添加额外信息到菜单项，使其适应卡片式展示
-  menuItems.value = sysMenus.map(menu => {
-    // 为菜单项添加描述、badge等信息
-    const result: MenuItem = { 
-      ...menu,
-      description: getMenuDescription(menu.id),
-    };
-    
-    // 添加角标信息（示例）
-    if (menu.id === 'system') {
-      result.badge = 'NEW';
-      result.badgeType = 'success';
-    }
-    
-    return result;
-  });
+// 菜单加载状态（调用 store 接口）
+const isMenuLoading = ref(true);
+const fetchMenus = async () => {
+  try {
+    isMenuLoading.value = true;
+    await menuStore.fetchMenuFromServer();
+  } finally {
+    isMenuLoading.value = false;
+  }
 };
 
 // 菜单描述 - 实际应用中这些描述可能来自配置或API
@@ -233,8 +234,10 @@ const getPriorityType = (priority: string) => {
 const initBusinessChart = () => {
   const chartElement = document.getElementById('businessChart');
   if (!chartElement) return;
+  if (!echarts) return;
   
-  businessChartInstance = echarts.init(chartElement);
+  // 使用懒加载的 echarts 实例
+  businessChartInstance = (echarts as any).init(chartElement);
   
   const option = {
     tooltip: {
@@ -307,7 +310,9 @@ const initBusinessChart = () => {
     ]
   };
   
-  businessChartInstance.setOption(option);
+  if (businessChartInstance) {
+    businessChartInstance.setOption(option);
+  }
 };
 
 // 处理窗口大小变化
@@ -319,16 +324,19 @@ const handleResize = () => {
 
 // 生命周期钩子
 onMounted(() => {
-  // 加载菜单
-  loadMenuItems();
+  // 加载菜单（从 store 拉取）
+  fetchMenus();
   
   // 更新时间
   timeInterval.value = window.setInterval(() => {
     currentTime.value = new Date().toLocaleTimeString('zh-CN');
   }, 1000);
   
-  // 初始化图表
-  setTimeout(() => {
+  // 懒加载 ECharts 并初始化图表，减小首页首屏体积
+  setTimeout(async () => {
+    if (!echarts) {
+      echarts = await import('echarts');
+    }
     initBusinessChart();
   }, 300);
   
