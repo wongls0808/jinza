@@ -5,8 +5,8 @@ services:
     name: jinza-backend
     env: node
     rootDirectory: server
-    buildCommand: npm install
-    startCommand: node index.js
+    buildCommand: npm ci
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: JWT_SECRET
