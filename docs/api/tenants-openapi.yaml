@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: Jinza Tenants API
+  version: 1.0.0
+  description: API for managing Tenants (账套) and file uploads for tenant assets and templates.
+servers:
+  - url: https://api.example.com
+    description: Production server
+paths:
+  /tenants:
+    get:
+      summary: Get list of tenants
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tenant'
+    post:
+      summary: Create a tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  message:
+                    type: string
+  /tenants/{tenantId}:
+    parameters:
+      - in: path
+        name: tenantId
+        required: true
+        schema:
+          type: string
+    put:
+      summary: Update tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantUpdate'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete tenant
+      responses:
+        '200':
+          description: Deleted
+  /uploads:
+    post:
+      summary: Upload file (PNG)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                  type:
+                    type: string
+components:
+  schemas:
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        codeFormat:
+          type: string
+        fileData:
+          type: string
+          description: dataURL or fileUrl
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        registerNo:
+          type: string
+        taxNo:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        logoData:
+          type: string
+        sealData:
+          type: string
+        signatureData:
+          type: string
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+    TenantCreate:
+      type: object
+      required:
+        - name
+        - code
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        registerNo:
+          type: string
+        taxNo:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        logoData:
+          type: string
+        sealData:
+          type: string
+        signatureData:
+          type: string
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+    TenantUpdate:
+      allOf:
+        - $ref: '#/components/schemas/TenantCreate'
+        - type: object
+          properties:
+            id:
+              type: string
+security: []
