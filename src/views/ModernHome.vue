@@ -51,17 +51,6 @@
     return items as MenuItem[];
   });
 
-  // 菜单加载状态
-  const isMenuLoading = ref(true);
-  const fetchMenus = async () => {
-    try {
-      isMenuLoading.value = true;
-      await menuStore.fetchMenuFromServer();
-    } finally {
-      isMenuLoading.value = false;
-    }
-  };
-
   // 时间相关
   const currentDate = ref(new Date().toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -110,7 +99,7 @@
   };
 
   onMounted(() => {
-    fetchMenus();
+    // menuStore is simplified and menu items are static for now
     timeInterval.value = window.setInterval(() => {
       currentTime.value = new Date().toLocaleTimeString('zh-CN');
     }, 1000);
