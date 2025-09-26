@@ -4,13 +4,25 @@ import type { RouteRecordRaw } from 'vue-router';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/test'
+    redirect: '/home'
+  },
+  {
+    path: '/home',
+    name: 'ModernHome',
+    component: () => import('@/views/ModernHome.vue'),
+    meta: { title: '首页', requireAuth: false }
   },
   {
     path: '/test',
     name: 'TestPing',
     component: () => import('@/views/TestPing.vue'),
     meta: { title: '后端连通性测试', requireAuth: false }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/views/settings/Index.vue'),
+    meta: { title: '系统设置', requireAuth: false }
   },
   {
     path: '/:pathMatch(.*)*',
