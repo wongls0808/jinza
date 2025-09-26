@@ -7,7 +7,11 @@ const userStore = useUserStore();
 onMounted(async () => {
   // 初始化时检查用户登录状态
   if (userStore.token) {
-    await userStore.fetchUserInfo();
+    try {
+      await userStore.getUserInfoAction();
+    } catch (error) {
+      console.error('获取用户信息失败', error);
+    }
   }
 });
 </script>

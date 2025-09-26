@@ -1,18 +1,9 @@
 import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
 import router from '@/router';
+import { useUserStore } from './user';
 import type { RouteRecordRaw } from 'vue-router';
-
-interface MenuItem {
-  id: string;
-  title: string;
-  path?: string;
-  icon?: string;
-  children?: MenuItem[];
-}
-
-interface MenuState {
-  menuItems: MenuItem[];
-}
+import type { MenuItem } from '@/types/menu';
 
 // 从路由生成菜单数据
 function generateMenuFromRoutes(routes: RouteRecordRaw[], basePath: string = '', baseId: string = '') {
@@ -50,46 +41,100 @@ function generateMenuFromRoutes(routes: RouteRecordRaw[], basePath: string = '',
   return result;
 }
 
-export const useMenuStore = defineStore('menu', {
-  state: (): MenuState => ({
-    menuItems: [
+// 系统管理菜单 - 仅管理员可见
+const systemManagementMenus: MenuItem[] = [
+  {
+    id: 'system',
+    title: '系统管理',
+    icon: 'Setting',
+    children: [
       {
-        id: '1',
-        title: '首页',
-        path: '/dashboard',
-        icon: 'HomeFilled'
+        id: 'system-user',
+        title: '用户管理',
+        path: '/system/user',
+        icon: 'User'
+      },
+      {
+        id: 'system-role',
+        title: '角色管理',
+        path: '/system/role',
+        icon: 'UserFilled'
+      },
+      {
+        id: 'system-menu',
+        title: '菜单管理',
+        path: '/system/menu',
+        icon: 'Menu'
+      },
+      {
+        id: 'system-tenant',
+        title: '账套管理',
+        path: '/system/tenant',
+        icon: 'Office'
       }
     ]
-  }),
-  
-  getters: {
-    getMenuItems: (state): MenuItem[] => state.menuItems
-  },
-  
-  actions: {
-    generateMenuFromRoutes() {
-      // 从路由配置生成菜单
-      const dashboardRoute = router.getRoutes().find(route => route.name === 'Dashboard');
-      if (dashboardRoute && dashboardRoute.children) {
-        this.menuItems = generateMenuFromRoutes(dashboardRoute.children);
-      }
-    },
-    
-    filterMenuByRole(role: string) {
-      // 这里应该根据角色过滤菜单项
-      // 实际应用中，这里会根据用户角色来过滤可见的菜单
-      return this.menuItems;
-    },
-    
-    async fetchMenuFromServer() {
-      // 实际应用中，这里应该从服务器获取菜单数据
-      return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          // 保持现有菜单不变，实际应用中这里会更新菜单
-          this.generateMenuFromRoutes();
-          resolve();
-        }, 300);
-      });
-    }
   }
+];
+
+export const useMenuStore = defineStore('menu', () => {
+  const userStore = useUserStore();
+  
+  // 菜单项
+  const menuItems = ref<MenuItem[]>([
+    {
+      id: '1',
+      title: '首页',
+      path: '/dashboard',
+      icon: 'HomeFilled'
+    }
+  ]);
+  
+  // 根据权限过滤的菜单
+  const filteredMenuItems = computed(() => {
+    // 基本菜单
+    let menus = [...menuItems.value];
+    
+    // 如果是管理员，添加系统管理菜单
+    if (userStore.hasRole('admin')) {
+      menus = [...menus, ...systemManagementMenus];
+    }
+    
+    return menus;
+  });
+  
+  // 从路由生成菜单
+  const generateMenusFromRoutes = () => {
+    // 从路由配置生成菜单
+    const dashboardRoute = router.getRoutes().find(route => route.name === 'Dashboard');
+    if (dashboardRoute && dashboardRoute.children) {
+      menuItems.value = generateMenuFromRoutes(dashboardRoute.children);
+    }
+  };
+  
+  // 根据权限过滤菜单
+  const filterMenuByPermissions = () => {
+    // 实际项目中，这里会基于用户权限来过滤菜单
+    // 目前简化处理，通过角色来过滤
+    return filteredMenuItems.value;
+  };
+  
+  // 从服务器获取菜单数据
+  const fetchMenuFromServer = async () => {
+    // 实际应用中，这里应该从服务器获取菜单数据
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        // 保持现有菜单不变，实际应用中这里会更新菜单
+        generateMenusFromRoutes();
+        resolve();
+      }, 300);
+    });
+  };
+  
+  return {
+    menuItems,
+    filteredMenuItems,
+    generateMenuFromRoutes: generateMenusFromRoutes,
+    filterMenuByPermissions,
+    fetchMenuFromServer
+  };
 });
