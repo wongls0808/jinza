@@ -327,6 +327,7 @@ import { get, post, put, del } from '@/utils/request';
 import service from '@/utils/request';
 import { ElMessage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
+import imageCompression from 'browser-image-compression';
 
 interface TemplateItem {
   id: string;
@@ -510,6 +511,27 @@ const removeTenant = async (row: Tenant) => {
   }
 };
 
+// 压缩图片函数
+const compressImage = async (file: File): Promise<File> => {
+  console.log('开始压缩图片，原始大小:', file.size / 1024, 'KB');
+  
+  const options = {
+    maxSizeMB: 0.5,              // 最大文件大小，超过则压缩
+    maxWidthOrHeight: 800,       // 最大宽度/高度
+    useWebWorker: true,          // 使用Web Worker提高性能
+    preserveExif: false          // 不保留EXIF数据，进一步减小体积
+  };
+
+  try {
+    const compressedFile = await imageCompression(file, options);
+    console.log('压缩后大小:', compressedFile.size / 1024, 'KB');
+    return compressedFile;
+  } catch (error) {
+    console.error('图片压缩失败:', error);
+    return file; // 压缩失败时返回原始文件
+  }
+};
+
 // 使用 El-Upload 组件处理文件上传
 const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'signature') => {
   if (!file || !file.raw) return;
@@ -521,11 +543,15 @@ const handleFileUpload = async (file: UploadFile, field: 'logo' | 'seal' | 'sign
   }
 
   // 尝试上传到后端（/api/tenants/uploads）
-  ElMessage.info('正在上传图片，请稍候...');
+  ElMessage.info('正在处理图片，请稍候...');
   try {
+    // 压缩图片
+    const compressedFile = await compressImage(rawFile);
+    
     const form = new FormData();
-    form.append('file', rawFile);
-    console.log(`上传图片: ${field}`, rawFile);
+    form.append('file', compressedFile);
+    console.log(`上传图片: ${field}, 大小: ${compressedFile.size / 1024} KB`);
+    
     const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     // 服务端返回结构：{ code:200, message:'上传成功', data: { url, mimetype } }
     console.log('上传图片响应:', res);
@@ -572,6 +598,10 @@ const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('文件过大，系统将自动压缩图片');
+  }
+  
   // 创建符合UploadFile类型的对象
   const uploadFile: UploadFile = {
     name: file.name,
@@ -612,11 +642,14 @@ const onTemplateFileChange = async (uploadFile: UploadFile) => {
     return;
   }
 
-  ElMessage.info('正在上传模板文件，请稍候...');
+  ElMessage.info('正在处理模板文件，请稍候...');
   try {
+    // 压缩模板文件
+    const compressedFile = await compressImage(file);
+    
     const form = new FormData();
-    form.append('file', file);
-    console.log('上传模板文件:', file);
+    form.append('file', compressedFile);
+    console.log('上传模板文件, 大小:', compressedFile.size / 1024, 'KB');
     const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     console.log('上传模板响应:', res);
     

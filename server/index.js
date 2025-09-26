@@ -13,8 +13,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 // 中间件
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));  // 增加JSON请求体大小限制
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));  // 增加URL编码请求体大小限制
 
 // 鉴权中间件
 const authenticateToken = (req, res, next) => {
