@@ -368,8 +368,16 @@ const tenants = ref<Tenant[]>([]);
 // Load tenants from backend on mount
 const loadTenants = async () => {
   try {
-    const res = await get<Tenant[]>('/api/tenants');
-    tenants.value = Array.isArray(res) ? res : [];
+    const res = await get<Tenant[] | { code: number; message: string; data: Tenant[] }>('/api/tenants');
+    if (Array.isArray(res)) {
+      tenants.value = res;
+    } else if (res && Array.isArray(res.data)) {
+      tenants.value = res.data;
+    } else {
+      console.warn('接口返回的数据格式不符合预期', res);
+      tenants.value = [];
+    }
+    console.log('加载账套完成', tenants.value);
   } catch (e) {
     console.error('加载账套失败', e);
     tenants.value = [];
@@ -444,11 +452,16 @@ const submitTenant = async () => {
       const payload = { ...editModel.value };
       // If id exists on server, call PUT, otherwise POST
       const exists = tenants.value.find(t => t.id === editModel.value.id);
+      
+      ElMessage.info('正在保存数据，请稍候...');
+      
       if (exists) {
+        console.log(`更新账套信息: ${payload.id}`, payload);
         await put(`/api/tenants/${editModel.value.id}`, payload);
         // refresh local list
         await loadTenants();
       } else {
+        console.log('创建新账套', payload);
         await post('/api/tenants', payload);
         await loadTenants();
       }
@@ -456,6 +469,10 @@ const submitTenant = async () => {
       ElMessage.success('保存成功');
     } catch (err: any) {
       console.error('保存账套失败', err);
+      // 显示具体的错误信息以便调试
+      const errorMsg = err?.response?.data?.message || err?.message || '未知错误';
+      console.error('错误详情:', errorMsg, err?.response?.data);
+      
       // If backend endpoint not implemented (404) or network error, fallback to local save
       const status = err?.response?.status;
       if (status === 404 || err?.message?.includes('404') || err?.message?.includes('Not Found')) {
@@ -469,7 +486,7 @@ const submitTenant = async () => {
         editDialogVisible.value = false;
         ElMessage.warning('后端接口未实现，已在本地保存显示（请在后端实现 /tenants 接口以持久化数据）');
       } else {
-        ElMessage.error('保存失败，请稍后重试');
+        ElMessage.error(`保存失败: ${errorMsg}`);
       }
     }
   });

@@ -39,7 +39,7 @@ service.interceptors.response.use(
     const res = response.data;
     
     // 根据自定义错误码判断请求是否成功
-    if (res.code && res.code !== 0 && res.code !== 200) {
+    if (res.code && res.code !== 0 && res.code !== 200 && res.code !== 201) {
       // 处理错误情况
       ElMessage.error(res.message || '服务器错误');
       
@@ -52,8 +52,12 @@ service.interceptors.response.use(
       
       return Promise.reject(new Error(res.message || '服务器错误'));
     } else {
-      // 请求成功
-      return res;
+      // 请求成功 - 支持code=200/201等成功码
+      if (res.data !== undefined) {
+        return res.data; // 直接返回data部分，简化调用
+      } else {
+        return res; // 兼容旧代码，如果没有data字段则返回整个响应
+      }
     }
   },
   (error: AxiosError) => {
