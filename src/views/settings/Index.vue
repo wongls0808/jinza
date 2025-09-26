@@ -1,13 +1,6 @@
 <template>
   <div class="settings-page">
     <div class="settings-container">
-        <aside class="settings-aside">
-          <el-menu default-active="users" class="el-menu-vertical" router>
-            <el-menu-item index="/settings/users" @click="go('/settings/users')">用户管理</el-menu-item>
-            <el-menu-item index="/settings/tenants" @click="go('/settings/tenants')">账套配置</el-menu-item>
-          </el-menu>
-        </aside>
-
         <section class="settings-main">
           <router-view />
         </section>

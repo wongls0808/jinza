@@ -19,24 +19,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '后端连通性测试', requireAuth: false }
   },
   {
-    path: '/settings',
-    name: 'Settings',
-    component: () => import('@/views/settings/Index.vue'),
-    meta: { title: '系统设置', requireAuth: false },
-    children: [
-      {
-        path: 'users',
-        name: 'SettingsUsers',
-        component: () => import('@/views/settings/Users.vue'),
-        meta: { title: '用户管理', requireAuth: false }
-      },
-      {
-        path: 'tenants',
-        name: 'SettingsTenants',
-        component: () => import('@/views/settings/Tenants.vue'),
-        meta: { title: '账套配置', requireAuth: false }
-      }
-    ]
+    path: '/settings/users',
+    name: 'SettingsUsers',
+    component: () => import('@/views/settings/Users.vue'),
+    meta: { title: '用户管理', requireAuth: false }
+  },
+  {
+    path: '/settings/tenants',
+    name: 'SettingsTenants',
+    component: () => import('@/views/settings/Tenants.vue'),
+    meta: { title: '账套配置', requireAuth: false }
   },
   {
     path: '/:pathMatch(.*)*',

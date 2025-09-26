@@ -614,8 +614,17 @@ const saveTemplate = () => {
 </script>
 
 <style scoped>
-.settings-tenants { padding: 12px; }
-.ops-area { display:flex; align-items:center }
+.settings-tenants { 
+  padding: 20px; 
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.ops-area { 
+  display: flex; 
+  align-items: center;
+  gap: 10px;
+}
 .list-area { margin-top: 6px }
 
 /* 图片上传样式 */
