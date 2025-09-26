@@ -3,12 +3,12 @@ import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axio
 import { ElMessage } from 'element-plus';
 
 // 创建axios实例
-const baseURL = import.meta.env.VITE_API_BASE_URL as string;
+const rawBaseURL = (import.meta.env.VITE_API_BASE_URL as string) || '';
 // 确保baseURL末尾没有/，以便后面可以正确拼接路径
-const normalizedBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+const normalizedBaseURL = rawBaseURL ? (rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL) : '';
 
 const service = axios.create({
-  baseURL: normalizedBaseURL, // API的基础URL
+  baseURL: normalizedBaseURL || undefined, // API的基础URL（为空时使用相对路径）
   timeout: 15000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json;charset=UTF-8'
@@ -90,6 +90,8 @@ service.interceptors.response.use(
 
 // 确保URL以/api开头
 const ensureApiPrefix = (url: string): string => {
+  // 如果配置了绝对 baseURL（例如 https://...），则不强制加 /api 前缀
+  if (normalizedBaseURL) return url.startsWith('/') ? url : `/${url}`;
   return url.startsWith('/api') ? url : `/api${url}`;
 };
 

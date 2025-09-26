@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { get, post, put, del } from '@/utils/request';
 import type { LoginForm, LoginResponse, User, Role, Permission, Tenant } from '@/types/system';
 
 // Simple switch: if VITE_API_BASE_URL is set, use real HTTP calls, otherwise use mock implementations
@@ -29,8 +30,7 @@ const mockPermissions: Permission[] = [
 // ---- API wrappers ----
 export const login = async (form: LoginForm): Promise<LoginResponse> => {
 	if (!useMock) {
-		const res = await axios.post(`${API_BASE}/login`, form);
-		return res.data;
+		return post<LoginResponse>('/login', form);
 	}
 
 	await delay(800);
@@ -49,8 +49,7 @@ export const login = async (form: LoginForm): Promise<LoginResponse> => {
 
 export const getUserInfo = async (token: string): Promise<LoginResponse> => {
 	if (!useMock) {
-		const res = await axios.get(`${API_BASE}/me`, { headers: { Authorization: token } });
-		return res.data;
+		return get<LoginResponse>('/me');
 	}
 	await delay(300);
 	if (!token) throw new Error('无效的token');
@@ -73,18 +72,18 @@ export const getUserInfo = async (token: string): Promise<LoginResponse> => {
 };
 
 export const logout = async () => {
-	if (!useMock) return axios.post(`${API_BASE}/logout`);
+	if (!useMock) return post('/logout');
 	await delay(200);
 };
 
 export const switchTenant = async (tenantId: number) => {
-	if (!useMock) return axios.post(`${API_BASE}/tenant/switch`, { tenantId });
+	if (!useMock) return post('/tenant/switch', { tenantId });
 	await delay(200);
 };
 
 // User CRUD
 export const fetchUsers = async (query?: any) => {
-	if (!useMock) return axios.get(`${API_BASE}/users`, { params: query }).then(r => r.data);
+	if (!useMock) return get('/users', query);
 	await delay(200);
 	let list = mockUsers.slice();
 	if (query?.keyword) list = list.filter(u => (u.username || '').includes(query.keyword));
@@ -92,13 +91,13 @@ export const fetchUsers = async (query?: any) => {
 };
 
 export const getUserById = async (id: number) => {
-	if (!useMock) return axios.get(`${API_BASE}/users/${id}`).then(r => r.data);
+	if (!useMock) return get(`/users/${id}`);
 	await delay(150);
 	return mockUsers.find(u => Number(u.id) === Number(id)) || null;
 };
 
 export const createUser = async (payload: Partial<User>) => {
-	if (!useMock) return axios.post(`${API_BASE}/users`, payload).then(r => r.data);
+	if (!useMock) return post('/users', payload);
 	await delay(200);
 	const maxId = mockUsers.reduce((m, u) => Math.max(m, Number(u.id || 0)), 0);
 	const newUser = { id: maxId + 1, username: payload.username || `user${maxId+1}`, nickname: payload.nickname || '', status: payload.status ?? 1, roles: payload.roles || [], tenants: payload.tenants || [], currentTenant: payload.currentTenant || null } as User;
@@ -107,7 +106,7 @@ export const createUser = async (payload: Partial<User>) => {
 };
 
 export const updateUser = async (id: number, payload: Partial<User>) => {
-	if (!useMock) return axios.put(`${API_BASE}/users/${id}`, payload).then(r => r.data);
+	if (!useMock) return put(`/users/${id}`, payload);
 	await delay(200);
 	const idx = mockUsers.findIndex(u => Number(u.id) === Number(id));
 	if (idx === -1) throw new Error('用户不存在');
@@ -116,7 +115,7 @@ export const updateUser = async (id: number, payload: Partial<User>) => {
 };
 
 export const deleteUser = async (id: number) => {
-	if (!useMock) return axios.delete(`${API_BASE}/users/${id}`).then(r => r.data);
+	if (!useMock) return del(`/users/${id}`);
 	await delay(150);
 	const idx = mockUsers.findIndex(u => Number(u.id) === Number(id));
 	if (idx === -1) throw new Error('用户不存在');
@@ -126,19 +125,19 @@ export const deleteUser = async (id: number) => {
 
 // Roles & Permissions
 export const fetchRoles = async () => {
-	if (!useMock) return axios.get(`${API_BASE}/roles`).then(r => r.data);
+	if (!useMock) return get('/roles');
 	await delay(150);
 	return mockRoles.slice();
 };
 
 export const fetchPermissions = async () => {
-	if (!useMock) return axios.get(`${API_BASE}/permissions`).then(r => r.data);
+	if (!useMock) return get('/permissions');
 	await delay(120);
 	return mockPermissions.slice();
 };
 
 export const assignRolesToUser = async (userId: number, roleIds: number[]) => {
-	if (!useMock) return axios.post(`${API_BASE}/users/${userId}/roles`, { roleIds }).then(r => r.data);
+	if (!useMock) return post(`/users/${userId}/roles`, { roleIds });
 	await delay(200);
 		const idx = mockUsers.findIndex(u => Number(u.id) === Number(userId));
 		if (idx === -1) throw new Error('用户不存在');
