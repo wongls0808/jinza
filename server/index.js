@@ -167,6 +167,14 @@ app.get('/api/categories', (req, res) => {
   });
 });
 
+// 导入API路由 (包含tenant、uploads等路由)
+const apiRoutes = require('./routes/api.routes');
+app.use('/api', apiRoutes);
+
+// 静态文件服务 - 配置uploads目录为静态资源
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // 服务启动
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
