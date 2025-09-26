@@ -159,14 +159,31 @@
           <el-tab-pane label="打印模板">
             <el-form-item label="打印模板管理">
               <div>
-                <el-button type="primary" @click="openAddTemplate">新增模板</el-button>
+                <el-button type="primary" @click="openAddTemplate">新增打印模板</el-button>
                 <el-table :data="editModel.templates" style="width:100%; margin-top:16px;" size="small">
                   <el-table-column prop="name" label="模板名称" />
-                  <el-table-column prop="codeFormat" label="发票编码格式" />
                   <el-table-column label="操作" width="150">
                     <template #default="{ row }">
                       <el-button type="primary" link @click="editTemplate(row)">编辑</el-button>
                       <el-button type="danger" link @click="removeTemplate(row)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-form-item>
+          </el-tab-pane>
+
+          <el-tab-pane label="发票编码格式">
+            <el-form-item label="编码格式管理">
+              <div>
+                <el-button type="primary" @click="openAddCodeFormat">新增编码格式</el-button>
+                <el-table :data="editModel.codeFormats" style="width:100%; margin-top:16px;" size="small">
+                  <el-table-column prop="name" label="格式名称" />
+                  <el-table-column prop="format" label="编码格式" />
+                  <el-table-column label="操作" width="150">
+                    <template #default="{ row }">
+                      <el-button type="primary" link @click="editCodeFormat(row)">编辑</el-button>
+                      <el-button type="danger" link @click="removeCodeFormat(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -182,23 +199,11 @@
       </template>
     </el-dialog>
 
-    <!-- 模板新增/编辑对话框 -->
-    <el-dialog v-model="templateDialogVisible" title="模板设置" width="600px">
+    <!-- 打印模板新增/编辑对话框 -->
+    <el-dialog v-model="templateDialogVisible" title="打印模板设置" width="600px">
       <el-form :model="currentTemplate" label-width="120px">
         <el-form-item label="模板名称">
           <el-input v-model="currentTemplate.name" />
-        </el-form-item>
-        <el-form-item label="发票编码格式">
-          <el-input v-model="currentTemplate.codeFormat" placeholder="例如：INV-{YYYY}{MM}-{SEQ:4}" />
-          <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
-            <el-button @click="generatePreview">生成示例编码</el-button>
-            <div style="font-size:13px; color:#666;">
-              示例：<span style="font-weight:500">{{ currentTemplatePreview }}</span>
-            </div>
-          </div>
-          <div style="margin-top:8px; font-size:12px; color:#909399;">
-            支持的占位符：{YYYY}年份, {MM}月份, {DD}日期, {SEQ:n}序号(n位数)
-          </div>
         </el-form-item>
         <el-form-item label="模板文件 (PNG)">
           <el-upload
@@ -220,6 +225,31 @@
       <template #footer>
         <el-button @click="templateDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="saveTemplate">保存模板</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 发票编码格式新增/编辑对话框 -->
+    <el-dialog v-model="codeFormatDialogVisible" title="发票编码格式设置" width="600px">
+      <el-form :model="currentCodeFormat" label-width="120px">
+        <el-form-item label="格式名称">
+          <el-input v-model="currentCodeFormat.name" />
+        </el-form-item>
+        <el-form-item label="编码格式">
+          <el-input v-model="currentCodeFormat.format" placeholder="例如：INV-{YYYY}{MM}-{SEQ:4}" />
+          <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
+            <el-button @click="generateCodeFormatPreview">生成示例编码</el-button>
+            <div style="font-size:13px; color:#666;">
+              示例：<span style="font-weight:500">{{ currentCodeFormatPreview }}</span>
+            </div>
+          </div>
+          <div style="margin-top:8px; font-size:12px; color:#909399;">
+            支持的占位符：{YYYY}年份, {MM}月份, {DD}日期, {SEQ:n}序号(n位数)
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="codeFormatDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveCodeFormat">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -350,8 +380,13 @@ import imageCompression from 'browser-image-compression';
 interface TemplateItem {
   id: string;
   name: string;
-  codeFormat?: string;
   fileData?: string | null; // dataURL
+}
+
+interface CodeFormatItem {
+  id: string;
+  name: string;
+  format: string;
 }
 
 // 定义上传文件类型接口
@@ -378,6 +413,7 @@ interface Tenant {
   sealData?: string | null;
   signatureData?: string | null;
   templates?: TemplateItem[];
+  codeFormats?: CodeFormatItem[];
 }
 
 const router = useRouter();
@@ -412,8 +448,11 @@ const editModel = ref<Tenant>({ id: '', name: '' });
 const tenantFormRef = ref();
 
 const templateDialogVisible = ref(false);
-const currentTemplate = ref<TemplateItem>({ id: '', name: '', codeFormat: '', fileData: null });
-const currentTemplatePreview = ref<string>('');
+const currentTemplate = ref<TemplateItem>({ id: '', name: '', fileData: null });
+
+const codeFormatDialogVisible = ref(false);
+const currentCodeFormat = ref<CodeFormatItem>({ id: '', name: '', format: '' });
+const currentCodeFormatPreview = ref<string>('');
 
 /**
  * 生成编码预览，支持占位符：{YYYY},{MM},{DD},{SEQ:n}
@@ -438,11 +477,11 @@ const formatInvoiceCode = (format: string, seq = 1) => {
   return out;
 };
 
-const generatePreview = () => {
+const generateCodeFormatPreview = () => {
   try {
-    currentTemplatePreview.value = formatInvoiceCode(currentTemplate.value.codeFormat || '', 1);
+    currentCodeFormatPreview.value = formatInvoiceCode(currentCodeFormat.value.format || '', 1);
   } catch (e) {
-    currentTemplatePreview.value = '';
+    currentCodeFormatPreview.value = '';
   }
 };
 
@@ -452,7 +491,12 @@ const rules = {
 };
 
 const addTenant = () => {
-  editModel.value = { id: `t${Date.now()}`, name: '', templates: [] } as Tenant;
+  editModel.value = { 
+    id: `t${Date.now()}`, 
+    name: '', 
+    templates: [], 
+    codeFormats: [] 
+  } as Tenant;
   editDialogVisible.value = true;
 };
 
@@ -641,25 +685,40 @@ const goHome = () => {
   router.push('/');
 };
 
-// 模板管理
+// 打印模板管理
 const openAddTemplate = () => {
-  currentTemplate.value = { id: `tpl${Date.now()}`, name: '', codeFormat: '', fileData: null };
+  currentTemplate.value = { id: `tpl${Date.now()}`, name: '', fileData: null };
   templateDialogVisible.value = true;
 };
 
 const editTemplate = (tpl: TemplateItem) => {
   // 深拷贝，确保编辑不直接影响原对象
   currentTemplate.value = JSON.parse(JSON.stringify(tpl));
-  // 确保每次编辑时有正确的预览
-  if (currentTemplate.value.codeFormat) {
-    generatePreview();
-  }
   templateDialogVisible.value = true;
 };
 
 const removeTemplate = (tpl: TemplateItem) => {
   if (!editModel.value.templates) return;
   editModel.value.templates = editModel.value.templates.filter(t => t.id !== tpl.id);
+};
+
+// 发票编码格式管理
+const openAddCodeFormat = () => {
+  currentCodeFormat.value = { id: `fmt${Date.now()}`, name: '', format: '' };
+  codeFormatDialogVisible.value = true;
+};
+
+const editCodeFormat = (fmt: CodeFormatItem) => {
+  // 深拷贝，确保编辑不直接影响原对象
+  currentCodeFormat.value = JSON.parse(JSON.stringify(fmt));
+  // 生成示例预览
+  generateCodeFormatPreview();
+  codeFormatDialogVisible.value = true;
+};
+
+const removeCodeFormat = (fmt: CodeFormatItem) => {
+  if (!editModel.value.codeFormats) return;
+  editModel.value.codeFormats = editModel.value.codeFormats.filter(f => f.id !== fmt.id);
 };
 
 const onTemplateFileChange = async (uploadFile: UploadFile) => {
@@ -732,11 +791,41 @@ const saveTemplate = () => {
     }
     
     templateDialogVisible.value = false;
-    ElMessage.success('模板保存成功');
-    console.log('当前模板列表:', editModel.value.templates);
+    ElMessage.success('打印模板保存成功');
+    console.log('当前打印模板列表:', editModel.value.templates);
   } catch (error) {
-    console.error('保存模板出错:', error);
-    ElMessage.error('保存模板失败，请重试');
+    console.error('保存打印模板出错:', error);
+    ElMessage.error('保存打印模板失败，请重试');
+  }
+};
+
+const saveCodeFormat = () => {
+  try {
+    if (!currentCodeFormat.value.name) {
+      ElMessage.warning('请输入格式名称');
+      return;
+    }
+    
+    if (!currentCodeFormat.value.format) {
+      ElMessage.warning('请输入编码格式');
+      return;
+    }
+    
+    if (!editModel.value.codeFormats) editModel.value.codeFormats = [];
+    
+    const idx = editModel.value.codeFormats.findIndex(f => f.id === currentCodeFormat.value.id);
+    if (idx >= 0) {
+      editModel.value.codeFormats[idx] = { ...currentCodeFormat.value } as CodeFormatItem;
+    } else {
+      editModel.value.codeFormats.push({ ...currentCodeFormat.value } as CodeFormatItem);
+    }
+    
+    codeFormatDialogVisible.value = false;
+    ElMessage.success('编码格式保存成功');
+    console.log('当前编码格式列表:', editModel.value.codeFormats);
+  } catch (error) {
+    console.error('保存编码格式出错:', error);
+    ElMessage.error('保存编码格式失败，请重试');
   }
 };
 </script>
