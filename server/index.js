@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -172,8 +174,35 @@ const apiRoutes = require('./routes/api.routes');
 app.use('/api', apiRoutes);
 
 // 静态文件服务 - 配置uploads目录为静态资源
-const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+try {
+  const uploadDir = path.join(__dirname, 'uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadDir));
+} catch (err) {
+  console.error('配置静态文件服务失败:', err);
+}
+
+// 404处理
+app.use((req, res, next) => {
+  res.status(404).json({
+    code: 404,
+    message: '请求的资源不存在',
+    data: null
+  });
+});
+
+// 错误处理中间件
+app.use((err, req, res, next) => {
+  console.error('应用错误:', err);
+  
+  res.status(err.status || 500).json({
+    code: err.status || 500,
+    message: err.message || '服务器内部错误',
+    data: null
+  });
+});
 
 // 服务启动
 app.listen(PORT, () => {

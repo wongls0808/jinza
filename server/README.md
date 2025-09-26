@@ -19,7 +19,17 @@ yarn install
 
 2. 配置环境变量:
 
-复制 `.env.example` 到 `.env` 并配置必要的变量。
+复制 `.env.example` 到 `.env` 并配置必要的变量:
+
+```
+# 基本配置
+PORT=8080
+NODE_ENV=development
+JWT_SECRET=your_jwt_secret
+
+# 日志配置
+LOG_LEVEL=info
+```
 
 3. 启动服务器:
 
@@ -36,6 +46,22 @@ npm run dev
 # 或
 yarn dev
 ```
+
+## 部署到 Render
+
+此项目配置为在 Render.com 上部署:
+
+1. 使用仓库根目录的 `render.yaml` 文件自动部署
+2. 服务配置:
+   - 根目录: `server`
+   - 构建命令: `npm install`
+   - 启动命令: `npm start`
+   - 健康检查路径: `/api/health`
+
+如遇部署失败:
+- 检查 Render 日志详细错误信息
+- 确认 `package.json` 中包含所有必要依赖
+- 验证 `engines` 字段中的 Node.js 版本兼容
 
 ## API 文档
 
