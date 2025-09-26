@@ -31,6 +31,10 @@ router.post('/auth/reset-password', authController.resetPassword);
 // 系统公开配置
 router.get('/config/public', configController.getConfig);
 
+// Tenants & Uploads (public for development/testing)
+const tenantsRoutes = require('./tenants.routes');
+router.use('/tenants', tenantsRoutes);
+
 // ===========================
 // 以下接口需要身份验证
 // ===========================
