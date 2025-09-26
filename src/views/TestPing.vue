@@ -1,10 +1,10 @@
 <template>
   <div style="padding:40px; max-width:800px; margin:0 auto; text-align:center">
     <h1>后端连通性测试</h1>
-    <p>尝试不同方法（GET/POST）与路径（/ping 或 /api/ping），并显示完整错误信息以便诊断。</p>
+    <p>尝试不同方法（GET/POST）与路径（/health），并显示完整错误信息以便诊断。</p>
     <div style="margin-bottom:12px">
-      <el-button type="primary" @click="pingGet" :loading="loadingGet">GET /ping</el-button>
-      <el-button type="primary" @click="pingPost" :loading="loadingPost" style="margin-left:8px">POST /ping</el-button>
+      <el-button type="primary" @click="pingGet" :loading="loadingGet">GET /health</el-button>
+      <el-button type="primary" @click="pingPost" :loading="loadingPost" style="margin-left:8px">POST /health</el-button>
     </div>
 
     <div style="margin-top:20px; text-align:left; max-width:900px; margin-left:auto; margin-right:auto;">
@@ -48,7 +48,7 @@ const showError = (e: any) => {
   result.value = JSON.stringify({ status, url, data, message: msg }, null, 2);
 };
 
-const endpoints = ['/ping'];
+const endpoints = ['/health'];
 
 const tryEndpoints = async (method: 'get' | 'post') => {
   const loader = method === 'get' ? loadingGet : loadingPost;
