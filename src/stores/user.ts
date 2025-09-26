@@ -203,7 +203,7 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', res.token);
 
       // 如果没有选择账套，但用户有可用账套，则自动选择第一个
-      if (!user.value.currentTenant && tenants.value.length > 0 && tenants.value[0]) {
+      if (user.value && !user.value.currentTenant && tenants.value.length > 0 && tenants.value[0]) {
         const firstTenantId = tenants.value[0].id;
         user.value.currentTenant = typeof firstTenantId === 'string' 
           ? Number(firstTenantId) 
@@ -232,7 +232,7 @@ export const useUserStore = defineStore('user', () => {
       roles.value = res.roles || [];
 
       // 如果没有选择账套，但用户有可用账套，则自动选择第一个
-      if (!user.value.currentTenant && tenants.value.length > 0) {
+      if (user.value && !user.value.currentTenant && tenants.value.length > 0 && tenants.value[0]) {
         const firstTenantId = tenants.value[0].id;
         user.value.currentTenant = typeof firstTenantId === 'string' 
           ? Number(firstTenantId) 

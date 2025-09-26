@@ -35,7 +35,7 @@ const appStore = useAppStore();
 const menuStore = useMenuStore();
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed);
-const menuItems = computed(() => menuStore.getMenuItems);
+const menuItems = computed(() => menuStore.filteredMenuItems);
 
 const sidebarWidth = computed(() => {
   return sidebarCollapsed.value ? '64px' : '220px';
