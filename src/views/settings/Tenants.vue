@@ -1,99 +1,161 @@
 <template>
   <div class="settings-tenants">
-    <h3>账套配置</h3>
-
-    <div class="ops-area" style="margin-bottom:12px; display:flex; gap:8px;">
-      <el-button type="primary" @click="addTenant">新增账套</el-button>
-      <el-button @click="goHome">返回导航页</el-button>
+    <div class="tenant-header">
+      <h2>账套配置</h2>
+      <div class="ops-area">
+        <el-button type="primary" @click="addTenant">新增账套</el-button>
+        <el-button @click="goHome">返回导航页</el-button>
+      </div>
     </div>
 
-    <el-card>
-      <div class="list-area">
-        <el-table :data="tenants" style="width:100%;">
-          <el-table-column prop="name" label="账套名称" />
-          <el-table-column prop="code" label="账套代码" />
-          <el-table-column prop="registerNo" label="注册号" />
-          <el-table-column prop="taxNo" label="税号" />
-          <el-table-column prop="phone" label="联系电话" />
-          <el-table-column prop="email" label="邮箱" />
-          <el-table-column prop="address" label="地址" />
-          <el-table-column label="操作">
-            <template #default="{ row }">
-              <el-button type="text" @click="editTenant(row)">编辑</el-button>
-              <el-button type="text" @click="removeTenant(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-card>
+    <div class="tenant-cards">
+      <el-row :gutter="16">
+        <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="item in tenants" :key="item.id" class="tenant-card-col">
+          <el-card shadow="hover" class="tenant-card">
+            <div class="tenant-card-header">
+              <h3>{{ item.name }}</h3>
+              <p class="tenant-code">代码: {{ item.code }}</p>
+            </div>
+            <div class="tenant-card-body">
+              <div class="tenant-info" v-if="item.registerNo"><label>注册号:</label> {{ item.registerNo }}</div>
+              <div class="tenant-info" v-if="item.taxNo"><label>税号:</label> {{ item.taxNo }}</div>
+              <div class="tenant-info" v-if="item.phone"><label>电话:</label> {{ item.phone }}</div>
+              <div class="tenant-info" v-if="item.email"><label>邮箱:</label> {{ item.email }}</div>
+              <div class="tenant-info" v-if="item.address"><label>地址:</label> {{ item.address }}</div>
+            </div>
+            <div class="tenant-logo" v-if="item.logoData">
+              <img :src="item.logoData" alt="logo" />
+            </div>
+            <div class="tenant-card-footer">
+              <el-button type="primary" size="small" @click="editTenant(item)">编辑</el-button>
+              <el-button type="danger" size="small" @click="removeTenant(item)">删除</el-button>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
 
-    <el-dialog title="添加/编辑账套" :visible.sync="editDialogVisible" width="720px">
+    <el-dialog v-model="editDialogVisible" title="添加/编辑账套" width="720px">
       <el-form :model="editModel" label-width="110px" :rules="rules" ref="tenantFormRef">
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="账套名称" prop="name">
-              <el-input v-model="editModel.name" />
-            </el-form-item>
-            <el-form-item label="账套代码" prop="code">
-              <el-input v-model="editModel.code" />
-            </el-form-item>
-            <el-form-item label="注册号" prop="registerNo">
-              <el-input v-model="editModel.registerNo" />
-            </el-form-item>
-            <el-form-item label="税号" prop="taxNo">
-              <el-input v-model="editModel.taxNo" />
-            </el-form-item>
-            <el-form-item label="联系电话" prop="phone">
-              <el-input v-model="editModel.phone" />
-            </el-form-item>
-            <el-form-item label="邮箱" prop="email">
-              <el-input v-model="editModel.email" />
-            </el-form-item>
-            <el-form-item label="地址" prop="address">
-              <el-input v-model="editModel.address" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :span="12">
-            <el-form-item label="Logo (PNG)" prop="logo">
-              <input type="file" accept="image/png" @change="onFileChange($event, 'logo')" />
-              <div v-if="editModel.logoData" style="margin-top:8px;">
-                <img :src="editModel.logoData" alt="logo" style="max-width:120px; max-height:120px; border:1px solid #eee;" />
-              </div>
-            </el-form-item>
-
-            <el-form-item label="公章 (PNG)" prop="seal">
-              <input type="file" accept="image/png" @change="onFileChange($event, 'seal')" />
-              <div v-if="editModel.sealData" style="margin-top:8px;">
-                <img :src="editModel.sealData" alt="seal" style="max-width:120px; max-height:120px; border:1px solid #eee;" />
-              </div>
-            </el-form-item>
-
-            <el-form-item label="签字 (PNG)" prop="signature">
-              <input type="file" accept="image/png" @change="onFileChange($event, 'signature')" />
-              <div v-if="editModel.signatureData" style="margin-top:8px;">
-                <img :src="editModel.signatureData" alt="signature" style="max-width:120px; max-height:120px; border:1px solid #eee;" />
-              </div>
-            </el-form-item>
-
-            <el-divider />
+        <el-tabs>
+          <el-tab-pane label="基本信息">
+            <el-row :gutter="16">
+              <el-col :span="12">
+                <el-form-item label="账套名称" prop="name">
+                  <el-input v-model="editModel.name" />
+                </el-form-item>
+                <el-form-item label="账套代码" prop="code">
+                  <el-input v-model="editModel.code" />
+                </el-form-item>
+                <el-form-item label="注册号" prop="registerNo">
+                  <el-input v-model="editModel.registerNo" />
+                </el-form-item>
+                <el-form-item label="税号" prop="taxNo">
+                  <el-input v-model="editModel.taxNo" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="联系电话" prop="phone">
+                  <el-input v-model="editModel.phone" />
+                </el-form-item>
+                <el-form-item label="邮箱" prop="email">
+                  <el-input v-model="editModel.email" />
+                </el-form-item>
+                <el-form-item label="地址" prop="address">
+                  <el-input v-model="editModel.address" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-tab-pane>
+          
+          <el-tab-pane label="图形素材">
+            <el-row :gutter="16">
+              <el-col :span="8">
+                <el-form-item label="Logo (PNG)" prop="logo">
+                  <el-upload
+                    action="#"
+                    :auto-upload="false"
+                    accept="image/png"
+                    :limit="1"
+                    :show-file-list="false"
+                    class="tenant-image-upload"
+                    :on-change="(file) => handleFileUpload(file, 'logo')"
+                  >
+                    <div class="upload-area">
+                      <div v-if="!editModel.logoData" class="upload-placeholder">
+                        <el-icon class="upload-icon"><Plus /></el-icon>
+                        <div class="upload-text">点击上传</div>
+                      </div>
+                      <img v-else :src="editModel.logoData" alt="logo" class="upload-preview" />
+                    </div>
+                  </el-upload>
+                </el-form-item>
+              </el-col>
+              
+              <el-col :span="8">
+                <el-form-item label="公章 (PNG)" prop="seal">
+                  <el-upload
+                    action="#"
+                    :auto-upload="false"
+                    accept="image/png"
+                    :limit="1"
+                    :show-file-list="false"
+                    class="tenant-image-upload"
+                    :on-change="(file) => handleFileUpload(file, 'seal')"
+                  >
+                    <div class="upload-area">
+                      <div v-if="!editModel.sealData" class="upload-placeholder">
+                        <el-icon class="upload-icon"><Plus /></el-icon>
+                        <div class="upload-text">点击上传</div>
+                      </div>
+                      <img v-else :src="editModel.sealData" alt="公章" class="upload-preview" />
+                    </div>
+                  </el-upload>
+                </el-form-item>
+              </el-col>
+              
+              <el-col :span="8">
+                <el-form-item label="签字 (PNG)" prop="signature">
+                  <el-upload
+                    action="#"
+                    :auto-upload="false"
+                    accept="image/png"
+                    :limit="1"
+                    :show-file-list="false"
+                    class="tenant-image-upload"
+                    :on-change="(file) => handleFileUpload(file, 'signature')"
+                  >
+                    <div class="upload-area">
+                      <div v-if="!editModel.signatureData" class="upload-placeholder">
+                        <el-icon class="upload-icon"><Plus /></el-icon>
+                        <div class="upload-text">点击上传</div>
+                      </div>
+                      <img v-else :src="editModel.signatureData" alt="签字" class="upload-preview" />
+                    </div>
+                  </el-upload>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-tab-pane>
+          
+          <el-tab-pane label="打印模板">
             <el-form-item label="打印模板管理">
               <div>
-                <el-button type="primary" size="mini" @click="openAddTemplate">新增模板</el-button>
-                <el-table :data="editModel.templates" style="width:100%; margin-top:8px;" size="small">
+                <el-button type="primary" @click="openAddTemplate">新增模板</el-button>
+                <el-table :data="editModel.templates" style="width:100%; margin-top:16px;" size="small">
                   <el-table-column prop="name" label="模板名称" />
                   <el-table-column prop="codeFormat" label="发票编码格式" />
-                  <el-table-column label="操作">
+                  <el-table-column label="操作" width="150">
                     <template #default="{ row }">
-                      <el-button type="text" @click="editTemplate(row)">编辑</el-button>
-                      <el-button type="text" @click="removeTemplate(row)">删除</el-button>
+                      <el-button type="primary" link @click="editTemplate(row)">编辑</el-button>
+                      <el-button type="danger" link @click="removeTemplate(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
               </div>
             </el-form-item>
-          </el-col>
-        </el-row>
+          </el-tab-pane>
+        </el-tabs>
       </el-form>
 
       <template #footer>
@@ -103,22 +165,37 @@
     </el-dialog>
 
     <!-- 模板新增/编辑对话框 -->
-    <el-dialog title="模板设置" :visible.sync="templateDialogVisible">
-      <el-form :model="currentTemplate">
+    <el-dialog v-model="templateDialogVisible" title="模板设置" width="600px">
+      <el-form :model="currentTemplate" label-width="120px">
         <el-form-item label="模板名称">
           <el-input v-model="currentTemplate.name" />
         </el-form-item>
         <el-form-item label="发票编码格式">
           <el-input v-model="currentTemplate.codeFormat" placeholder="例如：INV-{YYYY}{MM}-{SEQ:4}" />
-          <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
-            <el-button size="mini" @click="generatePreview">生成示例编码</el-button>
-            <div style="font-size:12px; color:#666;">示例：<span style="font-weight:500">{{ currentTemplatePreview }}</span></div>
+          <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
+            <el-button @click="generatePreview">生成示例编码</el-button>
+            <div style="font-size:13px; color:#666;">
+              示例：<span style="font-weight:500">{{ currentTemplatePreview }}</span>
+            </div>
+          </div>
+          <div style="margin-top:8px; font-size:12px; color:#909399;">
+            支持的占位符：{YYYY}年份, {MM}月份, {DD}日期, {SEQ:n}序号(n位数)
           </div>
         </el-form-item>
         <el-form-item label="模板文件 (PNG)">
-          <input type="file" accept="image/png" @change="onTemplateFileChange" />
-          <div v-if="currentTemplate.fileData" style="margin-top:8px;">
-            <img :src="currentTemplate.fileData" alt="tpl" style="max-width:160px; max-height:160px; border:1px solid #eee;" />
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            accept="image/png"
+            :limit="1"
+            :on-change="onTemplateFileChange"
+          >
+            <template #trigger>
+              <el-button type="primary">选择文件</el-button>
+            </template>
+          </el-upload>
+          <div v-if="currentTemplate.fileData" style="margin-top:12px;">
+            <img :src="currentTemplate.fileData" alt="模板预览" style="max-width:200px; max-height:200px; border:1px solid #eee;" />
           </div>
         </el-form-item>
       </el-form>
@@ -130,12 +207,126 @@
   </div>
 </template>
 
+<style scoped>
+.settings-tenants {
+  padding: 20px;
+}
+
+.tenant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.tenant-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.ops-area {
+  display: flex;
+  gap: 12px;
+}
+
+.tenant-cards {
+  margin-top: 20px;
+}
+
+.tenant-card-col {
+  margin-bottom: 20px;
+}
+
+.tenant-card {
+  height: 100%;
+  transition: all 0.3s;
+}
+
+.tenant-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.tenant-card-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.tenant-card-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #303133;
+}
+
+.tenant-code {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+
+.tenant-card-body {
+  margin-bottom: 15px;
+}
+
+.tenant-info {
+  margin-bottom: 6px;
+  font-size: 14px;
+  display: flex;
+}
+
+.tenant-info label {
+  color: #909399;
+  width: 60px;
+}
+
+.tenant-logo {
+  margin: 10px 0;
+  text-align: center;
+}
+
+.tenant-logo img {
+  max-width: 100px;
+  max-height: 80px;
+  object-fit: contain;
+}
+
+.tenant-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 表单样式 */
+:deep(.el-upload--text) {
+  width: 100%;
+}
+
+:deep(.el-tabs__item) {
+  font-size: 15px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+}
+
+:deep(.el-dialog__header) {
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 15px;
+}
+</style>
+
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { get, post, put, del } from '@/utils/request';
 import service from '@/utils/request';
 import { ElMessage } from 'element-plus';
+import { Plus } from '@element-plus/icons-vue';
 
 interface TemplateItem {
   id: string;
@@ -291,11 +482,12 @@ const removeTenant = async (row: Tenant) => {
   }
 };
 
-const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
-  const input = e.target as HTMLInputElement;
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  if (file.type !== 'image/png') {
+// 使用 El-Upload 组件处理文件上传
+const handleFileUpload = async (file: any, field: 'logo' | 'seal' | 'signature') => {
+  if (!file || !file.raw) return;
+  
+  const rawFile = file.raw;
+  if (rawFile.type !== 'image/png') {
     ElMessage.error('仅支持 PNG 格式的图片');
     return;
   }
@@ -303,7 +495,7 @@ const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
   // 尝试上传到后端（/api/tenants/uploads）
   try {
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', rawFile);
     const res = await service.post('/api/tenants/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
     // 服务端返回结构：{ code:200, message:'上传成功', data: { url, mimetype } }
     const url = res?.data?.url || null;
@@ -325,9 +517,19 @@ const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
       if (field === 'seal') editModel.value.sealData = data;
       if (field === 'signature') editModel.value.signatureData = data;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(rawFile);
     ElMessage.warning('上传失败，已在本地预览（稍后可重试上传）');
   }
+};
+
+// 保留原方法以兼容其他地方可能使用的情况
+const onFileChange = async (e: Event, field: 'logo' | 'seal' | 'signature') => {
+  const input = e.target as HTMLInputElement;
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  
+  // 创建类似El-Upload格式的文件对象
+  await handleFileUpload({ raw: file }, field);
 };
 
 const goHome = () => {
@@ -350,10 +552,10 @@ const removeTemplate = (tpl: TemplateItem) => {
   editModel.value.templates = editModel.value.templates.filter(t => t.id !== tpl.id);
 };
 
-const onTemplateFileChange = async (e: Event) => {
-  const input = e.target as HTMLInputElement;
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
+const onTemplateFileChange = async (uploadFile: any) => {
+  if (!uploadFile || !uploadFile.raw) return;
+  
+  const file = uploadFile.raw;
   if (file.type !== 'image/png') {
     ElMessage.error('模板文件仅支持 PNG 格式（当前实现）');
     return;
@@ -397,4 +599,63 @@ const saveTemplate = () => {
 .settings-tenants { padding: 12px; }
 .ops-area { display:flex; align-items:center }
 .list-area { margin-top: 6px }
+
+/* 图片上传样式 */
+.tenant-image-upload {
+  width: 100%;
+}
+
+.upload-area {
+  width: 100%;
+  height: 140px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.upload-area:hover {
+  border-color: #409EFF;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #8c939d;
+}
+
+.upload-icon {
+  font-size: 28px;
+  color: #8c939d;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  color: #8c939d;
+}
+
+.upload-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* 自定义Element Plus上传组件样式 */
+:deep(.el-upload) {
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.el-upload-dragger) {
+  width: 100%;
+  height: 100%;
+}
 </style>
