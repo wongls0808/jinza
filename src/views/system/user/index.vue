@@ -130,6 +130,11 @@
             <el-radio :label="0">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="角色" prop="roles">
+          <el-select v-model="userForm.roles" multiple placeholder="请选择角色">
+            <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="userForm.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>
@@ -188,20 +193,13 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { User, Role, Tenant } from '@/types/system';
+import { useUserStore } from '@/stores/user';
 
-// 模拟角色数据
-const roles = [
-  { id: 1, name: '超级管理员', code: 'admin' },
-  { id: 2, name: '普通用户', code: 'user' },
-  { id: 3, name: '财务', code: 'finance' },
-  { id: 4, name: '销售', code: 'sales' }
-];
+const userStore = useUserStore();
 
-// 模拟账套数据
-const tenants = [
-  { id: 1, name: '示例公司1', code: 'company1', status: 1 },
-  { id: 2, name: '示例公司2', code: 'company2', status: 1 }
-];
+// 使用 store 中的角色/租户数据（mock 存在于 store）
+const roles = ref<Role[]>([]);
+const tenants = ref<Tenant[]>([]);
 
 // 数据加载状态
 const loading = ref(false);
@@ -262,11 +260,7 @@ const userDialog = reactive({
 const roleDialog = reactive({
   visible: false,
   userId: '',
-  allRoles: roles.map(role => ({
-    id: role.id,
-    name: role.name,
-    key: role.id
-  })),
+  allRoles: [] as { id: number | string; name: string; key: number | string }[],
   selectedRoles: [] as (string | number)[]
 });
 
@@ -274,11 +268,7 @@ const roleDialog = reactive({
 const tenantDialog = reactive({
   visible: false,
   userId: '',
-  allTenants: tenants.map(tenant => ({
-    id: tenant.id,
-    name: tenant.name,
-    key: tenant.id
-  })),
+  allTenants: [] as { id: number | string; name: string; key: number | string }[],
   selectedTenants: [] as (string | number)[]
 });
 
@@ -287,7 +277,7 @@ const getRoleName = (role: Role | number | string): string => {
   if (typeof role === 'object' && role !== null) {
     return role.name;
   }
-  const foundRole = roles.find(r => r.id === role);
+  const foundRole = roles.value.find(r => r.id === role);
   return foundRole ? foundRole.name : `角色${role}`;
 };
 
@@ -296,7 +286,7 @@ const getTenantName = (tenant: Tenant | number | string): string => {
   if (typeof tenant === 'object' && tenant !== null) {
     return tenant.name;
   }
-  const foundTenant = tenants.find(t => t.id === tenant);
+  const foundTenant = tenants.value.find((t: Tenant) => t.id === tenant);
   return foundTenant ? foundTenant.name : `账套${tenant}`;
 };
 
@@ -307,7 +297,7 @@ const loadUserList = async () => {
     // 模拟API请求
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // 模拟数据
+  // 模拟数据
     const mockUsers: User[] = [
       {
         id: 1,
@@ -421,12 +411,46 @@ const handleEdit = (row: User) => {
 
 // 提交表单
 const submitForm = async () => {
-  // 模拟提交
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  ElMessage.success(userDialog.type === 'add' ? '添加成功' : '修改成功');
-  userDialog.visible = false;
-  loadUserList();
+  try {
+    // 表单验证（若需要可以使用 ref 的 validate）
+    if (userDialog.type === 'add') {
+      // 创建用户
+      const created = await userStore.createUser({
+        username: userForm.username,
+        nickname: userForm.nickname,
+        password: userForm.password,
+        email: userForm.email,
+        phone: userForm.phone,
+        status: userForm.status,
+        roles: userForm.roles as any,
+        remark: userForm.remark
+      });
+      // 分配角色（如果有）
+      if (Array.isArray(userForm.roles) && userForm.roles.length > 0) {
+        await userStore.assignRolesToUser(Number(created.id), userForm.roles as number[]);
+      }
+      ElMessage.success('添加成功');
+    } else {
+      // 更新用户
+      await userStore.updateUser(Number(userForm.id), {
+        nickname: userForm.nickname,
+        email: userForm.email,
+        phone: userForm.phone,
+        status: userForm.status,
+        roles: userForm.roles as any,
+        remark: userForm.remark
+      });
+      if (Array.isArray(userForm.roles)) {
+        await userStore.assignRolesToUser(Number(userForm.id), userForm.roles as number[]);
+      }
+      ElMessage.success('修改成功');
+    }
+    userDialog.visible = false;
+    loadUserList();
+  } catch (err) {
+    console.error('保存用户失败', err);
+    ElMessage.error('保存用户失败: ' + (err instanceof Error ? err.message : '未知错误'));
+  }
 };
 
 // 删除用户
@@ -462,12 +486,16 @@ const handleAssignRoles = (row: User) => {
 
 // 提交角色分配
 const submitAssignRoles = async () => {
-  // 模拟提交
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  ElMessage.success('角色分配成功');
-  roleDialog.visible = false;
-  loadUserList();
+  try {
+    // 调用 store 的分配方法（覆盖式分配）
+    await userStore.assignRolesToUser(Number(roleDialog.userId), roleDialog.selectedRoles as number[]);
+    ElMessage.success('角色分配成功');
+    roleDialog.visible = false;
+    loadUserList();
+  } catch (err) {
+    console.error('分配角色失败', err);
+    ElMessage.error('分配角色失败: ' + (err instanceof Error ? err.message : '未知错误'));
+  }
 };
 
 // 分配账套
@@ -504,6 +532,23 @@ const handleCurrentChange = (val: number) => {
 // 生命周期钩子
 onMounted(() => {
   loadUserList();
+
+  // 初始化角色与账套数据来自 store
+  (async () => {
+    try {
+      const fetchedRoles = await userStore.fetchRoles();
+      roles.value = fetchedRoles as Role[];
+      // map to dialog format
+      roleDialog.allRoles = roles.value.map(r => ({ id: r.id, name: r.name, key: r.id }));
+
+      // tenants 在 store 中可能是针对当前登录用户的账套列表
+      tenants.value = userStore.tenants || [];
+      tenantDialog.allTenants = tenants.value.map(t => ({ id: t.id, name: t.name, key: t.id }));
+    } catch (err) {
+      // ignore, keep local mocks if fetch fails
+      console.warn('加载角色或账套失败', err);
+    }
+  })();
 });
 </script>
 

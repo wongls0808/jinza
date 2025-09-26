@@ -402,6 +402,99 @@ export const useUserStore = defineStore('user', () => {
     return true;
   };
 
+  // ------- 角色与权限（Mock） -------
+  // 模拟角色列表（id 与 types/system.ts 中 Role 类型对应）
+  const rolesList = ref<import('@/types/system').Role[]>([
+    { id: 1, name: '管理员', code: 'admin', status: 1, permissions: [1,2,3,4], menuIds: [] },
+    { id: 2, name: '用户', code: 'user', status: 1, permissions: [1], menuIds: [] }
+  ]);
+
+  // 模拟权限列表
+  const permissionsList = ref<import('@/types/system').Permission[]>([
+    { id: 1, name: '查看用户', code: 'system:user:list', type: 'api', status: 1 },
+    { id: 2, name: '添加用户', code: 'system:user:add', type: 'api', status: 1 },
+    { id: 3, name: '编辑用户', code: 'system:user:edit', type: 'api', status: 1 },
+    { id: 4, name: '删除用户', code: 'system:user:delete', type: 'api', status: 1 }
+  ]);
+
+  const fetchRoles = async () => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return rolesList.value.slice();
+  };
+
+  const getRoleById = async (id: number) => {
+    await new Promise(resolve => setTimeout(resolve, 150));
+    return rolesList.value.find(r => Number(r.id) === Number(id)) || null;
+  };
+
+  const createRole = async (payload: Partial<import('@/types/system').Role>) => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const maxId = rolesList.value.reduce((m, r) => Math.max(m, Number(r.id || 0)), 0);
+    const newRole: import('@/types/system').Role = {
+      id: maxId + 1,
+      name: payload.name || `角色${maxId + 1}`,
+      code: payload.code || `role_${maxId + 1}`,
+      status: typeof payload.status === 'number' ? payload.status : 1,
+      permissions: payload.permissions || [],
+      menuIds: payload.menuIds || []
+    };
+    rolesList.value.push(newRole);
+    return newRole;
+  };
+
+  const updateRole = async (id: number, payload: Partial<import('@/types/system').Role>) => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const idx = rolesList.value.findIndex(r => Number(r.id) === Number(id));
+    if (idx === -1) throw new Error('角色不存在');
+    rolesList.value[idx] = { ...rolesList.value[idx], ...payload } as import('@/types/system').Role;
+    return rolesList.value[idx];
+  };
+
+  const deleteRole = async (id: number) => {
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const idx = rolesList.value.findIndex(r => Number(r.id) === Number(id));
+    if (idx === -1) throw new Error('角色不存在');
+    rolesList.value.splice(idx, 1);
+    return true;
+  };
+
+  // 给用户分配角色（覆盖式分配）
+  const assignRolesToUser = async (userId: number, roleIds: number[]) => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const idx = usersList.value.findIndex(u => Number(u.id) === Number(userId));
+    if (idx === -1) throw new Error('用户不存在');
+    const targetUser = usersList.value[idx];
+    if (!targetUser) throw new Error('用户不存在');
+    targetUser.roles = roleIds.slice();
+    // 如果正在登录的用户被修改，保持同步
+    if (user.value && Number(user.value.id) === Number(userId)) {
+      user.value.roles = roleIds.slice();
+      // 根据角色更新权限（简单聚合权限 codes）
+      const aggregated: string[] = [];
+      roleIds.forEach(rid => {
+        const role = rolesList.value.find(rr => Number(rr.id) === Number(rid));
+        if (role && Array.isArray(role.permissions)) {
+          role.permissions.forEach(pid => {
+            const perm = permissionsList.value.find(pp => Number(pp.id) === Number(pid));
+            if (perm && perm.code && !aggregated.includes(perm.code)) aggregated.push(perm.code);
+          });
+        }
+      });
+      permissions.value = aggregated;
+    }
+    return usersList.value[idx];
+  };
+
+  const fetchPermissions = async () => {
+    await new Promise(resolve => setTimeout(resolve, 150));
+    return permissionsList.value.slice();
+  };
+
+  const getPermissionById = async (id: number) => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return permissionsList.value.find(p => Number(p.id) === Number(id)) || null;
+  };
+
   return {
     token,
     user,
@@ -424,5 +517,17 @@ export const useUserStore = defineStore('user', () => {
     createUser,
     updateUser,
     deleteUser
+    ,
+    // 角色/权限 API
+    rolesList,
+    permissionsList,
+    fetchRoles,
+    getRoleById,
+    createRole,
+    updateRole,
+    deleteRole,
+    assignRolesToUser,
+    fetchPermissions,
+    getPermissionById
   };
 });
