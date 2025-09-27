@@ -197,6 +197,14 @@ const rules = {
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
 }
 
+function openAddDialog() {
+  dialogTitle.value = '新增账套'
+  Object.assign(form, {
+    id: null, name: '', code: '', regNo: '', taxNo: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', bankName2: '', bankAccount2: '', logo: '', seal: '', sign: '', templates: []
+  })
+  dialogVisible.value = true
+}
+
 function beforeTemplateUpload(file) {
 
 function removeTemplate(idx) {
