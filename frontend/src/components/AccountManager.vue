@@ -37,85 +37,117 @@
     </el-row>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog :title="dialogTitle" v-model="dialogVisible">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-        <el-form-item label="账套名称" prop="name">
-          <el-input v-model="form.name" @input="onNameInput" placeholder="自动转大写" />
-        </el-form-item>
-        <el-form-item label="账套编码" prop="code">
-          <el-input v-model="form.code" />
-        </el-form-item>
-        <el-form-item label="注册号" prop="regNo">
-          <el-input v-model="form.regNo" />
-        </el-form-item>
-        <el-form-item label="税号" prop="taxNo">
-          <el-input v-model="form.taxNo" />
-        </el-form-item>
-        <el-form-item label="联系电话" prop="phone">
-          <el-input v-model="form.phone" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" />
-        </el-form-item>
-        <el-form-item label="地址" prop="address">
-          <el-input v-model="form.address" />
-        </el-form-item>
-        <el-form-item label="银行名称" prop="bankName">
-          <el-input v-model="form.bankName" />
-        </el-form-item>
-        <el-form-item label="银行账号" prop="bankAccount">
-          <el-input v-model="form.bankAccount" />
-        </el-form-item>
-        <el-form-item label="银行名称Ⅱ" prop="bankName2">
-          <el-input v-model="form.bankName2" />
-        </el-form-item>
-        <el-form-item label="银行账户Ⅱ" prop="bankAccount2">
-          <el-input v-model="form.bankAccount2" />
-        </el-form-item>
-        <el-form-item label="LOGO" prop="logo">
-          <el-upload
-            class="upload-demo"
-            action="/api/upload"
-            :show-file-list="false"
-            :on-success="(res) => handleUploadSuccess(res, 'logo')"
-            :before-upload="beforePngUpload"
-          >
-            <img v-if="form.logo" :src="form.logo" style="height:40px;vertical-align:middle;" />
-            <el-button v-else size="small">上传LOGO</el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="公章" prop="seal">
-          <el-upload
-            class="upload-demo"
-            action="/api/upload"
-            :show-file-list="false"
-            :on-success="(res) => handleUploadSuccess(res, 'seal')"
-            :before-upload="beforePngUpload"
-          >
-            <img v-if="form.seal" :src="form.seal" style="height:40px;vertical-align:middle;" />
-            <el-button v-else size="small">上传公章</el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="签名" prop="sign">
-          <el-upload
-            class="upload-demo"
-            action="/api/upload"
-            :show-file-list="false"
-            :on-success="(res) => handleUploadSuccess(res, 'sign')"
-            :before-upload="beforePngUpload"
-          >
-            <img v-if="form.sign" :src="form.sign" style="height:40px;vertical-align:middle;" />
-            <el-button v-else size="small">上传签名</el-button>
-          </el-upload>
-        </el-form-item>
-        <el-divider>高级设置</el-divider>
-        <el-form-item label="打印模板">
-          <el-button size="small" @click="openTemplateDialog">管理打印模板</el-button>
-        </el-form-item>
-        <el-form-item label="单号生成模板">
-          <el-button size="small" @click="openSerialRuleDialog">设置单号生成规则</el-button>
-        </el-form-item>
-      </el-form>
+    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="900px">
+      <div style="display:flex;gap:32px;align-items:flex-start;">
+        <el-form :model="form" :rules="rules" ref="formRef" label-width="100px" style="flex:2;">
+          <el-row :gutter="12">
+            <el-col :span="6">
+              <el-form-item label="账套名称" prop="name">
+                <el-input v-model="form.name" @input="onNameInput" placeholder="自动转大写" />
+              </el-form-item>
+              <el-form-item label="账套编码" prop="code">
+                <el-input v-model="form.code" />
+              </el-form-item>
+              <el-form-item label="注册号" prop="regNo">
+                <el-input v-model="form.regNo" />
+              </el-form-item>
+              <el-form-item label="税号" prop="taxNo">
+                <el-input v-model="form.taxNo" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="联系电话" prop="phone">
+                <el-input v-model="form.phone" />
+              </el-form-item>
+              <el-form-item label="邮箱" prop="email">
+                <el-input v-model="form.email" />
+              </el-form-item>
+              <el-form-item label="地址" prop="address">
+                <el-input v-model="form.address" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="银行名称" prop="bankName">
+                <el-input v-model="form.bankName" />
+              </el-form-item>
+              <el-form-item label="银行账号" prop="bankAccount">
+                <el-input v-model="form.bankAccount" />
+              </el-form-item>
+              <el-form-item label="银行名称Ⅱ" prop="bankName2">
+                <el-input v-model="form.bankName2" />
+              </el-form-item>
+              <el-form-item label="银行账户Ⅱ" prop="bankAccount2">
+                <el-input v-model="form.bankAccount2" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="LOGO" prop="logo">
+                <el-upload
+                  class="upload-demo"
+                  action="/api/upload"
+                  :show-file-list="false"
+                  :on-success="(res) => handleUploadSuccess(res, 'logo')"
+                  :before-upload="beforePngUpload"
+                >
+                  <img v-if="form.logo" :src="form.logo" style="height:40px;vertical-align:middle;" />
+                  <el-button v-else size="small">上传LOGO</el-button>
+                </el-upload>
+              </el-form-item>
+              <el-form-item label="公章" prop="seal">
+                <el-upload
+                  class="upload-demo"
+                  action="/api/upload"
+                  :show-file-list="false"
+                  :on-success="(res) => handleUploadSuccess(res, 'seal')"
+                  :before-upload="beforePngUpload"
+                >
+                  <img v-if="form.seal" :src="form.seal" style="height:40px;vertical-align:middle;" />
+                  <el-button v-else size="small">上传公章</el-button>
+                </el-upload>
+              </el-form-item>
+              <el-form-item label="签名" prop="sign">
+                <el-upload
+                  class="upload-demo"
+                  action="/api/upload"
+                  :show-file-list="false"
+                  :on-success="(res) => handleUploadSuccess(res, 'sign')"
+                  :before-upload="beforePngUpload"
+                >
+                  <img v-if="form.sign" :src="form.sign" style="height:40px;vertical-align:middle;" />
+                  <el-button v-else size="small">上传签名</el-button>
+                </el-upload>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-divider>高级设置</el-divider>
+          <el-form-item label="打印模板">
+            <el-button size="small" @click="openTemplateDialog">管理打印模板</el-button>
+          </el-form-item>
+          <el-form-item label="单号生成模板">
+            <el-button size="small" @click="openSerialRuleDialog">设置单号生成规则</el-button>
+          </el-form-item>
+        </el-form>
+        <div style="flex:1;min-width:220px;max-width:260px;background:#f8f9fa;border-radius:10px;padding:18px 12px;box-shadow:0 2px 8px #e4e7ed;">
+          <div style="font-size:16px;font-weight:bold;margin-bottom:8px;">实时预览</div>
+          <div style="font-size:18px;font-weight:bold;">{{ form.name }}</div>
+          <div style="color:#888;font-size:13px;margin-bottom:8px;">账套编码：{{ form.code }}</div>
+          <el-divider style="margin:8px 0" />
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <img v-if="form.logo" :src="form.logo" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="LOGO" />
+            <img v-if="form.seal" :src="form.seal" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="公章" />
+            <img v-if="form.sign" :src="form.sign" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="签名" />
+          </div>
+          <div class="card-info-row"><span>注册号：</span>{{ form.regNo }}</div>
+          <div class="card-info-row"><span>税号：</span>{{ form.taxNo }}</div>
+          <div class="card-info-row"><span>联系电话：</span>{{ form.phone }}</div>
+          <div class="card-info-row"><span>邮箱：</span>{{ form.email }}</div>
+          <div class="card-info-row"><span>地址：</span>{{ form.address }}</div>
+          <div class="card-info-row"><span>银行名称：</span>{{ form.bankName }}</div>
+          <div class="card-info-row"><span>银行账号：</span>{{ form.bankAccount }}</div>
+          <div class="card-info-row"><span>银行名称Ⅱ：</span>{{ form.bankName2 }}</div>
+          <div class="card-info-row"><span>银行账户Ⅱ：</span>{{ form.bankAccount2 }}</div>
+        </div>
+      </div>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">保存</el-button>
