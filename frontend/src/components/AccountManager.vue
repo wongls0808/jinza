@@ -170,34 +170,51 @@
           </div>
         </el-tab-pane>
         <el-tab-pane label="单号生成模板" name="serial">
-          <el-form label-width="90px" style="max-width:400px;margin-top:16px;">
-            <el-form-item label="行业">
-              <el-select v-model="serialIndustry" placeholder="选择行业">
-                <el-option label="通用" value="common" />
-                <el-option label="制造业" value="manufacture" />
-                <el-option label="服务业" value="service" />
-                <el-option label="商贸业" value="trade" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="前缀">
-              <el-input v-model="serialRule.prefix" placeholder="如：INV" style="width:120px" />
-            </el-form-item>
-            <el-form-item label="日期格式">
-              <el-select v-model="serialRule.dateFormat" style="width:120px">
-                <el-option label="yyyyMMdd" value="yyyyMMdd" />
-                <el-option label="yyMMdd" value="yyMMdd" />
-                <el-option label="yyyyMM" value="yyyyMM" />
-                <el-option label="yyMM" value="yyMM" />
-                <el-option label="无" value="none" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="流水号位数">
-              <el-input-number v-model="serialRule.seqLength" :min="2" :max="8" />
-            </el-form-item>
-            <el-form-item label="预览">
-              <el-input :value="serialPreview" readonly />
-            </el-form-item>
-          </el-form>
+          <div style="margin-bottom:12px;">
+            <el-button size="small" type="primary" @click="addSerialRule">新增规则</el-button>
+          </div>
+          <el-tabs v-model="currentSerialIndex" type="card">
+            <el-tab-pane
+              v-for="(rule, idx) in serialRules"
+              :key="idx"
+              :label="industryOptions.find(i=>i.value===rule.industry)?.label + '-' + (serialTypeOptions.find(t=>t.value===rule.type)?.label||'')"
+              :name="idx"
+            >
+              <el-form label-width="90px" style="max-width:400px;margin-top:8px;">
+                <el-form-item label="行业">
+                  <el-select v-model="rule.industry" placeholder="选择行业">
+                    <el-option v-for="opt in industryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="类型">
+                  <el-select v-model="rule.type" placeholder="选择类型">
+                    <el-option v-for="opt in serialTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="前缀">
+                  <el-input v-model="rule.prefix" placeholder="如：INV" style="width:120px" />
+                </el-form-item>
+                <el-form-item label="日期格式">
+                  <el-select v-model="rule.dateFormat" style="width:120px">
+                    <el-option label="yyyyMMdd" value="yyyyMMdd" />
+                    <el-option label="yyMMdd" value="yyMMdd" />
+                    <el-option label="yyyyMM" value="yyyyMM" />
+                    <el-option label="yyMM" value="yyMM" />
+                    <el-option label="无" value="none" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="流水号位数">
+                  <el-input-number v-model="rule.seqLength" :min="2" :max="8" />
+                </el-form-item>
+                <el-form-item label="预览">
+                  <el-input :value="getSerialPreview(rule)" readonly />
+                </el-form-item>
+                <el-form-item>
+                  <el-button size="small" type="danger" @click="removeSerialRule(idx)" v-if="serialRules.length>1">删除此规则</el-button>
+                </el-form-item>
+              </el-form>
+            </el-tab-pane>
+          </el-tabs>
         </el-tab-pane>
       </el-tabs>
       <template #footer>
@@ -216,7 +233,6 @@ import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 // 行业与模板类型选项
 const templateIndustry = ref('common')
 const templateType = ref('invoice')
-const serialIndustry = ref('common')
 const industryOptions = [
   { label: '通用', value: 'common' },
   { label: '制造业', value: 'manufacture' },
@@ -224,6 +240,11 @@ const industryOptions = [
   { label: '商贸业', value: 'trade' }
 ]
 const templateTypeOptions = [
+  { label: '发票', value: 'invoice' },
+  { label: '收据', value: 'receipt' },
+  { label: '合同', value: 'contract' }
+]
+const serialTypeOptions = [
   { label: '发票', value: 'invoice' },
   { label: '收据', value: 'receipt' },
   { label: '合同', value: 'contract' }
@@ -250,7 +271,10 @@ const form = reactive({
   logo: '',
   seal: '',
   sign: '',
-  templates: []
+  templates: [],
+  serialRules: [
+    { industry: 'common', type: 'invoice', prefix: 'INV', dateFormat: 'yyyyMMdd', seqLength: 4 }
+  ]
 })
 const formRef = ref(null)
 const rules = {
@@ -292,18 +316,17 @@ function removeTemplate(idx, row) {
   if (i !== -1) form.templates.splice(i, 1)
 }
 
-// 单号生成Tab：多行业规则
-const serialRules = reactive({
-  common: { prefix: 'INV', dateFormat: 'yyyyMMdd', seqLength: 4 },
-  manufacture: { prefix: 'MFG', dateFormat: 'yyyyMM', seqLength: 5 },
-  service: { prefix: 'SRV', dateFormat: 'yyMM', seqLength: 4 },
-  trade: { prefix: 'TRD', dateFormat: 'yyyyMMdd', seqLength: 6 }
-})
+// 单号生成Tab：多规格数组
+const serialRules = ref([
+  { industry: 'common', type: 'invoice', prefix: 'INV', dateFormat: 'yyyyMMdd', seqLength: 4 }
+])
+const currentSerialIndex = ref(0)
 const serialRule = computed({
-  get: () => serialRules[serialIndustry.value],
-  set: v => { serialRules[serialIndustry.value] = v }
+  get: () => serialRules.value[currentSerialIndex.value] || {},
+  set: v => { serialRules.value[currentSerialIndex.value] = v }
 })
 function getSerialPreview(rule) {
+  if (!rule) return ''
   const now = new Date()
   let dateStr = ''
   switch (rule.dateFormat) {
@@ -313,10 +336,19 @@ function getSerialPreview(rule) {
     case 'yyMM': dateStr = String(now.getFullYear()).slice(-2) + pad2(now.getMonth()+1); break
     default: dateStr = ''
   }
-  return rule.prefix + (dateStr ? dateStr : '') + '0'.repeat(rule.seqLength-1) + '1'
+  return rule.prefix + (dateStr ? dateStr : '') + '0'.repeat((rule.seqLength||4)-1) + '1'
 }
 function pad2(n) { return n < 10 ? '0'+n : ''+n }
 const serialPreview = computed(() => getSerialPreview(serialRule.value))
+function addSerialRule() {
+  serialRules.value.push({ industry: 'common', type: 'invoice', prefix: '', dateFormat: 'yyyyMMdd', seqLength: 4 })
+  currentSerialIndex.value = serialRules.value.length - 1
+}
+function removeSerialRule(idx) {
+  if (serialRules.value.length === 1) return ElMessage.warning('至少保留一条规则')
+  serialRules.value.splice(idx, 1)
+  if (currentSerialIndex.value >= serialRules.value.length) currentSerialIndex.value = serialRules.value.length - 1
+}
 
 function openAddDialog() {
   dialogTitle.value = '新增账套'
