@@ -9,9 +9,7 @@
       </el-menu>
     </el-aside>
     <el-container>
-      <el-header style="background: #fff; box-shadow: 0 2px 8px #f0f1f2; display: flex; align-items: center; height: 64px;">
-        <h2 style="margin:0">jinza管理系统</h2>
-      </el-header>
+      <!-- 页头已去除 -->
       <el-main style="background: #f0f2f5; display: flex; justify-content: center; align-items: flex-start;">
         <el-card class="single-card" shadow="hover">
           <template v-if="activeMenu === 'account'">

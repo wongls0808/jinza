@@ -1,20 +1,40 @@
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3>账套列表</h3>
-      <el-button type="primary" @click="openAddDialog">新增账套</el-button>
+    <div style="display: flex; align-items: center; margin-bottom: 24px;">
+      <el-button type="primary" size="large" style="font-weight:bold;letter-spacing:2px;box-shadow:0 2px 8px #409eff33;" @click="openAddDialog">
+        <el-icon style="margin-right:6px"><Plus /></el-icon> 新增账套
+      </el-button>
+      <span style="font-size:18px;font-weight:bold;margin-left:24px;">账套管理</span>
     </div>
-    <el-table :data="accounts" style="width: 100%" v-loading="loading">
-      <el-table-column prop="name" label="账套名称" />
-      <el-table-column prop="code" label="账套编码" />
-      <el-table-column prop="createdAt" label="创建时间" />
-      <el-table-column label="操作">
-        <template #default="scope">
-          <el-button size="small" @click="openEditDialog(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <el-row :gutter="20" v-loading="loading">
+      <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="item in accounts" :key="item.id" style="margin-bottom: 20px;">
+        <el-card class="account-card" shadow="hover">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:18px;font-weight:bold;">{{ item.name }}</div>
+            <div>
+              <el-button size="small" type="primary" circle @click="openEditDialog(item)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" type="danger" circle @click="handleDelete(item)"><el-icon><Delete /></el-icon></el-button>
+            </div>
+          </div>
+          <div style="color:#888;font-size:13px;margin-bottom:8px;">账套编码：{{ item.code }}</div>
+          <el-divider style="margin:8px 0" />
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <img v-if="item.logo" :src="item.logo" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="LOGO" />
+            <img v-if="item.seal" :src="item.seal" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="公章" />
+            <img v-if="item.sign" :src="item.sign" style="height:32px;max-width:60px;object-fit:contain;border-radius:4px;" title="签名" />
+          </div>
+          <div class="card-info-row"><span>注册号：</span>{{ item.regNo }}</div>
+          <div class="card-info-row"><span>税号：</span>{{ item.taxNo }}</div>
+          <div class="card-info-row"><span>联系电话：</span>{{ item.phone }}</div>
+          <div class="card-info-row"><span>邮箱：</span>{{ item.email }}</div>
+          <div class="card-info-row"><span>地址：</span>{{ item.address }}</div>
+          <div class="card-info-row"><span>银行名称：</span>{{ item.bankName }}</div>
+          <div class="card-info-row"><span>银行账号：</span>{{ item.bankAccount }}</div>
+          <div class="card-info-row"><span>银行名称Ⅱ：</span>{{ item.bankName2 }}</div>
+          <div class="card-info-row"><span>银行账户Ⅱ：</span>{{ item.bankAccount2 }}</div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 新增/编辑弹窗 -->
     <el-dialog :title="dialogTitle" v-model="dialogVisible">
@@ -107,6 +127,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 
 const accounts = ref([])
 const loading = ref(false)
@@ -262,7 +284,19 @@ onMounted(fetchAccounts)
 </script>
 
 <style scoped>
-.el-table {
-  margin-bottom: 16px;
+.account-card {
+  border-radius: 14px;
+  box-shadow: 0 4px 18px 0 rgba(0,0,0,0.06);
+  transition: box-shadow .2s;
+}
+.account-card:hover {
+  box-shadow: 0 8px 32px 0 rgba(64,158,255,0.12);
+}
+.card-info-row {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 2px;
+  display: flex;
+  gap: 4px;
 }
 </style>
