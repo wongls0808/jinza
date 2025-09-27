@@ -86,6 +86,7 @@
                 :show-file-list="false"
                 :on-success="(res) => handleUploadSuccess(res, 'logo')"
                 :before-upload="beforePngUpload"
+                name="file"
               >
                 <el-button size="small">上传LOGO</el-button>
               </el-upload>
@@ -99,6 +100,7 @@
                 :show-file-list="false"
                 :on-success="(res) => handleUploadSuccess(res, 'seal')"
                 :before-upload="beforePngUpload"
+                name="file"
               >
                 <el-button size="small">上传公章</el-button>
               </el-upload>
@@ -112,6 +114,7 @@
                 :show-file-list="false"
                 :on-success="(res) => handleUploadSuccess(res, 'sign')"
                 :before-upload="beforePngUpload"
+                name="file"
               >
                 <el-button size="small">上传签名</el-button>
               </el-upload>
@@ -357,7 +360,12 @@ function onNameInput(val) {
 
 function handleUploadSuccess(res, field) {
   // 假设后端返回 { url: 'xxx' }
+  if (!res || !res.url) {
+    ElMessage.error('上传失败，请重试')
+    return
+  }
   form[field] = res.url
+  ElMessage.success('上传成功')
 }
 
 function beforePngUpload(file) {
@@ -390,6 +398,7 @@ function fetchAccounts() {
 onMounted(fetchAccounts)
 
 function handleSubmit() {
+  if (!formRef.value) return
   formRef.value.validate(async valid => {
     if (!valid) return
     loading.value = true
@@ -420,10 +429,17 @@ function handleSubmit() {
       body,
     })
       .then(res => res.json())
-      .then(() => {
-        ElMessage.success('保存成功')
-        dialogVisible.value = false
-        fetchAccounts()
+      .then((data) => {
+        if (data && data.id) {
+          ElMessage.success('保存成功')
+          dialogVisible.value = false
+          fetchAccounts()
+        } else {
+          ElMessage.error('保存失败，请检查必填项')
+        }
+      })
+      .catch(() => {
+        ElMessage.error('保存失败，服务器异常')
       })
       .finally(() => {
         loading.value = false
