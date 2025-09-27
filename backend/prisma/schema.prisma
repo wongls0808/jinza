@@ -1,5 +1,5 @@
 // Prisma schema for Jinza backend
-// Using SQLite for local development; can switch to PostgreSQL in production
+// Using SQLite for local development; will switch to PostgreSQL when DATABASE_URL for PG is ready
 
 generator client {
   provider = "prisma-client-js"
