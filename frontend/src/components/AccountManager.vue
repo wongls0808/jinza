@@ -188,19 +188,13 @@ const form = reactive({
   logo: '',
   seal: '',
   sign: '',
-  templates: [] // 打印模板文件列表 {name, url}
+  templates: []
 })
 const formRef = ref(null)
 const rules = {
   name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
   code: [{ required: true, message: '请输入账套编码', trigger: 'blur' }],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
-}
-
-// 打印模板Tab相关
-function handleTemplateUploadSuccess(res) {
-  // 假设后端返回 { url: 'xxx', name: 'xxx.pdf' }
-  form.templates.push({ name: res.name || '模板文件', url: res.url })
+  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
 }
 
 function beforeTemplateUpload(file) {
@@ -218,13 +212,6 @@ function beforeTemplateUpload(file) {
 
 function removeTemplate(idx) {
   form.templates.splice(idx, 1)
-}
-
-
-// 打印模板Tab相关
-function handleTemplateUploadSuccess(res) {
-  // 假设后端返回 { url: 'xxx', name: 'xxx.pdf' }
-  form.templates.push({ name: res.name || '模板文件', url: res.url })
 }
 
 function beforeTemplateUpload(file) {
