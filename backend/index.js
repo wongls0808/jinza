@@ -1,12 +1,85 @@
+
+
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
 // 简单账套本地存储（JSON文件模拟数据库）
-const ACCOUNTS_FILE = path.join(process.cwd(), 'accounts.json')
+const ACCOUNTS_FILE = path.join(process.cwd(), 'accounts.json');
 function readAccounts() {
-  if (!fs.existsSync(ACCOUNTS_FILE)) return []
-  return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf-8'))
+  try {
+    if (!fs.existsSync(ACCOUNTS_FILE)) {
+      fs.writeFileSync(ACCOUNTS_FILE, '[]', 'utf-8');
+      return [];
+    }
+    const content = fs.readFileSync(ACCOUNTS_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch (e) {
+    console.error('读取账套数据失败:', e);
+    return [];
+  }
 }
 function writeAccounts(data) {
-  fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(data, null, 2), 'utf-8')
+  try {
+    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('写入账套数据失败:', e);
+  }
 }
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+
+// 静态资源托管
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// 配置multer存储
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${Date.now()}${ext}`);
+  }
+});
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (allowed.includes(file.mimetype)) cb(null, true)
+    else cb(new Error('不支持的文件类型'))
+  }
+});
+
+// 上传接口
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '未上传文件' });
+  const url = `/uploads/${req.file.filename}`;
+  const name = req.file.originalname || req.file.filename
+  res.json({ url, name });
+});
+
+// Multer 错误处理中间件
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err)
+    return res.status(400).json({ error: err.message })
+  }
+  if (err) {
+    console.error('Unexpected error:', err)
+    return res.status(500).json({ error: err.message || '服务器错误' })
+  }
+  next()
+})
 
 // 获取所有账套
 app.get('/api/accounts', (req, res) => {
@@ -42,50 +115,6 @@ app.delete('/api/accounts/:id', (req, res) => {
   writeAccounts(accounts)
   res.json({ success: true })
 })
-
-import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-
-app.use(cors());
-app.use(express.json());
-
-// 静态资源托管
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
-// 配置multer存储
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, `${basename}-${Date.now()}${ext}`);
-  }
-});
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'image/png') cb(null, true);
-    else cb(new Error('仅支持PNG格式'));
-  }
-});
-
-// 上传接口
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '未上传文件' });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({ url });
-});
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
