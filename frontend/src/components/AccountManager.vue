@@ -77,7 +77,7 @@
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="素材提交" name="assets">
-          <div style="padding:12px 0;">
+          <div class="upload-row">
             <div class="upload-block">
               <div class="upload-label">LOGO</div>
               <el-upload
@@ -150,19 +150,32 @@ const form = reactive({
   id: null,
   name: '',
   code: '',
-  regNo: '',
-  taxNo: '',
-  phone: '',
-  email: '',
-  address: '',
-  bankName: '',
-  bankAccount: '',
-  bankName2: '',
-  bankAccount2: '',
-  logo: '',
-  seal: '',
-  sign: ''
-})
+.upload-row {
+  display: flex;
+  margin-top: 24px;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+.upload-block {
+  flex: 1 1 0%;
+  min-width: 120px;
+  max-width: 180px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-right: 1px dashed #e4e7ed;
+  text-align: center;
+}
+.upload-block:last-child {
+  border-right: none;
+}
+.upload-label {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+.upload-preview {
+  margin-top: 10px;
+}
 const formRef = ref(null)
 const rules = {
   name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
