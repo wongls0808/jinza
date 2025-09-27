@@ -206,6 +206,10 @@
 </template>
 
 <script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+
 // 行业与模板类型选项
 const templateIndustry = ref('common')
 const templateType = ref('invoice')
@@ -221,6 +225,36 @@ const templateTypeOptions = [
   { label: '收据', value: 'receipt' },
   { label: '合同', value: 'contract' }
 ]
+
+const activeTab = ref('fields')
+const accounts = ref([])
+const loading = ref(false)
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const form = reactive({
+  id: null,
+  name: '',
+  code: '',
+  regNo: '',
+  taxNo: '',
+  phone: '',
+  email: '',
+  address: '',
+  bankName: '',
+  bankAccount: '',
+  bankName2: '',
+  bankAccount2: '',
+  logo: '',
+  seal: '',
+  sign: '',
+  templates: []
+})
+const formRef = ref(null)
+const rules = {
+  name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
+  code: [{ required: true, message: '请输入账套编码', trigger: 'blur' }],
+  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
+}
 
 // 打印模板Tab：按行业/类型过滤
 const filteredTemplates = computed(() => {
@@ -269,41 +303,6 @@ function getSerialPreview(rule) {
 }
 function pad2(n) { return n < 10 ? '0'+n : ''+n }
 const serialPreview = computed(() => getSerialPreview(serialRule.value))
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
-
-const activeTab = ref('fields')
-
-const accounts = ref([])
-const loading = ref(false)
-const dialogVisible = ref(false)
-const dialogTitle = ref('')
-const form = reactive({
-  id: null,
-  name: '',
-  code: '',
-  regNo: '',
-  taxNo: '',
-  phone: '',
-  email: '',
-  address: '',
-  bankName: '',
-  bankAccount: '',
-  bankName2: '',
-  bankAccount2: '',
-  logo: '',
-  seal: '',
-  sign: '',
-  templates: []
-})
-const formRef = ref(null)
-const rules = {
-  name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入账套编码', trigger: 'blur' }],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
-}
 
 function openAddDialog() {
   dialogTitle.value = '新增账套'
@@ -314,9 +313,8 @@ function openAddDialog() {
 }
 
 function beforeTemplateUpload(file) {
-
-function removeTemplate(idx) {
-  form.templates.splice(idx, 1)
+  // 可根据需要添加校验逻辑
+  return true
 }
 
 function onNameInput(val) {
@@ -350,10 +348,12 @@ function fetchAccounts() {
     .then(data => {
       accounts.value = data
     })
+    .finally(() => {
+      loading.value = false
+    })
 }
 
 onMounted(fetchAccounts)
-}
 
 function handleSubmit() {
   formRef.value.validate(async valid => {
@@ -412,8 +412,7 @@ function handleDelete(row) {
         })
     })
 }
-
-
+</script>
 
 <style scoped>
 .account-card {
