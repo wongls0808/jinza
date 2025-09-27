@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://your-backend-url.onrender.com/api/$1" }
+  { "source": "/api/(.*)", "destination": "https://jinza-wss2.onrender.com/api/$1" }
   ],
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
