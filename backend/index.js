@@ -1,5 +1,3 @@
-
-
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -7,7 +5,8 @@ import path from 'path';
 import fs from 'fs';
 
 // 简单账套本地存储（JSON文件模拟数据库）
-const ACCOUNTS_FILE = path.join(process.cwd(), 'accounts.json');
+// 把文件路径保存在 globalThis 上以避免模块被多次加载时重复声明块级常量导致的错误
+var ACCOUNTS_FILE = globalThis.__ACCOUNTS_FILE || (globalThis.__ACCOUNTS_FILE = path.join(process.cwd(), 'accounts.json'));
 function readAccounts() {
   try {
     if (!fs.existsSync(ACCOUNTS_FILE)) {
