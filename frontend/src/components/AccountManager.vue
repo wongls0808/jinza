@@ -198,34 +198,6 @@ const rules = {
 }
 
 function beforeTemplateUpload(file) {
-  const allowed = [ 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ]
-  if (!allowed.includes(file.type)) {
-    ElMessage.error('仅支持PDF或Word文档')
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error('文件不能超过5MB')
-    return false
-  }
-  return true
-}
-
-function removeTemplate(idx) {
-  form.templates.splice(idx, 1)
-}
-
-function beforeTemplateUpload(file) {
-  const allowed = [ 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ]
-  if (!allowed.includes(file.type)) {
-    ElMessage.error('仅支持PDF或Word文档')
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error('文件不能超过5MB')
-    return false
-  }
-  return true
-}
 
 function removeTemplate(idx) {
   form.templates.splice(idx, 1)
@@ -262,53 +234,59 @@ function fetchAccounts() {
     .then(data => {
       accounts.value = data
     })
-    .finally(() => {
-      loading.value = false
-    })
 }
 
-function openAddDialog() {
-  dialogTitle.value = '新增账套'
-  Object.assign(form, {
-    id: null, name: '', code: '', regNo: '', taxNo: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', bankName2: '', bankAccount2: '', logo: '', seal: '', sign: ''
-  })
-  dialogVisible.value = true
+onMounted(fetchAccounts)
 }
+// ...existing script code...
+</script>
 
-function openEditDialog(row) {
-  dialogTitle.value = '编辑账套'
-  Object.assign(form, {
-    id: row.id,
-    name: row.name,
-    code: row.code,
-    regNo: row.regNo,
-    taxNo: row.taxNo,
-    phone: row.phone,
-    email: row.email,
-    address: row.address,
-    bankName: row.bankName,
-    bankAccount: row.bankAccount,
-    bankName2: row.bankName2,
-    bankAccount2: row.bankAccount2,
-    logo: row.logo,
-    seal: row.seal,
-    sign: row.sign
-  })
-  dialogVisible.value = true
+<style scoped>
+.account-card {
+  border-radius: 14px;
+  box-shadow: 0 4px 18px 0 rgba(0,0,0,0.06);
+  transition: box-shadow .2s;
 }
-
-function handleSubmit() {
-  formRef.value.validate(async valid => {
-    if (!valid) return
-    loading.value = true
-    const method = form.id ? 'PUT' : 'POST'
-    const url = form.id ? `/api/accounts/${form.id}` : '/api/accounts'
-    // 提交所有字段
-    const body = JSON.stringify({
-      name: form.name,
-      code: form.code,
-      regNo: form.regNo,
-      taxNo: form.taxNo,
+.account-card:hover {
+  box-shadow: 0 8px 32px 0 rgba(64,158,255,0.12);
+}
+.card-info-row {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 2px;
+  display: flex;
+  gap: 4px;
+}
+.upload-row {
+  display: flex;
+  margin-top: 24px;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+.upload-block {
+  flex: 1 1 0%;
+  min-width: 120px;
+  max-width: 180px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-right: 1px dashed #e4e7ed;
+  text-align: center;
+  margin-bottom: 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e4e7ed;
+}
+.upload-block:last-child {
+  border-right: none;
+}
+.upload-label {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+.upload-preview {
+  margin-top: 10px;
+}
+</style>
       phone: form.phone,
       email: form.email,
       address: form.address,
@@ -353,8 +331,7 @@ function handleDelete(row) {
     })
 }
 
-onMounted(fetchAccounts)
-</script>
+
 
 <style scoped>
 .account-card {
