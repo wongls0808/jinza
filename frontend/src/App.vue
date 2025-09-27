@@ -14,8 +14,13 @@
       </el-header>
       <el-main style="background: #f0f2f5; display: flex; justify-content: center; align-items: flex-start;">
         <el-card class="single-card" shadow="hover">
-          <div class="card-title">{{ currentCard.title }}</div>
-          <div class="card-desc">{{ currentCard.desc }}</div>
+          <template v-if="activeMenu === 'account'">
+            <AccountManager />
+          </template>
+          <template v-else>
+            <div class="card-title">{{ currentCard.title }}</div>
+            <div class="card-desc">{{ currentCard.desc }}</div>
+          </template>
         </el-card>
       </el-main>
     </el-container>
@@ -25,6 +30,8 @@
 <script setup>
 import { ref } from 'vue'
 import { User, Setting, Tickets, OfficeBuilding, UserFilled, Document, ShoppingCart, Money } from '@element-plus/icons-vue'
+
+import AccountManager from './components/AccountManager.vue'
 
 const menuItems = [
   { key: 'account', label: '账套管理', icon: Setting },
