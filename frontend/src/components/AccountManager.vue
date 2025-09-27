@@ -264,12 +264,23 @@ const filteredTemplates = computed(() => {
 
 function handleTemplateUploadSuccess(res) {
   // 假设后端返回 { url, name }
+  if (!res || !res.url) {
+    ElMessage.error('上传失败，请重试')
+    return
+  }
+  // 检查是否已存在同类型模板，避免重复
+  const exists = form.templates.some(t => t.url === res.url)
+  if (exists) {
+    ElMessage.warning('该模板已存在')
+    return
+  }
   form.templates.push({
     name: res.name || '模板文件',
     url: res.url,
     industry: templateIndustry.value,
     type: templateType.value
   })
+  ElMessage.success('模板上传成功')
 }
 
 function removeTemplate(idx, row) {
@@ -308,6 +319,29 @@ function openAddDialog() {
   dialogTitle.value = '新增账套'
   Object.assign(form, {
     id: null, name: '', code: '', regNo: '', taxNo: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', bankName2: '', bankAccount2: '', logo: '', seal: '', sign: '', templates: []
+  })
+  dialogVisible.value = true
+}
+
+function openEditDialog(item) {
+  dialogTitle.value = '编辑账套'
+  Object.assign(form, {
+    id: item.id,
+    name: item.name,
+    code: item.code,
+    regNo: item.regNo,
+    taxNo: item.taxNo,
+    phone: item.phone,
+    email: item.email,
+    address: item.address,
+    bankName: item.bankName,
+    bankAccount: item.bankAccount,
+    bankName2: item.bankName2,
+    bankAccount2: item.bankAccount2,
+    logo: item.logo,
+    seal: item.seal,
+    sign: item.sign,
+    templates: Array.isArray(item.templates) ? [...item.templates] : []
   })
   dialogVisible.value = true
 }
