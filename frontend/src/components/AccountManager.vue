@@ -150,32 +150,19 @@ const form = reactive({
   id: null,
   name: '',
   code: '',
-.upload-row {
-  display: flex;
-  margin-top: 24px;
-  margin-bottom: 8px;
-  justify-content: flex-start;
-}
-.upload-block {
-  flex: 1 1 0%;
-  min-width: 120px;
-  max-width: 180px;
-  padding-left: 8px;
-  padding-right: 8px;
-  border-right: 1px dashed #e4e7ed;
-  text-align: center;
-}
-.upload-block:last-child {
-  border-right: none;
-}
-.upload-label {
-  font-weight: bold;
-  margin-bottom: 8px;
-  font-size: 15px;
-}
-.upload-preview {
-  margin-top: 10px;
-}
+  regNo: '',
+  taxNo: '',
+  phone: '',
+  email: '',
+  address: '',
+  bankName: '',
+  bankAccount: '',
+  bankName2: '',
+  bankAccount2: '',
+  logo: '',
+  seal: '',
+  sign: ''
+})
 const formRef = ref(null)
 const rules = {
   name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
@@ -325,17 +312,60 @@ onMounted(fetchAccounts)
   gap: 4px;
 }
 
+.upload-row {
+  display: flex;
+  margin-top: 24px;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
 .upload-block {
-  margin-bottom: 18px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed #e4e7ed;
-  max-width: 260px;
+  flex: 1 1 0%;
+  min-width: 120px;
+  max-width: 180px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-right: 1px dashed #e4e7ed;
+  text-align: center;
+}
+.upload-block:last-child {
+  border-right: none;
 }
 .upload-label {
   font-weight: bold;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  font-size: 15px;
 }
 .upload-preview {
-  margin-top: 6px;
+  margin-top: 10px;
+}
+
+.upload-row {
+  display: flex;
+  margin-top: 24px;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+.upload-block {
+  flex: 1 1 0%;
+  min-width: 120px;
+  max-width: 180px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-right: 1px dashed #e4e7ed;
+  text-align: center;
+  margin-bottom: 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e4e7ed;
+}
+.upload-block:last-child {
+  border-right: none;
+}
+.upload-label {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+.upload-preview {
+  margin-top: 10px;
 }
 </style>
