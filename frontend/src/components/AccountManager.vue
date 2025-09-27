@@ -77,8 +77,9 @@
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="素材提交" name="assets">
-          <el-form :model="form" label-width="100px">
-            <el-form-item label="LOGO" prop="logo">
+          <div style="padding:12px 0;">
+            <div class="upload-block">
+              <div class="upload-label">LOGO</div>
               <el-upload
                 class="upload-demo"
                 action="/api/upload"
@@ -86,11 +87,12 @@
                 :on-success="(res) => handleUploadSuccess(res, 'logo')"
                 :before-upload="beforePngUpload"
               >
-                <img v-if="form.logo" :src="form.logo" style="height:40px;vertical-align:middle;" />
-                <el-button v-else size="small">上传LOGO</el-button>
+                <el-button size="small">上传LOGO</el-button>
               </el-upload>
-            </el-form-item>
-            <el-form-item label="公章" prop="seal">
+              <div v-if="form.logo" class="upload-preview"><img :src="form.logo" style="height:48px;max-width:120px;object-fit:contain;border-radius:4px;" /></div>
+            </div>
+            <div class="upload-block">
+              <div class="upload-label">公章</div>
               <el-upload
                 class="upload-demo"
                 action="/api/upload"
@@ -98,11 +100,12 @@
                 :on-success="(res) => handleUploadSuccess(res, 'seal')"
                 :before-upload="beforePngUpload"
               >
-                <img v-if="form.seal" :src="form.seal" style="height:40px;vertical-align:middle;" />
-                <el-button v-else size="small">上传公章</el-button>
+                <el-button size="small">上传公章</el-button>
               </el-upload>
-            </el-form-item>
-            <el-form-item label="签名" prop="sign">
+              <div v-if="form.seal" class="upload-preview"><img :src="form.seal" style="height:48px;max-width:120px;object-fit:contain;border-radius:4px;" /></div>
+            </div>
+            <div class="upload-block">
+              <div class="upload-label">签名</div>
               <el-upload
                 class="upload-demo"
                 action="/api/upload"
@@ -110,11 +113,11 @@
                 :on-success="(res) => handleUploadSuccess(res, 'sign')"
                 :before-upload="beforePngUpload"
               >
-                <img v-if="form.sign" :src="form.sign" style="height:40px;vertical-align:middle;" />
-                <el-button v-else size="small">上传签名</el-button>
+                <el-button size="small">上传签名</el-button>
               </el-upload>
-            </el-form-item>
-          </el-form>
+              <div v-if="form.sign" class="upload-preview"><img :src="form.sign" style="height:48px;max-width:120px;object-fit:contain;border-radius:4px;" /></div>
+            </div>
+          </div>
         </el-tab-pane>
         <el-tab-pane label="打印模板" name="template">
           <el-alert title="打印模板管理开发中..." type="info" show-icon />
@@ -307,5 +310,19 @@ onMounted(fetchAccounts)
   margin-bottom: 2px;
   display: flex;
   gap: 4px;
+}
+
+.upload-block {
+  margin-bottom: 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e4e7ed;
+  max-width: 260px;
+}
+.upload-label {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.upload-preview {
+  margin-top: 6px;
 }
 </style>
