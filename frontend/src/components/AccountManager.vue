@@ -120,7 +120,33 @@
           </div>
         </el-tab-pane>
         <el-tab-pane label="打印模板" name="template">
-          <el-alert title="打印模板管理开发中..." type="info" show-icon />
+          <div>
+            <el-upload
+              class="upload-demo"
+              action="/api/upload"
+              :show-file-list="false"
+              :on-success="(res) => handleTemplateUploadSuccess(res)"
+              :before-upload="beforeTemplateUpload"
+            >
+              <el-button size="small" type="primary">上传打印模板</el-button>
+            </el-upload>
+            <div v-if="form.templates && form.templates.length" style="margin-top:16px;">
+              <el-table :data="form.templates" border size="small" style="width:100%;">
+                <el-table-column prop="name" label="文件名" />
+                <el-table-column label="预览">
+                  <template #default="scope">
+                    <el-link type="primary" :href="scope.row.url" target="_blank">预览</el-link>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="80">
+                  <template #default="scope">
+                    <el-button size="small" type="danger" @click="removeTemplate(scope.$index)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+            <div v-else style="color:#888;margin-top:12px;">暂无打印模板文件</div>
+          </div>
         </el-tab-pane>
         <el-tab-pane label="单号生成模板" name="serial">
           <el-alert title="单号生成规则设置开发中..." type="info" show-icon />
@@ -161,13 +187,61 @@ const form = reactive({
   bankAccount2: '',
   logo: '',
   seal: '',
-  sign: ''
+  sign: '',
+  templates: [] // 打印模板文件列表 {name, url}
 })
 const formRef = ref(null)
 const rules = {
   name: [{ required: true, message: '请输入账套名称', trigger: 'blur' }],
   code: [{ required: true, message: '请输入账套编码', trigger: 'blur' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+}
+
+// 打印模板Tab相关
+function handleTemplateUploadSuccess(res) {
+  // 假设后端返回 { url: 'xxx', name: 'xxx.pdf' }
+  form.templates.push({ name: res.name || '模板文件', url: res.url })
+}
+
+function beforeTemplateUpload(file) {
+  const allowed = [ 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ]
+  if (!allowed.includes(file.type)) {
+    ElMessage.error('仅支持PDF或Word文档')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('文件不能超过5MB')
+    return false
+  }
+  return true
+}
+
+function removeTemplate(idx) {
+  form.templates.splice(idx, 1)
+}
+
+
+// 打印模板Tab相关
+function handleTemplateUploadSuccess(res) {
+  // 假设后端返回 { url: 'xxx', name: 'xxx.pdf' }
+  form.templates.push({ name: res.name || '模板文件', url: res.url })
+}
+
+function beforeTemplateUpload(file) {
+  const allowed = [ 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ]
+  if (!allowed.includes(file.type)) {
+    ElMessage.error('仅支持PDF或Word文档')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('文件不能超过5MB')
+    return false
+  }
+  return true
+}
+
+function removeTemplate(idx) {
+  form.templates.splice(idx, 1)
 }
 
 function onNameInput(val) {
