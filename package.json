@@ -1,0 +1,12 @@
+{
+  "name": "jinza-monorepo",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "build": "npm -w frontend run build && npm -w backend run build",
+    "lint": "npm -w frontend run lint && npm -w backend run lint",
+    "start": "node backend/dist/index.js"
+  }
+}

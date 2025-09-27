@@ -1,0 +1,3 @@
+html,body,#app { height:100%; margin:0; padding:0; }
+body { background:#f5f7fa; color:#222; }
+* { box-sizing: border-box; }
