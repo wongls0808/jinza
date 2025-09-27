@@ -121,6 +121,23 @@
         </el-tab-pane>
         <el-tab-pane label="打印模板" name="template">
           <div>
+            <el-form :inline="true" style="margin-bottom:12px;">
+              <el-form-item label="行业">
+                <el-select v-model="templateIndustry" placeholder="选择行业" style="width:120px">
+                  <el-option label="通用" value="common" />
+                  <el-option label="制造业" value="manufacture" />
+                  <el-option label="服务业" value="service" />
+                  <el-option label="商贸业" value="trade" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="模板类型">
+                <el-select v-model="templateType" placeholder="选择类型" style="width:120px">
+                  <el-option label="发票" value="invoice" />
+                  <el-option label="收据" value="receipt" />
+                  <el-option label="合同" value="contract" />
+                </el-select>
+              </el-form-item>
+            </el-form>
             <el-upload
               class="upload-demo"
               action="/api/upload"
@@ -130,9 +147,10 @@
             >
               <el-button size="small" type="primary">上传打印模板</el-button>
             </el-upload>
-            <div v-if="form.templates && form.templates.length" style="margin-top:16px;">
-              <el-table :data="form.templates" border size="small" style="width:100%;">
+            <div v-if="filteredTemplates.length" style="margin-top:16px;">
+              <el-table :data="filteredTemplates" border size="small" style="width:100%;">
                 <el-table-column prop="name" label="文件名" />
+                <el-table-column prop="typeLabel" label="模板类型" />
                 <el-table-column label="预览">
                   <template #default="scope">
                     <el-link type="primary" :href="scope.row.url" target="_blank">预览</el-link>
@@ -140,16 +158,43 @@
                 </el-table-column>
                 <el-table-column label="操作" width="80">
                   <template #default="scope">
-                    <el-button size="small" type="danger" @click="removeTemplate(scope.$index)">删除</el-button>
+                    <el-button size="small" type="danger" @click="removeTemplate(scope.$index, scope.row)">删除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
             </div>
-            <div v-else style="color:#888;margin-top:12px;">暂无打印模板文件</div>
+            <div v-else style="color:#888;margin-top:12px;">暂无该行业/类型模板</div>
           </div>
         </el-tab-pane>
         <el-tab-pane label="单号生成模板" name="serial">
-          <el-alert title="单号生成规则设置开发中..." type="info" show-icon />
+          <el-form label-width="90px" style="max-width:400px;margin-top:16px;">
+            <el-form-item label="行业">
+              <el-select v-model="serialIndustry" placeholder="选择行业">
+                <el-option label="通用" value="common" />
+                <el-option label="制造业" value="manufacture" />
+                <el-option label="服务业" value="service" />
+                <el-option label="商贸业" value="trade" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="前缀">
+              <el-input v-model="serialRule.prefix" placeholder="如：INV" style="width:120px" />
+            </el-form-item>
+            <el-form-item label="日期格式">
+              <el-select v-model="serialRule.dateFormat" style="width:120px">
+                <el-option label="yyyyMMdd" value="yyyyMMdd" />
+                <el-option label="yyMMdd" value="yyMMdd" />
+                <el-option label="yyyyMM" value="yyyyMM" />
+                <el-option label="yyMM" value="yyMM" />
+                <el-option label="无" value="none" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="流水号位数">
+              <el-input-number v-model="serialRule.seqLength" :min="2" :max="8" />
+            </el-form-item>
+            <el-form-item label="预览">
+              <el-input :value="serialPreview" readonly />
+            </el-form-item>
+          </el-form>
         </el-tab-pane>
       </el-tabs>
       <template #footer>
@@ -161,6 +206,69 @@
 </template>
 
 <script setup>
+// 行业与模板类型选项
+const templateIndustry = ref('common')
+const templateType = ref('invoice')
+const serialIndustry = ref('common')
+const industryOptions = [
+  { label: '通用', value: 'common' },
+  { label: '制造业', value: 'manufacture' },
+  { label: '服务业', value: 'service' },
+  { label: '商贸业', value: 'trade' }
+]
+const templateTypeOptions = [
+  { label: '发票', value: 'invoice' },
+  { label: '收据', value: 'receipt' },
+  { label: '合同', value: 'contract' }
+]
+
+// 打印模板Tab：按行业/类型过滤
+const filteredTemplates = computed(() => {
+  return form.templates.filter(t => t.industry === templateIndustry.value && t.type === templateType.value)
+    .map(t => ({ ...t, typeLabel: templateTypeOptions.find(opt => opt.value === t.type)?.label || t.type }))
+})
+
+function handleTemplateUploadSuccess(res) {
+  // 假设后端返回 { url, name }
+  form.templates.push({
+    name: res.name || '模板文件',
+    url: res.url,
+    industry: templateIndustry.value,
+    type: templateType.value
+  })
+}
+
+function removeTemplate(idx, row) {
+  // 只删除当前行业/类型下的模板
+  const i = form.templates.findIndex(t => t.url === row.url && t.industry === row.industry && t.type === row.type)
+  if (i !== -1) form.templates.splice(i, 1)
+}
+
+// 单号生成Tab：多行业规则
+const serialRules = reactive({
+  common: { prefix: 'INV', dateFormat: 'yyyyMMdd', seqLength: 4 },
+  manufacture: { prefix: 'MFG', dateFormat: 'yyyyMM', seqLength: 5 },
+  service: { prefix: 'SRV', dateFormat: 'yyMM', seqLength: 4 },
+  trade: { prefix: 'TRD', dateFormat: 'yyyyMMdd', seqLength: 6 }
+})
+const serialRule = computed({
+  get: () => serialRules[serialIndustry.value],
+  set: v => { serialRules[serialIndustry.value] = v }
+})
+function getSerialPreview(rule) {
+  const now = new Date()
+  let dateStr = ''
+  switch (rule.dateFormat) {
+    case 'yyyyMMdd': dateStr = now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate()); break
+    case 'yyMMdd': dateStr = String(now.getFullYear()).slice(-2) + pad2(now.getMonth()+1) + pad2(now.getDate()); break
+    case 'yyyyMM': dateStr = now.getFullYear() + pad2(now.getMonth()+1); break
+    case 'yyMM': dateStr = String(now.getFullYear()).slice(-2) + pad2(now.getMonth()+1); break
+    default: dateStr = ''
+  }
+  return rule.prefix + (dateStr ? dateStr : '') + '0'.repeat(rule.seqLength-1) + '1'
+}
+function pad2(n) { return n < 10 ? '0'+n : ''+n }
+const serialPreview = computed(() => getSerialPreview(serialRule.value))
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -246,55 +354,19 @@ function fetchAccounts() {
 
 onMounted(fetchAccounts)
 }
-// ...existing script code...
-</script>
 
-<style scoped>
-.account-card {
-  border-radius: 14px;
-  box-shadow: 0 4px 18px 0 rgba(0,0,0,0.06);
-  transition: box-shadow .2s;
-}
-.account-card:hover {
-  box-shadow: 0 8px 32px 0 rgba(64,158,255,0.12);
-}
-.card-info-row {
-  font-size: 13px;
-  color: #555;
-  margin-bottom: 2px;
-  display: flex;
-  gap: 4px;
-}
-.upload-row {
-  display: flex;
-  margin-top: 24px;
-  margin-bottom: 8px;
-  justify-content: flex-start;
-}
-.upload-block {
-  flex: 1 1 0%;
-  min-width: 120px;
-  max-width: 180px;
-  padding-left: 8px;
-  padding-right: 8px;
-  border-right: 1px dashed #e4e7ed;
-  text-align: center;
-  margin-bottom: 18px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed #e4e7ed;
-}
-.upload-block:last-child {
-  border-right: none;
-}
-.upload-label {
-  font-weight: bold;
-  margin-bottom: 8px;
-  font-size: 15px;
-}
-.upload-preview {
-  margin-top: 10px;
-}
-</style>
+function handleSubmit() {
+  formRef.value.validate(async valid => {
+    if (!valid) return
+    loading.value = true
+    const method = form.id ? 'PUT' : 'POST'
+    const url = form.id ? `/api/accounts/${form.id}` : '/api/accounts'
+    // 提交所有字段，包括打印模板和所有行业单号规则
+    const body = JSON.stringify({
+      name: form.name,
+      code: form.code,
+      regNo: form.regNo,
+      taxNo: form.taxNo,
       phone: form.phone,
       email: form.email,
       address: form.address,
@@ -304,7 +376,9 @@ onMounted(fetchAccounts)
       bankAccount2: form.bankAccount2,
       logo: form.logo,
       seal: form.seal,
-      sign: form.sign
+      sign: form.sign,
+      templates: form.templates,
+      serialRules: JSON.parse(JSON.stringify(serialRules))
     })
     fetch(url, {
       method,

@@ -1,3 +1,47 @@
+// 简单账套本地存储（JSON文件模拟数据库）
+const ACCOUNTS_FILE = path.join(process.cwd(), 'accounts.json')
+function readAccounts() {
+  if (!fs.existsSync(ACCOUNTS_FILE)) return []
+  return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf-8'))
+}
+function writeAccounts(data) {
+  fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(data, null, 2), 'utf-8')
+}
+
+// 获取所有账套
+app.get('/api/accounts', (req, res) => {
+  res.json(readAccounts())
+})
+
+// 新增账套
+app.post('/api/accounts', (req, res) => {
+  const accounts = readAccounts()
+  const id = Date.now().toString()
+  const account = { ...req.body, id }
+  accounts.push(account)
+  writeAccounts(accounts)
+  res.json(account)
+})
+
+// 更新账套
+app.put('/api/accounts/:id', (req, res) => {
+  const accounts = readAccounts()
+  const idx = accounts.findIndex(a => a.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: '账套不存在' })
+  accounts[idx] = { ...accounts[idx], ...req.body }
+  writeAccounts(accounts)
+  res.json(accounts[idx])
+})
+
+// 删除账套
+app.delete('/api/accounts/:id', (req, res) => {
+  let accounts = readAccounts()
+  const idx = accounts.findIndex(a => a.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: '账套不存在' })
+  accounts.splice(idx, 1)
+  writeAccounts(accounts)
+  res.json({ success: true })
+})
 
 import express from 'express';
 import cors from 'cors';
