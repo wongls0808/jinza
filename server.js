@@ -1018,6 +1018,29 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
       }
     );
   });
+});     
+
+        // 文件上传路由（简化版 - 在实际项目中应该处理真实的文件上传）
+app.post('/api/upload/:type', requireAuth, (req, res) => {
+  const { type } = req.params; // logo, seal, signature
+  const { account_set_id } = req.body;
+  
+  // 模拟文件上传成功，返回模拟的文件路径
+  const filePath = `/uploads/${type}_${account_set_id}_${Date.now()}.png`;
+  
+  // 更新账套的文件路径
+  const field = `${type}_path`;
+  db.run(
+    `UPDATE account_sets SET ${field} = ? WHERE id = ?`,
+    [filePath, account_set_id],
+    function(err) {
+      if (err) {
+        console.error('更新文件路径失败:', err);
+        return res.status(500).json({ error: '文件上传失败' });
+      }
+      res.json({ success: true, file_path: filePath });
+    }
+  );
 });
 
 export default app;
