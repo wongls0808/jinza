@@ -1,0 +1,795 @@
+import express from 'express';
+import sqlite3 from 'sqlite3';
+import session from 'express-session';
+import bcrypt from 'bcryptjs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 确保数据目录存在
+const dataDir = join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// 中间件
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session配置
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'enterprise-secret-key-2024',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: false, 
+    maxAge: 24 * 60 * 60 * 1000, // 24小时
+    httpOnly: true
+  }
+}));
+
+// SQLite数据库连接
+const db = new sqlite3.Database(join(dataDir, 'app.db'), (err) => {
+  if (err) {
+    console.error('数据库连接失败:', err.message);
+  } else {
+    console.log('已连接到 SQLite 数据库');
+  }
+});
+
+// 初始化数据库表
+function initializeDatabase() {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      // 用户表
+      db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        department TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // 客户表
+      db.run(`CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        contact TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        note TEXT,
+        status TEXT DEFAULT 'active',
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )`);
+
+      // 项目表
+      db.run(`CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        customer_id INTEGER,
+        description TEXT,
+        status TEXT DEFAULT 'planning',
+        progress INTEGER DEFAULT 0,
+        budget DECIMAL(10,2),
+        start_date DATE,
+        end_date DATE,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(customer_id) REFERENCES customers(id),
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )`);
+
+      // 任务表
+      db.run(`CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'pending',
+        priority TEXT DEFAULT 'medium',
+        assigned_to INTEGER,
+        due_date DATE,
+        completed_at DATETIME,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(project_id) REFERENCES projects(id),
+        FOREIGN KEY(assigned_to) REFERENCES users(id),
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )`);
+
+      // 检查并创建默认管理员
+      db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
+        if (err) {
+          console.error('检查用户表失败:', err);
+          reject(err);
+          return;
+        }
+        
+        if (row.count === 0) {
+          const defaultPassword = bcrypt.hashSync('admin123', 10);
+          db.run(
+            "INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
+            ['admin', defaultPassword, '系统管理员', 'admin'],
+            function(err) {
+              if (err) {
+                console.error('创建默认管理员失败:', err);
+                reject(err);
+              } else {
+                console.log('默认管理员已创建: admin / admin123');
+                resolve();
+              }
+            }
+          );
+        } else {
+          console.log('数据库已初始化，找到', row.count, '个用户');
+          resolve();
+        }
+      });
+    });
+  });
+}
+
+// 认证中间件
+const requireAuth = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: '请先登录' });
+  }
+  next();
+};
+
+// 管理员权限中间件
+const requireAdmin = (req, res, next) => {
+  if (!req.session.userRole || req.session.userRole !== 'admin') {
+    return res.status(403).json({ error: '需要管理员权限' });
+  }
+  next();
+};
+
+// CORS 中间件（开发环境）
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+}
+
+// 生产环境下托管静态文件
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(join(__dirname, 'dist')));
+  console.log('生产模式：托管 dist 静态文件');
+} else {
+  console.log('开发模式：请运行前端开发服务器 (npm run client)');
+}
+
+// ========== API 路由 ==========
+
+// 健康检查
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// 认证路由
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: '用户名和密码不能为空' });
+  }
+  
+  db.get(
+    "SELECT * FROM users WHERE username = ? AND is_active = 1",
+    [username],
+    (err, user) => {
+      if (err) {
+        console.error('登录查询失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+        return res.status(401).json({ error: '用户名或密码错误' });
+      }
+      
+      // 设置 session
+      req.session.userId = user.id;
+      req.session.userRole = user.role;
+      req.session.userName = user.name;
+      
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          department: user.department
+        }
+      });
+    }
+  );
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('退出登录失败:', err);
+      return res.status(500).json({ error: '退出失败' });
+    }
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  db.get(
+    "SELECT id, username, name, role, department FROM users WHERE id = ?",
+    [req.session.userId],
+    (err, user) => {
+      if (err) {
+        console.error('获取用户信息失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      res.json({ user });
+    }
+  );
+});
+
+// 用户管理路由
+app.get('/api/users', requireAuth, (req, res) => {
+  db.all(
+    "SELECT id, username, name, role, department, is_active, created_at FROM users ORDER BY created_at DESC",
+    (err, rows) => {
+      if (err) {
+        console.error('获取用户列表失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
+  const { username, password, name, role, department } = req.body;
+  
+  if (!username || !password || !name) {
+    return res.status(400).json({ error: '用户名、密码和姓名不能为空' });
+  }
+  
+  const passwordHash = bcrypt.hashSync(password, 10);
+  
+  db.run(
+    "INSERT INTO users (username, password_hash, name, role, department) VALUES (?, ?, ?, ?, ?)",
+    [username, passwordHash, name, role || 'user', department || ''],
+    function(err) {
+      if (err) {
+        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          return res.status(400).json({ error: '用户名已存在' });
+        }
+        console.error('创建用户失败:', err);
+        return res.status(500).json({ error: '创建用户失败' });
+      }
+      
+      res.json({ 
+        id: this.lastID, 
+        username, 
+        name, 
+        role: role || 'user', 
+        department: department || '',
+        is_active: 1
+      });
+    }
+  );
+});
+
+app.put('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
+  const userId = req.params.id;
+  const { name, role, department, is_active } = req.body;
+  
+  db.run(
+    "UPDATE users SET name = ?, role = ?, department = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [name, role, department, is_active, userId],
+    function(err) {
+      if (err) {
+        console.error('更新用户失败:', err);
+        return res.status(500).json({ error: '更新用户失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '用户不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// 客户管理路由
+app.get('/api/customers', requireAuth, (req, res) => {
+  const { search, status } = req.query;
+  let query = `
+    SELECT c.*, u.name as creator_name 
+    FROM customers c 
+    LEFT JOIN users u ON c.created_by = u.id
+  `;
+  const params = [];
+  
+  if (search || status) {
+    query += ' WHERE ';
+    const conditions = [];
+    
+    if (search) {
+      conditions.push('(c.name LIKE ? OR c.contact LIKE ? OR c.phone LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    
+    if (status) {
+      conditions.push('c.status = ?');
+      params.push(status);
+    }
+    
+    query += conditions.join(' AND ');
+  }
+  
+  query += ' ORDER BY c.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取客户列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.get('/api/customers/:id', requireAuth, (req, res) => {
+  const customerId = req.params.id;
+  
+  db.get(
+    `SELECT c.*, u.name as creator_name 
+     FROM customers c 
+     LEFT JOIN users u ON c.created_by = u.id 
+     WHERE c.id = ?`,
+    [customerId],
+    (err, row) => {
+      if (err) {
+        console.error('获取客户详情失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      if (!row) {
+        return res.status(404).json({ error: '客户不存在' });
+      }
+      
+      res.json(row);
+    }
+  );
+});
+
+app.post('/api/customers', requireAuth, (req, res) => {
+  const { name, contact, phone, email, address, note } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: '客户名称不能为空' });
+  }
+  
+  db.run(
+    "INSERT INTO customers (name, contact, phone, email, address, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [name, contact, phone, email, address, note, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建客户失败:', err);
+        return res.status(500).json({ error: '创建客户失败' });
+      }
+      
+      // 返回新创建的客户信息
+      db.get(
+        `SELECT c.*, u.name as creator_name 
+         FROM customers c 
+         LEFT JOIN users u ON c.created_by = u.id 
+         WHERE c.id = ?`,
+        [this.lastID],
+        (err, row) => {
+          if (err) {
+            console.error('获取新客户失败:', err);
+            return res.status(500).json({ error: '创建成功但获取客户信息失败' });
+          }
+          res.json(row);
+        }
+      );
+    }
+  );
+});
+
+app.put('/api/customers/:id', requireAuth, (req, res) => {
+  const customerId = req.params.id;
+  const { name, contact, phone, email, address, note, status } = req.body;
+  
+  db.run(
+    "UPDATE customers SET name = ?, contact = ?, phone = ?, email = ?, address = ?, note = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [name, contact, phone, email, address, note, status, customerId],
+    function(err) {
+      if (err) {
+        console.error('更新客户失败:', err);
+        return res.status(500).json({ error: '更新客户失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '客户不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// 项目管理路由
+app.get('/api/projects', requireAuth, (req, res) => {
+  const { status } = req.query;
+  let query = `
+    SELECT p.*, c.name as customer_name, u.name as creator_name 
+    FROM projects p 
+    LEFT JOIN customers c ON p.customer_id = c.id
+    LEFT JOIN users u ON p.created_by = u.id
+  `;
+  const params = [];
+  
+  if (status) {
+    query += ' WHERE p.status = ?';
+    params.push(status);
+  }
+  
+  query += ' ORDER BY p.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取项目列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.get('/api/projects/:id', requireAuth, (req, res) => {
+  const projectId = req.params.id;
+  
+  db.get(
+    `SELECT p.*, c.name as customer_name, u.name as creator_name 
+     FROM projects p 
+     LEFT JOIN customers c ON p.customer_id = c.id
+     LEFT JOIN users u ON p.created_by = u.id
+     WHERE p.id = ?`,
+    [projectId],
+    (err, row) => {
+      if (err) {
+        console.error('获取项目详情失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      if (!row) {
+        return res.status(404).json({ error: '项目不存在' });
+      }
+      
+      res.json(row);
+    }
+  );
+});
+
+app.post('/api/projects', requireAuth, (req, res) => {
+  const { name, customer_id, description, budget, start_date, end_date } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: '项目名称不能为空' });
+  }
+  
+  db.run(
+    "INSERT INTO projects (name, customer_id, description, budget, start_date, end_date, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [name, customer_id, description, budget, start_date, end_date, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建项目失败:', err);
+        return res.status(500).json({ error: '创建项目失败' });
+      }
+      
+      // 返回新创建的项目信息
+      db.get(
+        `SELECT p.*, c.name as customer_name, u.name as creator_name 
+         FROM projects p 
+         LEFT JOIN customers c ON p.customer_id = c.id
+         LEFT JOIN users u ON p.created_by = u.id
+         WHERE p.id = ?`,
+        [this.lastID],
+        (err, row) => {
+          if (err) {
+            console.error('获取新项目失败:', err);
+            return res.status(500).json({ error: '创建成功但获取项目信息失败' });
+          }
+          res.json(row);
+        }
+      );
+    }
+  );
+});
+
+app.put('/api/projects/:id', requireAuth, (req, res) => {
+  const projectId = req.params.id;
+  const { name, customer_id, description, status, progress, budget, start_date, end_date } = req.body;
+  
+  db.run(
+    "UPDATE projects SET name = ?, customer_id = ?, description = ?, status = ?, progress = ?, budget = ?, start_date = ?, end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [name, customer_id, description, status, progress, budget, start_date, end_date, projectId],
+    function(err) {
+      if (err) {
+        console.error('更新项目失败:', err);
+        return res.status(500).json({ error: '更新项目失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '项目不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// 任务管理路由
+app.get('/api/tasks', requireAuth, (req, res) => {
+  const { project_id, status, assigned_to } = req.query;
+  let query = `
+    SELECT t.*, p.name as project_name, u1.name as assigned_name, u2.name as creator_name
+    FROM tasks t 
+    LEFT JOIN projects p ON t.project_id = p.id
+    LEFT JOIN users u1 ON t.assigned_to = u1.id
+    LEFT JOIN users u2 ON t.created_by = u2.id
+  `;
+  const params = [];
+  
+  if (project_id || status || assigned_to) {
+    query += ' WHERE ';
+    const conditions = [];
+    
+    if (project_id) {
+      conditions.push('t.project_id = ?');
+      params.push(project_id);
+    }
+    
+    if (status) {
+      conditions.push('t.status = ?');
+      params.push(status);
+    }
+    
+    if (assigned_to) {
+      conditions.push('t.assigned_to = ?');
+      params.push(assigned_to);
+    }
+    
+    query += conditions.join(' AND ');
+  }
+  
+  query += ' ORDER BY t.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取任务列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/api/tasks', requireAuth, (req, res) => {
+  const { project_id, title, description, priority, assigned_to, due_date } = req.body;
+  
+  if (!title) {
+    return res.status(400).json({ error: '任务标题不能为空' });
+  }
+  
+  db.run(
+    "INSERT INTO tasks (project_id, title, description, priority, assigned_to, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [project_id, title, description, priority, assigned_to, due_date, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建任务失败:', err);
+        return res.status(500).json({ error: '创建任务失败' });
+      }
+      
+      // 返回新创建的任务信息
+      db.get(
+        `SELECT t.*, p.name as project_name, u1.name as assigned_name, u2.name as creator_name
+         FROM tasks t 
+         LEFT JOIN projects p ON t.project_id = p.id
+         LEFT JOIN users u1 ON t.assigned_to = u1.id
+         LEFT JOIN users u2 ON t.created_by = u2.id
+         WHERE t.id = ?`,
+        [this.lastID],
+        (err, row) => {
+          if (err) {
+            console.error('获取新任务失败:', err);
+            return res.status(500).json({ error: '创建成功但获取任务信息失败' });
+          }
+          res.json(row);
+        }
+      );
+    }
+  );
+});
+
+app.put('/api/tasks/:id', requireAuth, (req, res) => {
+  const taskId = req.params.id;
+  const { title, description, status, priority, assigned_to, due_date } = req.body;
+  
+  let completed_at = null;
+  if (status === 'completed') {
+    completed_at = new Date().toISOString();
+  }
+  
+  db.run(
+    "UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, assigned_to = ?, due_date = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [title, description, status, priority, assigned_to, due_date, completed_at, taskId],
+    function(err) {
+      if (err) {
+        console.error('更新任务失败:', err);
+        return res.status(500).json({ error: '更新任务失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '任务不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// 仪表板数据
+app.get('/api/dashboard/stats', requireAuth, (req, res) => {
+  const stats = {};
+  
+  // 获取客户数量
+  db.get("SELECT COUNT(*) as count FROM customers WHERE status = 'active'", (err, row) => {
+    if (err) {
+      console.error('获取客户统计失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    stats.customers = row.count;
+    
+    // 获取项目数量
+    db.get("SELECT COUNT(*) as count FROM projects", (err, row) => {
+      if (err) {
+        console.error('获取项目统计失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      stats.projects = row.count;
+      
+      // 获取进行中项目数量
+      db.get("SELECT COUNT(*) as count FROM projects WHERE status = 'active'", (err, row) => {
+        if (err) {
+          console.error('获取进行中项目统计失败:', err);
+          return res.status(500).json({ error: '服务器错误' });
+        }
+        stats.activeProjects = row.count;
+        
+        // 获取用户数量
+        db.get("SELECT COUNT(*) as count FROM users WHERE is_active = 1", (err, row) => {
+          if (err) {
+            console.error('获取用户统计失败:', err);
+            return res.status(500).json({ error: '服务器错误' });
+          }
+          stats.users = row.count;
+          
+          // 获取任务统计
+          db.get("SELECT COUNT(*) as total FROM tasks", (err, row) => {
+            if (err) {
+              console.error('获取任务统计失败:', err);
+              return res.status(500).json({ error: '服务器错误' });
+            }
+            stats.tasks = row.total;
+            
+            db.get("SELECT COUNT(*) as count FROM tasks WHERE status = 'completed'", (err, row) => {
+              if (err) {
+                console.error('获取完成任务统计失败:', err);
+                return res.status(500).json({ error: '服务器错误' });
+              }
+              stats.completedTasks = row.count;
+              
+              res.json(stats);
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+// 通配符路由 - 返回前端应用（生产环境）
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, 'dist', 'index.html'));
+  });
+} else {
+  // 开发环境下的根路径提示
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: '企业管理系统后端 API 服务运行中',
+      environment: 'development',
+      frontend: '请运行 npm run client 启动前端开发服务器',
+      endpoints: {
+        auth: '/api/login, /api/logout, /api/me',
+        users: '/api/users',
+        customers: '/api/customers',
+        projects: '/api/projects',
+        tasks: '/api/tasks',
+        dashboard: '/api/dashboard/stats'
+      }
+    });
+  });
+}
+
+// 404 处理
+app.use((req, res) => {
+  res.status(404).json({ error: '接口不存在' });
+});
+
+// 全局错误处理
+app.use((err, req, res, next) => {
+  console.error('服务器错误:', err);
+  res.status(500).json({ error: '服务器内部错误' });
+});
+
+// 初始化数据库并启动服务器
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`企业管理系统后端服务运行在 http://localhost:${PORT}`);
+      console.log(`环境: ${process.env.NODE_ENV || 'development'}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`前端开发服务器请运行: npm run client`);
+        console.log(`默认管理员账号: admin / admin123`);
+      }
+    });
+  })
+  .catch((err) => {
+    console.error('数据库初始化失败:', err);
+    process.exit(1);
+  });
+
+// 优雅关闭
+process.on('SIGINT', () => {
+  console.log('正在关闭服务器...');
+  db.close((err) => {
+    if (err) {
+      console.error('关闭数据库失败:', err);
+    } else {
+      console.log('数据库连接已关闭');
+    }
+    process.exit(0);
+  });
+});
+
+export default app;
