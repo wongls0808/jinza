@@ -933,4 +933,24 @@ process.on('SIGINT', () => {
   });
 });
 
+// 在文件上传路由后添加删除API
+app.delete('/api/upload/:type', requireAuth, (req, res) => {
+  const { type } = req.params; // logo, seal, signature
+  const { account_set_id } = req.body;
+  
+  // 清空对应的素材路径
+  const field = `${type}_path`;
+  db.run(
+    `UPDATE account_sets SET ${field} = NULL WHERE id = ?`,
+    [account_set_id],
+    function(err) {
+      if (err) {
+        console.error('删除素材失败:', err);
+        return res.status(500).json({ error: '删除素材失败' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
 export default app;

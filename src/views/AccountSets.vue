@@ -61,6 +61,31 @@
               <span class="address">{{ account.address || '未设置地址' }}</span>
             </div>
           </div>
+
+          <!-- 素材预览 -->
+          <div class="material-previews" v-if="hasMaterials(account)">
+            <div class="preview-title">素材预览</div>
+            <div class="preview-items">
+              <div v-if="account.logo_path" class="preview-item" @click="previewMaterial(account.logo_path, 'LOGO')">
+                <div class="preview-label">LOGO</div>
+                <div class="preview-image">
+                  <img :src="getMaterialUrl(account.logo_path)" alt="LOGO" />
+                </div>
+              </div>
+              <div v-if="account.seal_path" class="preview-item" @click="previewMaterial(account.seal_path, '印章')">
+                <div class="preview-label">印章</div>
+                <div class="preview-image">
+                  <img :src="getMaterialUrl(account.seal_path)" alt="印章" />
+                </div>
+              </div>
+              <div v-if="account.signature_path" class="preview-item" @click="previewMaterial(account.signature_path, '签名')">
+                <div class="preview-label">签名</div>
+                <div class="preview-image">
+                  <img :src="getMaterialUrl(account.signature_path)" alt="签名" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="card-footer">
@@ -85,12 +110,27 @@
       :title="editingAccountSet ? '编辑账套' : '新增账套'" 
       width="600px"
       class="modern-dialog"
+      @closed="handleDialogClosed"
     >
-      <el-form :model="accountSetForm" label-width="100px" class="modern-form">
-        <el-form-item label="账套名称" required>
+      <el-form :model="accountSetForm" label-width="100px" class="modern-form" ref="accountFormRef">
+        <el-form-item 
+          label="账套名称" 
+          required
+          :rules="[{ required: true, message: '请输入账套名称', trigger: 'blur' }]"
+        >
           <el-input 
             v-model="accountSetForm.name" 
             placeholder="请输入账套名称"
+            size="large"
+            @input="handleNameInput"
+          />
+        </el-form-item>
+
+        <el-form-item label="账套代码">
+          <el-input 
+            v-model="accountSetForm.code" 
+            disabled 
+            placeholder="自动生成"
             size="large"
           />
         </el-form-item>
@@ -192,11 +232,22 @@
       v-model="showCodeRuleDialog" 
       :account-set="currentAccountSet"
     />
+
+    <!-- 素材预览对话框 -->
+    <el-dialog v-model="showMaterialPreview" :title="`${previewMaterialType}预览`" width="500px" align-center>
+      <div class="material-preview-dialog">
+        <img :src="previewMaterialUrl" :alt="previewMaterialType" class="preview-full-image" />
+        <div class="preview-info">
+          <p>素材类型: {{ previewMaterialType }}</p>
+          <p>建议尺寸: {{ getMaterialSize(previewMaterialType) }}</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Plus, MoreFilled, Phone, Message, Location 
@@ -211,6 +262,7 @@ const accountSets = ref([]);
 const showAddDialog = ref(false);
 const editingAccountSet = ref(null);
 const saving = ref(false);
+const accountFormRef = ref(null);
 const accountSetForm = ref({
   name: '',
   code: '',
@@ -231,6 +283,11 @@ const showTemplateDialog = ref(false);
 const showCodeRuleDialog = ref(false);
 const currentAccountSet = ref(null);
 
+// 素材预览
+const showMaterialPreview = ref(false);
+const previewMaterialUrl = ref('');
+const previewMaterialType = ref('');
+
 onMounted(async () => {
   await loadAccountSets();
 });
@@ -244,6 +301,33 @@ const loadAccountSets = async () => {
   } catch (error) {
     console.error('加载账套失败:', error);
     ElMessage.error('加载账套失败');
+  }
+};
+
+// 账套名称输入处理 - 自动转为大写
+const handleNameInput = (value) => {
+  accountSetForm.value.name = value.toUpperCase();
+  
+  // 自动生成账套代码（名称前3个字母 + 2位随机数）
+  if (value.length >= 2) {
+    const namePrefix = value.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase();
+    const randomNum = Math.floor(Math.random() * 90 + 10); // 10-99
+    accountSetForm.value.code = `${namePrefix}${randomNum}`;
+  } else {
+    accountSetForm.value.code = '';
+  }
+};
+
+// 对话框关闭处理
+const handleDialogClosed = () => {
+  editingAccountSet.value = null;
+  accountSetForm.value = {
+    name: '', code: '', registration_number: '', tax_number: '',
+    phone: '', email: '', address: '', bank_name: '', bank_account: '',
+    bank_name2: '', bank_account2: ''
+  };
+  if (accountFormRef.value) {
+    accountFormRef.value.clearValidate();
   }
 };
 
@@ -269,12 +353,6 @@ const saveAccountSet = async () => {
     
     if (response.ok) {
       showAddDialog.value = false;
-      editingAccountSet.value = null;
-      accountSetForm.value = {
-        name: '', code: '', registration_number: '', tax_number: '',
-        phone: '', email: '', address: '', bank_name: '', bank_account: '',
-        bank_name2: '', bank_account2: ''
-      };
       await loadAccountSets();
       ElMessage.success(editingAccountSet.value ? '更新成功' : '创建成功');
     } else {
@@ -348,6 +426,35 @@ const toggleAccountStatus = async (account) => {
     ElMessage.error('操作失败');
   }
 };
+
+// 素材相关功能
+const hasMaterials = (account) => {
+  return account.logo_path || account.seal_path || account.signature_path;
+};
+
+const getMaterialUrl = (path) => {
+  // 如果是完整的URL，直接返回
+  if (path.startsWith('http')) {
+    return path;
+  }
+  // 如果是相对路径，构建完整URL
+  return path;
+};
+
+const previewMaterial = (url, type) => {
+  previewMaterialUrl.value = getMaterialUrl(url);
+  previewMaterialType.value = type;
+  showMaterialPreview.value = true;
+};
+
+const getMaterialSize = (type) => {
+  const sizes = {
+    'LOGO': '400×400px',
+    '印章': '400×400px',
+    '签名': '400×150px'
+  };
+  return sizes[type] || '';
+};
 </script>
 
 <style scoped>
@@ -385,7 +492,7 @@ const toggleAccountStatus = async (account) => {
 
 .account-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 20px;
   margin-bottom: 32px;
 }
@@ -448,6 +555,7 @@ const toggleAccountStatus = async (account) => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 16px;
 }
 
 .info-item {
@@ -464,10 +572,66 @@ const toggleAccountStatus = async (account) => {
 
 .address {
   display: -webkit-box;
-  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 素材预览样式 */
+.material-previews {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 16px;
+}
+
+.preview-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 12px;
+}
+
+.preview-items {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-item {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 8px;
+  background: #f8f9fa;
+}
+
+.preview-item:hover {
+  border-color: #409eff;
+  background: #f0f7ff;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.preview-image {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.preview-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .card-footer {
@@ -505,5 +669,33 @@ const toggleAccountStatus = async (account) => {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+/* 素材预览对话框 */
+.material-preview-dialog {
+  text-align: center;
+}
+
+.preview-full-image {
+  max-width: 100%;
+  max-height: 400px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8f9fa;
+  margin-bottom: 16px;
+}
+
+.preview-info {
+  text-align: left;
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.preview-info p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #606266;
 }
 </style>
