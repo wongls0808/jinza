@@ -113,6 +113,57 @@ function initializeDatabase() {
         FOREIGN KEY(created_by) REFERENCES users(id)
       )`);
 
+      // 账套表
+db.run(`CREATE TABLE IF NOT EXISTS account_sets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  registration_number TEXT,
+  tax_number TEXT,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  bank_name TEXT,
+  bank_account TEXT,
+  bank_name2 TEXT,
+  bank_account2 TEXT,
+  logo_path TEXT,
+  seal_path TEXT,
+  signature_path TEXT,
+  is_active INTEGER DEFAULT 1,
+  created_by INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(created_by) REFERENCES users(id)
+)`);
+
+// 打印模板表
+db.run(`CREATE TABLE IF NOT EXISTS print_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_set_id INTEGER,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL, -- invoice, receipt, contract等
+  paper_size TEXT DEFAULT 'A4',
+  content TEXT, -- 模板内容JSON
+  is_default INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
+)`);
+
+// 编码规则表
+db.run(`CREATE TABLE IF NOT EXISTS code_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_set_id INTEGER,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL, -- 编码类型
+  prefix TEXT,
+  suffix TEXT,
+  format TEXT, -- 编码格式
+  current_number INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
+)`);
+
       // 检查并创建默认管理员
       db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
         if (err) {
@@ -789,6 +840,183 @@ process.on('SIGINT', () => {
       console.log('数据库连接已关闭');
     }
     process.exit(0);
+  });
+});
+
+// 账套管理路由
+app.get('/api/account-sets', requireAuth, (req, res) => {
+  db.all(`
+    SELECT a.*, u.name as creator_name 
+    FROM account_sets a 
+    LEFT JOIN users u ON a.created_by = u.id
+    ORDER BY a.created_at DESC
+  `, (err, rows) => {
+    if (err) {
+      console.error('获取账套列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/api/account-sets', requireAuth, (req, res) => {
+  const {
+    name, registration_number, tax_number, phone, email, address,
+    bank_name, bank_account, bank_name2, bank_account2
+  } = req.body;
+  
+  // 自动生成账套代码（名称首字母大写 + 2位数字）
+  const namePrefix = name.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
+  const randomNum = Math.floor(Math.random() * 90 + 10); // 10-99
+  
+  const code = `${namePrefix}${randomNum}`;
+  
+  db.run(
+    `INSERT INTO account_sets 
+     (name, code, registration_number, tax_number, phone, email, address, 
+      bank_name, bank_account, bank_name2, bank_account2, created_by) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, code, registration_number, tax_number, phone, email, address,
+     bank_name, bank_account, bank_name2, bank_account2, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建账套失败:', err);
+        return res.status(500).json({ error: '创建账套失败' });
+      }
+      
+      res.json({ 
+        id: this.lastID, 
+        name, code, registration_number, tax_number, phone, email, address,
+        bank_name, bank_account, bank_name2, bank_account2,
+        is_active: 1
+      });
+    }
+  );
+});
+
+// 文件上传路由（LOGO、印章、签名）
+app.post('/api/upload/:type', requireAuth, (req, res) => {
+  // 这里需要处理文件上传，简化版本
+  const { type } = req.params; // logo, seal, signature
+  const { account_set_id, file_data } = req.body;
+  
+  // 在实际项目中，这里应该处理文件上传到云存储或本地文件系统
+  const filePath = `/uploads/${type}_${account_set_id}_${Date.now()}.png`;
+  
+  // 更新账套的文件路径
+  const field = `${type}_path`;
+  db.run(
+    `UPDATE account_sets SET ${field} = ? WHERE id = ?`,
+    [filePath, account_set_id],
+    function(err) {
+      if (err) {
+        console.error('更新文件路径失败:', err);
+        return res.status(500).json({ error: '文件上传失败' });
+      }
+      res.json({ success: true, file_path: filePath });
+    }
+  );
+});
+
+// 打印模板管理
+app.get('/api/print-templates', requireAuth, (req, res) => {
+  const { account_set_id } = req.query;
+  
+  db.all(
+    `SELECT * FROM print_templates WHERE account_set_id = ? ORDER BY created_at DESC`,
+    [account_set_id],
+    (err, rows) => {
+      if (err) {
+        console.error('获取打印模板失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+app.post('/api/print-templates', requireAuth, (req, res) => {
+  const { account_set_id, name, type, paper_size, content } = req.body;
+  
+  db.run(
+    `INSERT INTO print_templates (account_set_id, name, type, paper_size, content) 
+     VALUES (?, ?, ?, ?, ?)`,
+    [account_set_id, name, type, paper_size, content],
+    function(err) {
+      if (err) {
+        console.error('创建打印模板失败:', err);
+        return res.status(500).json({ error: '创建模板失败' });
+      }
+      res.json({ id: this.lastID, name, type, paper_size, content });
+    }
+  );
+});
+
+// 编码规则管理
+app.get('/api/code-rules', requireAuth, (req, res) => {
+  const { account_set_id } = req.query;
+  
+  db.all(
+    `SELECT * FROM code_rules WHERE account_set_id = ? ORDER BY created_at DESC`,
+    [account_set_id],
+    (err, rows) => {
+      if (err) {
+        console.error('获取编码规则失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+app.post('/api/code-rules', requireAuth, (req, res) => {
+  const { account_set_id, name, type, prefix, suffix, format } = req.body;
+  
+  db.run(
+    `INSERT INTO code_rules (account_set_id, name, type, prefix, suffix, format) 
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [account_set_id, name, type, prefix, suffix, format],
+    function(err) {
+      if (err) {
+        console.error('创建编码规则失败:', err);
+        return res.status(500).json({ error: '创建编码规则失败' });
+      }
+      res.json({ id: this.lastID, name, type, prefix, suffix, format, current_number: 0 });
+    }
+  );
+});
+
+// 生成编码
+app.post('/api/generate-code', requireAuth, (req, res) => {
+  const { rule_id } = req.body;
+  
+  db.get(`SELECT * FROM code_rules WHERE id = ?`, [rule_id], (err, rule) => {
+    if (err || !rule) {
+      return res.status(400).json({ error: '编码规则不存在' });
+    }
+    
+    // 更新当前编号
+    const newNumber = rule.current_number + 1;
+    db.run(
+      `UPDATE code_rules SET current_number = ? WHERE id = ?`,
+      [newNumber, rule_id],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: '生成编码失败' });
+        }
+        
+        // 根据格式生成编码
+        let generatedCode = rule.format
+          .replace('{prefix}', rule.prefix || '')
+          .replace('{suffix}', rule.suffix || '')
+          .replace('{number}', newNumber.toString().padStart(4, '0'))
+          .replace('{year}', new Date().getFullYear())
+          .replace('{month}', (new Date().getMonth() + 1).toString().padStart(2, '0'))
+          .replace('{day}', new Date().getDate().toString().padStart(2, '0'));
+        
+        res.json({ code: generatedCode, rule_id, current_number: newNumber });
+      }
+    );
   });
 });
 

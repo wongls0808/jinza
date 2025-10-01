@@ -27,6 +27,10 @@
             <el-icon><Setting /></el-icon>
             <span>用户管理</span>
           </el-menu-item>
+          <el-menu-item index="5" @click="currentView = 'accountSets'">
+          <el-icon><Document /></el-icon>
+           <span>账套管理</span>
+           </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -70,6 +74,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from './utils/router.js';
+import AccountSets from './views/AccountSets.vue';
 
 const { currentRoute, navigate } = useRouter();
 const user = ref(null);
