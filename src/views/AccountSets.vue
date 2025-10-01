@@ -1,314 +1,216 @@
 <template>
-  <div class="account-sets">
-    <div class="header">
-      <h2>账套管理</h2>
-      <el-button type="primary" @click="showAddDialog = true">新增账套</el-button>
+  <div class="account-sets-modern">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">账套管理</h1>
+        <p class="page-description">管理企业财务账套信息，包括基础信息、银行账户和业务素材</p>
+      </div>
+      <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
+        <el-icon><Plus /></el-icon>
+        新增账套
+      </el-button>
     </div>
 
-    <!-- 账套列表 -->
-    <el-table :data="accountSets" style="width: 100%">
-      <el-table-column prop="code" label="账套代码" width="120" />
-      <el-table-column prop="name" label="账套名称" />
-      <el-table-column prop="tax_number" label="税号" />
-      <el-table-column prop="phone" label="联系电话" />
-      <el-table-column prop="is_active" label="状态" width="80">
-        <template #default="scope">
-          <el-tag :type="scope.row.is_active ? 'success' : 'info'">
-            {{ scope.row.is_active ? '启用' : '停用' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="300">
-        <template #default="scope">
-          <el-button size="small" @click="editAccountSet(scope.row)">编辑</el-button>
-          <el-button size="small" @click="manageMaterials(scope.row)">素材</el-button>
-          <el-button size="small" @click="manageTemplates(scope.row)">模板</el-button>
-          <el-button size="small" @click="manageCodeRules(scope.row)">编码</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 账套卡片列表 -->
+    <div class="account-cards" v-if="accountSets.length > 0">
+      <el-card 
+        v-for="account in accountSets" 
+        :key="account.id" 
+        class="account-card"
+        :class="{ 'active-card': account.is_active }"
+      >
+        <div class="card-header">
+          <div class="account-badge">
+            <span class="account-code">{{ account.code }}</span>
+            <el-tag :type="account.is_active ? 'success' : 'info'" size="small">
+              {{ account.is_active ? '启用' : '停用' }}
+            </el-tag>
+          </div>
+          <el-dropdown @command="(command) => handleAccountCommand(command, account)">
+            <el-button text class="card-menu">
+              <el-icon><MoreFilled /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="edit">编辑账套</el-dropdown-item>
+                <el-dropdown-item command="materials">管理素材</el-dropdown-item>
+                <el-dropdown-item command="templates">打印模板</el-dropdown-item>
+                <el-dropdown-item command="codes">编码规则</el-dropdown-item>
+                <el-dropdown-item divided command="toggleStatus">
+                  {{ account.is_active ? '停用' : '启用' }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+        
+        <div class="card-content">
+          <h3 class="account-name">{{ account.name }}</h3>
+          <div class="account-info">
+            <div class="info-item">
+              <el-icon><Phone /></el-icon>
+              <span>{{ account.phone || '未设置' }}</span>
+            </div>
+            <div class="info-item">
+              <el-icon><Message /></el-icon>
+              <span>{{ account.email || '未设置' }}</span>
+            </div>
+            <div class="info-item">
+              <el-icon><Location /></el-icon>
+              <span class="address">{{ account.address || '未设置地址' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <div class="action-buttons">
+            <el-button size="small" @click="editAccountSet(account)">编辑</el-button>
+            <el-button size="small" type="primary" @click="manageMaterials(account)">素材</el-button>
+            <el-button size="small" type="primary" @click="manageTemplates(account)">模板</el-button>
+            <el-button size="small" type="primary" @click="manageCodeRules(account)">编码</el-button>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 空状态 -->
+    <el-empty v-else description="暂无账套数据" class="empty-state">
+      <el-button type="primary" @click="showAddDialog = true">创建第一个账套</el-button>
+    </el-empty>
 
     <!-- 新增/编辑账套对话框 -->
-    <el-dialog v-model="showAddDialog" :title="editingAccountSet ? '编辑账套' : '新增账套'" width="800px">
-      <el-form :model="accountSetForm" label-width="100px">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="账套名称" required>
-              <el-input v-model="accountSetForm.name" placeholder="请输入账套名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="账套代码">
-              <el-input v-model="accountSetForm.code" disabled placeholder="自动生成" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="注册号">
-              <el-input v-model="accountSetForm.registration_number" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="税号">
-              <el-input v-model="accountSetForm.tax_number" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-form-item label="联系电话">
-          <el-input v-model="accountSetForm.phone" />
+    <el-dialog 
+      v-model="showAddDialog" 
+      :title="editingAccountSet ? '编辑账套' : '新增账套'" 
+      width="600px"
+      class="modern-dialog"
+    >
+      <el-form :model="accountSetForm" label-width="100px" class="modern-form">
+        <el-form-item label="账套名称" required>
+          <el-input 
+            v-model="accountSetForm.name" 
+            placeholder="请输入账套名称"
+            size="large"
+          />
         </el-form-item>
 
-        <el-form-item label="邮箱">
-          <el-input v-model="accountSetForm.email" />
+        <el-form-item label="注册信息">
+          <div class="form-row">
+            <el-input 
+              v-model="accountSetForm.registration_number" 
+              placeholder="注册号"
+            />
+            <el-input 
+              v-model="accountSetForm.tax_number" 
+              placeholder="税号"
+            />
+          </div>
+        </el-form-item>
+
+        <el-form-item label="联系信息">
+          <div class="form-row">
+            <el-input 
+              v-model="accountSetForm.phone" 
+              placeholder="联系电话"
+            />
+            <el-input 
+              v-model="accountSetForm.email" 
+              placeholder="邮箱地址"
+            />
+          </div>
         </el-form-item>
 
         <el-form-item label="地址">
-          <el-input v-model="accountSetForm.address" type="textarea" :rows="2" />
+          <el-input 
+            v-model="accountSetForm.address" 
+            type="textarea" 
+            :rows="2" 
+            placeholder="详细地址"
+          />
         </el-form-item>
 
-        <el-divider>银行信息</el-divider>
+        <el-divider content-position="left">银行账户信息</el-divider>
 
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="银行名称">
-              <el-input v-model="accountSetForm.bank_name" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="银行账号">
-              <el-input v-model="accountSetForm.bank_account" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="主要账户">
+          <div class="form-row">
+            <el-input 
+              v-model="accountSetForm.bank_name" 
+              placeholder="银行名称"
+            />
+            <el-input 
+              v-model="accountSetForm.bank_account" 
+              placeholder="银行账号"
+            />
+          </div>
+        </el-form-item>
 
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="银行名称Ⅱ">
-              <el-input v-model="accountSetForm.bank_name2" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="银行账号Ⅱ">
-              <el-input v-model="accountSetForm.bank_account2" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="备用账户">
+          <div class="form-row">
+            <el-input 
+              v-model="accountSetForm.bank_name2" 
+              placeholder="银行名称"
+            />
+            <el-input 
+              v-model="accountSetForm.bank_account2" 
+              placeholder="银行账号"
+            />
+          </div>
+        </el-form-item>
       </el-form>
 
       <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveAccountSet">确定</el-button>
+        <div class="dialog-footer">
+          <el-button @click="showAddDialog = false" size="large">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="saveAccountSet" 
+            size="large"
+            :loading="saving"
+          >
+            {{ saving ? '保存中...' : '确认保存' }}
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
     <!-- 素材管理对话框 -->
-    <el-dialog v-model="showMaterialDialog" title="素材管理" width="600px">
-      <div class="material-management">
-        <div class="material-header">
-          <h3>账套: {{ currentAccountSet?.name }}</h3>
-        </div>
+    <MaterialManagement 
+      v-model="showMaterialDialog" 
+      :account-set="currentAccountSet"
+      @update="loadAccountSets"
+    />
 
-        <el-form label-width="100px">
-          <el-form-item label="LOGO">
-            <el-upload
-              class="upload-demo"
-              action="/api/upload/logo"
-              :data="{ account_set_id: currentAccountSet?.id }"
-              :on-success="handleLogoSuccess"
-              :show-file-list="false"
-            >
-              <el-button type="primary">点击上传</el-button>
-              <template #tip>
-                <div class="el-upload__tip">建议尺寸: 200x200px, PNG格式</div>
-              </template>
-            </el-upload>
-            <div v-if="currentAccountSet?.logo_path" class="preview">
-              <img :src="currentAccountSet.logo_path" alt="LOGO" class="preview-image" />
-            </div>
-          </el-form-item>
-
-          <el-form-item label="印章">
-            <el-upload
-              class="upload-demo"
-              action="/api/upload/seal"
-              :data="{ account_set_id: currentAccountSet?.id }"
-              :on-success="handleSealSuccess"
-              :show-file-list="false"
-            >
-              <el-button type="primary">点击上传</el-button>
-              <template #tip>
-                <div class="el-upload__tip">建议尺寸: 150x150px, PNG格式</div>
-              </template>
-            </el-upload>
-            <div v-if="currentAccountSet?.seal_path" class="preview">
-              <img :src="currentAccountSet.seal_path" alt="印章" class="preview-image" />
-            </div>
-          </el-form-item>
-
-          <el-form-item label="签名">
-            <el-upload
-              class="upload-demo"
-              action="/api/upload/signature"
-              :data="{ account_set_id: currentAccountSet?.id }"
-              :on-success="handleSignatureSuccess"
-              :show-file-list="false"
-            >
-              <el-button type="primary">点击上传</el-button>
-              <template #tip>
-                <div class="el-upload__tip">建议尺寸: 200x80px, PNG格式</div>
-              </template>
-            </el-upload>
-            <div v-if="currentAccountSet?.signature_path" class="preview">
-              <img :src="currentAccountSet.signature_path" alt="签名" class="preview-image" />
-            </div>
-          </el-form-item>
-        </el-form>
-      </div>
-    </el-dialog>
-
-    <!-- 打印模板管理对话框 -->
-    <el-dialog v-model="showTemplateDialog" title="打印模板管理" width="900px">
-      <div class="template-management">
-        <div class="template-header">
-          <h3>账套: {{ currentAccountSet?.name }}</h3>
-          <el-button type="primary" @click="showAddTemplate = true">新增模板</el-button>
-        </div>
-
-        <el-table :data="printTemplates" style="width: 100%">
-          <el-table-column prop="name" label="模板名称" />
-          <el-table-column prop="type" label="类型">
-            <template #default="scope">
-              <el-tag>{{ getTemplateTypeText(scope.row.type) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="paper_size" label="纸张规格" />
-          <el-table-column label="默认模板">
-            <template #default="scope">
-              <el-tag v-if="scope.row.is_default" type="success">是</el-tag>
-              <el-tag v-else type="info">否</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="150">
-            <template #default="scope">
-              <el-button size="small" @click="editTemplate(scope.row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteTemplate(scope.row.id)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 新增模板对话框 -->
-        <el-dialog v-model="showAddTemplate" title="新增打印模板" width="600px" append-to-body>
-          <el-form :model="templateForm" label-width="100px">
-            <el-form-item label="模板名称" required>
-              <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
-            </el-form-item>
-            <el-form-item label="模板类型" required>
-              <el-select v-model="templateForm.type" placeholder="请选择模板类型">
-                <el-option label="发票" value="invoice" />
-                <el-option label="收据" value="receipt" />
-                <el-option label="合同" value="contract" />
-                <el-option label="报价单" value="quotation" />
-                <el-option label="送货单" value="delivery" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="纸张规格">
-              <el-select v-model="templateForm.paper_size">
-                <el-option label="A4" value="A4" />
-                <el-option label="A5" value="A5" />
-                <el-option label="B5" value="B5" />
-                <el-option label="80mm" value="80mm" />
-                <el-option label="58mm" value="58mm" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="设为默认">
-              <el-switch v-model="templateForm.is_default" />
-            </el-form-item>
-            <el-form-item label="模板内容">
-              <el-input v-model="templateForm.content" type="textarea" :rows="6" placeholder="请输入模板内容（支持HTML）" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="showAddTemplate = false">取消</el-button>
-            <el-button type="primary" @click="saveTemplate">保存模板</el-button>
-          </template>
-        </el-dialog>
-      </div>
-    </el-dialog>
+    <!-- 模板管理对话框 -->
+    <TemplateManagement 
+      v-model="showTemplateDialog" 
+      :account-set="currentAccountSet"
+    />
 
     <!-- 编码规则管理对话框 -->
-    <el-dialog v-model="showCodeRuleDialog" title="编码规则管理" width="800px">
-      <div class="code-rule-management">
-        <div class="code-rule-header">
-          <h3>账套: {{ currentAccountSet?.name }}</h3>
-          <el-button type="primary" @click="showAddCodeRule = true">新增规则</el-button>
-        </div>
-
-        <el-table :data="codeRules" style="width: 100%">
-          <el-table-column prop="name" label="规则名称" />
-          <el-table-column prop="type" label="类型">
-            <template #default="scope">
-              <el-tag>{{ getCodeTypeText(scope.row.type) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="format" label="格式" />
-          <el-table-column prop="current_number" label="当前编号" />
-          <el-table-column label="操作" width="150">
-            <template #default="scope">
-              <el-button size="small" @click="generateCode(scope.row)">生成</el-button>
-              <el-button size="small" @click="editCodeRule(scope.row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteCodeRule(scope.row.id)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 新增编码规则对话框 -->
-        <el-dialog v-model="showAddCodeRule" title="新增编码规则" width="600px" append-to-body>
-          <el-form :model="codeRuleForm" label-width="100px">
-            <el-form-item label="规则名称" required>
-              <el-input v-model="codeRuleForm.name" placeholder="请输入规则名称" />
-            </el-form-item>
-            <el-form-item label="编码类型" required>
-              <el-select v-model="codeRuleForm.type" placeholder="请选择编码类型">
-                <el-option label="发票编号" value="invoice" />
-                <el-option label="收据编号" value="receipt" />
-                <el-option label="合同编号" value="contract" />
-                <el-option label="客户编码" value="customer" />
-                <el-option label="项目编码" value="project" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="前缀">
-              <el-input v-model="codeRuleForm.prefix" placeholder="如: INVOICE" />
-            </el-form-item>
-            <el-form-item label="后缀">
-              <el-input v-model="codeRuleForm.suffix" placeholder="如: -01" />
-            </el-form-item>
-            <el-form-item label="编码格式" required>
-              <el-input v-model="codeRuleForm.format" placeholder="如: {prefix}{year}{month}{number}{suffix}" />
-              <div class="format-tips">
-                可用变量: {prefix}前缀, {suffix}后缀, {number}序号, {year}年, {month}月, {day}日
-              </div>
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="showAddCodeRule = false">取消</el-button>
-            <el-button type="primary" @click="saveCodeRule">保存规则</el-button>
-          </template>
-        </el-dialog>
-      </div>
-    </el-dialog>
+    <CodeRuleManagement 
+      v-model="showCodeRuleDialog" 
+      :account-set="currentAccountSet"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { 
+  Plus, MoreFilled, Phone, Message, Location 
+} from '@element-plus/icons-vue';
+
+// 导入组件
+import MaterialManagement from '../components/account/MaterialManagement.vue';
+import TemplateManagement from '../components/account/TemplateManagement.vue';
+import CodeRuleManagement from '../components/account/CodeRuleManagement.vue';
 
 const accountSets = ref([]);
 const showAddDialog = ref(false);
 const editingAccountSet = ref(null);
+const saving = ref(false);
 const accountSetForm = ref({
   name: '',
   code: '',
@@ -323,33 +225,11 @@ const accountSetForm = ref({
   bank_account2: ''
 });
 
-// 素材管理相关
+// 管理对话框
 const showMaterialDialog = ref(false);
-
-// 模板管理相关
 const showTemplateDialog = ref(false);
-const showAddTemplate = ref(false);
-const currentAccountSet = ref(null);
-const printTemplates = ref([]);
-const templateForm = ref({
-  name: '',
-  type: '',
-  paper_size: 'A4',
-  content: '',
-  is_default: false
-});
-
-// 编码规则管理相关
 const showCodeRuleDialog = ref(false);
-const showAddCodeRule = ref(false);
-const codeRules = ref([]);
-const codeRuleForm = ref({
-  name: '',
-  type: '',
-  prefix: '',
-  suffix: '',
-  format: ''
-});
+const currentAccountSet = ref(null);
 
 onMounted(async () => {
   await loadAccountSets();
@@ -368,21 +248,26 @@ const loadAccountSets = async () => {
 };
 
 const saveAccountSet = async () => {
-  try {
-    // 表单验证
-    if (!accountSetForm.value.name) {
-      ElMessage.error('请输入账套名称');
-      return;
-    }
+  if (!accountSetForm.value.name) {
+    ElMessage.error('请输入账套名称');
+    return;
+  }
 
-    const response = await fetch('/api/account-sets', {
-      method: 'POST',
+  saving.value = true;
+  try {
+    const url = editingAccountSet.value 
+      ? `/api/account-sets/${editingAccountSet.value.id}`
+      : '/api/account-sets';
+    
+    const method = editingAccountSet.value ? 'PUT' : 'POST';
+    
+    const response = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(accountSetForm.value)
     });
     
     if (response.ok) {
-      const data = await response.json();
       showAddDialog.value = false;
       editingAccountSet.value = null;
       accountSetForm.value = {
@@ -391,14 +276,16 @@ const saveAccountSet = async () => {
         bank_name2: '', bank_account2: ''
       };
       await loadAccountSets();
-      ElMessage.success('账套创建成功');
+      ElMessage.success(editingAccountSet.value ? '更新成功' : '创建成功');
     } else {
       const errorData = await response.json();
-      ElMessage.error(errorData.error || '创建账套失败');
+      ElMessage.error(errorData.error || '保存失败');
     }
   } catch (error) {
     console.error('保存账套失败:', error);
     ElMessage.error('保存账套失败，请检查网络连接');
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -408,204 +295,215 @@ const editAccountSet = (accountSet) => {
   showAddDialog.value = true;
 };
 
-const manageMaterials = async (accountSet) => {
+const manageMaterials = (accountSet) => {
   currentAccountSet.value = accountSet;
   showMaterialDialog.value = true;
 };
 
-const manageTemplates = async (accountSet) => {
+const manageTemplates = (accountSet) => {
   currentAccountSet.value = accountSet;
   showTemplateDialog.value = true;
-  await loadPrintTemplates(accountSet.id);
 };
 
-const loadPrintTemplates = async (accountSetId) => {
-  try {
-    const response = await fetch(`/api/print-templates?account_set_id=${accountSetId}`);
-    if (response.ok) {
-      printTemplates.value = await response.json();
-    }
-  } catch (error) {
-    console.error('加载打印模板失败:', error);
-  }
-};
-
-const saveTemplate = async () => {
-  try {
-    if (!templateForm.value.name || !templateForm.value.type) {
-      ElMessage.error('请填写模板名称和类型');
-      return;
-    }
-
-    const response = await fetch('/api/print-templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...templateForm.value,
-        account_set_id: currentAccountSet.value.id
-      })
-    });
-    
-    if (response.ok) {
-      showAddTemplate.value = false;
-      templateForm.value = {
-        name: '', type: '', paper_size: 'A4', content: '', is_default: false
-      };
-      await loadPrintTemplates(currentAccountSet.value.id);
-      ElMessage.success('模板创建成功');
-    }
-  } catch (error) {
-    console.error('保存模板失败:', error);
-    ElMessage.error('保存模板失败');
-  }
-};
-
-const manageCodeRules = async (accountSet) => {
+const manageCodeRules = (accountSet) => {
   currentAccountSet.value = accountSet;
   showCodeRuleDialog.value = true;
-  await loadCodeRules(accountSet.id);
 };
 
-const loadCodeRules = async (accountSetId) => {
-  try {
-    const response = await fetch(`/api/code-rules?account_set_id=${accountSetId}`);
-    if (response.ok) {
-      codeRules.value = await response.json();
-    }
-  } catch (error) {
-    console.error('加载编码规则失败:', error);
+const handleAccountCommand = (command, account) => {
+  switch (command) {
+    case 'edit':
+      editAccountSet(account);
+      break;
+    case 'materials':
+      manageMaterials(account);
+      break;
+    case 'templates':
+      manageTemplates(account);
+      break;
+    case 'codes':
+      manageCodeRules(account);
+      break;
+    case 'toggleStatus':
+      toggleAccountStatus(account);
+      break;
   }
 };
 
-const saveCodeRule = async () => {
+const toggleAccountStatus = async (account) => {
   try {
-    if (!codeRuleForm.value.name || !codeRuleForm.value.type || !codeRuleForm.value.format) {
-      ElMessage.error('请填写规则名称、类型和格式');
-      return;
-    }
-
-    const response = await fetch('/api/code-rules', {
-      method: 'POST',
+    const newStatus = !account.is_active;
+    const response = await fetch(`/api/account-sets/${account.id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...codeRuleForm.value,
-        account_set_id: currentAccountSet.value.id
-      })
+      body: JSON.stringify({ is_active: newStatus ? 1 : 0 })
     });
     
     if (response.ok) {
-      showAddCodeRule.value = false;
-      codeRuleForm.value = {
-        name: '', type: '', prefix: '', suffix: '', format: ''
-      };
-      await loadCodeRules(currentAccountSet.value.id);
-      ElMessage.success('编码规则创建成功');
+      await loadAccountSets();
+      ElMessage.success(newStatus ? '账套已启用' : '账套已停用');
     }
   } catch (error) {
-    console.error('保存编码规则失败:', error);
-    ElMessage.error('保存编码规则失败');
+    console.error('更新状态失败:', error);
+    ElMessage.error('操作失败');
   }
-};
-
-const generateCode = async (rule) => {
-  try {
-    const response = await fetch('/api/generate-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rule_id: rule.id })
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      ElMessage.success(`生成的编码: ${data.code}`);
-      await loadCodeRules(currentAccountSet.value.id);
-    }
-  } catch (error) {
-    console.error('生成编码失败:', error);
-    ElMessage.error('生成编码失败');
-  }
-};
-
-// 文件上传处理
-const handleLogoSuccess = (response) => {
-  if (currentAccountSet.value) {
-    currentAccountSet.value.logo_path = response.file_path;
-  }
-  ElMessage.success('LOGO上传成功');
-};
-
-const handleSealSuccess = (response) => {
-  if (currentAccountSet.value) {
-    currentAccountSet.value.seal_path = response.file_path;
-  }
-  ElMessage.success('印章上传成功');
-};
-
-const handleSignatureSuccess = (response) => {
-  if (currentAccountSet.value) {
-    currentAccountSet.value.signature_path = response.file_path;
-  }
-  ElMessage.success('签名上传成功');
-};
-
-// 辅助函数
-const getTemplateTypeText = (type) => {
-  const types = {
-    invoice: '发票',
-    receipt: '收据',
-    contract: '合同',
-    quotation: '报价单',
-    delivery: '送货单'
-  };
-  return types[type] || type;
-};
-
-const getCodeTypeText = (type) => {
-  const types = {
-    invoice: '发票编号',
-    receipt: '收据编号',
-    contract: '合同编号',
-    customer: '客户编码',
-    project: '项目编码'
-  };
-  return types[type] || type;
 };
 </script>
 
 <style scoped>
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.account-sets-modern {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.template-header,
-.code-rule-header,
-.material-header {
+.page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
   border-bottom: 1px solid #e6e6e6;
 }
 
-.preview {
-  margin-top: 10px;
+.header-content .page-title {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #303133;
 }
 
-.preview-image {
-  max-width: 150px;
-  max-height: 150px;
-  border: 1px solid #ddd;
+.header-content .page-description {
+  margin: 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.add-button {
+  border-radius: 8px;
+  padding: 12px 24px;
+}
+
+.account-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.account-card {
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  border: 1px solid #e6e6e6;
+}
+
+.account-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.active-card {
+  border-left: 4px solid #409eff;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.account-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-code {
+  font-weight: 600;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 4px 8px;
   border-radius: 4px;
-  padding: 5px;
+  font-size: 12px;
 }
 
-.format-tips {
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
+.card-menu {
+  padding: 4px;
+}
+
+.card-content {
+  margin-bottom: 16px;
+}
+
+.account-name {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.info-item .el-icon {
+  color: #909399;
+}
+
+.address {
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-footer {
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  margin: 60px 0;
+}
+
+.modern-dialog :deep(.el-dialog__header) {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e6e6e6;
+  margin: 0;
+}
+
+.modern-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+.modern-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 </style>

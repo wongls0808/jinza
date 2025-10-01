@@ -1,26 +1,51 @@
 <template>
   <div id="app">
     <el-container v-if="user" class="layout">
-      <!-- 侧边栏 -->
-      <el-aside width="200px" class="sidebar">
-        <div class="logo">企业管理系统</div>
+      <!-- 侧边栏 - 现代风格 -->
+      <el-aside width="240px" class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <div class="logo-icon">📊</div>
+            <span class="logo-text">企业管理系统</span>
+          </div>
+        </div>
+        
+        <div class="user-info-sidebar">
+          <div class="avatar">
+            {{ user.name.charAt(0) }}
+          </div>
+          <div class="user-details">
+            <div class="user-name">{{ user.name }}</div>
+            <div class="user-role">{{ user.role === 'admin' ? '管理员' : '用户' }}</div>
+          </div>
+        </div>
+
         <el-menu
           :default-active="activeMenu"
-          background-color="#304156"
-          text-color="#bfcbd9"
-          active-text-color="#409EFF"
+          class="sidebar-menu"
+          background-color="transparent"
+          text-color="#e0e0e0"
+          active-text-color="#ffffff"
         >
           <el-menu-item index="customers" @click="navigate('customers')">
-            <el-icon><User /></el-icon>
-            <span>客户管理</span>
+            <div class="menu-item-content">
+              <div class="menu-icon">👥</div>
+              <span class="menu-text">客户管理</span>
+            </div>
           </el-menu-item>
+          
           <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigate('users')">
-            <el-icon><Setting /></el-icon>
-            <span>用户管理</span>
+            <div class="menu-item-content">
+              <div class="menu-icon">👨‍💼</div>
+              <span class="menu-text">用户管理</span>
+            </div>
           </el-menu-item>
+          
           <el-menu-item index="accountSets" @click="navigate('accountSets')">
-            <el-icon><Document /></el-icon>
-            <span>账套管理</span>
+            <div class="menu-item-content">
+              <div class="menu-icon">📁</div>
+              <span class="menu-text">账套管理</span>
+            </div>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -28,40 +53,91 @@
       <!-- 主内容区 -->
       <el-container>
         <el-header class="header">
-          <div class="user-info">
-            <span>欢迎, {{ user.name }} ({{ user.role === 'admin' ? '管理员' : '用户' }})</span>
-            <el-button type="text" @click="logout">退出</el-button>
+          <div class="header-left">
+            <div class="breadcrumb">
+              <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <el-dropdown @command="handleCommand">
+              <span class="user-dropdown">
+                <el-avatar :size="32" :src="user.avatar" class="header-avatar">
+                  {{ user.name.charAt(0) }}
+                </el-avatar>
+                <span class="user-name">{{ user.name }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="profile">个人资料</el-dropdown-item>
+                  <el-dropdown-item command="settings">系统设置</el-dropdown-item>
+                  <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </el-header>
         
         <el-main class="main-content">
           <!-- 动态组件渲染 -->
-          <component :is="currentComponent" :user="user" />
+          <div class="page-container">
+            <component :is="currentComponent" :user="user" />
+          </div>
         </el-main>
       </el-container>
     </el-container>
 
-    <!-- 登录页 -->
+    <!-- 登录页 - 现代风格 -->
     <div v-else class="login-container">
-      <el-card class="login-box">
-        <template #header>
-          <h2>企业管理系统</h2>
-        </template>
-        <el-form @submit.prevent="login">
-          <el-form-item label="用户名">
-            <el-input v-model="loginForm.username" placeholder="请输入用户名" />
-          </el-form-item>
-          <el-form-item label="密码">
-            <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="login" style="width: 100%">登录</el-button>
-          </el-form-item>
-        </el-form>
-        <div style="color: #666; font-size: 12px; margin-top: 20px;">
-          默认账号: admin / admin123
+      <div class="login-background">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-logo">
+              <div class="logo-large">📊</div>
+              <h1>企业管理系统</h1>
+            </div>
+            <p class="login-subtitle">专业的企业管理解决方案</p>
+          </div>
+          
+          <el-form class="login-form" @submit.prevent="login">
+            <el-form-item>
+              <el-input
+                v-model="loginForm.username"
+                placeholder="用户名"
+                size="large"
+                :prefix-icon="User"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-input
+                v-model="loginForm.password"
+                type="password"
+                placeholder="密码"
+                size="large"
+                :prefix-icon="Lock"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                size="large" 
+                @click="login" 
+                class="login-button"
+                :loading="loading"
+              >
+                {{ loading ? '登录中...' : '登录系统' }}
+              </el-button>
+            </el-form-item>
+          </el-form>
+          
+          <div class="login-footer">
+            <div class="demo-account">
+              <span>演示账号: admin / admin123</span>
+            </div>
+          </div>
         </div>
-      </el-card>
+      </div>
     </div>
   </div>
 </template>
@@ -69,11 +145,7 @@
 <script setup>
 import { ref, onMounted, markRaw } from 'vue';
 import { ElMessage } from 'element-plus';
-import {
-  User,
-  Document,
-  Setting
-} from '@element-plus/icons-vue';
+import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 
 // 导入组件
 import Customers from './views/Customers.vue';
@@ -81,8 +153,9 @@ import Users from './views/Users.vue';
 import AccountSets from './views/AccountSets.vue';
 
 const user = ref(null);
-const activeMenu = ref('customers'); // 默认激活客户管理
+const activeMenu = ref('customers');
 const loginForm = ref({ username: '', password: '' });
+const loading = ref(false);
 
 // 定义路由组件映射
 const routes = {
@@ -92,13 +165,34 @@ const routes = {
 };
 
 // 当前组件
-const currentComponent = ref(routes.customers); // 默认显示客户管理
+const currentComponent = ref(routes.customers);
 
 // 导航函数
 const navigate = (route) => {
   activeMenu.value = route;
   if (routes[route]) {
     currentComponent.value = routes[route];
+  }
+};
+
+// 获取页面标题
+const getPageTitle = (route) => {
+  const titles = {
+    customers: '客户管理',
+    users: '用户管理',
+    accountSets: '账套管理'
+  };
+  return titles[route] || '企业管理系统';
+};
+
+// 用户下拉菜单处理
+const handleCommand = (command) => {
+  if (command === 'logout') {
+    logout();
+  } else if (command === 'profile') {
+    ElMessage.info('个人资料功能开发中');
+  } else if (command === 'settings') {
+    ElMessage.info('系统设置功能开发中');
   }
 };
 
@@ -117,6 +211,12 @@ onMounted(async () => {
 
 // 登录
 const login = async () => {
+  if (!loginForm.value.username || !loginForm.value.password) {
+    ElMessage.error('请输入用户名和密码');
+    return;
+  }
+
+  loading.value = true;
   try {
     const response = await fetch('/api/login', {
       method: 'POST',
@@ -129,11 +229,13 @@ const login = async () => {
       user.value = data.user;
       ElMessage.success('登录成功');
     } else {
-      ElMessage.error(data.error);
+      ElMessage.error(data.error || '登录失败');
     }
   } catch (error) {
     console.error('登录失败:', error);
     ElMessage.error('登录失败，请检查网络连接');
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -151,6 +253,225 @@ const logout = async () => {
 };
 </script>
 
-<style>
-/* 样式保持不变 */
+<style scoped>
+/* 现代布局样式 */
+.layout {
+  height: 100vh;
+  background: #f5f7fa;
+}
+
+/* 侧边栏样式 */
+.sidebar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  font-size: 24px;
+}
+
+.logo-text {
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.user-info-sidebar {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+}
+
+.user-details {
+  color: white;
+}
+
+.user-name {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.user-role {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sidebar-menu {
+  border: none;
+  margin-top: 10px;
+}
+
+.sidebar-menu .el-menu-item {
+  height: 50px;
+  margin: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-menu .el-menu-item.is-active {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-left: 3px solid #ffffff;
+}
+
+.menu-item-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-icon {
+  font-size: 18px;
+}
+
+.menu-text {
+  font-weight: 500;
+}
+
+/* 头部样式 */
+.header {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.header-left .page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-right .user-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.3s;
+}
+
+.header-right .user-dropdown:hover {
+  background: #f5f7fa;
+}
+
+.header-avatar {
+  background: #409eff;
+}
+
+.user-name {
+  font-weight: 500;
+}
+
+/* 主内容区 */
+.main-content {
+  padding: 0;
+  background: #f5f7fa;
+}
+
+.page-container {
+  padding: 24px;
+  min-height: calc(100vh - 60px);
+}
+
+/* 登录页样式 */
+.login-container {
+  height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-background {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 2px;
+}
+
+.login-card {
+  background: white;
+  border-radius: 18px;
+  padding: 40px;
+  width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-large {
+  font-size: 48px;
+}
+
+.login-logo h1 {
+  margin: 0;
+  color: #303133;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.login-subtitle {
+  margin: 8px 0 0 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.login-form {
+  margin-bottom: 20px;
+}
+
+.login-button {
+  width: 100%;
+  height: 44px;
+  font-weight: 500;
+}
+
+.login-footer {
+  text-align: center;
+  border-top: 1px solid #e6e6e6;
+  padding-top: 20px;
+}
+
+.demo-account {
+  font-size: 12px;
+  color: #909399;
+}
 </style>

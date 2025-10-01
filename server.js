@@ -1041,6 +1041,36 @@ app.post('/api/upload/:type', requireAuth, (req, res) => {
       res.json({ success: true, file_path: filePath });
     }
   );
-});
+});  
+
+     // 添加在账套管理API部分
+app.put('/api/account-sets/:id', requireAuth, (req, res) => {
+  const accountSetId = req.params.id;
+  const {
+    name, registration_number, tax_number, phone, email, address,
+    bank_name, bank_account, bank_name2, bank_account2
+  } = req.body;
+  
+  db.run(
+    `UPDATE account_sets 
+     SET name = ?, registration_number = ?, tax_number = ?, phone = ?, email = ?, address = ?,
+         bank_name = ?, bank_account = ?, bank_name2 = ?, bank_account2 = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [name, registration_number, tax_number, phone, email, address,
+     bank_name, bank_account, bank_name2, bank_account2, accountSetId],
+    function(err) {
+      if (err) {
+        console.error('更新账套失败:', err);
+        return res.status(500).json({ error: '更新账套失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '账套不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});   
 
 export default app;
