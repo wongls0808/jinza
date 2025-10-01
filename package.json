@@ -2,24 +2,19 @@
   "name": "enterprise-management",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "node server.js",
-    "client": "vite",
+    "dev": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "npm run build && node server.js"
+    "start": "node server.js"
   },
   "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6",
+    "express-session": "^1.17.3",
     "bcryptjs": "^2.4.3",
-    "express": "^4.21.2",
-    "express-session": "^1.18.2",
-    "sqlite3": "^5.1.7"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^4.3.0",
-    "concurrently": "^8.2.0",
-    "element-plus": "^2.3.8",
     "vite": "^4.4.0",
-    "vue": "^3.3.4"
+    "vue": "^3.3.4",
+    "element-plus": "^2.3.8",
+    "@vitejs/plugin-vue": "^4.3.0"
   }
 }
