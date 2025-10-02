@@ -1,9 +1,10 @@
 <template>
   <div id="app" :class="{ 'logged-in': user }">
-    <!-- v-if/v-else 确保同时只渲染一个界面，避免重复 -->
-    <!-- 已登录状态 - 显示主应用内容 -->
-    <el-container v-if="user" class="layout">
-      <!-- 侧边栏 - 现代风格 -->
+    <!-- 使用过渡动画，确保登录状态切换平滑 -->
+    <Transition name="fade" mode="out-in">
+      <!-- 已登录状态 - 显示主应用内容 -->
+      <el-container v-if="user" class="layout" key="app-layout">
+        <!-- 侧边栏 - 现代风格 -->
       <el-aside width="240px" class="sidebar">
         <div class="sidebar-header">
           <div class="logo">
@@ -97,9 +98,11 @@
       </el-container>
     </el-container>
     <ForcePasswordChange v-if="user && showForcePwd" :user-id="user.id" :require-old="true" @done="handlePwdUpdated" />
+    </Transition>
 
     <!-- 未登录状态 - 仅显示登录页 -->
-    <div v-else class="login-container">
+    <Transition name="fade" mode="out-in">
+      <div v-if="!user" class="login-container" key="login-container">
       <!-- 使用单独的容器包装登录页，避免与主应用内容交叉 -->
       <div class="login-background">
         <div class="login-card">
@@ -158,11 +161,12 @@
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, markRaw } from 'vue';
+import { ref, onMounted, markRaw, nextTick, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 
@@ -178,6 +182,11 @@ const activeMenu = ref('customers');
 const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
 const capsLockOn = ref(false);
+
+// 调试帮助函数，监控user变化
+watch(user, (newVal) => {
+  console.log('用户状态变化:', newVal);
+}, { deep: true });
 
 // 定义路由组件映射
 const routes = {
@@ -250,11 +259,22 @@ const login = async () => {
     
     const data = await response.json();
     if (data.success) {
-      user.value = data.user;
-      ElMessage.success('登录成功');
-      if (data.user.forcePasswordChange) {
-        showForcePwd.value = true;
-      }
+      console.log('登录成功，获取到用户信息:', data.user);
+      
+      // 确保表单重置
+      loginForm.value = { username: '', password: '' };
+      
+      // 设置用户状态，触发界面切换
+      setTimeout(() => {
+        user.value = { ...data.user }; // 使用扩展运算符创建新对象引用
+        ElMessage.success('登录成功');
+        console.log('用户状态已更新:', user.value);
+        
+        // 处理强制密码更改
+        if (data.user.forcePasswordChange) {
+          showForcePwd.value = true;
+        }
+      }, 100); // 短暂延迟确保状态更新和DOM刷新
     } else {
       ElMessage.error(data.error || '登录失败');
     }
@@ -305,6 +325,17 @@ const handlePwdUpdated = () => {
   width: 100vw;
   position: relative;
   overflow-x: hidden;
+}
+
+/* 淡入淡出过渡效果 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* 已登录状态下禁止滚动超出 */
