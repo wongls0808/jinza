@@ -1,14 +1,19 @@
 <template>
   <div class="recycle-bin">
     <div class="toolbar">
-      <el-input v-model="search" placeholder="搜索客户名称/注册号/税号" clearable @clear="loadData" @keyup.enter="loadData" style="width:260px" />
+      <el-input v-model="search" placeholder="搜索名称/注册号/税号" clearable @clear="loadData" @keyup.enter="loadData" style="width:260px" />
       <el-button type="primary" @click="loadData" :loading="loading">刷新</el-button>
     </div>
-    <el-empty v-if="!loading && items.length===0" description="暂无已删除客户" />
+    <el-empty v-if="!loading && items.length===0" description="暂无已删除内容" />
     <div v-else class="cards-grid">
-      <div v-for="c in items" :key="c.id" class="entity-card deleted">
+      <div v-for="c in items" :key="`${c.entityType}-${c.id}`" class="entity-card deleted">
         <div class="card-header">
-          <div class="title">{{ c.name }}</div>
+          <div class="title">
+            {{ c.name }}
+            <el-tag size="small" effect="plain" class="entity-type">
+              {{ c.entityType === 'customer' ? '客户' : '供应商' }}
+            </el-tag>
+          </div>
           <el-dropdown @command="cmd=>handleCommand(cmd,c)">
             <span class="more-actions">⋮</span>
             <template #dropdown>
@@ -20,6 +25,7 @@
           </el-dropdown>
         </div>
         <div class="meta">
+          <div v-if="c.contact && c.entityType === 'supplier'">联系人：{{ c.contact }}</div>
           <div v-if="c.registration_no">注册号：{{ c.registration_no }}</div>
           <div v-if="c.tax_no">税号：{{ c.tax_no }}</div>
           <div>状态：<el-tag size="small" type="info">已删除</el-tag></div>
@@ -43,13 +49,27 @@ const search = ref('');
 
 const loadData = async () => {
   loading.value = true;
+  items.value = [];
+  
   try {
     const qs = new URLSearchParams();
     if (search.value.trim()) qs.append('search', search.value.trim());
     qs.append('includeDeleted','1');
-    const resp = await fetch(`/api/customers?${qs.toString()}`);
-    const data = await resp.json();
-    items.value = Array.isArray(data) ? data.filter(r=>r.deleted_at) : [];
+    
+    // 加载客户
+    const customerResp = await fetch(`/api/customers?${qs.toString()}`);
+    const customerData = await customerResp.json();
+    const deletedCustomers = Array.isArray(customerData) ? customerData.filter(r=>r.deleted_at) : [];
+    deletedCustomers.forEach(c => c.entityType = 'customer');
+    
+    // 加载供应商
+    const supplierResp = await fetch(`/api/suppliers?${qs.toString()}`);
+    const supplierData = await supplierResp.json();
+    const deletedSuppliers = Array.isArray(supplierData) ? supplierData.filter(r=>r.deleted_at) : [];
+    deletedSuppliers.forEach(s => s.entityType = 'supplier');
+    
+    // 合并结果
+    items.value = [...deletedCustomers, ...deletedSuppliers];
   } catch (e) {
     ElMessage.error('加载失败');
   } finally {
@@ -61,7 +81,8 @@ onMounted(loadData);
 
 const restoreItem = async (row) => {
   try {
-    const resp = await fetch(`/api/customers/${row.id}/restore`, { method:'PATCH' });
+    const endpoint = row.entityType === 'customer' ? 'customers' : 'suppliers';
+    const resp = await fetch(`/api/${endpoint}/${row.id}/restore`, { method:'PATCH' });
     if (!resp.ok) throw new Error();
     ElMessage.success('已恢复');
     loadData();
@@ -72,10 +93,12 @@ const restoreItem = async (row) => {
 
 const purgeItem = async (row) => {
   try {
-    await ElMessageBox.confirm(`确定彻底删除【${row.name}】? 此操作不可恢复`, '警告', { type:'warning' });
+    const entityTypeText = row.entityType === 'customer' ? '客户' : '供应商';
+    await ElMessageBox.confirm(`确定彻底删除${entityTypeText}【${row.name}】? 此操作不可恢复`, '警告', { type:'warning' });
   } catch { return; }
   try {
-    const resp = await fetch(`/api/customers/${row.id}?force=1`, { method:'DELETE' });
+    const endpoint = row.entityType === 'customer' ? 'customers' : 'suppliers';
+    const resp = await fetch(`/api/${endpoint}/${row.id}?force=1`, { method:'DELETE' });
     if (!resp.ok) throw new Error();
     ElMessage.success('已彻底删除');
     loadData();
@@ -110,6 +133,8 @@ function formatTime(ts){
 .entity-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); position:relative; display:flex; flex-direction:column; gap:8px; }
 .entity-card.deleted { opacity:0.9; border:1px dashed #d3d3d3; }
 .card-header { display:flex; justify-content:space-between; align-items:center; }
+.title { display: flex; align-items: center; gap: 8px; }
+.entity-type { margin-left: 4px; font-size: 12px; }
 .title { font-weight:600; font-size:15px; }
 .more-actions { cursor:pointer; padding:4px 6px; border-radius:4px; }
 .more-actions:hover { background:#f0f2f5; }

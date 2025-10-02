@@ -40,6 +40,13 @@
               </div>
             </el-menu-item>
             
+            <el-menu-item index="suppliers" @click="navigate('suppliers')">
+              <div class="menu-item-content">
+                <div class="menu-icon">🏭</div>
+                <span class="menu-text">供应商管理</span>
+              </div>
+            </el-menu-item>
+            
             <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigate('users')">
               <div class="menu-item-content">
                 <div class="menu-icon">👨‍💼</div>
@@ -51,6 +58,20 @@
               <div class="menu-item-content">
                 <div class="menu-icon">📁</div>
                 <span class="menu-text">账套管理</span>
+              </div>
+            </el-menu-item>
+
+            <el-menu-item index="products" @click="navigate('products')">
+              <div class="menu-item-content">
+                <div class="menu-icon">🛒</div>
+                <span class="menu-text">商品库</span>
+              </div>
+            </el-menu-item>
+            
+            <el-menu-item index="salespeople" @click="navigate('salespeople')">
+              <div class="menu-item-content">
+                <div class="menu-icon">👨‍💼</div>
+                <span class="menu-text">业务员管理</span>
               </div>
             </el-menu-item>
             
@@ -184,6 +205,9 @@ import { reportAuthChange, reportApiResult, reportViewChange, reportError, check
 import Customers from './views/Customers.vue';
 import Users from './views/Users.vue';
 import AccountSets from './views/AccountSets.vue';
+import Salespeople from './views/Salespeople.vue';
+import Products from './views/Products.vue';
+import Suppliers from './views/Suppliers.vue';
 import RecycleBin from './views/RecycleBin.vue';
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
 
@@ -204,6 +228,9 @@ const routes = {
   customers: markRaw(Customers),
   users: markRaw(Users),
   accountSets: markRaw(AccountSets),
+  products: markRaw(Products),
+  suppliers: markRaw(Suppliers),
+  salespeople: markRaw(Salespeople),
   recycle: markRaw(RecycleBin)
 };
 
@@ -225,6 +252,9 @@ const getPageTitle = (route) => {
     customers: '客户管理',
     users: '用户管理',
     accountSets: '账套管理',
+    products: '商品库',
+    suppliers: '供应商管理',
+    salespeople: '业务员管理',
     recycle: '回收站'
   };
   return titles[route] || '企业管理系统';

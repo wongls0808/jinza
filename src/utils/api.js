@@ -65,6 +65,10 @@ export const customerApi = {
   list: (query) => api.get('/api/customers', { params: query })
 };
 
+export const supplierApi = {
+  list: (query) => api.get('/api/suppliers', { params: query })
+};
+
 export const projectApi = {
   list: (query) => api.get('/api/projects', { params: query })
 };
@@ -72,3 +76,14 @@ export const projectApi = {
 export const accountSetApi = {
   list: () => api.get('/api/account-sets')
 };
+
+// 带有凭据的fetch包装函数
+export async function fetchWithCredentials(url, options = {}) {
+  // 确保包含credentials参数
+  const fetchOptions = {
+    ...options,
+    credentials: 'include'
+  };
+  
+  return fetch(url, fetchOptions);
+}

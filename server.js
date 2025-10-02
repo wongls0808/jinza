@@ -202,6 +202,25 @@ function initializeDatabase() {
         // 这里不直接 resolve 由后续默认管理员检查分支处理
       }
 
+      // 供应商表
+      db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        contact TEXT, -- 联系人
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        note TEXT, -- 存储标签 JSON 数组
+        status TEXT DEFAULT 'active',
+        created_by INTEGER,
+        registration_no TEXT, -- 注册号
+        tax_no TEXT, -- 税号
+        deleted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )`);
+
       // 项目表
       db.run(`CREATE TABLE IF NOT EXISTS projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -269,6 +288,37 @@ function initializeDatabase() {
         current_number INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
+      )`);
+
+      // 商品表
+      db.run(`CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        description TEXT NOT NULL,
+        purchase_price DECIMAL(10,2) DEFAULT 0,
+        selling_price DECIMAL(10,2) DEFAULT 0,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        account_set_id INTEGER,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY(created_by) REFERENCES users(id),
+        FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
+      )`);
+      
+      // 业务员表
+      db.run(`CREATE TABLE IF NOT EXISTS salespeople (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nickname TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        status TEXT DEFAULT 'active',
+        created_by INTEGER,
+        deleted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(created_by) REFERENCES users(id)
       )`);
 
       // 检查并创建默认管理员
@@ -748,6 +798,328 @@ app.patch('/api/customers/:id/restore', requireAuth, (req, res) => {
   });
 });
 
+// 供应商管理路由
+app.get('/api/suppliers', requireAuth, (req, res) => {
+  const { search, status } = req.query;
+  let query = `
+    SELECT s.*, u.name as creator_name 
+    FROM suppliers s 
+    LEFT JOIN users u ON s.created_by = u.id
+  `;
+  const params = [];
+  
+  const whereParts = [];
+  if (!('includeDeleted' in req.query)) {
+    whereParts.push('s.deleted_at IS NULL');
+  }
+  if (search || status) {
+    if (whereParts.length === 0) query += ' WHERE ';
+    else query += ' WHERE ';
+    const conditions = [];
+    
+    if (search) {
+      conditions.push('(s.name LIKE ? OR s.contact LIKE ? OR s.phone LIKE ? OR s.registration_no LIKE ? OR s.tax_no LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    
+    if (status) {
+      conditions.push('s.status = ?');
+      params.push(status);
+    }
+    
+    if (whereParts.length) conditions.unshift(whereParts.shift());
+    query += conditions.join(' AND ');
+  } else if (whereParts.length) {
+    query += ' WHERE ' + whereParts.join(' AND ');
+  }
+  
+  query += ' ORDER BY s.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取供应商列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    const result = rows.map(r => {
+      let tags = [];
+      if (r.note) {
+        try { const parsed = JSON.parse(r.note); if (Array.isArray(parsed)) tags = parsed; } catch {}
+      }
+      return { ...r, tags };
+    });
+    res.json(result);
+  });
+});
+
+app.post('/api/suppliers', requireAuth, (req, res) => {
+  let { name, registration_no, tax_no, phone, email, address, note, tags, contact } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: '供应商名称不能为空' });
+  }
+  if (Array.isArray(tags)) {
+    try { note = JSON.stringify(tags); } catch { note = '[]'; }
+  } else if (note && typeof note !== 'string') {
+    note = JSON.stringify(note);
+  }
+  db.run(
+    `INSERT INTO suppliers (name, registration_no, tax_no, phone, email, address, note, contact, created_by) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || '[]', contact || null, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建供应商失败:', err);
+        return res.status(500).json({ error: '创建供应商失败' });
+      }
+      res.json({ 
+        id: this.lastID, 
+        name, registration_no, tax_no, phone, email, address, note, contact, tags: Array.isArray(tags)?tags:[],
+        status: 'active'
+      });
+    }
+  );
+});
+
+// 更新供应商信息
+app.put('/api/suppliers/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  let { name, registration_no, tax_no, phone, email, address, note, status, tags, contact } = req.body;
+  if (!name) return res.status(400).json({ error: '供应商名称不能为空' });
+  if (Array.isArray(tags)) {
+    try { note = JSON.stringify(tags); } catch { note = '[]'; }
+  } else if (note && typeof note !== 'string') {
+    note = JSON.stringify(note);
+  }
+  const fields = ['name','registration_no','tax_no','phone','email','address','note','contact'];
+  const setParts = fields.map(f => `${f} = ?`);
+  const params = [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || null, contact || null];
+  if (status) { setParts.push('status = ?'); params.push(status); }
+  setParts.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(id);
+  const sql = `UPDATE suppliers SET ${setParts.join(', ')} WHERE id = ?`;
+  db.run(sql, params, function(err){
+    if (err) {
+      console.error('更新供应商失败:', err);
+      return res.status(500).json({ error: '更新供应商失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '供应商不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 切换状态 active/inactive
+app.patch('/api/suppliers/:id/status', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!['active','inactive'].includes(status)) {
+    return res.status(400).json({ error: '非法状态' });
+  }
+  db.run(`UPDATE suppliers SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id], function(err){
+    if (err) {
+      console.error('更新状态失败:', err);
+      return res.status(500).json({ error: '更新状态失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '供应商不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 删除供应商 (物理删除或软删除)
+app.delete('/api/suppliers/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const force = req.query.force === '1';
+  if (force) {
+    // 物理删除
+    db.run(`DELETE FROM suppliers WHERE id = ?`, [id], function(err){
+      if (err) {
+        console.error('物理删除供应商失败:', err);
+        return res.status(500).json({ error: '删除供应商失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '供应商不存在' });
+      res.json({ success: true, force: true });
+    });
+  } else {
+    // 软删除
+    db.run(`UPDATE suppliers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
+      if (err) {
+        console.error('软删除供应商失败:', err);
+        return res.status(500).json({ error: '删除供应商失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '供应商不存在或已删除' });
+      res.json({ success: true, force: false });
+    });
+  }
+});
+
+// 恢复软删除供应商
+app.patch('/api/suppliers/:id/restore', requireAuth, (req, res) => {
+  const { id } = req.params;
+  db.run(`UPDATE suppliers SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
+    if (err) {
+      console.error('恢复供应商失败:', err);
+      return res.status(500).json({ error: '恢复供应商失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '供应商不存在或未被删除' });
+    res.json({ success: true });
+  });
+});
+
+// 业务员管理路由
+app.get('/api/salespeople', requireAuth, (req, res) => {
+  const { search, status } = req.query;
+  let query = `
+    SELECT s.*, u.name as creator_name 
+    FROM salespeople s 
+    LEFT JOIN users u ON s.created_by = u.id
+  `;
+  const params = [];
+  const whereParts = ['s.deleted_at IS NULL'];
+  
+  if (search || status) {
+    query += ' WHERE ' + whereParts.shift();
+    const conditions = []; 
+    
+    if (search) {
+      conditions.push('(s.nickname LIKE ? OR s.name LIKE ? OR s.phone LIKE ? OR s.email LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    
+    if (status) {
+      conditions.push('s.status = ?');
+      params.push(status);
+    }
+    
+    if (conditions.length) query += ' AND ' + conditions.join(' AND ');
+  } else {
+    query += ' WHERE ' + whereParts.join(' AND ');
+  }
+  
+  query += ' ORDER BY s.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取业务员列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/api/salespeople', requireAuth, (req, res) => {
+  let { nickname, name, phone, email } = req.body;
+  
+  if (!nickname || !name) {
+    return res.status(400).json({ error: '业务员简称和名称不能为空' });
+  }
+  
+  db.run(
+    `INSERT INTO salespeople (nickname, name, phone, email, created_by) 
+     VALUES (?, ?, ?, ?, ?)`,
+    [nickname, name, phone || null, email || null, req.session.userId],
+    function(err) {
+      if (err) {
+        console.error('创建业务员失败:', err);
+        return res.status(500).json({ error: '创建业务员失败' });
+      }
+      res.json({ 
+        id: this.lastID, 
+        nickname, name, phone, email, 
+        status: 'active'
+      });
+    }
+  );
+});
+
+app.put('/api/salespeople/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  let { nickname, name, phone, email, status } = req.body;
+  
+  if (!nickname || !name) {
+    return res.status(400).json({ error: '业务员简称和名称不能为空' });
+  }
+  
+  const fields = ['nickname', 'name', 'phone', 'email'];
+  const setParts = fields.map(f => `${f} = ?`);
+  const params = [nickname, name, phone || null, email || null];
+  
+  if (status) { 
+    setParts.push('status = ?'); 
+    params.push(status); 
+  }
+  
+  setParts.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(id);
+  
+  const sql = `UPDATE salespeople SET ${setParts.join(', ')} WHERE id = ?`;
+  
+  db.run(sql, params, function(err){
+    if (err) {
+      console.error('更新业务员失败:', err);
+      return res.status(500).json({ error: '更新业务员失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '业务员不存在' });
+    res.json({ success: true });
+  });
+});
+
+app.patch('/api/salespeople/:id/status', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  if (!['active','inactive'].includes(status)) {
+    return res.status(400).json({ error: '非法状态' });
+  }
+  
+  db.run(`UPDATE salespeople SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id], function(err){
+    if (err) {
+      console.error('更新业务员状态失败:', err);
+      return res.status(500).json({ error: '更新状态失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '业务员不存在' });
+    res.json({ success: true });
+  });
+});
+
+app.delete('/api/salespeople/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const force = req.query.force === '1';
+  
+  if (force) {
+    // 物理删除
+    db.run(`DELETE FROM salespeople WHERE id = ?`, [id], function(err){
+      if (err) {
+        console.error('物理删除业务员失败:', err);
+        return res.status(500).json({ error: '删除业务员失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '业务员不存在' });
+      res.json({ success: true, force: true });
+    });
+  } else {
+    // 软删除
+    db.run(`UPDATE salespeople SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
+      if (err) {
+        console.error('软删除业务员失败:', err);
+        return res.status(500).json({ error: '删除业务员失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '业务员不存在或已删除' });
+      res.json({ success: true, force: false });
+    });
+  }
+});
+
+app.patch('/api/salespeople/:id/restore', requireAuth, (req, res) => {
+  const { id } = req.params;
+  
+  db.run(`UPDATE salespeople SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
+    if (err) {
+      console.error('恢复业务员失败:', err);
+      return res.status(500).json({ error: '恢复业务员失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '业务员不存在或未被删除' });
+    res.json({ success: true });
+  });
+});
+
 // 项目管理路由
 app.get('/api/projects', requireAuth, (req, res) => {
   const { status } = req.query;
@@ -1126,6 +1498,155 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
   });
 });
 
+// 商品管理API
+app.get('/api/products', requireAuth, (req, res) => {
+  const { account_set_id, search } = req.query;
+  
+  if (!account_set_id) {
+    return res.status(400).json({ error: '账套ID不能为空' });
+  }
+  
+  let query = `
+    SELECT p.*, u.name as creator_name 
+    FROM products p 
+    LEFT JOIN users u ON p.created_by = u.id
+    WHERE p.is_deleted = 0 AND p.account_set_id = ?
+  `;
+  const params = [account_set_id];
+  
+  if (search) {
+    query += ' AND (p.code LIKE ? OR p.description LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  
+  query += ' ORDER BY p.created_at DESC';
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('获取商品列表失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    res.json(rows);
+  });
+});
+
+app.post('/api/products', requireAuth, (req, res) => {
+  const { account_set_id, description, purchase_price, selling_price } = req.body;
+  
+  if (!account_set_id || !description) {
+    return res.status(400).json({ error: '账套ID和商品描述不能为空' });
+  }
+  
+  // 生成9位随机商品编码
+  const generateRandomCode = () => {
+    const digits = '0123456789';
+    let code = '';
+    for (let i = 0; i < 9; i++) {
+      code += digits[Math.floor(Math.random() * 10)];
+    }
+    return code;
+  };
+  
+  // 尝试生成唯一编码，最多尝试10次
+  const tryGenerateUniqueCode = (attempt = 0) => {
+    if (attempt >= 10) {
+      return res.status(500).json({ error: '无法生成唯一商品编码，请稍后再试' });
+    }
+    
+    const code = generateRandomCode();
+    
+    // 检查编码是否已存在
+    db.get('SELECT id FROM products WHERE code = ?', [code], (err, existing) => {
+      if (err) {
+        console.error('检查商品编码失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      if (existing) {
+        // 编码已存在，重试
+        return tryGenerateUniqueCode(attempt + 1);
+      }
+      
+      // 插入新商品
+      db.run(
+        `INSERT INTO products (code, description, purchase_price, selling_price, created_by, account_set_id) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [code, description, purchase_price || 0, selling_price || 0, req.session.userId, account_set_id],
+        function(err) {
+          if (err) {
+            console.error('创建商品失败:', err);
+            return res.status(500).json({ error: '创建商品失败' });
+          }
+          
+          res.json({ 
+            id: this.lastID, 
+            code,
+            description, 
+            purchase_price: purchase_price || 0,
+            selling_price: selling_price || 0,
+            created_by: req.session.userId,
+            account_set_id,
+            is_deleted: 0
+          });
+        }
+      );
+    });
+  };
+  
+  // 开始尝试生成唯一编码
+  tryGenerateUniqueCode();
+});
+
+app.put('/api/products/:id', requireAuth, (req, res) => {
+  const productId = req.params.id;
+  const { description, purchase_price, selling_price } = req.body;
+  
+  if (!description) {
+    return res.status(400).json({ error: '商品描述不能为空' });
+  }
+  
+  db.run(
+    `UPDATE products 
+     SET description = ?, purchase_price = ?, selling_price = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND is_deleted = 0`,
+    [description, purchase_price || 0, selling_price || 0, productId],
+    function(err) {
+      if (err) {
+        console.error('更新商品失败:', err);
+        return res.status(500).json({ error: '更新商品失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '商品不存在或已被删除' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+app.delete('/api/products/:id', requireAuth, (req, res) => {
+  const productId = req.params.id;
+  
+  // 软删除，将is_deleted设为1
+  db.run(
+    `UPDATE products SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [productId],
+    function(err) {
+      if (err) {
+        console.error('删除商品失败:', err);
+        return res.status(500).json({ error: '删除商品失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '商品不存在' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
 // 仪表板数据
 app.get('/api/dashboard/stats', requireAuth, (req, res) => {
   const stats = {};
@@ -1170,7 +1691,16 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
             }
             stats.accountSets = row.count;
             
-            res.json(stats);
+            // 获取商品数量
+            db.get("SELECT COUNT(*) as count FROM products WHERE is_deleted = 0", (err, row) => {
+              if (err) {
+                console.error('获取商品统计失败:', err);
+                return res.status(500).json({ error: '服务器错误' });
+              }
+              stats.products = row.count;
+              
+              res.json(stats);
+            });
           });
         });
       });
@@ -1194,10 +1724,12 @@ if (process.env.NODE_ENV === 'production') {
         auth: '/api/login, /api/logout, /api/me',
         users: '/api/users',
         customers: '/api/customers',
+        suppliers: '/api/suppliers',
         projects: '/api/projects',
         account_sets: '/api/account-sets',
         print_templates: '/api/print-templates',
         code_rules: '/api/code-rules',
+        products: '/api/products',
         dashboard: '/api/dashboard/stats'
       }
     });
