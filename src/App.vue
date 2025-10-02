@@ -74,13 +74,6 @@
                 <span class="menu-text">业务员管理</span>
               </div>
             </el-menu-item>
-            
-            <el-menu-item index="recycle" @click="navigate('recycle')">
-              <div class="menu-item-content">
-                <div class="menu-icon">🗑️</div>
-                <span class="menu-text">回收站</span>
-              </div>
-            </el-menu-item>
           </el-menu>
         </el-aside>
 
@@ -208,7 +201,7 @@ import AccountSets from './views/AccountSets.vue';
 import Salespeople from './views/Salespeople.vue';
 import Products from './views/Products.vue';
 import Suppliers from './views/Suppliers.vue';
-import RecycleBin from './views/RecycleBin.vue';
+// 移除回收站组件导入
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
 
 // 核心应用状态
@@ -231,7 +224,7 @@ const routes = {
   products: markRaw(Products),
   suppliers: markRaw(Suppliers),
   salespeople: markRaw(Salespeople),
-  recycle: markRaw(RecycleBin)
+  // 移除回收站组件
 };
 
 // 当前组件
@@ -255,7 +248,7 @@ const getPageTitle = (route) => {
     products: '商品库',
     suppliers: '供应商管理',
     salespeople: '业务员管理',
-    recycle: '回收站'
+    // 移除回收站标题
   };
   return titles[route] || '企业管理系统';
 };

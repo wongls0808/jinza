@@ -298,11 +298,11 @@ const handleToggle = async (row) => {
 };
 
 const handleDelete = async (row) => {
-  if (!confirm(`确定删除供应商【${row.name}】? 此操作将把供应商放入回收站（软删除）。`)) return;
+  if (!confirm(`确定删除供应商【${row.name}】? 此操作不可恢复。`)) return;
   try {
     const resp = await fetch(`/api/suppliers/${row.id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败');
-    ElMessage.success('已移入回收站');
+    ElMessage.success('删除成功');
     await loadSuppliers();
   } catch (e) {
     ElMessage.error(e.message || '操作失败');

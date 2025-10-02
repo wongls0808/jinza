@@ -158,11 +158,10 @@ function initializeDatabase() {
         created_by INTEGER,
         registration_no TEXT, -- 新增 注册号
         tax_no TEXT,           -- 新增 税号
-        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
-      )`);
+      )`);  // 已移除deleted_at字段
 
       // 列存在性检测（对已存在旧表做增量）
       db.all("PRAGMA table_info(users)", (err, rows) => {
@@ -188,7 +187,6 @@ function initializeDatabase() {
         const alters = [];
   if (!colNames.includes('registration_no')) alters.push('ALTER TABLE customers ADD COLUMN registration_no TEXT');
   if (!colNames.includes('tax_no')) alters.push('ALTER TABLE customers ADD COLUMN tax_no TEXT');
-  if (!colNames.includes('deleted_at')) alters.push('ALTER TABLE customers ADD COLUMN deleted_at DATETIME');
         if (alters.length === 0) return proceed();
         let done = 0;
         alters.forEach(sql => db.run(sql, (e)=>{
@@ -215,11 +213,10 @@ function initializeDatabase() {
         created_by INTEGER,
         registration_no TEXT, -- 注册号
         tax_no TEXT, -- 税号
-        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
-      )`);
+      )`);  // 已移除deleted_at字段
 
       // 项目表
       db.run(`CREATE TABLE IF NOT EXISTS projects (
@@ -300,9 +297,8 @@ function initializeDatabase() {
         created_by INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
         FOREIGN KEY(created_by) REFERENCES users(id)
-      )`);  // 移除account_set_id字段和外键
+      )`);  // 移除account_set_id字段和外键，移除is_deleted字段
       
       // 业务员表
       db.run(`CREATE TABLE IF NOT EXISTS salespeople (
@@ -313,11 +309,10 @@ function initializeDatabase() {
         email TEXT,
         status TEXT DEFAULT 'active',
         created_by INTEGER,
-        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
-      )`);
+      )`);  // 已移除deleted_at字段
 
       // 检查并创建默认管理员
       db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
@@ -641,9 +636,6 @@ app.get('/api/customers', requireAuth, (req, res) => {
   const params = [];
   
   const whereParts = [];
-  if (!('includeDeleted' in req.query)) {
-    whereParts.push('c.deleted_at IS NULL');
-  }
   if (search || status) {
     if (whereParts.length === 0) query += ' WHERE ';
     else query += ' WHERE ';
@@ -759,42 +751,19 @@ app.patch('/api/customers/:id/status', requireAuth, (req, res) => {
 // 删除客户 (物理删除)
 app.delete('/api/customers/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const force = req.query.force === '1';
-  if (force) {
-    // 物理删除
-    db.run(`DELETE FROM customers WHERE id = ?`, [id], function(err){
-      if (err) {
-        console.error('物理删除客户失败:', err);
-        return res.status(500).json({ error: '删除客户失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
-      res.json({ success: true, force: true });
-    });
-  } else {
-    // 软删除
-    db.run(`UPDATE customers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
-      if (err) {
-        console.error('软删除客户失败:', err);
-        return res.status(500).json({ error: '删除客户失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '客户不存在或已删除' });
-      res.json({ success: true, force: false });
-    });
-  }
-});
-
-// 恢复软删除客户
-app.patch('/api/customers/:id/restore', requireAuth, (req, res) => {
-  const { id } = req.params;
-  db.run(`UPDATE customers SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
+  
+  // 直接物理删除
+  db.run(`DELETE FROM customers WHERE id = ?`, [id], function(err){
     if (err) {
-      console.error('恢复客户失败:', err);
-      return res.status(500).json({ error: '恢复客户失败' });
+      console.error('删除客户失败:', err);
+      return res.status(500).json({ error: '删除客户失败' });
     }
-    if (this.changes === 0) return res.status(404).json({ error: '客户不存在或未被删除' });
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
     res.json({ success: true });
   });
 });
+
+// 已移除客户恢复路由
 
 // 供应商管理路由
 app.get('/api/suppliers', requireAuth, (req, res) => {
@@ -807,9 +776,6 @@ app.get('/api/suppliers', requireAuth, (req, res) => {
   const params = [];
   
   const whereParts = [];
-  if (!('includeDeleted' in req.query)) {
-    whereParts.push('s.deleted_at IS NULL');
-  }
   if (search || status) {
     if (whereParts.length === 0) query += ' WHERE ';
     else query += ' WHERE ';
@@ -922,45 +888,22 @@ app.patch('/api/suppliers/:id/status', requireAuth, (req, res) => {
   });
 });
 
-// 删除供应商 (物理删除或软删除)
+// 删除供应商 (物理删除)
 app.delete('/api/suppliers/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const force = req.query.force === '1';
-  if (force) {
-    // 物理删除
-    db.run(`DELETE FROM suppliers WHERE id = ?`, [id], function(err){
-      if (err) {
-        console.error('物理删除供应商失败:', err);
-        return res.status(500).json({ error: '删除供应商失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '供应商不存在' });
-      res.json({ success: true, force: true });
-    });
-  } else {
-    // 软删除
-    db.run(`UPDATE suppliers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
-      if (err) {
-        console.error('软删除供应商失败:', err);
-        return res.status(500).json({ error: '删除供应商失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '供应商不存在或已删除' });
-      res.json({ success: true, force: false });
-    });
-  }
-});
-
-// 恢复软删除供应商
-app.patch('/api/suppliers/:id/restore', requireAuth, (req, res) => {
-  const { id } = req.params;
-  db.run(`UPDATE suppliers SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
+  
+  // 直接物理删除
+  db.run(`DELETE FROM suppliers WHERE id = ?`, [id], function(err){
     if (err) {
-      console.error('恢复供应商失败:', err);
-      return res.status(500).json({ error: '恢复供应商失败' });
+      console.error('删除供应商失败:', err);
+      return res.status(500).json({ error: '删除供应商失败' });
     }
-    if (this.changes === 0) return res.status(404).json({ error: '供应商不存在或未被删除' });
+    if (this.changes === 0) return res.status(404).json({ error: '供应商不存在' });
     res.json({ success: true });
   });
 });
+
+// 已移除供应商恢复路由
 
 // 业务员管理路由
 app.get('/api/salespeople', requireAuth, (req, res) => {
@@ -971,7 +914,7 @@ app.get('/api/salespeople', requireAuth, (req, res) => {
     LEFT JOIN users u ON s.created_by = u.id
   `;
   const params = [];
-  const whereParts = ['s.deleted_at IS NULL'];
+  const whereParts = [];
   
   if (search || status) {
     query += ' WHERE ' + whereParts.shift();
@@ -1080,40 +1023,14 @@ app.patch('/api/salespeople/:id/status', requireAuth, (req, res) => {
 
 app.delete('/api/salespeople/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const force = req.query.force === '1';
   
-  if (force) {
-    // 物理删除
-    db.run(`DELETE FROM salespeople WHERE id = ?`, [id], function(err){
-      if (err) {
-        console.error('物理删除业务员失败:', err);
-        return res.status(500).json({ error: '删除业务员失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '业务员不存在' });
-      res.json({ success: true, force: true });
-    });
-  } else {
-    // 软删除
-    db.run(`UPDATE salespeople SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
-      if (err) {
-        console.error('软删除业务员失败:', err);
-        return res.status(500).json({ error: '删除业务员失败' });
-      }
-      if (this.changes === 0) return res.status(404).json({ error: '业务员不存在或已删除' });
-      res.json({ success: true, force: false });
-    });
-  }
-});
-
-app.patch('/api/salespeople/:id/restore', requireAuth, (req, res) => {
-  const { id } = req.params;
-  
-  db.run(`UPDATE salespeople SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
+  // 直接物理删除
+  db.run(`DELETE FROM salespeople WHERE id = ?`, [id], function(err){
     if (err) {
-      console.error('恢复业务员失败:', err);
-      return res.status(500).json({ error: '恢复业务员失败' });
+      console.error('删除业务员失败:', err);
+      return res.status(500).json({ error: '删除业务员失败' });
     }
-    if (this.changes === 0) return res.status(404).json({ error: '业务员不存在或未被删除' });
+    if (this.changes === 0) return res.status(404).json({ error: '业务员不存在' });
     res.json({ success: true });
   });
 });
@@ -1504,7 +1421,6 @@ app.get('/api/products', requireAuth, (req, res) => {
     SELECT p.*, u.name as creator_name 
     FROM products p 
     LEFT JOIN users u ON p.created_by = u.id
-    WHERE p.is_deleted = 0
   `;
   const params = [];
   
@@ -1578,8 +1494,7 @@ app.post('/api/products', requireAuth, (req, res) => {
             description, 
             purchase_price: purchase_price || 0,
             selling_price: selling_price || 0,
-            created_by: req.session.userId,
-            is_deleted: 0
+            created_by: req.session.userId
           });
         }
       );
@@ -1601,7 +1516,7 @@ app.put('/api/products/:id', requireAuth, (req, res) => {
   db.run(
     `UPDATE products 
      SET description = ?, purchase_price = ?, selling_price = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND is_deleted = 0`,
+     WHERE id = ?`,
     [description, purchase_price || 0, selling_price || 0, productId],
     function(err) {
       if (err) {
@@ -1621,9 +1536,9 @@ app.put('/api/products/:id', requireAuth, (req, res) => {
 app.delete('/api/products/:id', requireAuth, (req, res) => {
   const productId = req.params.id;
   
-  // 软删除，将is_deleted设为1
+  // 直接物理删除
   db.run(
-    `UPDATE products SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    `DELETE FROM products WHERE id = ?`,
     [productId],
     function(err) {
       if (err) {
@@ -1685,7 +1600,7 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
             stats.accountSets = row.count;
             
             // 获取商品数量
-            db.get("SELECT COUNT(*) as count FROM products WHERE is_deleted = 0", (err, row) => {
+            db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
               if (err) {
                 console.error('获取商品统计失败:', err);
                 return res.status(500).json({ error: '服务器错误' });
