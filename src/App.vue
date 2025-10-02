@@ -116,6 +116,16 @@
                 size="large"
                 :prefix-icon="Lock"
                 show-password
+                @keyup="handlePasswordKey"
+                @blur="capsLockOn = false"
+              />
+            </el-form-item>
+            <el-form-item v-if="capsLockOn">
+              <el-alert
+                type="warning"
+                title="已开启大写锁定 (Caps Lock)，可能导致密码输入错误"
+                :closable="false"
+                show-icon
               />
             </el-form-item>
             <el-form-item>
@@ -125,11 +135,13 @@
                 @click="login" 
                 class="login-button"
                 :loading="loading"
+                :disabled="loading"
               >
                 {{ loading ? '登录中...' : '登录系统' }}
               </el-button>
             </el-form-item>
           </el-form>
+          <div class="login-hint">安全提示：请勿在公共设备保存密码。</div>
           
         </div>
       </div>
@@ -151,6 +163,7 @@ const user = ref(null);
 const activeMenu = ref('customers');
 const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
+const capsLockOn = ref(false);
 
 // 定义路由组件映射
 const routes = {
@@ -231,6 +244,13 @@ const login = async () => {
     ElMessage.error('登录失败，请检查网络连接');
   } finally {
     loading.value = false;
+  }
+};
+
+// 密码输入区 CapsLock 监测
+const handlePasswordKey = (e) => {
+  if (e.getModifierState) {
+    capsLockOn.value = e.getModifierState('CapsLock');
   }
 };
 
@@ -457,6 +477,14 @@ const logout = async () => {
   width: 100%;
   height: 44px;
   font-weight: 500;
+}
+
+.login-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+  user-select: none;
 }
 
 </style>
