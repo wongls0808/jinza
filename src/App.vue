@@ -1,111 +1,120 @@
 <template>
-  <div id="app" :class="{ 'logged-in': user }">
-    <!-- 使用过渡动画，确保登录状态切换平滑 -->
-    <Transition name="fade" mode="out-in">
-      <!-- 已登录状态 - 显示主应用内容 -->
-      <el-container v-if="user" class="layout" key="app-layout">
-        <!-- 侧边栏 - 现代风格 -->
-      <el-aside width="240px" class="sidebar">
-        <div class="sidebar-header">
-          <div class="logo">
-            <div class="logo-icon">📊</div>
-            <span class="logo-text">企业管理系统</span>
-          </div>
-        </div>
-        
-        <div class="user-info-sidebar">
-          <div class="avatar">
-            {{ user.name.charAt(0) }}
-          </div>
-          <div class="user-details">
-            <div class="user-name">{{ user.name }}</div>
-            <div class="user-role">{{ user.role === 'admin' ? '管理员' : '用户' }}</div>
-          </div>
-        </div>
-
-        <el-menu
-          :default-active="activeMenu"
-          class="sidebar-menu"
-          background-color="transparent"
-          text-color="#e0e0e0"
-          active-text-color="#ffffff"
-        >
-          <el-menu-item index="customers" @click="navigate('customers')">
-            <div class="menu-item-content">
-              <div class="menu-icon">👥</div>
-              <span class="menu-text">客户管理</span>
+  <div id="app">
+    <!-- 强制分离登录和主应用视图，避免重叠 -->
+    
+    <!-- 已登录状态 -->
+    <div v-if="user" class="app-main">
+      <el-container class="layout">
+        <!-- 侧边栏 -->
+        <el-aside width="240px" class="sidebar">
+          <div class="sidebar-header">
+            <div class="logo">
+              <div class="logo-icon">📊</div>
+              <span class="logo-text">企业管理系统</span>
             </div>
-          </el-menu-item>
+          </div>
           
-          <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigate('users')">
-            <div class="menu-item-content">
-              <div class="menu-icon">👨‍💼</div>
-              <span class="menu-text">用户管理</span>
+          <!-- 用户信息 -->
+          <div class="user-info-sidebar">
+            <div class="avatar">
+              {{ user.name.charAt(0) }}
             </div>
-          </el-menu-item>
-          
-          <el-menu-item index="accountSets" @click="navigate('accountSets')">
-            <div class="menu-item-content">
-              <div class="menu-icon">📁</div>
-              <span class="menu-text">账套管理</span>
+            <div class="user-details">
+              <div class="user-name">{{ user.name }}</div>
+              <div class="user-role">{{ user.role === 'admin' ? '管理员' : '用户' }}</div>
             </div>
-          </el-menu-item>
-          <el-menu-item index="recycle" @click="navigate('recycle')">
-            <div class="menu-item-content">
-              <div class="menu-icon">🗑️</div>
-              <span class="menu-text">回收站</span>
-            </div>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
+          </div>
 
-      <!-- 主内容区 -->
-      <el-container>
-        <el-header class="header">
-          <div class="header-left">
-            <div class="breadcrumb">
-              <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
+          <!-- 导航菜单 -->
+          <el-menu
+            :default-active="activeMenu"
+            class="sidebar-menu"
+            background-color="transparent"
+            text-color="#e0e0e0"
+            active-text-color="#ffffff"
+          >
+            <el-menu-item index="customers" @click="navigate('customers')">
+              <div class="menu-item-content">
+                <div class="menu-icon">👥</div>
+                <span class="menu-text">客户管理</span>
+              </div>
+            </el-menu-item>
+            
+            <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigate('users')">
+              <div class="menu-item-content">
+                <div class="menu-icon">👨‍💼</div>
+                <span class="menu-text">用户管理</span>
+              </div>
+            </el-menu-item>
+            
+            <el-menu-item index="accountSets" @click="navigate('accountSets')">
+              <div class="menu-item-content">
+                <div class="menu-icon">📁</div>
+                <span class="menu-text">账套管理</span>
+              </div>
+            </el-menu-item>
+            
+            <el-menu-item index="recycle" @click="navigate('recycle')">
+              <div class="menu-item-content">
+                <div class="menu-icon">🗑️</div>
+                <span class="menu-text">回收站</span>
+              </div>
+            </el-menu-item>
+          </el-menu>
+        </el-aside>
+
+        <!-- 主内容区 -->
+        <el-container>
+          <!-- 顶部导航栏 -->
+          <el-header class="header">
+            <div class="header-left">
+              <div class="breadcrumb">
+                <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
+              </div>
             </div>
-          </div>
-          <div class="header-right">
-            <el-dropdown @command="handleCommand">
-              <span class="user-dropdown">
-                <el-avatar :size="32" :src="user.avatar" class="header-avatar">
-                  {{ user.name.charAt(0) }}
-                </el-avatar>
-                <span class="user-name">{{ user.name }}</span>
-                <el-icon><ArrowDown /></el-icon>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">个人资料</el-dropdown-item>
-                  <el-dropdown-item command="settings">系统设置</el-dropdown-item>
-                  <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-        </el-header>
-        
-        <el-main class="main-content">
-          <!-- 动态组件渲染 - 确保只加载当前所需组件 -->
-          <div class="page-container">
-            <keep-alive>
+            <div class="header-right">
+              <el-dropdown @command="handleCommand">
+                <span class="user-dropdown">
+                  <el-avatar :size="32" :src="user.avatar" class="header-avatar">
+                    {{ user.name.charAt(0) }}
+                  </el-avatar>
+                  <span class="user-name">{{ user.name }}</span>
+                  <el-icon><ArrowDown /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="profile">个人资料</el-dropdown-item>
+                    <el-dropdown-item command="settings">系统设置</el-dropdown-item>
+                    <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </el-header>
+          
+          <!-- 内容主区域 -->
+          <el-main class="main-content">
+            <div class="page-container">
               <component :is="currentComponent" :user="user" />
-            </keep-alive>
-          </div>
-        </el-main>
+            </div>
+          </el-main>
+        </el-container>
       </el-container>
-    </el-container>
-    <ForcePasswordChange v-if="user && showForcePwd" :user-id="user.id" :require-old="true" @done="handlePwdUpdated" />
-    </Transition>
+      
+      <!-- 强制密码修改对话框 -->
+      <ForcePasswordChange 
+        v-if="showForcePwd" 
+        :user-id="user.id" 
+        :require-old="true" 
+        @done="handlePwdUpdated" 
+      />
+    </div>
 
-    <!-- 未登录状态 - 仅显示登录页 -->
-    <Transition name="fade" mode="out-in">
-      <div v-if="!user" class="login-container" key="login-container">
-      <!-- 使用单独的容器包装登录页，避免与主应用内容交叉 -->
+    <!-- 未登录状态 - 登录页 -->
+    <div v-else class="login-container">
       <div class="login-background">
         <div class="login-card">
+          <!-- 登录页标题 -->
           <div class="login-header">
             <div class="login-logo">
               <div class="logo-large">📊</div>
@@ -114,6 +123,7 @@
             <p class="login-subtitle">专业的企业管理解决方案</p>
           </div>
           
+          <!-- 登录表单 -->
           <el-form class="login-form" @submit.prevent="login">
             <el-form-item>
               <el-input
@@ -132,6 +142,7 @@
                 :prefix-icon="Lock"
                 show-password
                 @keyup="handlePasswordKey"
+                @keyup.enter="login"
                 @blur="capsLockOn = false"
               />
             </el-form-item>
@@ -157,11 +168,9 @@
             </el-form-item>
           </el-form>
           <div class="login-hint">安全提示：请勿在公共设备保存密码。</div>
-          
         </div>
       </div>
     </div>
-    </Transition>
   </div>
 </template>
 
@@ -169,6 +178,7 @@
 import { ref, onMounted, markRaw, nextTick, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
+import { reportAuthChange, reportApiResult, reportViewChange, reportError, checkAppState } from './utils/debug';
 
 // 导入组件
 import Customers from './views/Customers.vue';
@@ -177,18 +187,19 @@ import AccountSets from './views/AccountSets.vue';
 import RecycleBin from './views/RecycleBin.vue';
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
 
+// 核心应用状态
 const user = ref(null);
 const activeMenu = ref('customers');
 const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
 const capsLockOn = ref(false);
 
-// 调试帮助函数，监控user变化
-watch(user, (newVal) => {
-  console.log('用户状态变化:', newVal);
+// 监控用户状态变化
+watch(user, (newVal, oldVal) => {
+  reportAuthChange('用户状态发生变化', { before: oldVal, after: newVal });
 }, { deep: true });
 
-// 定义路由组件映射
+// 路由组件映射
 const routes = {
   customers: markRaw(Customers),
   users: markRaw(Users),
@@ -201,6 +212,7 @@ const currentComponent = ref(routes.customers);
 
 // 导航函数
 const navigate = (route) => {
+  reportViewChange('Navigation', `切换到 ${route} 路由`);
   activeMenu.value = route;
   if (routes[route]) {
     currentComponent.value = routes[route];
@@ -229,28 +241,66 @@ const handleCommand = (command) => {
   }
 };
 
-// 检查登录状态
+// 应用初始化 - 检查登录状态
 onMounted(async () => {
+  reportViewChange('App', '应用挂载完成，检查登录状态');
   try {
+    // 第一步：重置状态并添加CSS类以强制显示正确状态
+    user.value = null;
+    document.body.classList.add('logged-out');
+    document.body.classList.remove('logged-in');
+    await nextTick();
+    
+    // 输出调试状态
+    checkAppState(user, routes, activeMenu, currentComponent);
+    
+    // 第二步：检查是否已有会话
+    reportApiResult('/api/me', '正在检查会话状态');
     const response = await fetch('/api/me');
     if (response.ok) {
       const data = await response.json();
-      user.value = data.user;
+      reportApiResult('/api/me', data);
+      
+      // 有会话信息
+      if (data.user) {
+        reportAuthChange('发现现有会话', data.user);
+        
+        // 使用延时确保DOM完全更新后再设置状态
+        setTimeout(() => {
+          // 先设置用户数据
+          user.value = {...data.user};
+          
+          // 再更新CSS类
+          document.body.classList.add('logged-in');
+          document.body.classList.remove('logged-out');
+          
+          reportViewChange('App', '已设置用户状态为已登录');
+          checkAppState(user, routes, activeMenu, currentComponent);
+        }, 100);
+      } else {
+        reportAuthChange('无有效会话', null);
+      }
+    } else {
+      reportAuthChange('无有效会话或会话已过期', null);
     }
   } catch (error) {
-    console.log('未登录');
+    reportError('检查会话', error);
   }
 });
 
-// 登录
+// 登录处理
 const login = async () => {
+  // 表单验证
   if (!loginForm.value.username || !loginForm.value.password) {
     ElMessage.error('请输入用户名和密码');
     return;
   }
 
   loading.value = true;
+  reportAuthChange('开始登录', { username: loginForm.value.username });
+  
   try {
+    // 发送登录请求
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -258,28 +308,47 @@ const login = async () => {
     });
     
     const data = await response.json();
-    if (data.success) {
-      console.log('登录成功，获取到用户信息:', data.user);
-      
-      // 确保表单重置
+    reportApiResult('/api/login', data);
+    
+    if (data.success && data.user) {
+      // 清理登录表单
+      const credentials = {...loginForm.value};
       loginForm.value = { username: '', password: '' };
       
-      // 设置用户状态，触发界面切换
-      setTimeout(() => {
-        user.value = { ...data.user }; // 使用扩展运算符创建新对象引用
-        ElMessage.success('登录成功');
-        console.log('用户状态已更新:', user.value);
-        
-        // 处理强制密码更改
-        if (data.user.forcePasswordChange) {
-          showForcePwd.value = true;
-        }
-      }, 100); // 短暂延迟确保状态更新和DOM刷新
+      reportAuthChange(`用户 ${credentials.username} 登录成功`, data.user);
+      
+      // 强制重置视图状态并设置用户信息
+      // 先重置用户对象
+      user.value = null;
+      document.body.classList.add('logged-out');
+      document.body.classList.remove('logged-in');
+      await nextTick();
+      reportViewChange('App', '视图已重置为未登录状态');
+      
+      // 强制延时，确保DOM完全更新
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // 然后通过同步方式设置用户并更新CSS类
+      user.value = {...data.user};
+      document.body.classList.add('logged-in');
+      document.body.classList.remove('logged-out');
+      reportViewChange('App', '视图已更新为已登录状态');
+      
+      // 检查并输出最终状态
+      setTimeout(() => checkAppState(user, routes, activeMenu, currentComponent), 100);
+      ElMessage.success(`欢迎回来，${data.user.name}`);
+      
+      // 处理强制密码更改
+      if (data.user.forcePasswordChange) {
+        reportViewChange('App', '需要强制修改密码');
+        showForcePwd.value = true;
+      }
     } else {
+      reportError('登录失败', data);
       ElMessage.error(data.error || '登录失败');
     }
   } catch (error) {
-    console.error('登录失败:', error);
+    reportError('登录过程', error);
     ElMessage.error('登录失败，请检查网络连接');
   } finally {
     loading.value = false;
@@ -291,26 +360,52 @@ const handlePasswordKey = (e) => {
   if (e.getModifierState) {
     capsLockOn.value = e.getModifierState('CapsLock');
   }
+  // 支持按Enter键登录
+  if (e.key === 'Enter') {
+    login();
+  }
 };
 
-// 退出
+// 退出登录
 const logout = async () => {
+  reportAuthChange('开始退出登录', { userId: user.value?.id });
   try {
     await fetch('/api/logout', { method: 'POST' });
-    user.value = null;
+    
+    // 更新状态和CSS类
     currentComponent.value = routes.customers;
     activeMenu.value = 'customers';
+    
+    // 确保用户对象先清空，并更新CSS类
+    user.value = null;
+    document.body.classList.add('logged-out');
+    document.body.classList.remove('logged-in');
+    
+    await nextTick();
     ElMessage.success('已退出登录');
+    reportAuthChange('退出登录成功', null);
+    
+    // 检查并输出最终状态
+    setTimeout(() => checkAppState(user, routes, activeMenu, currentComponent), 100);
   } catch (error) {
-    console.error('退出失败:', error);
+    reportError('退出登录', error);
+    ElMessage.error('退出失败');
   }
 };
 
 const showForcePwd = ref(false);
 const handlePwdUpdated = () => {
   showForcePwd.value = false;
+  reportViewChange('App', '密码已更新，刷新用户信息');
   // 刷新当前用户信息
-  fetch('/api/me').then(r=>r.ok?r.json():null).then(d=>{ if(d && d.user) user.value = d.user; });
+  fetch('/api/me')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { 
+      if (d && d.user) {
+        user.value = d.user;
+        reportAuthChange('用户信息已更新', d.user);
+      }
+    });
 };
 </script>
 
@@ -324,30 +419,28 @@ const handlePwdUpdated = () => {
   height: 100vh;
   width: 100vw;
   position: relative;
-  overflow-x: hidden;
 }
 
-/* 淡入淡出过渡效果 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+/* 已登录状态和未登录状态互斥布局 */
+.app-main, .login-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+/* 已登录状态容器 */
+.app-main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 已登录状态下禁止滚动超出 */
-#app.logged-in {
-  overflow: hidden;
-}
-
-/* 现代布局样式 */
+/* 已登录布局样式 */
 .layout {
   height: 100vh;
   background: #f5f7fa;
-  overflow: hidden; /* 防止内容溢出 */
 }
 
 /* 侧边栏样式 */
@@ -393,8 +486,8 @@ const handlePwdUpdated = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 500;
   color: white;
-  font-weight: 600;
 }
 
 .user-details {
@@ -450,6 +543,7 @@ const handlePwdUpdated = () => {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  z-index: 10; /* 确保顶部导航在更高层级 */
 }
 
 .header-left .page-title {
@@ -487,6 +581,7 @@ const handlePwdUpdated = () => {
   overflow-y: auto;
   overflow-x: hidden;
   height: calc(100vh - 60px); /* 减去头部高度 */
+  z-index: 1;
 }
 
 .page-container {
@@ -496,16 +591,13 @@ const handlePwdUpdated = () => {
 
 /* 登录页样式 */
 .login-container {
-  position: fixed; /* 使用fixed定位，确保不会随滚动变化 */
-  top: 0;
-  left: 0;
-  width: 100%;
   height: 100vh;
+  width: 100vw;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999; /* 确保登录页在最上层 */
+  z-index: 2000; /* 确保登录页在最高层级 */
 }
 
 .login-background {
@@ -569,5 +661,4 @@ const handlePwdUpdated = () => {
   text-align: center;
   user-select: none;
 }
-
 </style>
