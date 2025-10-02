@@ -31,7 +31,7 @@
               :before-upload="beforeLogoUpload"
               :on-success="handleLogoSuccess"
               :on-error="handleUploadError"
-              accept=".png,.jpg,.jpeg"
+              accept="image/*"
             >
               <div class="upload-content">
                 <el-icon class="upload-icon"><UploadFilled /></el-icon>
@@ -85,7 +85,7 @@
               :before-upload="beforeSealUpload"
               :on-success="handleSealSuccess"
               :on-error="handleUploadError"
-              accept=".png,.jpg,.jpeg"
+              accept="image/*"
             >
               <div class="upload-content">
                 <el-icon class="upload-icon"><Stamp /></el-icon>
@@ -139,7 +139,7 @@
               :before-upload="beforeSignatureUpload"
               :on-success="handleSignatureSuccess"
               :on-error="handleUploadError"
-              accept=".png,.jpg,.jpeg"
+              accept="image/*"
             >
               <div class="upload-content">
                 <el-icon class="upload-icon"><Edit /></el-icon>
@@ -308,8 +308,27 @@ function openCropper(file, type) {
     targetHeight.value = meta.h;
     cropContext.value = { type, label: meta.label };
   }
-  cropSrc.value = URL.createObjectURL(file);
-  cropperVisible.value = true;
+  // 优先使用 objectURL，如失败再回退 base64
+  let url;
+  try {
+    url = URL.createObjectURL(file);
+  } catch(e) {
+    url = null;
+  }
+  if (url) {
+    cropSrc.value = url;
+    cropperVisible.value = true;
+  } else {
+    const reader = new FileReader();
+    reader.onload = () => {
+      cropSrc.value = reader.result;
+      cropperVisible.value = true;
+    };
+    reader.onerror = () => {
+      ElMessage.error('读取图片失败');
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 // 对话框真正打开后再初始化，避免图片尚未完成渲染导致 cropper 生成空白
