@@ -92,13 +92,11 @@ sqlite3 app.db ".backup 'backup.db'"
 
 > 注意：WAL 模式下备份时需包含 `app.db`, `app.db-wal`, `app.db-shm`。
 
-### Customers 表软删除
-- 新增列：`deleted_at DATETIME`。
-- 删除操作：`DELETE /api/customers/:id` 默认软删除 (UPDATE 设置 `deleted_at=CURRENT_TIMESTAMP`)，传 `?force=1` 则物理删除。
-- 列表获取：`GET /api/customers` 默认过滤 `deleted_at IS NULL`；`?includeDeleted=1` 包含软删除。
-- 恢复：`PATCH /api/customers/:id/restore` 取消软删除（`deleted_at=NULL`）。
-- 回收站视图：前端 `回收站` 菜单加载 `includeDeleted=1` 并筛选有 `deleted_at` 的记录，支持恢复与彻底删除。
-- 清理建议：可添加计划任务物理删除软删除超过 90 天记录。
+### 数据删除策略
+- 数据删除采用物理删除而非软删除（自v1.2.0-base起）
+- 删除操作：`DELETE /api/customers/:id` 直接物理删除记录
+- 删除前会显示确认提示，明确告知用户此操作不可恢复
+- 重要数据建议在删除前进行数据库备份
 
 ### 标签系统
 - `customers.note` 字段现存储标签 JSON 数组。
