@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import crypto from 'crypto';
@@ -20,8 +19,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 在 Render / 任何前置反向代理环境下需要开启 trust proxy，确保 req.ip 与 X-Forwarded-* 解析正确
-app.set('trust proxy', 1);
+// 信任所有代理（Render/多层反向代理兼容）
+app.set('trust proxy', true);
+console.log('[bootstrap] trust proxy =', app.get('trust proxy'));
 
 // 生产模式校验关键环境变量
 if (process.env.NODE_ENV === 'production') {
