@@ -92,6 +92,7 @@
         </el-main>
       </el-container>
     </el-container>
+    <ForcePasswordChange v-if="user && showForcePwd" :user-id="user.id" :require-old="true" @done="handlePwdUpdated" />
 
     <!-- 登录页 - 现代风格 -->
     <div v-else class="login-container">
@@ -165,6 +166,7 @@ import Customers from './views/Customers.vue';
 import Users from './views/Users.vue';
 import AccountSets from './views/AccountSets.vue';
 import RecycleBin from './views/RecycleBin.vue';
+import ForcePasswordChange from './views/ForcePasswordChange.vue';
 
 const user = ref(null);
 const activeMenu = ref('customers');
@@ -245,6 +247,9 @@ const login = async () => {
     if (data.success) {
       user.value = data.user;
       ElMessage.success('登录成功');
+      if (data.user.forcePasswordChange) {
+        showForcePwd.value = true;
+      }
     } else {
       ElMessage.error(data.error || '登录失败');
     }
@@ -274,6 +279,13 @@ const logout = async () => {
   } catch (error) {
     console.error('退出失败:', error);
   }
+};
+
+const showForcePwd = ref(false);
+const handlePwdUpdated = () => {
+  showForcePwd.value = false;
+  // 刷新当前用户信息
+  fetch('/api/me').then(r=>r.ok?r.json():null).then(d=>{ if(d && d.user) user.value = d.user; });
 };
 </script>
 

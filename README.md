@@ -95,6 +95,14 @@ sqlite3 app.db ".backup 'backup.db'"
 - 标签颜色：采用哈希 → HSL 动态生成（固定 55% 饱和 / 50% 亮度），确保同名标签不同卡片颜色一致。
 - 限制：最多 10 个标签，单标签 ≤ 20 字符。
 
+### 密码与安全策略
+- 弱密码判定：长度 < 8；全部相同字符；连续顺子(>=6) 正/逆序（字母或数字）；常见弱口令（password, 123456, qwerty 等）
+- 登录时若使用弱密码或账户标记 needs_password_reset，将返回 forcePasswordChange，前端弹出强制改密层
+- 管理员重置密码：POST /api/users/:id/reset-password （可传 newPassword，否则生成随机 12 位临时密码并强制下次修改）
+- 用户改密：POST /api/users/:id/change-password（本人需带 oldPassword；管理员无需）
+- 字段：users.needs_password_reset=1 表示登录需改密；password_updated_at 记录最近修改时间
+- 建议：生产启用 HTTPS，前端可增加密码输入强度实时提示（已实现基础版本）
+
 ## 目录结构（核心）
 ```
 server.js

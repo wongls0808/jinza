@@ -139,6 +139,8 @@ function initializeDatabase() {
         role TEXT DEFAULT 'user',
         department TEXT,
         is_active INTEGER DEFAULT 1,
+        needs_password_reset INTEGER DEFAULT 0,
+        password_updated_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
@@ -163,6 +165,19 @@ function initializeDatabase() {
       )`);
 
       // 列存在性检测（对已存在旧表做增量）
+      db.all("PRAGMA table_info(users)", (err, rows) => {
+        if (err) {
+          console.warn('获取 users 表结构失败:', err.message);
+        } else {
+          const colNames = rows.map(r => r.name);
+          const userAlters = [];
+          if (!colNames.includes('needs_password_reset')) userAlters.push('ALTER TABLE users ADD COLUMN needs_password_reset INTEGER DEFAULT 0');
+            if (!colNames.includes('password_updated_at')) userAlters.push('ALTER TABLE users ADD COLUMN password_updated_at DATETIME');
+          if (userAlters.length) {
+            userAlters.forEach(sql => db.run(sql, e => e && console.warn('ALTER users 失败:', sql, e.message)));
+          }
+        }
+      });
       db.all("PRAGMA table_info(customers)", (err, rows) => {
         if (err) {
           console.warn('获取 customers 表结构失败:', err.message);
@@ -304,6 +319,31 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// 简单弱密码检测：长度<8; 全相同字符; 递增/递减顺子 >=6; 常见弱口令
+function isWeakPassword(pw) {
+  if (!pw) return true;
+  if (pw.length < 8) return true;
+  const lower = pw.toLowerCase();
+  const common = ['password','123456','12345678','123456789','qwerty','admin','111111','abc123','iloveyou'];
+  if (common.includes(lower)) return true;
+  // 全相同字符
+  if (/^(.)\1+$/.test(pw)) return true;
+  // 递增或递减顺子检测（数字或字母）
+  const seq = 'abcdefghijklmnopqrstuvwxyz';
+  const seqNum = '0123456789';
+  const checkSequential = (s, minLen=6) => {
+    for (let i=0;i<=s.length - minLen;i++) {
+      const part = s.slice(i,i+minLen);
+      if (seq.includes(part) || seqNum.includes(part)) return true;
+      const rev = part.split('').reverse().join('');
+      if (seq.includes(rev) || seqNum.includes(rev)) return true;
+    }
+    return false;
+  };
+  if (checkSequential(lower)) return true;
+  return false;
+}
+
 // CORS 中间件（开发环境）
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
@@ -364,6 +404,10 @@ app.post('/api/login', loginLimiter, (req, res) => {
       req.session.userRole = user.role;
       req.session.userName = user.name;
       
+      const forceChange = !!user.needs_password_reset || isWeakPassword(password);
+      if (forceChange && !user.needs_password_reset) {
+        db.run(`UPDATE users SET needs_password_reset = 1 WHERE id = ?`, [user.id]);
+      }
       res.json({
         success: true,
         user: {
@@ -371,11 +415,68 @@ app.post('/api/login', loginLimiter, (req, res) => {
           username: user.username,
           name: user.name,
           role: user.role,
-          department: user.department
+          department: user.department,
+          forcePasswordChange: forceChange
         }
       });
     }
   );
+});
+
+// 管理员重置用户密码（生成临时密码或指定）
+app.post('/api/users/:id/reset-password', requireAuth, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  let { newPassword } = req.body || {};
+  if (newPassword && isWeakPassword(newPassword)) {
+    return res.status(400).json({ error: '新密码过于简单，请使用更复杂组合' });
+  }
+  if (!newPassword) {
+    // 生成随机临时密码（12 位：字母数字）
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    newPassword = Array.from({length:12},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.run(`UPDATE users SET password_hash = ?, needs_password_reset = 1, password_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [hash, id], function(err){
+    if (err) {
+      console.error('重置密码失败:', err);
+      return res.status(500).json({ error: '重置失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '用户不存在' });
+    res.json({ success: true, tempPassword: newPassword });
+  });
+});
+
+// 用户自行修改密码（例如强制修改流程）
+app.post('/api/users/:id/change-password', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const requester = req.session.userId;
+  const { oldPassword, newPassword } = req.body || {};
+  if (!newPassword) return res.status(400).json({ error: '新密码不能为空' });
+  if (isWeakPassword(newPassword)) return res.status(400).json({ error: '新密码过于简单' });
+  // 只有本人或管理员可改
+  if (Number(id) !== requester && req.session.userRole !== 'admin') {
+    return res.status(403).json({ error: '无权限修改该用户密码' });
+  }
+  db.get(`SELECT id, password_hash FROM users WHERE id = ?`, [id], (err, user) => {
+    if (err) {
+      console.error('查询用户失败:', err);
+      return res.status(500).json({ error: '服务器错误' });
+    }
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    if (req.session.userRole !== 'admin') {
+      if (!oldPassword || !bcrypt.compareSync(oldPassword, user.password_hash)) {
+        return res.status(400).json({ error: '旧密码错误' });
+      }
+    }
+    const hash = bcrypt.hashSync(newPassword, 10);
+    db.run(`UPDATE users SET password_hash = ?, needs_password_reset = 0, password_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [hash, id], function(updErr){
+      if (updErr) {
+        console.error('更新密码失败:', updErr);
+        return res.status(500).json({ error: '修改失败' });
+      }
+      res.json({ success: true });
+    });
+  });
 });
 
 app.post('/api/logout', (req, res) => {
