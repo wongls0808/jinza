@@ -27,6 +27,16 @@
               <div class="line" v-if="c.phone" :title="c.phone">联系电话：{{ c.phone }}</div>
               <div class="line email" v-if="c.email" :title="c.email">邮箱：{{ c.email }}</div>
               <div class="line" v-if="c.address" :title="c.address">地址：{{ c.address }}</div>
+              <div class="tags-row" v-if="c.tags && c.tags.length">
+                <el-tag
+                  v-for="(t,i) in c.tags.slice(0,3)"
+                  :key="t+i"
+                  size="small"
+                  type="info"
+                  class="tag-item"
+                >{{ t }}</el-tag>
+                <el-tag v-if="c.tags.length>3" size="small" effect="plain">+{{ c.tags.length-3 }}</el-tag>
+              </div>
             </div>
             <div class="actions">
               <el-dropdown trigger="click" @command="cmd => handleCardCommand(cmd, c)">
@@ -93,8 +103,38 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="备注" prop="note">
-              <el-input v-model="form.note" type="textarea" :rows="3" />
+            <el-form-item label="标签">
+              <div class="tag-editor">
+                <div class="tags">
+                  <el-tag
+                    v-for="(tag, index) in form.tags"
+                    :key="tag+index"
+                    closable
+                    size="small"
+                    @close="removeTag(index)"
+                  >{{ tag }}</el-tag>
+                  <el-input
+                    v-if="inputVisible"
+                    ref="tagInputRef"
+                    v-model="tagInput"
+                    size="small"
+                    class="tag-input"
+                    @keyup.enter.prevent="confirmTag"
+                    @blur="confirmTag"
+                    :maxlength="20"
+                    placeholder="回车添加"
+                  />
+                  <el-button
+                    v-else
+                    size="small"
+                    type="primary"
+                    text
+                    @click="showTagInput"
+                    :disabled="form.tags.length >= maxTags"
+                  >+ 标签</el-button>
+                </div>
+                <div class="tag-hint">最多 {{ maxTags }} 个；单个≤20字符</div>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -108,7 +148,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, nextTick } from 'vue';
 import { MoreFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import '@/styles/cards.css';
@@ -127,9 +167,13 @@ const form = reactive({
   phone: '',
   email: '',
   address: '',
-  note: '',
-  status: 'active'
+  status: 'active',
+  tags: []
 });
+const maxTags = 10;
+const tagInputRef = ref();
+const inputVisible = ref(false);
+const tagInput = ref('');
 const rules = {
   name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
@@ -160,8 +204,8 @@ const resetForm = () => {
   form.phone = '';
   form.email = '';
   form.address = '';
-  form.note = '';
   form.status = 'active';
+  form.tags = [];
 };
 
 const openCreate = () => {
@@ -188,7 +232,7 @@ const submitForm = () => {
         const resp = await fetch('/api/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form)
+          body: JSON.stringify({ ...form })
         });
         if (!resp.ok) throw new Error('创建失败');
         ElMessage.success('创建成功');
@@ -213,9 +257,16 @@ const handleEdit = (row) => {
     phone: row.phone || '',
     email: row.email || '',
     address: row.address || '',
-    note: row.note || '',
     status: row.status || 'active'
   });
+  // 解析标签
+  try {
+    if (Array.isArray(row.tags)) form.tags = [...row.tags];
+    else if (row.note) {
+      const parsed = JSON.parse(row.note);
+      if (Array.isArray(parsed)) form.tags = parsed;
+    }
+  } catch {}
   showAddDialog.value = true;
 };
 
@@ -252,6 +303,23 @@ const handleCardCommand = (cmd, row) => {
   if (cmd === 'toggle') return handleToggle(row);
   if (cmd === 'delete') return handleDelete(row);
 };
+
+// 标签逻辑
+const showTagInput = () => {
+  inputVisible.value = true;
+  nextTick(() => tagInputRef.value?.focus());
+};
+const confirmTag = () => {
+  const val = tagInput.value.trim();
+  if (val && !form.tags.includes(val) && form.tags.length < maxTags) {
+    form.tags.push(val);
+  }
+  tagInput.value = '';
+  inputVisible.value = false;
+};
+const removeTag = (i) => {
+  form.tags.splice(i,1);
+};
 </script>
 
 <style scoped>
@@ -268,6 +336,13 @@ const handleCardCommand = (cmd, row) => {
 .line { font-size: 12px; color: #606266; margin-bottom: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .email { color: #409eff; }
 .footer-text { user-select: none; }
+
+.tags-row { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-item { margin-bottom: 2px; }
+.tag-editor { display: flex; flex-direction: column; gap: 4px; }
+.tag-editor .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-input { width: 110px; }
+.tag-hint { font-size: 12px; color: #909399; }
 
 @media (max-width: 600px) {
   .name { max-width: 110px; }

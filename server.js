@@ -151,7 +151,7 @@ function initializeDatabase() {
         phone TEXT,
         email TEXT,
         address TEXT,
-        note TEXT,
+        note TEXT, -- 存储标签 JSON 数组
         status TEXT DEFAULT 'active',
         created_by INTEGER,
         registration_no TEXT, -- 新增 注册号
@@ -160,6 +160,30 @@ function initializeDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
       )`);
+
+      // 列存在性检测（对已存在旧表做增量）
+      db.all("PRAGMA table_info(customers)", (err, rows) => {
+        if (err) {
+          console.warn('获取 customers 表结构失败:', err.message);
+          proceed();
+          return;
+        }
+        const colNames = rows.map(r => r.name);
+        const alters = [];
+        if (!colNames.includes('registration_no')) alters.push('ALTER TABLE customers ADD COLUMN registration_no TEXT');
+        if (!colNames.includes('tax_no')) alters.push('ALTER TABLE customers ADD COLUMN tax_no TEXT');
+        if (alters.length === 0) return proceed();
+        let done = 0;
+        alters.forEach(sql => db.run(sql, (e)=>{
+          if (e) console.warn('执行列添加失败:', sql, e.message);
+          if (++done === alters.length) proceed();
+        }));
+      });
+
+      function proceed(){
+        // 创建默认管理员逻辑在后面 resolve
+        // 这里不直接 resolve 由后续默认管理员检查分支处理
+      }
 
       // 项目表
       db.run(`CREATE TABLE IF NOT EXISTS projects (
@@ -489,20 +513,32 @@ app.get('/api/customers', requireAuth, (req, res) => {
       console.error('获取客户列表失败:', err);
       return res.status(500).json({ error: '服务器错误' });
     }
-    res.json(rows);
+    const result = rows.map(r => {
+      let tags = [];
+      if (r.note) {
+        try { const parsed = JSON.parse(r.note); if (Array.isArray(parsed)) tags = parsed; } catch {}
+      }
+      return { ...r, tags };
+    });
+    res.json(result);
   });
 });
 
 app.post('/api/customers', requireAuth, (req, res) => {
-  const { name, registration_no, tax_no, phone, email, address, note } = req.body;
+  let { name, registration_no, tax_no, phone, email, address, note, tags } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: '客户名称不能为空' });
   }
+  if (Array.isArray(tags)) {
+    try { note = JSON.stringify(tags); } catch { note = '[]'; }
+  } else if (note && typeof note !== 'string') {
+    note = JSON.stringify(note);
+  }
   db.run(
     `INSERT INTO customers (name, registration_no, tax_no, phone, email, address, note, created_by) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || null, req.session.userId],
+    [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || '[]', req.session.userId],
     function(err) {
       if (err) {
         console.error('创建客户失败:', err);
@@ -510,7 +546,7 @@ app.post('/api/customers', requireAuth, (req, res) => {
       }
       res.json({ 
         id: this.lastID, 
-        name, registration_no, tax_no, phone, email, address, note,
+        name, registration_no, tax_no, phone, email, address, note, tags: Array.isArray(tags)?tags:[],
         status: 'active'
       });
     }
@@ -520,8 +556,13 @@ app.post('/api/customers', requireAuth, (req, res) => {
 // 更新客户信息
 app.put('/api/customers/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const { name, registration_no, tax_no, phone, email, address, note, status } = req.body;
+  let { name, registration_no, tax_no, phone, email, address, note, status, tags } = req.body;
   if (!name) return res.status(400).json({ error: '客户名称不能为空' });
+  if (Array.isArray(tags)) {
+    try { note = JSON.stringify(tags); } catch { note = '[]'; }
+  } else if (note && typeof note !== 'string') {
+    note = JSON.stringify(note);
+  }
   const fields = ['name','registration_no','tax_no','phone','email','address','note'];
   const setParts = fields.map(f => `${f} = ?`);
   const params = [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || null];
