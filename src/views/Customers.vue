@@ -32,8 +32,8 @@
                   v-for="(t,i) in c.tags.slice(0,3)"
                   :key="t+i"
                   size="small"
-                  type="info"
-                  class="tag-item"
+                  class="tag-item dynamic-tag"
+                  :style="tagStyle(t)"
                 >{{ t }}</el-tag>
                 <el-tag v-if="c.tags.length>3" size="small" effect="plain">+{{ c.tags.length-3 }}</el-tag>
               </div>
@@ -111,6 +111,8 @@
                     :key="tag+index"
                     closable
                     size="small"
+                    class="dynamic-tag"
+                    :style="tagStyle(tag)"
                     @close="removeTag(index)"
                   >{{ tag }}</el-tag>
                   <el-input
@@ -287,11 +289,11 @@ const handleToggle = async (row) => {
 };
 
 const handleDelete = async (row) => {
-  if (!confirm(`确定删除客户【${row.name}】? 此操作不可恢复`)) return;
+  if (!confirm(`确定删除客户【${row.name}】? 此操作将把客户放入回收（软删除），后续可在后台通过专用恢复接口(未来)恢复。`)) return;
   try {
     const resp = await fetch(`/api/customers/${row.id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败');
-    ElMessage.success('已删除');
+    ElMessage.success('已移入回收');
     await loadCustomers();
   } catch (e) {
     ElMessage.error(e.message || '操作失败');
@@ -320,6 +322,27 @@ const confirmTag = () => {
 const removeTag = (i) => {
   form.tags.splice(i,1);
 };
+
+// 标签配色：FNV-1a 哈希生成色相，固定饱和度与亮度，根据亮度选择文字颜色
+function hashHue(str){
+  let h = 2166136261;
+  for (let i=0;i<str.length;i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 360;
+}
+function tagStyle(tag){
+  const hue = hashHue(tag);
+  const saturation = 55; // %
+  const light = 50; // %
+  const textColor = light > 55 ? '#303133' : '#ffffff';
+  return {
+    background: `hsl(${hue} ${saturation}% ${light}%)`,
+    color: textColor,
+    border: 'none'
+  };
+}
 </script>
 
 <style scoped>

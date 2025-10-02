@@ -156,6 +156,7 @@ function initializeDatabase() {
         created_by INTEGER,
         registration_no TEXT, -- 新增 注册号
         tax_no TEXT,           -- 新增 税号
+        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
@@ -170,8 +171,9 @@ function initializeDatabase() {
         }
         const colNames = rows.map(r => r.name);
         const alters = [];
-        if (!colNames.includes('registration_no')) alters.push('ALTER TABLE customers ADD COLUMN registration_no TEXT');
-        if (!colNames.includes('tax_no')) alters.push('ALTER TABLE customers ADD COLUMN tax_no TEXT');
+  if (!colNames.includes('registration_no')) alters.push('ALTER TABLE customers ADD COLUMN registration_no TEXT');
+  if (!colNames.includes('tax_no')) alters.push('ALTER TABLE customers ADD COLUMN tax_no TEXT');
+  if (!colNames.includes('deleted_at')) alters.push('ALTER TABLE customers ADD COLUMN deleted_at DATETIME');
         if (alters.length === 0) return proceed();
         let done = 0;
         alters.forEach(sql => db.run(sql, (e)=>{
@@ -489,8 +491,13 @@ app.get('/api/customers', requireAuth, (req, res) => {
   `;
   const params = [];
   
+  const whereParts = [];
+  if (!('includeDeleted' in req.query)) {
+    whereParts.push('c.deleted_at IS NULL');
+  }
   if (search || status) {
-    query += ' WHERE ';
+    if (whereParts.length === 0) query += ' WHERE ';
+    else query += ' WHERE ';
     const conditions = [];
     
     if (search) {
@@ -503,7 +510,10 @@ app.get('/api/customers', requireAuth, (req, res) => {
       params.push(status);
     }
     
+    if (whereParts.length) conditions.unshift(whereParts.shift());
     query += conditions.join(' AND ');
+  } else if (whereParts.length) {
+    query += ' WHERE ' + whereParts.join(' AND ');
   }
   
   query += ' ORDER BY c.created_at DESC';
@@ -600,12 +610,12 @@ app.patch('/api/customers/:id/status', requireAuth, (req, res) => {
 // 删除客户 (物理删除)
 app.delete('/api/customers/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  db.run(`DELETE FROM customers WHERE id = ?`, [id], function(err){
+  db.run(`UPDATE customers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
     if (err) {
       console.error('删除客户失败:', err);
       return res.status(500).json({ error: '删除客户失败' });
     }
-    if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在或已删除' });
     res.json({ success: true });
   });
 });
