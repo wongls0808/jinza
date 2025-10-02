@@ -2,7 +2,7 @@
   <el-dialog 
     v-model="dialogVisible" 
     title="素材管理" 
-    width="800px"
+    width="900px"
     class="material-dialog"
     @closed="handleDialogClosed"
   >
@@ -203,11 +203,51 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 裁剪弹窗 -->
+    <el-dialog
+      v-model="cropperVisible"
+      width="700px"
+      :title="`裁剪${cropContext.label}`"
+      append-to-body
+      class="cropper-dialog"
+    >
+      <div class="cropper-wrapper">
+        <div v-if="cropSrc" class="cropper-container">
+          <img ref="cropperImage" :src="cropSrc" alt="待裁剪图片" class="cropper-image" />
+        </div>
+        <div class="cropper-side">
+          <el-form label-width="90px" size="small">
+            <el-form-item label="固定尺寸">
+              <el-switch v-model="enforceSize" />
+            </el-form-item>
+            <el-form-item label="宽 × 高">
+              <div class="size-row">
+                <el-input-number v-model="targetWidth" :min="20" :max="2000" />
+                <span class="size-mul">×</span>
+                <el-input-number v-model="targetHeight" :min="20" :max="2000" />
+              </div>
+            </el-form-item>
+            <el-form-item label="缩放">
+              <el-slider v-model="zoomLevel" :min="0.1" :max="3" :step="0.01" @input="applyZoom" />
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelCrop">取消</el-button>
+          <el-button type="primary" @click="confirmCrop" :loading="uploading">{{ uploading ? '上传中...' : '裁剪并上传' }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import Cropper from 'cropperjs';
+import 'cropperjs/dist/cropper.css';
+import { ref, watch, computed, onMounted, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { UploadFilled, Stamp, Edit } from '@element-plus/icons-vue';
 
@@ -224,6 +264,24 @@ const imageViewerVisible = ref(false);
 const currentImage = ref('');
 const currentImageType = ref('');
 const saving = ref(false);
+
+// 新增裁剪相关状态
+const cropperVisible = ref(false);
+const cropperInstance = ref(null);
+const cropperImage = ref(null);
+const cropSrc = ref('');
+const cropContext = ref({ type: '', label: '' });
+const uploading = ref(false);
+const enforceSize = ref(true);
+const targetWidth = ref(400);
+const targetHeight = ref(400);
+const zoomLevel = ref(1);
+
+const typeMeta = {
+  logo: { w: 400, h: 400, label: 'LOGO' },
+  seal: { w: 400, h: 400, label: '印章' },
+  signature: { w: 400, h: 150, label: '签名' }
+};
 
 // 计算是否有更改
 const hasChanges = computed(() => {
@@ -242,81 +300,115 @@ const handleDialogClosed = () => {
   activeTab.value = 'logo';
 };
 
-// 文件上传前验证
-const validateImage = (file, expectedWidth, expectedHeight, typeName) => {
-  return new Promise((resolve, reject) => {
-    const isImage = file.type.startsWith('image/');
-    const isLt5M = file.size / 1024 / 1024 < 5;
-
-    if (!isImage) {
-      ElMessage.error(`上传${typeName}只能是图片格式!`);
-      return reject(false);
+function openCropper(file, type) {
+  const meta = typeMeta[type];
+  if (meta) {
+    targetWidth.value = meta.w;
+    targetHeight.value = meta.h;
+    cropContext.value = { type, label: meta.label };
+  }
+  cropSrc.value = URL.createObjectURL(file);
+  cropperVisible.value = true;
+  nextTick(() => {
+    if (cropperInstance.value) {
+      cropperInstance.value.destroy();
     }
-    if (!isLt5M) {
-      ElMessage.error(`上传${typeName}大小不能超过 5MB!`);
-      return reject(false);
-    }
-
-    // 创建图片对象检查尺寸
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const width = img.width;
-      const height = img.height;
-      
-      if (width !== expectedWidth || height !== expectedHeight) {
-        ElMessage.warning(`建议${typeName}尺寸为 ${expectedWidth}×${expectedHeight}px，当前为 ${width}×${height}px`);
-      }
-      resolve(true);
-    };
-    
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(true); // 如果图片加载失败，仍然允许上传
-    };
-    
-    img.src = objectUrl;
+    cropperInstance.value = new Cropper(cropperImage.value, {
+      aspectRatio: enforceSize.value ? targetWidth.value / targetHeight.value : NaN,
+      viewMode: 1,
+      autoCropArea: 1,
+      dragMode: 'move',
+      background: false,
+      responsive: true,
+      checkOrientation: true,
+    });
   });
-};
+}
 
-const beforeLogoUpload = (file) => {
-  return validateImage(file, 400, 400, 'LOGO');
-};
-
-const beforeSealUpload = (file) => {
-  return validateImage(file, 400, 400, '印章');
-};
-
-const beforeSignatureUpload = (file) => {
-  return validateImage(file, 400, 150, '签名');
-};
-
-// 上传成功处理
-const handleLogoSuccess = (response) => {
-  if (props.accountSet && response.success) {
-    props.accountSet.logo_path = response.file_path;
-    ElMessage.success('LOGO上传成功');
-    emit('update');
+function applyZoom(val) {
+  if (cropperInstance.value) {
+    cropperInstance.value.zoomTo(val);
   }
-};
+}
 
-const handleSealSuccess = (response) => {
-  if (props.accountSet && response.success) {
-    props.accountSet.seal_path = response.file_path;
-    ElMessage.success('印章上传成功');
-    emit('update');
-  }
-};
+function beforeGenericUpload(type) {
+  return async (file) => {
+    openCropper(file, type); // 阻断自动上传，改为手动
+    return false; // 阻止 el-upload 默认行为
+  };
+}
 
-const handleSignatureSuccess = (response) => {
-  if (props.accountSet && response.success) {
-    props.accountSet.signature_path = response.file_path;
-    ElMessage.success('签名上传成功');
-    emit('update');
+// 替换原有 beforeXXXUpload
+const beforeLogoUpload = beforeGenericUpload('logo');
+const beforeSealUpload = beforeGenericUpload('seal');
+const beforeSignatureUpload = beforeGenericUpload('signature');
+
+function cancelCrop() {
+  cleanupCropper();
+}
+
+function cleanupCropper() {
+  cropperVisible.value = false;
+  if (cropperInstance.value) {
+    cropperInstance.value.destroy();
+    cropperInstance.value = null;
   }
-};
+  if (cropSrc.value) URL.revokeObjectURL(cropSrc.value);
+  cropSrc.value = '';
+  zoomLevel.value = 1;
+}
+
+async function confirmCrop() {
+  if (!cropperInstance.value) return;
+  try {
+    uploading.value = true;
+    // 获取裁剪Canvas
+    let canvas = cropperInstance.value.getCroppedCanvas({
+      width: enforceSize.value ? targetWidth.value : undefined,
+      height: enforceSize.value ? targetHeight.value : undefined,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high'
+    });
+    if (enforceSize.value && (canvas.width !== targetWidth.value || canvas.height !== targetHeight.value)) {
+      // 通过再绘制强制尺寸
+      const forced = document.createElement('canvas');
+      forced.width = targetWidth.value;
+      forced.height = targetHeight.value;
+      const ctx = forced.getContext('2d');
+      ctx.drawImage(canvas, 0, 0, forced.width, forced.height);
+      canvas = forced;
+    }
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
+    const formData = new FormData();
+    formData.append('file', blob, `${cropContext.value.type}.png`);
+    formData.append('account_set_id', props.accountSet.id);
+    const resp = await fetch(`/api/upload/${cropContext.value.type}`, { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || '上传失败');
+    const field = `${cropContext.value.type}_path`;
+    props.accountSet[field] = data.file_path;
+    ElMessage.success(`${cropContext.value.label} 上传成功`);
+    emit('update');
+  } catch (e) {
+    console.error('裁剪/上传失败', e);
+    ElMessage.error(e.message || '上传失败');
+  } finally {
+    uploading.value = false;
+    cleanupCropper();
+  }
+}
+
+// 兼容原有成功回调保留（如果其他逻辑仍引用）
+const handleLogoSuccess = () => {};
+const handleSealSuccess = () => {};
+const handleSignatureSuccess = () => {};
+
+// 覆盖 getImageUrl 容错
+function getImageUrl(imagePath) {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+  return imagePath; // 后端已托管 /uploads 静态
+}
 
 // 上传错误处理
 const handleUploadError = (error) => {
@@ -329,16 +421,6 @@ const viewImage = (imageUrl, type) => {
   currentImage.value = getImageUrl(imageUrl);
   currentImageType.value = type;
   imageViewerVisible.value = true;
-};
-
-// 获取图片URL
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return '';
-  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
-    return imagePath;
-  }
-  // 对于相对路径，可以添加基础URL
-  return imagePath;
 };
 
 // 删除图片
@@ -618,4 +700,15 @@ const getRecommendedSize = (type) => {
   align-items: center;
   gap: 12px;
 }
+
+/* 新增裁剪样式 */
+.cropper-dialog :deep(.el-dialog__body){
+  padding:16px 20px;
+}
+.cropper-wrapper{display:flex;gap:16px;align-items:flex-start;}
+.cropper-container{flex:1;min-height:400px;max-height:520px;overflow:hidden;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;}
+.cropper-image{max-width:100%;display:block;}
+.cropper-side{width:240px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:12px;}
+.size-row{display:flex;align-items:center;gap:6px;}
+.size-mul{font-size:12px;color:#666;}
 </style>

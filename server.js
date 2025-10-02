@@ -8,6 +8,8 @@ import fs from 'fs';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import crypto from 'crypto';
 
 // 加载环境变量 (.env 可选)
 dotenv.config();
@@ -30,6 +32,41 @@ const dataDir = join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+// 确保上传目录存在
+const uploadDir = join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// 静态托管上传文件
+app.use('/uploads', express.static(uploadDir));
+
+// Multer存储策略（根据类型子目录）
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const { type } = req.params; // logo / seal / signature
+    const subDir = join(uploadDir, type || 'misc');
+    if (!fs.existsSync(subDir)) fs.mkdirSync(subDir, { recursive: true });
+    cb(null, subDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = file.originalname.split('.').pop();
+    const rand = crypto.randomBytes(8).toString('hex');
+    cb(null, `${Date.now()}_${rand}.${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('仅支持图片文件'));
+    }
+    cb(null, true);
+  }
+});
 
 // 安全中间件与基础解析
 app.use(helmet({
@@ -575,26 +612,24 @@ app.put('/api/account-sets/:id', requireAuth, (req, res) => {
 });
 
 // 文件上传路由（LOGO、印章、签名）- 简化版
-app.post('/api/upload/:type', requireAuth, (req, res) => {
+app.post('/api/upload/:type', requireAuth, upload.single('file'), (req, res) => {
   const { type } = req.params; // logo, seal, signature
   const { account_set_id } = req.body;
-  
-  // 模拟文件上传成功，返回模拟的文件路径
-  const filePath = `/uploads/${type}_${account_set_id}_${Date.now()}.png`;
-  
-  // 更新账套的文件路径
+  if (!req.file) {
+    return res.status(400).json({ error: '未接收到文件' });
+  }
+  if (!account_set_id) {
+    return res.status(400).json({ error: '缺少 account_set_id' });
+  }
+  const relativePath = `/uploads/${type}/${req.file.filename}`;
   const field = `${type}_path`;
-  db.run(
-    `UPDATE account_sets SET ${field} = ? WHERE id = ?`,
-    [filePath, account_set_id],
-    function(err) {
-      if (err) {
-        console.error('更新文件路径失败:', err);
-        return res.status(500).json({ error: '文件上传失败' });
-      }
-      res.json({ success: true, file_path: filePath });
+  db.run(`UPDATE account_sets SET ${field} = ? WHERE id = ?`, [relativePath, account_set_id], function(err) {
+    if (err) {
+      console.error('更新文件路径失败:', err);
+      return res.status(500).json({ error: '文件上传失败' });
     }
-  );
+    res.json({ success: true, file_path: relativePath });
+  });
 });
 
 // 打印模板管理
@@ -963,23 +998,29 @@ process.on('SIGINT', () => {
 });
 
 // 在文件上传路由后添加删除API
-app.delete('/api/upload/:type', requireAuth, (req, res) => {
-  const { type } = req.params; // logo, seal, signature
-  const { account_set_id } = req.body;
-  
-  // 清空对应的素材路径
+app.delete('/api/upload/:type', requireAuth, express.json(), (req, res) => {
+  const { type } = req.params;
+  const { account_set_id, file_path } = req.body;
   const field = `${type}_path`;
-  db.run(
-    `UPDATE account_sets SET ${field} = NULL WHERE id = ?`,
-    [account_set_id],
-    function(err) {
-      if (err) {
-        console.error('删除素材失败:', err);
+  db.get(`SELECT ${field} FROM account_sets WHERE id = ?`, [account_set_id], (err, row) => {
+    if (err) {
+      console.error('查询素材失败:', err);
+      return res.status(500).json({ error: '删除素材失败' });
+    }
+    const currentPath = row?.[field];
+    db.run(`UPDATE account_sets SET ${field} = NULL WHERE id = ?`, [account_set_id], function(uErr) {
+      if (uErr) {
+        console.error('删除素材失败:', uErr);
         return res.status(500).json({ error: '删除素材失败' });
       }
+      // 删除文件（忽略错误）
+      if (currentPath) {
+        const absPath = join(__dirname, currentPath.replace('/uploads', 'uploads'));
+        fs.unlink(absPath, () => {});
+      }
       res.json({ success: true });
-    }
-  );
+    });
+  });
 });
 
 export default app;
