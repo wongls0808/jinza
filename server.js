@@ -20,6 +20,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 在 Render / 任何前置反向代理环境下需要开启 trust proxy，确保 req.ip 与 X-Forwarded-* 解析正确
+app.set('trust proxy', 1);
+
 // 生产模式校验关键环境变量
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'CHANGE_ME_TO_STRONG_SECRET') {
@@ -94,13 +97,16 @@ const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 
 
 // Session配置
+const isProd = process.env.NODE_ENV === 'production';
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'enterprise-secret-key-2024', // 建议 .env 中覆盖
+  secret: process.env.SESSION_SECRET || 'enterprise-secret-key-2024',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: false, 
-    maxAge: 24 * 60 * 60 * 1000, // 24小时
+  proxy: true, // 与 trust proxy 配合，确保 cookie secure 判定
+  cookie: {
+    secure: isProd, // HTTPS 下启用
+    sameSite: isProd ? 'lax' : 'lax', // 若前后端不同域并需跨站，可改为 'none' + secure
+    maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true
   }
 }));
@@ -111,6 +117,7 @@ const loginLimiter = rateLimit({
   max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10),
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req, _res) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
   message: { error: '登录尝试过于频繁，请稍后再试' }
 });
 
