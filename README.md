@@ -42,6 +42,45 @@ npm run dev
 ## 数据库
 SQLite 单文件 (data/app.db) 自动初始化。
 
+### 数据持久化与部署
+默认数据目录为 `./data`（项目根目录下）。你可以通过环境变量 `DATA_DIR` 自定义，例如：
+
+```
+DATA_DIR=/var/lib/jinza-data
+```
+
+推荐在生产：
+1. 使用持久卷/挂载盘指向 `DATA_DIR`，防止容器重建丢失。
+2. 启用我们已配置的 SQLite WAL 模式：提高并发与崩溃恢复能力（启动日志可见 `journal_mode=WAL`）。
+3. 定期备份：
+	- 在线热备：复制 `*.db` 和 `*-wal` `*-shm` 文件（尽量在低写入窗口）。
+	- 冷备：短暂锁写（或停机）后直接归档整个目录。
+4. 迁移到外部数据库（中长期）：
+	- 选择 PostgreSQL / MySQL。
+	- 依据当前 schema 生成迁移脚本（可用 Prisma 或 Knex 重建模型）。
+	- 将数据导出：使用 `sqlite3 app.db .dump > dump.sql`，再清洗自增/类型后导入目标库。
+
+#### Render / 容器平台策略
+若使用 Render 免费实例，文件系统可能在重启或迁移时被重置，务必：
+- 配置持久化卷 (Persistent Disk) 挂载到 `/var/lib/jinza-data` 并在 `.env` 设置 `DATA_DIR=/var/lib/jinza-data`。
+- 或者将关键表迁移至托管 PostgreSQL（推荐长期方案）。
+
+#### 监控与健康检查建议
+- 定时任务：每日运行 `VACUUM`（可选）与备份脚本。
+- 监控数据库文件大小阈值，超过预期告警。
+- 建立 `/healthz` 端点（后续可添加）返回数据库 `SELECT 1` 结果。
+
+#### 手动备份示例（Linux）
+```
+tar czf backup-$(date +%Y%m%d%H%M).tar.gz -C /var/lib jinzA-data
+``` 
+或使用 sqlite3 原生命令：
+```
+sqlite3 app.db ".backup 'backup.db'"
+```
+
+> 注意：WAL 模式下备份时需包含 `app.db`, `app.db-wal`, `app.db-shm`。
+
 ## 目录结构（核心）
 ```
 server.js

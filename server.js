@@ -28,7 +28,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // 确保数据目录存在
-const dataDir = join(__dirname, 'data');
+// 数据目录可通过环境变量覆盖，便于持久化挂载
+const dataDir = process.env.DATA_DIR ? process.env.DATA_DIR : join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -119,6 +120,9 @@ const db = new sqlite3.Database(join(dataDir, 'app.db'), (err) => {
     console.error('数据库连接失败:', err.message);
   } else {
     console.log('已连接到 SQLite 数据库');
+    // 开启 WAL 模式提升并发与崩溃恢复能力
+    db.run("PRAGMA journal_mode=WAL;", (e)=>{ if(e) console.warn('设置 WAL 失败:', e.message); });
+    db.run("PRAGMA synchronous=NORMAL;", (e)=>{ if(e) console.warn('设置 synchronous 失败:', e.message); });
   }
 });
 
