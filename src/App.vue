@@ -47,6 +47,12 @@
               <span class="menu-text">账套管理</span>
             </div>
           </el-menu-item>
+          <el-menu-item index="recycle" @click="navigate('recycle')">
+            <div class="menu-item-content">
+              <div class="menu-icon">🗑️</div>
+              <span class="menu-text">回收站</span>
+            </div>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -158,6 +164,7 @@ import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 import Customers from './views/Customers.vue';
 import Users from './views/Users.vue';
 import AccountSets from './views/AccountSets.vue';
+import RecycleBin from './views/RecycleBin.vue';
 
 const user = ref(null);
 const activeMenu = ref('customers');
@@ -169,7 +176,8 @@ const capsLockOn = ref(false);
 const routes = {
   customers: markRaw(Customers),
   users: markRaw(Users),
-  accountSets: markRaw(AccountSets)
+  accountSets: markRaw(AccountSets),
+  recycle: markRaw(RecycleBin)
 };
 
 // 当前组件
@@ -188,7 +196,8 @@ const getPageTitle = (route) => {
   const titles = {
     customers: '客户管理',
     users: '用户管理',
-    accountSets: '账套管理'
+    accountSets: '账套管理',
+    recycle: '回收站'
   };
   return titles[route] || '企业管理系统';
 };

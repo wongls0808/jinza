@@ -83,10 +83,11 @@ sqlite3 app.db ".backup 'backup.db'"
 
 ### Customers 表软删除
 - 新增列：`deleted_at DATETIME`。
-- 删除操作：`DELETE /api/customers/:id` 现实现为软删除 (UPDATE 设置 `deleted_at=CURRENT_TIMESTAMP`)。
-- 列表获取：`GET /api/customers` 默认自动过滤 `deleted_at IS NULL`。
-- 若需要包含已删除记录，可添加查询参数：`?includeDeleted=1`。
-- 后续可扩展：恢复接口 `PATCH /api/customers/:id/restore`（暂未实现）与定期物理清理脚本（例如清理 90 天前软删除记录）。
+- 删除操作：`DELETE /api/customers/:id` 默认软删除 (UPDATE 设置 `deleted_at=CURRENT_TIMESTAMP`)，传 `?force=1` 则物理删除。
+- 列表获取：`GET /api/customers` 默认过滤 `deleted_at IS NULL`；`?includeDeleted=1` 包含软删除。
+- 恢复：`PATCH /api/customers/:id/restore` 取消软删除（`deleted_at=NULL`）。
+- 回收站视图：前端 `回收站` 菜单加载 `includeDeleted=1` 并筛选有 `deleted_at` 的记录，支持恢复与彻底删除。
+- 清理建议：可添加计划任务物理删除软删除超过 90 天记录。
 
 ### 标签系统
 - `customers.note` 字段现存储标签 JSON 数组。

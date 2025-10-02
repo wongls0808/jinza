@@ -610,12 +610,39 @@ app.patch('/api/customers/:id/status', requireAuth, (req, res) => {
 // 删除客户 (物理删除)
 app.delete('/api/customers/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  db.run(`UPDATE customers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
+  const force = req.query.force === '1';
+  if (force) {
+    // 物理删除
+    db.run(`DELETE FROM customers WHERE id = ?`, [id], function(err){
+      if (err) {
+        console.error('物理删除客户失败:', err);
+        return res.status(500).json({ error: '删除客户失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
+      res.json({ success: true, force: true });
+    });
+  } else {
+    // 软删除
+    db.run(`UPDATE customers SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, [id], function(err){
+      if (err) {
+        console.error('软删除客户失败:', err);
+        return res.status(500).json({ error: '删除客户失败' });
+      }
+      if (this.changes === 0) return res.status(404).json({ error: '客户不存在或已删除' });
+      res.json({ success: true, force: false });
+    });
+  }
+});
+
+// 恢复软删除客户
+app.patch('/api/customers/:id/restore', requireAuth, (req, res) => {
+  const { id } = req.params;
+  db.run(`UPDATE customers SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL`, [id], function(err){
     if (err) {
-      console.error('删除客户失败:', err);
-      return res.status(500).json({ error: '删除客户失败' });
+      console.error('恢复客户失败:', err);
+      return res.status(500).json({ error: '恢复客户失败' });
     }
-    if (this.changes === 0) return res.status(404).json({ error: '客户不存在或已删除' });
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在或未被删除' });
     res.json({ success: true });
   });
 });
