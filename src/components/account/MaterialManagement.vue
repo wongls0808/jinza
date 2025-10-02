@@ -211,6 +211,7 @@
       :title="`裁剪${cropContext.label}`"
       append-to-body
       class="cropper-dialog"
+      @opened="initCropper"
     >
       <div class="cropper-wrapper">
         <div v-if="cropSrc" class="cropper-container">
@@ -309,21 +310,48 @@ function openCropper(file, type) {
   }
   cropSrc.value = URL.createObjectURL(file);
   cropperVisible.value = true;
+}
+
+// 对话框真正打开后再初始化，避免图片尚未完成渲染导致 cropper 生成空白
+function initCropper() {
   nextTick(() => {
-    if (cropperInstance.value) {
-      cropperInstance.value.destroy();
+    const imgEl = cropperImage.value;
+    if (!imgEl || !cropSrc.value) return;
+    const build = () => {
+      if (cropperInstance.value) {
+        try { cropperInstance.value.destroy(); } catch(e) {}
+        cropperInstance.value = null;
+      }
+      cropperInstance.value = new Cropper(imgEl, {
+        aspectRatio: enforceSize.value ? targetWidth.value / targetHeight.value : NaN,
+        viewMode: 1,
+        autoCropArea: 1,
+        dragMode: 'move',
+        background: false,
+        responsive: true,
+        checkOrientation: true,
+      });
+      if (zoomLevel.value !== 1) {
+        cropperInstance.value.zoomTo(zoomLevel.value);
+      }
+    };
+    // 若图片已经缓存完成
+    if (imgEl.complete && imgEl.naturalWidth) {
+      build();
+    } else {
+      imgEl.onload = () => { build(); imgEl.onload = null; };
+      imgEl.onerror = () => { ElMessage.error('图片加载失败，请重试'); };
     }
-    cropperInstance.value = new Cropper(cropperImage.value, {
-      aspectRatio: enforceSize.value ? targetWidth.value / targetHeight.value : NaN,
-      viewMode: 1,
-      autoCropArea: 1,
-      dragMode: 'move',
-      background: false,
-      responsive: true,
-      checkOrientation: true,
-    });
   });
 }
+
+// 监听尺寸/约束变化，动态更新裁剪区域比例
+watch([enforceSize, targetWidth, targetHeight], () => {
+  if (cropperInstance.value) {
+    const ratio = enforceSize.value ? (targetWidth.value / targetHeight.value) : NaN;
+    try { cropperInstance.value.setAspectRatio(ratio); } catch(e) {}
+  }
+});
 
 function applyZoom(val) {
   if (cropperInstance.value) {
