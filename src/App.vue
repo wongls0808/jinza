@@ -1,5 +1,7 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ 'logged-in': user }">
+    <!-- v-if/v-else 确保同时只渲染一个界面，避免重复 -->
+    <!-- 已登录状态 - 显示主应用内容 -->
     <el-container v-if="user" class="layout">
       <!-- 侧边栏 - 现代风格 -->
       <el-aside width="240px" class="sidebar">
@@ -85,17 +87,20 @@
         </el-header>
         
         <el-main class="main-content">
-          <!-- 动态组件渲染 -->
+          <!-- 动态组件渲染 - 确保只加载当前所需组件 -->
           <div class="page-container">
-            <component :is="currentComponent" :user="user" />
+            <keep-alive>
+              <component :is="currentComponent" :user="user" />
+            </keep-alive>
           </div>
         </el-main>
       </el-container>
     </el-container>
     <ForcePasswordChange v-if="user && showForcePwd" :user-id="user.id" :require-old="true" @done="handlePwdUpdated" />
 
-    <!-- 登录页 - 现代风格 -->
+    <!-- 未登录状态 - 仅显示登录页 -->
     <div v-else class="login-container">
+      <!-- 使用单独的容器包装登录页，避免与主应用内容交叉 -->
       <div class="login-background">
         <div class="login-card">
           <div class="login-header">
@@ -290,10 +295,28 @@ const handlePwdUpdated = () => {
 </script>
 
 <style scoped>
+/* 全局布局样式 */
+#app {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #2c3e50;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 已登录状态下禁止滚动超出 */
+#app.logged-in {
+  overflow: hidden;
+}
+
 /* 现代布局样式 */
 .layout {
   height: 100vh;
   background: #f5f7fa;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 /* 侧边栏样式 */
@@ -430,20 +453,28 @@ const handlePwdUpdated = () => {
 .main-content {
   padding: 0;
   background: #f5f7fa;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: calc(100vh - 60px); /* 减去头部高度 */
 }
 
 .page-container {
   padding: 24px;
-  min-height: calc(100vh - 60px);
+  min-height: 100%;
 }
 
 /* 登录页样式 */
 .login-container {
+  position: fixed; /* 使用fixed定位，确保不会随滚动变化 */
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 999; /* 确保登录页在最上层 */
 }
 
 .login-background {
