@@ -2,16 +2,7 @@
   <div class="products-container">
     <div class="header">
       <h2>商品库</h2>
-      <div class="account-select" v-if="accountSets.length > 0">
-        <el-select v-model="selectedAccountSet" placeholder="选择账套" @change="fetchProducts">
-          <el-option
-            v-for="item in accountSets"
-            :key="item.id"
-            :label="item.name"
-            :value="item.id"
-          />
-        </el-select>
-      </div>
+      <div class="description">通用商品数据，所有账套共享</div>
     </div>
 
     <el-card shadow="hover" class="main-card">
@@ -147,8 +138,6 @@ export default {
   },
   setup() {
     const products = ref([]);
-    const accountSets = ref([]);
-    const selectedAccountSet = ref(null);
     const loading = ref(false);
     const saving = ref(false);
     const deleting = ref(false);
@@ -163,8 +152,7 @@ export default {
       code: '',
       description: '',
       purchase_price: 0,
-      selling_price: 0,
-      account_set_id: null
+      selling_price: 0
     });
 
     const rules = {
@@ -200,33 +188,15 @@ export default {
       }).format(date);
     };
 
-    // 获取账套列表
-    const fetchAccountSets = async () => {
-      try {
-        const response = await fetchWithCredentials('/api/account-sets');
-        if (response.ok) {
-          const data = await response.json();
-          accountSets.value = data.filter(item => item.is_active === 1);
-          if (accountSets.value.length > 0 && !selectedAccountSet.value) {
-            selectedAccountSet.value = accountSets.value[0].id;
-            fetchProducts();
-          }
-        }
-      } catch (error) {
-        console.error('获取账套列表失败:', error);
-        ElMessage.error('获取账套列表失败');
-      }
-    };
+    // 直接获取商品列表，不需要账套选择
 
     // 获取商品列表
     const fetchProducts = async () => {
-      if (!selectedAccountSet.value) return;
-      
       loading.value = true;
       try {
-        let url = `/api/products?account_set_id=${selectedAccountSet.value}`;
+        let url = `/api/products`;
         if (searchText.value) {
-          url += `&search=${encodeURIComponent(searchText.value)}`;
+          url += `?search=${encodeURIComponent(searchText.value)}`;
         }
         
         const response = await fetchWithCredentials(url);
@@ -258,8 +228,7 @@ export default {
           code: product.code,
           description: product.description,
           purchase_price: product.purchase_price,
-          selling_price: product.selling_price,
-          account_set_id: product.account_set_id
+          selling_price: product.selling_price
         });
       } else {
         // 新增模式
@@ -268,8 +237,7 @@ export default {
           code: '',
           description: '',
           purchase_price: 0,
-          selling_price: 0,
-          account_set_id: selectedAccountSet.value
+          selling_price: 0
         });
       }
       dialogVisible.value = true;
@@ -302,7 +270,6 @@ export default {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                account_set_id: dialogData.account_set_id,
                 description: dialogData.description,
                 purchase_price: dialogData.purchase_price,
                 selling_price: dialogData.selling_price
@@ -368,13 +335,11 @@ export default {
     };
 
     onMounted(() => {
-      fetchAccountSets();
+      fetchProducts();
     });
 
     return {
       products,
-      accountSets,
-      selectedAccountSet,
       loading,
       saving,
       deleting,
@@ -406,6 +371,13 @@ export default {
 .header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.description {
+  color: #606266;
+  font-size: 14px;
+  margin-left: 10px;
   align-items: center;
   margin-bottom: 20px;
 }

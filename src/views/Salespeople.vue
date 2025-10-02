@@ -49,7 +49,7 @@
               :type="person.status === 'active' ? 'success' : 'info'"
               size="small"
             >
-              {{ person.status === 'active' ? '在职' : '离职' }}
+              {{ person.status === 'active' ? '启用' : '停用' }}
             </el-tag>
           </div>
           
@@ -73,7 +73,7 @@
               size="small" 
               @click="handleStatusChange(person)"
             >
-              {{ person.status === 'active' ? '设为离职' : '设为在职' }}
+              {{ person.status === 'active' ? '设为停用' : '设为启用' }}
             </el-button>
             <el-button type="danger" size="small" @click="handleDelete(person)">
               <el-icon><Delete /></el-icon>删除
@@ -109,8 +109,8 @@
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
-            <el-radio label="active">在职</el-radio>
-            <el-radio label="inactive">离职</el-radio>
+            <el-radio label="active">启用</el-radio>
+            <el-radio label="inactive">停用</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -161,9 +161,7 @@ const rules = {
     { required: true, message: '请输入业务员姓名', trigger: 'blur' },
     { min: 1, max: 50, message: '长度在 1 到 50 个字符', trigger: 'blur' }
   ],
-  phone: [
-    { pattern: /^1[3-9]\d{9}$|^$/, message: '请输入有效的手机号码', trigger: 'blur' }
-  ],
+  phone: [],  // 去除手机号格式验证，允许自由输入
   email: [
     { type: 'email', message: '请输入有效的电子邮箱地址', trigger: 'blur' }
   ]
@@ -267,7 +265,7 @@ const submitForm = async () => {
 
 const handleStatusChange = async (person) => {
   const newStatus = person.status === 'active' ? 'inactive' : 'active';
-  const action = newStatus === 'active' ? '设为在职' : '设为离职';
+  const action = newStatus === 'active' ? '设为启用' : '设为停用';
   
   try {
     await api.patch(`/api/salespeople/${person.id}/status`, { status: newStatus });

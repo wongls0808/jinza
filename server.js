@@ -300,11 +300,9 @@ function initializeDatabase() {
         created_by INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        account_set_id INTEGER,
         is_deleted INTEGER DEFAULT 0,
-        FOREIGN KEY(created_by) REFERENCES users(id),
-        FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
-      )`);
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )`);  // 移除account_set_id字段和外键
       
       // 业务员表
       db.run(`CREATE TABLE IF NOT EXISTS salespeople (
@@ -1500,19 +1498,15 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
 
 // 商品管理API
 app.get('/api/products', requireAuth, (req, res) => {
-  const { account_set_id, search } = req.query;
-  
-  if (!account_set_id) {
-    return res.status(400).json({ error: '账套ID不能为空' });
-  }
+  const { search } = req.query;
   
   let query = `
     SELECT p.*, u.name as creator_name 
     FROM products p 
     LEFT JOIN users u ON p.created_by = u.id
-    WHERE p.is_deleted = 0 AND p.account_set_id = ?
+    WHERE p.is_deleted = 0
   `;
-  const params = [account_set_id];
+  const params = [];
   
   if (search) {
     query += ' AND (p.code LIKE ? OR p.description LIKE ?)';
@@ -1531,10 +1525,10 @@ app.get('/api/products', requireAuth, (req, res) => {
 });
 
 app.post('/api/products', requireAuth, (req, res) => {
-  const { account_set_id, description, purchase_price, selling_price } = req.body;
+  const { description, purchase_price, selling_price } = req.body;
   
-  if (!account_set_id || !description) {
-    return res.status(400).json({ error: '账套ID和商品描述不能为空' });
+  if (!description) {
+    return res.status(400).json({ error: '商品描述不能为空' });
   }
   
   // 生成9位随机商品编码
@@ -1569,9 +1563,9 @@ app.post('/api/products', requireAuth, (req, res) => {
       
       // 插入新商品
       db.run(
-        `INSERT INTO products (code, description, purchase_price, selling_price, created_by, account_set_id) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [code, description, purchase_price || 0, selling_price || 0, req.session.userId, account_set_id],
+        `INSERT INTO products (code, description, purchase_price, selling_price, created_by) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [code, description, purchase_price || 0, selling_price || 0, req.session.userId],
         function(err) {
           if (err) {
             console.error('创建商品失败:', err);
@@ -1585,7 +1579,6 @@ app.post('/api/products', requireAuth, (req, res) => {
             purchase_price: purchase_price || 0,
             selling_price: selling_price || 0,
             created_by: req.session.userId,
-            account_set_id,
             is_deleted: 0
           });
         }
