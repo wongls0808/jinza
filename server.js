@@ -914,10 +914,8 @@ app.get('/api/salespeople', requireAuth, (req, res) => {
     LEFT JOIN users u ON s.created_by = u.id
   `;
   const params = [];
-  const whereParts = [];
   
   if (search || status) {
-    query += ' WHERE ' + whereParts.shift();
     const conditions = []; 
     
     if (search) {
@@ -930,9 +928,9 @@ app.get('/api/salespeople', requireAuth, (req, res) => {
       params.push(status);
     }
     
-    if (conditions.length) query += ' AND ' + conditions.join(' AND ');
-  } else {
-    query += ' WHERE ' + whereParts.join(' AND ');
+    if (conditions.length) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
   }
   
   query += ' ORDER BY s.created_at DESC';
