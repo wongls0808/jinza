@@ -131,11 +131,6 @@
             </el-form-item>
           </el-form>
           
-          <div class="login-footer">
-            <div class="demo-account">
-              <span>演示账号: admin / admin123</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -464,14 +459,4 @@ const logout = async () => {
   font-weight: 500;
 }
 
-.login-footer {
-  text-align: center;
-  border-top: 1px solid #e6e6e6;
-  padding-top: 20px;
-}
-
-.demo-account {
-  font-size: 12px;
-  color: #909399;
-}
 </style>
