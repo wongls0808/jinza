@@ -5,6 +5,12 @@ import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+
+// 加载环境变量 (.env 可选)
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,19 +18,33 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 生产模式校验关键环境变量
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'CHANGE_ME_TO_STRONG_SECRET') {
+    console.warn('[安全警告] SESSION_SECRET 未设置或仍为默认值，请在生产环境中使用强随机值');
+  }
+}
+
 // 确保数据目录存在
 const dataDir = join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// 中间件
+// 安全中间件与基础解析
+app.use(helmet({
+  crossOriginEmbedderPolicy: false, // 与某些前端构建兼容
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// 动态 CORS （开发模式已在后面逻辑中设置，这里仅可选启用未来扩展）
+const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+
+
 // Session配置
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'enterprise-secret-key-2024',
+  secret: process.env.SESSION_SECRET || 'enterprise-secret-key-2024', // 建议 .env 中覆盖
   resave: false,
   saveUninitialized: false,
   cookie: { 
@@ -33,6 +53,15 @@ app.use(session({
     httpOnly: true
   }
 }));
+
+// 登录接口限流（防暴力破解）
+const loginLimiter = rateLimit({
+  windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10),
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '登录尝试过于频繁，请稍后再试' }
+});
 
 // SQLite数据库连接
 const db = new sqlite3.Database(join(dataDir, 'app.db'), (err) => {
@@ -228,7 +257,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // 认证路由
-app.post('/api/login', (req, res) => {
+app.post('/api/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   
   if (!username || !password) {

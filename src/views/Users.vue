@@ -50,6 +50,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { ElMessage } from 'element-plus';
+import { userApi } from '@/utils/api';
 
 const users = ref([]);
 const showAddDialog = ref(false);
@@ -60,37 +62,43 @@ const newUser = ref({
   role: 'user',
   department: ''
 });
+const loading = ref(false);
+const creating = ref(false);
 
 onMounted(async () => {
   await loadUsers();
 });
 
 const loadUsers = async () => {
+  loading.value = true;
   try {
-    const response = await fetch('/api/users');
-    if (response.ok) {
-      users.value = await response.json();
-    }
-  } catch (error) {
-    console.error('加载用户失败:', error);
+    users.value = await userApi.list();
+  } catch (err) {
+    console.error('加载用户失败:', err);
+    ElMessage.error('加载用户失败');
+  } finally {
+    loading.value = false;
   }
 };
 
 const addUser = async () => {
+  if (!newUser.value.username || !newUser.value.password || !newUser.value.name) {
+    ElMessage.warning('请填写必填字段');
+    return;
+  }
+  creating.value = true;
   try {
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newUser.value)
-    });
-    
-    if (response.ok) {
-      showAddDialog.value = false;
-      newUser.value = { username: '', password: '', name: '', role: 'user', department: '' };
-      await loadUsers();
-    }
-  } catch (error) {
-    console.error('添加用户失败:', error);
+    await userApi.create(newUser.value);
+    ElMessage.success('创建成功');
+    showAddDialog.value = false;
+    newUser.value = { username: '', password: '', name: '', role: 'user', department: '' };
+    await loadUsers();
+  } catch (err) {
+    console.error('添加用户失败:', err);
+    const apiMsg = err?.data?.error || '添加用户失败';
+    ElMessage.error(apiMsg);
+  } finally {
+    creating.value = false;
   }
 };
 </script>
