@@ -47,7 +47,6 @@
                 <h5>当前LOGO预览</h5>
                 <div class="preview-actions">
                   <el-button size="small" @click="viewImage(accountSet.logo_path, 'LOGO')">查看大图</el-button>
-                  <el-button size="small" @click="openCropDialog(accountSet.logo_path, 'logo')">优化裁剪</el-button>
                   <el-button size="small" type="danger" @click="removeImage('logo')">删除</el-button>
                 </div>
               </div>
@@ -102,7 +101,6 @@
                 <h5>当前印章预览</h5>
                 <div class="preview-actions">
                   <el-button size="small" @click="viewImage(accountSet.seal_path, '印章')">查看大图</el-button>
-                  <el-button size="small" @click="openCropDialog(accountSet.seal_path, 'seal')">优化裁剪</el-button>
                   <el-button size="small" type="danger" @click="removeImage('seal')">删除</el-button>
                 </div>
               </div>
@@ -157,7 +155,6 @@
                 <h5>当前签名预览</h5>
                 <div class="preview-actions">
                   <el-button size="small" @click="viewImage(accountSet.signature_path, '签名')">查看大图</el-button>
-                  <el-button size="small" @click="openCropDialog(accountSet.signature_path, 'signature')">优化裁剪</el-button>
                   <el-button size="small" type="danger" @click="removeImage('signature')">删除</el-button>
                 </div>
               </div>
@@ -206,38 +203,13 @@
         </div>
       </div>
     </el-dialog>
-
-    <!-- 图片裁剪对话框 -->
-    <el-dialog v-model="cropDialogVisible" :title="`${currentCropType}裁剪`" width="800px" align-center>
-      <div class="crop-dialog">
-        <div class="crop-container">
-          <div class="crop-area" ref="cropArea">
-            <img :src="currentCropImage" alt="裁剪图片" ref="cropImage" />
-          </div>
-          <div class="crop-controls">
-            <div class="crop-preview">
-              <h4>裁剪预览</h4>
-              <div class="preview-container" ref="previewContainer">
-                <img :src="currentCropImage" alt="预览" ref="previewImage" />
-              </div>
-            </div>
-            <div class="crop-buttons">
-              <el-button @click="resetCrop">重置</el-button>
-              <el-button type="primary" @click="confirmCrop">确认裁剪</el-button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </el-dialog>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, watch, computed, nextTick, onMounted } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { UploadFilled, Stamp, Edit } from '@element-plus/icons-vue';
-import Cropper from 'cropperjs';
-import 'cropperjs/dist/cropper.css';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -249,13 +221,9 @@ const emit = defineEmits(['update:modelValue', 'update']);
 const dialogVisible = ref(false);
 const activeTab = ref('logo');
 const imageViewerVisible = ref(false);
-const cropDialogVisible = ref(false);
 const currentImage = ref('');
 const currentImageType = ref('');
-const currentCropImage = ref('');
-const currentCropType = ref('');
 const saving = ref(false);
-const cropper = ref(null);
 
 // 计算是否有更改
 const hasChanges = computed(() => {
@@ -361,107 +329,6 @@ const viewImage = (imageUrl, type) => {
   currentImage.value = getImageUrl(imageUrl);
   currentImageType.value = type;
   imageViewerVisible.value = true;
-};
-
-// 打开裁剪对话框
-const openCropDialog = (imageUrl, type) => {
-  currentCropImage.value = getImageUrl(imageUrl);
-  currentCropType.value = type;
-  cropDialogVisible.value = true;
-  
-  nextTick(() => {
-    initCropper();
-  });
-};
-
-// 初始化裁剪器
-const initCropper = () => {
-  const image = document.querySelector('.crop-area img');
-  const preview = document.querySelector('.preview-container img');
-  
-  if (cropper.value) {
-    cropper.value.destroy();
-  }
-  
-  // 根据类型设置裁剪比例
-  let aspectRatio = 1; // 默认正方形
-  if (currentCropType.value === 'signature') {
-    aspectRatio = 400 / 150; // 签名比例
-  }
-  
-  cropper.value = new Cropper(image, {
-    aspectRatio: aspectRatio,
-    viewMode: 1,
-    preview: preview,
-    guides: true,
-    center: true,
-    highlight: true,
-    background: false,
-    autoCropArea: 0.8,
-    responsive: true,
-    restore: true,
-    checkCrossOrigin: false,
-    cropBoxResizable: true,
-    cropBoxMovable: true,
-    toggleDragModeOnDblclick: true
-  });
-};
-
-// 重置裁剪
-const resetCrop = () => {
-  if (cropper.value) {
-    cropper.value.reset();
-  }
-};
-
-// 确认裁剪
-const confirmCrop = () => {
-  if (cropper.value) {
-    const canvas = cropper.value.getCroppedCanvas();
-    
-    // 根据类型设置输出尺寸
-    let outputWidth = 400;
-    let outputHeight = 400;
-    
-    if (currentCropType.value === 'signature') {
-      outputWidth = 400;
-      outputHeight = 150;
-    }
-    
-    // 调整画布尺寸
-    const resizedCanvas = document.createElement('canvas');
-    const resizedContext = resizedCanvas.getContext('2d');
-    resizedCanvas.width = outputWidth;
-    resizedCanvas.height = outputHeight;
-    
-    // 绘制调整后的图像
-    resizedContext.drawImage(canvas, 0, 0, outputWidth, outputHeight);
-    
-    // 获取Base64数据
-    const croppedImageData = resizedCanvas.toDataURL('image/png');
-    
-    // 更新对应类型的图片
-    if (props.accountSet) {
-      if (currentCropType.value === 'logo') {
-        props.accountSet.logo_path = croppedImageData;
-      } else if (currentCropType.value === 'seal') {
-        props.accountSet.seal_path = croppedImageData;
-      } else if (currentCropType.value === 'signature') {
-        props.accountSet.signature_path = croppedImageData;
-      }
-      
-      ElMessage.success('裁剪成功');
-      emit('update');
-    }
-    
-    cropDialogVisible.value = false;
-    
-    // 销毁裁剪器
-    if (cropper.value) {
-      cropper.value.destroy();
-      cropper.value = null;
-    }
-  }
 };
 
 // 获取图片URL
@@ -750,55 +617,5 @@ const getRecommendedSize = (type) => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-}
-
-/* 裁剪对话框样式 */
-.crop-dialog {
-  padding: 0 10px;
-}
-
-.crop-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.crop-area {
-  width: 100%;
-  height: 400px;
-  background: #f8f9fa;
-  border: 1px solid #e6e6e6;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.crop-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.crop-preview {
-  width: 150px;
-}
-
-.crop-preview h4 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  color: #606266;
-}
-
-.preview-container {
-  width: 150px;
-  height: 150px;
-  border: 1px solid #e6e6e6;
-  border-radius: 6px;
-  overflow: hidden;
-  background: white;
-}
-
-.crop-buttons {
-  display: flex;
-  gap: 10px;
 }
 </style>
