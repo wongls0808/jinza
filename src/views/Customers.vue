@@ -12,7 +12,7 @@
         <el-button type="primary" link @click="showAddDialog = true">+ 新增客户</el-button>
       </div>
       <div v-else class="card-grid">
-  <div class="customer-card data-card" v-for="c in customers" :key="c.id">
+        <div class="customer-card data-card" v-for="c in customers" :key="c.id">
           <div class="card-top">
             <div class="logo-circle">{{ (c.name || '?').charAt(0).toUpperCase() }}</div>
             <div class="meta">
@@ -22,9 +22,11 @@
                   {{ c.status === 'active' ? '活跃' : '停用' }}
                 </el-tag>
               </div>
-              <div class="line" v-if="c.contact" :title="c.contact">联系人：{{ c.contact }}</div>
-              <div class="line" v-if="c.phone" :title="c.phone">电话：{{ c.phone }}</div>
+              <div class="line" v-if="c.registration_no" :title="c.registration_no">注册号：{{ c.registration_no }}</div>
+              <div class="line" v-if="c.tax_no" :title="c.tax_no">税号：{{ c.tax_no }}</div>
+              <div class="line" v-if="c.phone" :title="c.phone">联系电话：{{ c.phone }}</div>
               <div class="line email" v-if="c.email" :title="c.email">邮箱：{{ c.email }}</div>
+              <div class="line" v-if="c.address" :title="c.address">地址：{{ c.address }}</div>
             </div>
             <div class="actions">
               <el-dropdown trigger="click" @command="cmd => handleCardCommand(cmd, c)">
@@ -33,9 +35,9 @@
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="edit" disabled>编辑(待实现)</el-dropdown-item>
-                    <el-dropdown-item command="toggle" disabled>{{ c.status === 'active' ? '停用' : '启用' }}(待实现)</el-dropdown-item>
-                    <el-dropdown-item divided command="delete" disabled>删除(待实现)</el-dropdown-item>
+                    <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                    <el-dropdown-item command="toggle">{{ c.status === 'active' ? '停用' : '启用' }}</el-dropdown-item>
+                    <el-dropdown-item divided command="delete">删除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -48,32 +50,65 @@
       </div>
     </div>
 
-    <!-- 新增客户对话框 -->
-    <el-dialog v-model="showAddDialog" title="新增客户">
-      <el-form :model="newCustomer">
-        <el-form-item label="客户名称">
-          <el-input v-model="newCustomer.name" />
-        </el-form-item>
-        <el-form-item label="联系人">
-          <el-input v-model="newCustomer.contact" />
-        </el-form-item>
-        <el-form-item label="电话">
-          <el-input v-model="newCustomer.phone" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="newCustomer.email" />
-        </el-form-item>
+    <!-- 新增 / 编辑 客户对话框 -->
+    <el-dialog :title="isEdit ? '编辑客户' : '新增客户'" v-model="showAddDialog" width="640px">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="90px" status-icon>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="客户名称" prop="name">
+              <el-input v-model="form.name" placeholder="必填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="注册号" prop="registration_no">
+              <el-input v-model="form.registration_no" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="税号" prop="tax_no">
+              <el-input v-model="form.tax_no" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系电话" prop="phone">
+              <el-input v-model="form.phone" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="邮箱" prop="email">
+              <el-input v-model="form.email" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态" v-if="isEdit">
+              <el-select v-model="form.status">
+                <el-option label="活跃" value="active" />
+                <el-option label="停用" value="inactive" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="地址" prop="address">
+              <el-input v-model="form.address" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="备注" prop="note">
+              <el-input v-model="form.note" type="textarea" :rows="3" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="addCustomer" :loading="creating">确定</el-button>
+        <el-button type="primary" :loading="creating" @click="submitForm">{{ isEdit ? '保存' : '创建' }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, reactive } from 'vue';
 import { MoreFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import '@/styles/cards.css';
@@ -82,12 +117,23 @@ const customers = ref([]);
 const showAddDialog = ref(false);
 const loading = ref(false);
 const creating = ref(false);
-const newCustomer = ref({
+const isEdit = ref(false);
+const editingId = ref(null);
+const formRef = ref();
+const form = reactive({
   name: '',
-  contact: '',
+  registration_no: '',
+  tax_no: '',
   phone: '',
-  email: ''
+  email: '',
+  address: '',
+  note: '',
+  status: 'active'
 });
+const rules = {
+  name: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
+  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
+};
 
 onMounted(async () => {
   await loadCustomers();
@@ -107,43 +153,111 @@ const loadCustomers = async () => {
   }
 };
 
-const addCustomer = async () => {
-  if (!newCustomer.value.name) {
-    ElMessage.warning('请输入客户名称');
-    return;
-  }
-  creating.value = true;
-  try {
-    const response = await fetch('/api/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCustomer.value)
-    });
-    if (response.ok) {
+const resetForm = () => {
+  form.name = '';
+  form.registration_no = '';
+  form.tax_no = '';
+  form.phone = '';
+  form.email = '';
+  form.address = '';
+  form.note = '';
+  form.status = 'active';
+};
+
+const openCreate = () => {
+  resetForm();
+  isEdit.value = false;
+  editingId.value = null;
+  showAddDialog.value = true;
+};
+
+const submitForm = () => {
+  formRef.value.validate(async (valid) => {
+    if (!valid) return;
+    creating.value = true;
+    try {
+      if (isEdit.value) {
+        const resp = await fetch(`/api/customers/${editingId.value}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form)
+        });
+        if (!resp.ok) throw new Error('更新失败');
+        ElMessage.success('已保存');
+      } else {
+        const resp = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form)
+        });
+        if (!resp.ok) throw new Error('创建失败');
+        ElMessage.success('创建成功');
+      }
       showAddDialog.value = false;
-      newCustomer.value = { name: '', contact: '', phone: '', email: '' };
       await loadCustomers();
-      ElMessage.success('创建成功');
+    } catch (e) {
+      ElMessage.error(e.message || '操作失败');
+    } finally {
+      creating.value = false;
     }
-  } catch (error) {
-    console.error('添加客户失败:', error);
-    ElMessage.error('添加客户失败');
-  } finally {
-    creating.value = false;
+  });
+};
+
+const handleEdit = (row) => {
+  isEdit.value = true;
+  editingId.value = row.id;
+  Object.assign(form, {
+    name: row.name || '',
+    registration_no: row.registration_no || '',
+    tax_no: row.tax_no || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    address: row.address || '',
+    note: row.note || '',
+    status: row.status || 'active'
+  });
+  showAddDialog.value = true;
+};
+
+const handleToggle = async (row) => {
+  const target = row.status === 'active' ? 'inactive' : 'active';
+  try {
+    const resp = await fetch(`/api/customers/${row.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: target })
+    });
+    if (!resp.ok) throw new Error('状态更新失败');
+    ElMessage.success(target === 'active' ? '已启用' : '已停用');
+    await loadCustomers();
+  } catch (e) {
+    ElMessage.error(e.message || '操作失败');
+  }
+};
+
+const handleDelete = async (row) => {
+  if (!confirm(`确定删除客户【${row.name}】? 此操作不可恢复`)) return;
+  try {
+    const resp = await fetch(`/api/customers/${row.id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('删除失败');
+    ElMessage.success('已删除');
+    await loadCustomers();
+  } catch (e) {
+    ElMessage.error(e.message || '操作失败');
   }
 };
 
 const handleCardCommand = (cmd, row) => {
-  if (['edit','toggle','delete'].includes(cmd)) {
-    ElMessage.info('该功能尚未实现');
-  }
+  if (cmd === 'edit') return handleEdit(row);
+  if (cmd === 'toggle') return handleToggle(row);
+  if (cmd === 'delete') return handleDelete(row);
 };
 </script>
 
 <style scoped>
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .loading-tip { color: #909399; font-size: 14px; padding: 12px 0; }
-.empty-state { background: #fafafa; border: 1px dashed #dcdfe6; padding: 40px 20px; text-align: center; border-radius: 8px; color: #909399; }
+.empty-state { background: #fafafa; border: 1px dashed #dcdfe6; padding: 40px 20px; text-align: center; border-radius: 8px; color: #909399; cursor: default; }
 .empty-text { margin-bottom: 8px; }
 
 /* 特有样式 */

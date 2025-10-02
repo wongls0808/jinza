@@ -147,13 +147,15 @@ function initializeDatabase() {
       db.run(`CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        contact TEXT,
+        contact TEXT, -- 旧字段(可能弃用)
         phone TEXT,
         email TEXT,
         address TEXT,
         note TEXT,
         status TEXT DEFAULT 'active',
         created_by INTEGER,
+        registration_no TEXT, -- 新增 注册号
+        tax_no TEXT,           -- 新增 税号
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(created_by) REFERENCES users(id)
@@ -468,8 +470,8 @@ app.get('/api/customers', requireAuth, (req, res) => {
     const conditions = [];
     
     if (search) {
-      conditions.push('(c.name LIKE ? OR c.contact LIKE ? OR c.phone LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      conditions.push('(c.name LIKE ? OR c.contact LIKE ? OR c.phone LIKE ? OR c.registration_no LIKE ? OR c.tax_no LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
     
     if (status) {
@@ -492,28 +494,79 @@ app.get('/api/customers', requireAuth, (req, res) => {
 });
 
 app.post('/api/customers', requireAuth, (req, res) => {
-  const { name, contact, phone, email, address, note } = req.body;
+  const { name, registration_no, tax_no, phone, email, address, note } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: '客户名称不能为空' });
   }
-  
   db.run(
-    "INSERT INTO customers (name, contact, phone, email, address, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [name, contact, phone, email, address, note, req.session.userId],
+    `INSERT INTO customers (name, registration_no, tax_no, phone, email, address, note, created_by) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || null, req.session.userId],
     function(err) {
       if (err) {
         console.error('创建客户失败:', err);
         return res.status(500).json({ error: '创建客户失败' });
       }
-      
       res.json({ 
         id: this.lastID, 
-        name, contact, phone, email, address, note,
+        name, registration_no, tax_no, phone, email, address, note,
         status: 'active'
       });
     }
   );
+});
+
+// 更新客户信息
+app.put('/api/customers/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { name, registration_no, tax_no, phone, email, address, note, status } = req.body;
+  if (!name) return res.status(400).json({ error: '客户名称不能为空' });
+  const fields = ['name','registration_no','tax_no','phone','email','address','note'];
+  const setParts = fields.map(f => `${f} = ?`);
+  const params = [name, registration_no || null, tax_no || null, phone || null, email || null, address || null, note || null];
+  if (status) { setParts.push('status = ?'); params.push(status); }
+  setParts.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(id);
+  const sql = `UPDATE customers SET ${setParts.join(', ')} WHERE id = ?`;
+  db.run(sql, params, function(err){
+    if (err) {
+      console.error('更新客户失败:', err);
+      return res.status(500).json({ error: '更新客户失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 切换状态 active/inactive
+app.patch('/api/customers/:id/status', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!['active','inactive'].includes(status)) {
+    return res.status(400).json({ error: '非法状态' });
+  }
+  db.run(`UPDATE customers SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id], function(err){
+    if (err) {
+      console.error('更新状态失败:', err);
+      return res.status(500).json({ error: '更新状态失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
+    res.json({ success: true });
+  });
+});
+
+// 删除客户 (物理删除)
+app.delete('/api/customers/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  db.run(`DELETE FROM customers WHERE id = ?`, [id], function(err){
+    if (err) {
+      console.error('删除客户失败:', err);
+      return res.status(500).json({ error: '删除客户失败' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: '客户不存在' });
+    res.json({ success: true });
+  });
 });
 
 // 项目管理路由
