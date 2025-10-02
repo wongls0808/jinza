@@ -4,19 +4,51 @@
       <h2>用户管理</h2>
       <el-button type="primary" @click="showAddDialog = true">新增用户</el-button>
     </div>
-    
-    <el-table :data="users" style="width: 100%">
-      <el-table-column prop="username" label="用户名" />
-      <el-table-column prop="name" label="姓名" />
-      <el-table-column prop="role" label="角色">
-        <template #default="scope">
-          <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'success'">
-            {{ scope.row.role === 'admin' ? '管理员' : '普通用户' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="department" label="部门" />
-    </el-table>
+
+    <div v-if="loading" class="loading-tip">加载中...</div>
+    <div v-else>
+      <div v-if="!users.length" class="empty-state">
+        <div class="empty-text">暂无用户数据</div>
+        <el-button type="primary" link @click="showAddDialog = true">+ 新增用户</el-button>
+      </div>
+      <div v-else class="card-grid">
+  <div class="user-card data-card" v-for="u in users" :key="u.id">
+          <div class="card-top">
+            <div class="avatar" :class="u.role">
+              {{ (u.name || u.username || '?').charAt(0).toUpperCase() }}
+            </div>
+            <div class="meta">
+              <div class="name-row">
+                <span class="name" :title="u.name || u.username">{{ u.name || u.username }}</span>
+                <el-tag size="small" :type="u.role === 'admin' ? 'danger' : 'success'">
+                  {{ u.role === 'admin' ? '管理员' : '用户' }}
+                </el-tag>
+              </div>
+              <div class="sub-line" :title="u.username">@{{ u.username }}</div>
+              <div class="dept" v-if="u.department" :title="u.department">部门：{{ u.department }}</div>
+              <div class="dept dept-empty" v-else>无部门</div>
+            </div>
+            <div class="actions">
+              <el-dropdown trigger="click" @command="cmd => handleCardCommand(cmd, u)">
+                <span class="dropdown-trigger">
+                  <el-icon><MoreFilled /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit" disabled>编辑(待实现)</el-dropdown-item>
+                    <el-dropdown-item command="reset" disabled>重置密码(待实现)</el-dropdown-item>
+                    <el-dropdown-item divided command="delete" disabled>删除(待实现)</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="footer-text">角色：{{ u.role === 'admin' ? '管理员' : '普通用户' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 新增用户对话框 -->
     <el-dialog v-model="showAddDialog" title="新增用户">
@@ -42,7 +74,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="addUser">确定</el-button>
+        <el-button type="primary" @click="addUser" :loading="creating">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -51,6 +83,8 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { MoreFilled } from '@element-plus/icons-vue';
+import '@/styles/cards.css';
 import { userApi } from '@/utils/api';
 
 const users = ref([]);
@@ -101,6 +135,13 @@ const addUser = async () => {
     creating.value = false;
   }
 };
+
+// 卡片下拉命令（当前占位）
+const handleCardCommand = (cmd, row) => {
+  if (['edit','reset','delete'].includes(cmd)) {
+    ElMessage.info('该功能尚未实现');
+  }
+};
 </script>
 
 <style scoped>
@@ -108,6 +149,55 @@ const addUser = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.loading-tip {
+  color: #909399;
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+.empty-state {
+  background: #fafafa;
+  border: 1px dashed #dcdfe6;
+  padding: 40px 20px;
+  text-align: center;
+  border-radius: 8px;
+  color: #909399;
+}
+.empty-text { margin-bottom: 8px; }
+
+
+
+
+.avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  font-size: 18px;
+  background: linear-gradient(135deg,#409eff,#337ecc);
+  flex-shrink: 0;
+}
+.avatar.admin { background: linear-gradient(135deg,#f56c6c,#dd6161); }
+
+.meta { flex: 1; min-width: 0; }
+.name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.name { font-weight: 600; font-size: 15px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-line { font-size: 12px; color: #909399; margin-bottom: 4px; max-width: 160px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept { font-size: 12px; color: #606266; }
+.dept-empty { color: #c0c4cc; font-style: italic; }
+
+
+.footer-text { user-select: none; }
+
+@media (max-width: 600px) {
+  .name { max-width: 100px; }
+  .sub-line { max-width: 120px; }
 }
 </style>
