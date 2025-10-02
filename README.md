@@ -81,6 +81,19 @@ sqlite3 app.db ".backup 'backup.db'"
 
 > 注意：WAL 模式下备份时需包含 `app.db`, `app.db-wal`, `app.db-shm`。
 
+### Customers 表软删除
+- 新增列：`deleted_at DATETIME`。
+- 删除操作：`DELETE /api/customers/:id` 现实现为软删除 (UPDATE 设置 `deleted_at=CURRENT_TIMESTAMP`)。
+- 列表获取：`GET /api/customers` 默认自动过滤 `deleted_at IS NULL`。
+- 若需要包含已删除记录，可添加查询参数：`?includeDeleted=1`。
+- 后续可扩展：恢复接口 `PATCH /api/customers/:id/restore`（暂未实现）与定期物理清理脚本（例如清理 90 天前软删除记录）。
+
+### 标签系统
+- `customers.note` 字段现存储标签 JSON 数组。
+- 前端展示前 3 个标签，其余折叠为 `+N`。
+- 标签颜色：采用哈希 → HSL 动态生成（固定 55% 饱和 / 50% 亮度），确保同名标签不同卡片颜色一致。
+- 限制：最多 10 个标签，单标签 ≤ 20 字符。
+
 ## 目录结构（核心）
 ```
 server.js
@@ -93,4 +106,4 @@ data/
 ```
 
 ---
-本文档自动补充了运行与安全说明，后续可继续扩展 API 文档与 ER 图。
+本文档自动补充了运行与安全说明与近期新增：标签系统、客户软删除策略。后续可继续扩展 API 文档与 ER 图。
