@@ -70,7 +70,20 @@ const upload = multer({
 
 // 安全中间件与基础解析
 app.use(helmet({
-  crossOriginEmbedderPolicy: false, // 与某些前端构建兼容
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", 'data:', 'blob:'],
+      // 允许内联样式（Element Plus + 动态注入），可逐步替换为哈希/nonce
+      "style-src": ["'self'", "'unsafe-inline'", 'https:'],
+      // 允许 blob: 脚本（若未来使用 worker，可保留），暂不开放 'unsafe-inline'
+      "script-src": ["'self'", 'blob:'],
+      // 若部署在 Render，需要允许同源即可，若有外部字体：
+      "font-src": ["'self'", 'data:'],
+    }
+  }
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
