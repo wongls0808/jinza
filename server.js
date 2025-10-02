@@ -112,12 +112,12 @@ app.use(session({
 }));
 
 // 登录接口限流（防暴力破解）
+console.log('[startup] trust proxy =', app.get('trust proxy'));
 const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10),
   max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10),
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req, _res) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
   message: { error: '登录尝试过于频繁，请稍后再试' }
 });
 
@@ -318,7 +318,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // 认证路由
-app.post('/api/login', loginLimiter, (req, res) => {
+app.post('/api/login', (req, res, next) => {
+  // 调试日志（生产可移除）
+  if (process.env.NODE_ENV === 'production') {
+    const xff = req.headers['x-forwarded-for'];
+    console.log('[login attempt] ip=', req.ip, 'xff=', xff);
+  }
+  next();
+}, loginLimiter, (req, res) => {
   const { username, password } = req.body;
   
   if (!username || !password) {
