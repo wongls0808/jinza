@@ -111,15 +111,32 @@ app.use(session({
   }
 }));
 
-// 登录接口限流（防暴力破解）
+// 登录接口自定义内存限流（替换 express-rate-limit 避免 X-Forwarded-For 校验冲突）
 console.log('[startup] trust proxy =', app.get('trust proxy'));
-const loginLimiter = rateLimit({
-  windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10),
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: '登录尝试过于频繁，请稍后再试' }
-});
+const LOGIN_WINDOW_MS = parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10);
+const LOGIN_MAX = parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '10', 10);
+const loginAttempts = new Map(); // ip -> { count, first }
+function customLoginLimiter(req, res, next) {
+  const ip = req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  const now = Date.now();
+  let rec = loginAttempts.get(ip);
+  if (!rec || now - rec.first > LOGIN_WINDOW_MS) {
+    rec = { count: 0, first: now };
+    loginAttempts.set(ip, rec);
+  }
+  rec.count++;
+  if (rec.count > LOGIN_MAX) {
+    return res.status(429).json({ error: '登录尝试过于频繁，请稍后再试' });
+  }
+  // 伪随机清理过期记录，控制内存
+  if (loginAttempts.size > 2000 && Math.random() < 0.01) {
+    const cutoff = now - LOGIN_WINDOW_MS * 2;
+    for (const [k, v] of loginAttempts.entries()) {
+      if (v.first < cutoff) loginAttempts.delete(k);
+    }
+  }
+  next();
+}
 
 // SQLite数据库连接
 const db = new sqlite3.Database(join(dataDir, 'app.db'), (err) => {
@@ -318,14 +335,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // 认证路由
-app.post('/api/login', (req, res, next) => {
+app.post('/api/login', customLoginLimiter, (req, res, next) => {
   // 调试日志（生产可移除）
   if (process.env.NODE_ENV === 'production') {
     const xff = req.headers['x-forwarded-for'];
     console.log('[login attempt] ip=', req.ip, 'xff=', xff);
   }
   next();
-}, loginLimiter, (req, res) => {
+}, (req, res) => {
   const { username, password } = req.body;
   
   if (!username || !password) {
