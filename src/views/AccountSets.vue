@@ -294,7 +294,9 @@ onMounted(async () => {
 
 const loadAccountSets = async () => {
   try {
-    const response = await fetch('/api/account-sets');
+    const response = await fetch('/api/account-sets', {
+      credentials: 'include'
+    });
     if (response.ok) {
       accountSets.value = await response.json();
     }
@@ -348,6 +350,7 @@ const saveAccountSet = async () => {
     const response = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(accountSetForm.value)
     });
     
@@ -414,6 +417,7 @@ const toggleAccountStatus = async (account) => {
     const response = await fetch(`/api/account-sets/${account.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ is_active: newStatus ? 1 : 0 })
     });
     
