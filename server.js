@@ -334,6 +334,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// 版本信息（用于确认部署是否刷新）
+app.get('/api/version', (req, res) => {
+  res.json({
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'unknown',
+    node: process.version,
+    trustProxy: app.get('trust proxy'),
+    ts: Date.now()
+  });
+});
+
 // 认证路由
 app.post('/api/login', customLoginLimiter, (req, res, next) => {
   // 调试日志（生产可移除）
