@@ -20,6 +20,13 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 检查是否在UI测试模式启动
+const isTestMode = process.argv.includes('--test-ui') || process.argv.includes('--test-responsive');
+if (isTestMode) {
+  console.log('⚠️ 以UI测试模式启动服务器');
+  console.log('📝 访问 http://localhost:' + PORT + '/ui-test.html 开始测试');
+}
+
 // 生产模式校验关键环境变量
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'CHANGE_ME_TO_STRONG_SECRET') {
@@ -437,8 +444,19 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(join(__dirname, 'dist')));
   console.log('生产模式：托管 dist 静态文件');
 } else {
-  console.log('开发模式：请运行前端开发服务器 (npm run client)');
+  console.log('开发模式：请运行前端开发服务器 (npm run frontend)');
 }
+
+// 无论在什么环境，都托管根目录下的UI测试相关文件
+app.use(express.static(__dirname, {
+  index: false,  // 禁用目录索引
+  // 只允许访问特定的测试文件
+  setHeaders: (res, path) => {
+    if (path.endsWith('ui-test.html') || path.endsWith('test-plan.md') || path.endsWith('ui-test-manual.md')) {
+      res.set('Content-Type', path.endsWith('.md') ? 'text/markdown' : 'text/html');
+    }
+  }
+}));
 
 // ========== API 路由 ==========
 
