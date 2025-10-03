@@ -1703,6 +1703,16 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
   });
 });
 
+// 发票API路由（在通配符和404之前注册，避免被HTML兜底匹配）
+try {
+  const invoicesRoutesModule = await import('./routes/invoices.js');
+  const invoicesRoutes = invoicesRoutesModule.default;
+  app.use('/api/invoices', invoicesRoutes);
+  console.log('发票管理API路由已加载在/api/invoices路径');
+} catch (error) {
+  console.error('加载发票路由失败:', error);
+}
+
 // 通配符路由 - 返回前端应用（生产环境）
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {
@@ -1742,17 +1752,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: '服务器内部错误' });
 });
 
-// 发票API路由
-try {
-  const invoicesRoutesModule = await import('./routes/invoices.js');
-  const invoicesRoutes = invoicesRoutesModule.default;
-  
-  // 使用 /api/invoices 路径注册路由
-  app.use('/api/invoices', invoicesRoutes);
-  console.log('发票管理API路由已加载在/api/invoices路径');
-} catch (error) {
-  console.error('加载发票路由失败:', error);
-}
 
 // 初始化数据库并启动服务器
 initializeDatabase()
