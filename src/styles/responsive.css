@@ -18,14 +18,18 @@
     top: 0;
     height: 100%;
     z-index: 100;
-    transition: left 0.3s ease;
-    width: 80% !important; /* 覆盖固定宽度 */
+    transition: left 0.3s ease, transform 0.3s ease;
+    width: 85% !important; /* 覆盖固定宽度 */
     max-width: 300px;
+    border-radius: 0 16px 16px 0;
+    box-shadow: 5px 0 25px rgba(0, 0, 0, 0.15);
+    transform: translateX(-10px);
   }
 
   /* 侧边栏展开状态 */
   .layout .sidebar.expanded {
     left: 0;
+    transform: translateX(0);
   }
 
   /* 侧边栏遮罩层 */
@@ -38,15 +42,20 @@
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 99;
     display: none;
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
   .sidebar-overlay.visible {
     display: block;
+    opacity: 1;
   }
 
   /* 移动端顶部导航栏 */
   .header {
-    padding: 0 10px !important;
+    padding: 0 16px !important;
+    height: 60px !important;
   }
 
   /* 显示汉堡菜单按钮 */
@@ -54,27 +63,53 @@
     display: flex !important;
   }
 
-  /* 调整页面容器内边距 */
+  /* 调整页面容器内边距和样式 */
   .page-container {
-    padding: 10px !important;
+    padding: 16px !important;
+    border-radius: 0 !important;
+  }
+
+  /* 内容区域适配底部导航 */
+  .main-content.has-mobile-tabbar {
+    padding-bottom: 70px !important; /* 考虑安全区域 */
   }
 
   /* 调整表格在移动设备上的显示 */
   .el-table {
     width: 100% !important;
     overflow-x: auto;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  /* 优化表单布局 */
+  .el-form-item {
+    margin-bottom: 15px !important;
+  }
+
+  /* 优化按钮大小 */
+  .el-button {
+    padding: 10px 16px !important;
+    font-size: 15px !important;
   }
 
   /* 登录框在移动设备上的宽度 */
   .login-card {
     width: 90% !important;
     max-width: 400px;
-    padding: 20px !important;
+    padding: 24px !important;
+    border-radius: 16px !important;
   }
 
   /* 用户下拉菜单 */
   .user-name {
     display: none !important; /* 在移动设备上隐藏用户名，只显示头像 */
+  }
+  
+  /* 调整卡片样式 */
+  .el-card {
+    margin-bottom: 16px !important;
+    border-radius: 12px !important;
   }
 }
 
@@ -82,18 +117,31 @@
 @media (min-width: 768px) and (max-width: 1023px) {
   /* 侧边栏在平板上宽度调整 */
   .layout .sidebar {
-    width: 200px !important;
+    width: 220px !important;
   }
 
   /* 表格在平板上的调整 */
   .el-table {
     width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   }
 
   /* 登录框在平板上的宽度 */
   .login-card {
     width: 70%;
-    max-width: 400px;
+    max-width: 450px;
+  }
+  
+  /* 优化页面容器 */
+  .page-container {
+    padding: 20px !important;
+    max-width: 95% !important;
+  }
+  
+  /* 隐藏移动端底部导航 */
+  .mobile-tabbar {
+    display: none !important;
   }
 }
 
@@ -103,11 +151,57 @@
   .layout .sidebar {
     width: 220px !important;
   }
+  
+  /* 页面容器最大宽度 */
+  .page-container {
+    max-width: 90% !important;
+  }
+
+  /* 隐藏移动导航相关元素 */
+  .mobile-tabbar,
+  .menu-toggle-btn,
+  .sidebar-overlay {
+    display: none !important;
+  }
 }
 
 /* 桌面断点 - 大于等于1280px */
 @media (min-width: 1280px) {
-  /* 可以在这里添加大屏幕特有的样式 */
+  /* 侧边栏宽度 */
+  .layout .sidebar {
+    width: 240px !important;
+  }
+  
+  /* 页面容器最大宽度和内边距 */
+  .page-container {
+    max-width: 1400px !important;
+    padding: 30px !important;
+  }
+  
+  /* 隐藏移动导航相关元素 */
+  .mobile-tabbar,
+  .menu-toggle-btn,
+  .sidebar-overlay {
+    display: none !important;
+  }
+  
+  /* 表格样式增强 */
+  .el-table {
+    border-radius: 12px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.04);
+  }
+  
+  /* 卡片样式增强 */
+  .el-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  
+  .el-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+  }
 }
 
 /* 触控设备优化 */
