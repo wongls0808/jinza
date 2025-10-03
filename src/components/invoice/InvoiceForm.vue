@@ -25,8 +25,8 @@
             <div class="form-section">
               <h3 class="section-title">基本信息</h3>
               
-              <!-- 账套选择 -->
-              <el-form-item label="账套" prop="account_set_id" required>
+              <!-- 账套选择（隐藏，自动选择默认账套） -->
+              <el-form-item label="账套" prop="account_set_id" required style="display:none;">
                 <el-select 
                   v-model="form.account_set_id" 
                   placeholder="选择账套"
@@ -147,6 +147,19 @@
           <el-col :xs="24" :sm="24" :md="14" :lg="16">
             <div class="form-section">
               <h3 class="section-title">发票明细</h3>
+
+              <!-- 统一税率设置 -->
+              <div style="display:flex; gap:16px; align-items:center; margin: 10px 0;">
+                <span style="color: var(--el-text-color-regular);">统一税率(%)</span>
+                <el-input-number 
+                  v-model="unifiedTaxRate" 
+                  :min="0" 
+                  :max="100" 
+                  :precision="2" 
+                  controls-position="right"
+                  @change="recalculateAllItems"
+                />
+              </div>
               
               <!-- 明细表格 -->
               <el-table 
@@ -155,14 +168,16 @@
                 style="width: 100%"
                 class="invoice-items-table"
               >
-                <el-table-column label="商品" width="220">
+                <el-table-column label="商品/描述" min-width="320">
                   <template #default="scope">
                     <el-select 
-                      v-model="scope.row.product_id" 
-                      placeholder="选择商品"
+                      :model-value="getItemSelection(scope.row)"
+                      placeholder="选择商品或直接输入描述"
                       filterable
+                      allow-create
+                      default-first-option
                       clearable
-                      @change="handleProductChange($event, scope.$index)"
+                      @update:model-value="handleItemSelectionChange($event, scope.$index)"
                       style="width: 100%"
                     >
                       <el-option
@@ -177,12 +192,6 @@
                         </div>
                       </el-option>
                     </el-select>
-                  </template>
-                </el-table-column>
-                
-                <el-table-column label="描述" min-width="200">
-                  <template #default="scope">
-                    <el-input v-model="scope.row.description" placeholder="商品描述" />
                   </template>
                 </el-table-column>
                 
@@ -218,19 +227,7 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="税率%" width="100">
-                  <template #default="scope">
-                    <el-input-number 
-                      v-model="scope.row.tax_rate" 
-                      :min="0"
-                      :max="100"
-                      :precision="2"
-                      controls-position="right"
-                      @change="calculateItemAmount(scope.$index)"
-                      style="width: 100%"
-                    />
-                  </template>
-                </el-table-column>
+                <!-- 移除行级税率列，改为统一税率设置 -->
                 
                 <el-table-column label="金额" width="120">
                   <template #default="scope">
@@ -266,15 +263,15 @@
               <div class="invoice-summary">
                 <div class="summary-item">
                   <span class="summary-label">合计金额：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceTotal) }}</span>
                 </div>
                 <div class="summary-item">
                   <span class="summary-label">税额合计：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceTaxTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
                 <div class="summary-item total">
                   <span class="summary-label">应付总计：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceGrandTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceGrandTotal) }}</span>
                 </div>
               </div>
             </div>
@@ -344,6 +341,8 @@ const accountSetOptions = ref([]);
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
+// 统一税率
+const unifiedTaxRate = ref(0);
 
 // Selected customer details
 const selectedCustomer = ref(null);
@@ -351,9 +350,7 @@ const selectedAccountSet = ref(null);
 
 // Validation rules
 const rules = {
-  account_set_id: [
-    { required: true, message: '请选择账套', trigger: 'change' }
-  ],
+  // 去除账套必填校验（UI层面不再强制绑定）
   invoice_number: [
     { required: true, message: '请生成发票编号', trigger: 'blur' }
   ],
@@ -378,9 +375,12 @@ onMounted(async () => {
     await fetchInvoiceDetails();
   } else {
     addEmptyItem();
+    // 自动选择默认账套（若存在），以满足后端必填，但在UI隐藏
     if (accountSetOptions.value.length > 0) {
-      form.account_set_id = accountSetOptions.value[0].id;
-      await generateInvoiceNumber();
+      // 优先选 is_active 或第一个
+      const def = accountSetOptions.value.find(a => a.is_active === 1) || accountSetOptions.value[0];
+      form.account_set_id = def?.id || null;
+      if (form.account_set_id) await generateInvoiceNumber();
     }
   }
 });
@@ -541,10 +541,15 @@ function calculateItemAmount(index) {
   
   const quantity = parseFloat(item.quantity) || 0;
   const unitPrice = parseFloat(item.unit_price) || 0;
-  const taxRate = parseFloat(item.tax_rate) || 0;
+  const taxRate = parseFloat(unifiedTaxRate.value) || 0;
   
   item.amount = quantity * unitPrice;
   item.tax_amount = item.amount * (taxRate / 100);
+}
+
+// 统一税率变化后重算所有行
+function recalculateAllItems() {
+  form.items.forEach((_, idx) => calculateItemAmount(idx));
 }
 
 function handleAccountSetChange(value) {
@@ -569,6 +574,30 @@ function handleProductChange(productId, index) {
     item.unit_price = parseFloat(product.price) || 0;
     calculateItemAmount(index);
   }
+}
+
+// 用于商品/描述合并选择的值
+function getItemSelection(row) {
+  // 若选择过商品，返回商品ID；否则返回描述文本
+  return row.product_id || row.description || '';
+}
+
+// 处理商品/描述合并列的变更
+function handleItemSelectionChange(val, index) {
+  const row = form.items[index];
+  if (!row) return;
+  const matched = productOptions.value.find(p => p.id === val);
+  if (matched) {
+    row.product_id = matched.id;
+    row.description = matched.name;
+    row.unit = matched.unit || '';
+    row.unit_price = parseFloat(matched.price) || 0;
+  } else {
+    // 自由文本，清除product_id，仅作为描述
+    row.product_id = null;
+    row.description = String(val || '').trim();
+  }
+  calculateItemAmount(index);
 }
 
 function formatAmount(amount) {
@@ -604,15 +633,35 @@ async function save(status) {
       publishing.value = true;
     }
     
-    // Set total amounts
+    // 构造与后端契合的字段
     const data = {
-      ...form,
-      total_amount: invoiceTotal.value,
-      tax_total: invoiceTaxTotal.value,
+      customer_id: form.customer_id,
+      account_set_id: form.account_set_id,
+      salesperson_id: form.salesperson_id,
+      invoice_date: form.issue_date,
+      due_date: form.due_date,
+      status: form.status,
+      payment_status: form.payment_status,
+      payment_method: form.payment_method || null,
+      payment_date: form.payment_date || null,
+      subtotal: invoiceTotal.value,
+      tax_amount: invoiceTaxTotal.value,
+      discount_amount: 0,
+      total_amount: invoiceGrandTotal.value,
+      notes: form.notes,
       items: form.items.map(item => ({
-        ...item,
-        amount: parseFloat(item.amount) || 0,
-        tax_amount: parseFloat(item.tax_amount) || 0
+        product_id: item.product_id,
+        description: item.description,
+        quantity: parseFloat(item.quantity) || 0,
+        unit_price: parseFloat(item.unit_price) || 0,
+        unit: item.unit || '',
+        tax_rate: parseFloat(unifiedTaxRate.value) || 0,
+        tax_amount: parseFloat(item.tax_amount) || 0,
+        discount_rate: 0,
+        discount_amount: 0,
+        subtotal: parseFloat(item.amount) || 0,
+        total: (parseFloat(item.amount) || 0) + (parseFloat(item.tax_amount) || 0),
+        notes: item.notes || null
       }))
     };
     
