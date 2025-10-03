@@ -213,9 +213,9 @@ import { ref, reactive, onMounted, computed } from 'vue';
 import { Plus, ArrowDown } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 
-// 组件将在后续创建，现在先引入为占位符
-// import InvoiceDetail from '../components/invoice/InvoiceDetail.vue';
-// import InvoiceForm from '../components/invoice/InvoiceForm.vue';
+// 引入发票组件
+import InvoiceDetail from '../components/invoice/InvoiceDetail.vue';
+import InvoiceForm from '../components/invoice/InvoiceForm.vue';
 
 // 状态变量
 const loading = ref(false);
@@ -304,8 +304,8 @@ async function fetchInvoices() {
       queryParams.append('end_date', filters.dateRange[1]);
     }
 
-    // 使用正确的API路径，确保末尾有斜杠
-    const apiUrl = `/api/invoices/?${queryParams.toString()}`;
+    // 使用正确的API路径，不包括尾部斜杠
+    const apiUrl = `/api/invoices?${queryParams.toString()}`;
     console.log('发送请求到:', apiUrl);
     const response = await fetch(apiUrl);
     console.log('获取响应状态:', response.status, response.statusText);
@@ -349,7 +349,7 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/invoices/stats/');
+    const response = await fetch('/api/invoices/stats');
     console.log('统计数据响应状态:', response.status, response.statusText);
     
     if (response.ok) {
