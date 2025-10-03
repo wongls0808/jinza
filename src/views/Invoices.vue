@@ -6,10 +6,7 @@
         <h1 class="page-title">发票管理</h1>
         <p class="page-description">创建、管理和跟踪企业发票，支持关联客户、商品和业务员</p>
       </div>
-      <el-button type="primary" size="large" @cl    // 使用正确的API路径，确保末尾有斜杠
-    const apiUrl = `/api/invoices/?${queryParams.toString()}`;
-    console.log('发送请求到:', apiUrl);
-    const response = await fetch(apiUrl);"showAddDialog = true" class="add-button">
+      <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
         <el-icon><Plus /></el-icon>
         新建发票
       </el-button>
