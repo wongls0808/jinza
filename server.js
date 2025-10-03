@@ -105,9 +105,6 @@ app.use(session({
   }
 }));
 
-// 应用用户活动跟踪中间件，在每个API请求中更新用户最后活动时间
-app.use(trackUserActivity);
-
 // 登录接口限流（防暴力破解）
 const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10),
@@ -376,6 +373,9 @@ const requireAuth = (req, res, next) => {
   }
   next();
 };
+
+// 应用用户活动跟踪中间件，在每个API请求中更新用户最后活动时间
+app.use(trackUserActivity);
 
 // 管理员权限中间件
 const requireAdmin = (req, res, next) => {
