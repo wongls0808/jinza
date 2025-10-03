@@ -195,7 +195,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, markRaw, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, markRaw, nextTick, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 
 // 自定义消息函数，避免重复消息
@@ -244,6 +244,8 @@ const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
 const capsLockOn = ref(false);
 const appLoading = ref(true); // 添加应用加载状态变量
+const sessionInfo = ref(null); // 会话信息
+const sessionCheckInterval = ref(null); // 保存定时器ID
 
 // 禁用用户状态变化的监听器，避免重复消息
 // watch(user, (newVal, oldVal) => {
@@ -320,6 +322,9 @@ onMounted(async () => {
         // 设置用户数据
         user.value = {...data.user};
         
+        // 保存会话信息
+        sessionInfo.value = data.session || null;
+        
         // 更新CSS类
         document.body.classList.add('logged-in');
         document.body.classList.remove('logged-out');
@@ -337,6 +342,9 @@ onMounted(async () => {
           activeMenu.value = lastPage;
           currentComponent.value = routes[lastPage];
         }
+        
+        // 启动会话监控
+        startSessionMonitor();
         
         reportViewChange('App', '已设置用户状态为已登录');
         checkAppState(user, routes, activeMenu, currentComponent);
@@ -474,10 +482,51 @@ const handlePwdUpdated = () => {
     .then(d => { 
       if (d && d.user) {
         user.value = d.user;
+        sessionInfo.value = d.session || null;
         reportAuthChange('用户信息已更新', d.user);
       }
     });
 };
+
+// 会话监控相关函数
+const startSessionMonitor = () => {
+  // 清除旧的定时器
+  if (sessionCheckInterval.value) {
+    clearInterval(sessionCheckInterval.value);
+  }
+  
+  // 创建新的定时器，每分钟检查一次会话状态
+  sessionCheckInterval.value = setInterval(checkSessionStatus, 60000);
+  
+  // 立即检查一次
+  checkSessionStatus();
+};
+
+const checkSessionStatus = () => {
+  if (!sessionInfo.value || !sessionInfo.value.remainingTime) return;
+  
+  const now = new Date();
+  const expiresAt = new Date(sessionInfo.value.expiresAt);
+  const remainingMinutes = Math.max(0, Math.round((expiresAt - now) / 60000));
+  
+  // 如果会话过期时间小于10分钟，提醒用户
+  if (remainingMinutes <= 10 && remainingMinutes > 0) {
+    showMessage('warning', `您的会话将在${remainingMinutes}分钟后过期，请及时保存工作`);
+  }
+  
+  // 如果会话已经过期，强制登出
+  if (remainingMinutes <= 0) {
+    showMessage('error', '您的会话已过期，请重新登录');
+    setTimeout(() => logout(), 2000);
+  }
+};
+
+// 在组件卸载时清除定时器
+onBeforeUnmount(() => {
+  if (sessionCheckInterval.value) {
+    clearInterval(sessionCheckInterval.value);
+  }
+});
 </script>
 
 <style scoped>

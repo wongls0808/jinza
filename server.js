@@ -100,7 +100,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: { 
     secure: false, 
-    maxAge: 24 * 60 * 60 * 1000, // 24小时
+    maxAge: 4 * 60 * 60 * 1000, // 4小时，每天工作时间需重新登录一次
     httpOnly: true
   }
 }));
@@ -371,6 +371,13 @@ const requireAuth = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: '请先登录' });
   }
+  
+  // 计算会话剩余时间（如果有）
+  if (req.session.cookie && req.session.cookie.expires) {
+    // 添加会话过期信息到请求对象，以便后续处理可以使用
+    req.sessionExpiresAt = req.session.cookie.expires;
+  }
+  
   next();
 };
 
@@ -581,7 +588,19 @@ app.get('/api/me', requireAuth, (req, res) => {
       safeUser.online = isOnline;
       safeUser.lastActiveTime = user.last_active;
       
-      res.json({ user: safeUser });
+      // 添加会话过期信息到响应
+      const sessionInfo = {
+        expiresAt: req.sessionExpiresAt || null,
+        maxAge: req.session.cookie.maxAge,
+        // 计算会话剩余时间（毫秒）
+        remainingTime: req.sessionExpiresAt ? 
+          Math.max(0, new Date(req.sessionExpiresAt) - now) : null
+      };
+      
+      res.json({ 
+        user: safeUser, 
+        session: sessionInfo
+      });
     }
   );
 });
