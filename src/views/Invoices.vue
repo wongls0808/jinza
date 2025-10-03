@@ -304,17 +304,23 @@ async function fetchInvoices() {
       queryParams.append('end_date', filters.dateRange[1]);
     }
 
+    console.log('发送请求到:', `/api/invoices?${queryParams.toString()}`);
     const response = await fetch(`/api/invoices?${queryParams.toString()}`);
+    console.log('获取响应状态:', response.status, response.statusText);
+    
     if (response.ok) {
       const data = await response.json();
+      console.log('获取发票数据成功:', data);
       invoices.value = data.invoices;
       total.value = data.total;
     } else {
-      throw new Error('获取数据失败');
+      const errorText = await response.text();
+      console.error('API错误响应:', response.status, errorText);
+      throw new Error(`获取数据失败: ${response.status} - ${errorText || response.statusText}`);
     }
   } catch (error) {
     console.error('获取发票列表失败:', error);
-    ElMessage.error('获取发票数据失败');
+    ElMessage.error(`获取发票数据失败: ${error.message || '未知错误'}`);
   } finally {
     loading.value = false;
   }
@@ -323,13 +329,20 @@ async function fetchInvoices() {
 // 获取统计数据
 async function fetchStats() {
   try {
+    console.log('正在获取统计数据...');
     const response = await fetch('/api/invoices/stats');
+    console.log('统计数据响应状态:', response.status, response.statusText);
+    
     if (response.ok) {
       const data = await response.json();
+      console.log('统计数据:', data);
       stats.total = data.total || 0;
       stats.unpaid = data.unpaid || 0;
       stats.paid = data.paid || 0;
       stats.totalAmount = data.totalAmount || 0;
+    } else {
+      const errorText = await response.text();
+      console.error('统计API错误响应:', response.status, errorText);
     }
   } catch (error) {
     console.error('获取统计数据失败:', error);
