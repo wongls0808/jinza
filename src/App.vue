@@ -297,6 +297,12 @@ onMounted(async () => {
           document.body.classList.add('logged-in');
           document.body.classList.remove('logged-out');
           
+          // 检查是否需要强制修改密码
+          if (data.user.forcePasswordChange) {
+            reportViewChange('App', '会话恢复: 检测到需要强制修改密码');
+            showForcePwd.value = true;
+          }
+          
           reportViewChange('App', '已设置用户状态为已登录');
           checkAppState(user, routes, activeMenu, currentComponent);
         }, 100);

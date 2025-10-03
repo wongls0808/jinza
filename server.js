@@ -534,14 +534,22 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', requireAuth, (req, res) => {
   db.get(
-    "SELECT id, username, name, role, department FROM users WHERE id = ?",
+    "SELECT id, username, name, role, department, needs_password_reset FROM users WHERE id = ?",
     [req.session.userId],
     (err, user) => {
       if (err) {
         console.error('获取用户信息失败:', err);
         return res.status(500).json({ error: '服务器错误' });
       }
-      res.json({ user });
+      
+      // 检查是否需要强制修改密码（仅基于needs_password_reset标记）
+      const forceChange = !!user.needs_password_reset;
+      
+      // 去除敏感字段，然后添加forcePasswordChange标志
+      const { needs_password_reset, ...safeUser } = user;
+      safeUser.forcePasswordChange = forceChange;
+      
+      res.json({ user: safeUser });
     }
   );
 });
