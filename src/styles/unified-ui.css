@@ -141,21 +141,34 @@
 }
 
 /* 响应式辅助类 */
+/* 默认情况下移动设备隐藏类是可见的 */
 .hide-on-mobile {
-  @media (max-width: 767px) {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .hide-on-mobile {
     display: none !important;
   }
 }
 
+/* 默认情况下桌面隐藏类是可见的 */
 .hide-on-desktop {
-  @media (min-width: 1024px) {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .hide-on-desktop {
     display: none !important;
   }
 }
 
 .show-on-mobile {
   display: none;
-  @media (max-width: 767px) {
+}
+
+@media (max-width: 767px) {
+  .show-on-mobile {
     display: block !important;
   }
 }
