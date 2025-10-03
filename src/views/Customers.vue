@@ -199,6 +199,7 @@ const loadCustomers = async () => {
   }
 };
 
+// 重置表单数据为初始状态
 const resetForm = () => {
   form.name = '';
   form.registration_no = '';
