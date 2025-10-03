@@ -910,11 +910,19 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
   height: calc(100vh - 60px); /* 减去头部高度 */
   z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.main-content.has-mobile-tabbar {
+  padding-bottom: 60px;
 }
 
 .page-container {
   padding: 24px;
   min-height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  transition: all 0.3s ease;
 }
 
 /* 登录页样式 */
@@ -1075,7 +1083,6 @@ onBeforeUnmount(() => {
   
   .menu-toggle-btn:active {
     transform: scale(0.95);
-  }
     color: white;
   }
 }
