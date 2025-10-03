@@ -2,8 +2,16 @@
   <div id="app">
     <!-- 强制分离登录和主应用视图，避免重叠 -->
     
+    <!-- 应用加载状态 -->
+    <div v-if="appLoading" class="app-loading">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <span>加载中...</span>
+      </div>
+    </div>
+    
     <!-- 已登录状态 -->
-    <div v-if="user" class="app-main">
+    <div v-else-if="user" class="app-main">
       <el-container class="layout">
         <!-- 侧边栏 -->
         <el-aside width="240px" class="sidebar">
@@ -125,7 +133,7 @@
     </div>
 
     <!-- 未登录状态 - 登录页 -->
-    <div v-else class="login-container">
+    <div v-else-if="!appLoading && !user" class="login-container">
       <div class="login-background">
         <div class="login-card">
           <!-- 登录页标题 -->
@@ -210,6 +218,7 @@ const activeMenu = ref('customers');
 const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
 const capsLockOn = ref(false);
+const appLoading = ref(true); // 添加应用加载状态变量
 
 // 监控用户状态变化
 watch(user, (newVal, oldVal) => {
@@ -268,16 +277,13 @@ const handleCommand = (command) => {
 onMounted(async () => {
   reportViewChange('App', '应用挂载完成，检查登录状态');
   try {
-    // 第一步：重置状态并添加CSS类以强制显示正确状态
-    user.value = null;
-    document.body.classList.add('logged-out');
-    document.body.classList.remove('logged-in');
-    await nextTick();
+    // 设置应用为加载状态，不显示登录界面
+    appLoading.value = true;
     
     // 输出调试状态
     checkAppState(user, routes, activeMenu, currentComponent);
     
-    // 第二步：检查是否已有会话
+    // 检查是否已有会话
     reportApiResult('/api/me', '正在检查会话状态');
     const response = await fetch('/api/me');
     if (response.ok) {
@@ -288,24 +294,21 @@ onMounted(async () => {
       if (data.user) {
         reportAuthChange('发现现有会话', data.user);
         
-        // 使用延时确保DOM完全更新后再设置状态
-        setTimeout(() => {
-          // 先设置用户数据
-          user.value = {...data.user};
-          
-          // 再更新CSS类
-          document.body.classList.add('logged-in');
-          document.body.classList.remove('logged-out');
-          
-          // 检查是否需要强制修改密码
-          if (data.user.forcePasswordChange) {
-            reportViewChange('App', '会话恢复: 检测到需要强制修改密码');
-            showForcePwd.value = true;
-          }
-          
-          reportViewChange('App', '已设置用户状态为已登录');
-          checkAppState(user, routes, activeMenu, currentComponent);
-        }, 100);
+        // 设置用户数据
+        user.value = {...data.user};
+        
+        // 更新CSS类
+        document.body.classList.add('logged-in');
+        document.body.classList.remove('logged-out');
+        
+        // 检查是否需要强制修改密码
+        if (data.user.forcePasswordChange) {
+          reportViewChange('App', '会话恢复: 检测到需要强制修改密码');
+          showForcePwd.value = true;
+        }
+        
+        reportViewChange('App', '已设置用户状态为已登录');
+        checkAppState(user, routes, activeMenu, currentComponent);
       } else {
         reportAuthChange('无有效会话', null);
       }
@@ -314,6 +317,11 @@ onMounted(async () => {
     }
   } catch (error) {
     reportError('检查会话', error);
+  } finally {
+    // 无论结果如何，最终关闭加载状态
+    setTimeout(() => {
+      appLoading.value = false;
+    }, 300); // 短暂延迟，确保界面平滑过渡
   }
 });
 
@@ -451,6 +459,42 @@ const handlePwdUpdated = () => {
   height: 100vh;
   width: 100vw;
   position: relative;
+}
+
+/* 加载界面样式 */
+.app-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 2001;
+  color: white;
+  font-size: 18px;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 已登录状态和未登录状态互斥布局 */
