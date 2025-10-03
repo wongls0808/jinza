@@ -7,9 +7,12 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 数据库连接
-const dataDir = process.env.DATA_DIR ? process.env.DATA_DIR : join(__dirname, '../data');
-const db = new sqlite3.Database(join(dataDir, 'app.db'));
+// 获取数据库连接函数
+function getDb() {
+  const dataDir = process.env.DATA_DIR ? process.env.DATA_DIR : join(__dirname, '../data');
+  const dbPath = join(dataDir, 'app.db');
+  return new sqlite3.Database(dbPath);
+}
 
 // 从中间件中获取requireAuth函数
 const requireAuth = (req, res, next) => {
@@ -24,8 +27,38 @@ import { generatePDF } from '../utils/pdfGenerator.js';
 
 const router = express.Router();
 
+// 数据库查询工具函数
+function dbQuery(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+function dbGet(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function dbRun(db, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
 // 获取所有发票
 router.get('/invoices', requireAuth, async (req, res) => {
+  const db = getDb();
+  
   try {
     let query = `
       SELECT i.*, 
@@ -89,7 +122,7 @@ router.get('/invoices', requireAuth, async (req, res) => {
       params.push(limit, offset);
     }
     
-    const invoices = await db.all(query, ...params);
+    const invoices = await dbQuery(db, query, params);
     
     // 获取总数
     const totalQuery = `
@@ -130,7 +163,7 @@ router.get('/invoices', requireAuth, async (req, res) => {
       totalParams.push(searchTerm, searchTerm);
     }
     
-    const countResult = await db.get(totalQuery, ...totalParams);
+    const countResult = await dbGet(db, totalQuery, totalParams);
     
     res.json({
       total: countResult ? countResult.total : 0,
@@ -139,6 +172,9 @@ router.get('/invoices', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('获取发票列表失败:', error);
     res.status(500).json({ error: '获取发票列表失败' });
+  } finally {
+    // 关闭数据库连接
+    db.close();
   }
 });
 

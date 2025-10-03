@@ -9,9 +9,12 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 数据库连接
-const dataDir = process.env.DATA_DIR ? process.env.DATA_DIR : join(__dirname, '../data');
-const db = new sqlite3.Database(join(dataDir, 'app.db'));
+// 获取数据库连接
+function getDb() {
+  const dataDir = process.env.DATA_DIR ? process.env.DATA_DIR : join(__dirname, '../data');
+  const dbPath = join(dataDir, 'app.db');
+  return new sqlite3.Database(dbPath);
+}
 
 /**
  * 根据账套ID生成发票编号
@@ -19,24 +22,36 @@ const db = new sqlite3.Database(join(dataDir, 'app.db'));
  * @returns {Promise<string>} 生成的发票编号
  */
 export async function generateInvoiceNumber(accountSetId) {
+  const db = getDb();
+  
   try {
+    // 使用Promise包装数据库操作
+    const getCodeRule = (query, params) => {
+      return new Promise((resolve, reject) => {
+        db.get(query, params, (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+    };
+    
     // 查找该账套下的默认编号规则
-    let codeRule = await db.get(`
+    let codeRule = await getCodeRule(`
       SELECT cr.*
       FROM invoice_code_rules icr
       JOIN code_rules cr ON icr.code_rule_id = cr.id
       WHERE icr.account_set_id = ? AND icr.is_default = 1
-    `, accountSetId);
+    `, [accountSetId]);
     
     // 如果没有默认规则，选择第一个规则
     if (!codeRule) {
-      codeRule = await db.get(`
+      codeRule = await getCodeRule(`
         SELECT cr.*
         FROM invoice_code_rules icr
         JOIN code_rules cr ON icr.code_rule_id = cr.id
         WHERE icr.account_set_id = ?
         LIMIT 1
-      `, accountSetId);
+      `, [accountSetId]);
     }
     
     // 如果仍找不到规则，使用系统默认规则
@@ -82,11 +97,16 @@ export async function generateInvoiceNumber(accountSetId) {
     
     // 更新当前序列号
     if (codeRule.id) {
-      await db.run(`
-        UPDATE code_rules
-        SET sequence_current = ?
-        WHERE id = ?
-      `, [sequenceNumber, codeRule.id]);
+      await new Promise((resolve, reject) => {
+        db.run(`
+          UPDATE code_rules
+          SET sequence_current = ?
+          WHERE id = ?
+        `, [sequenceNumber, codeRule.id], function(err) {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     }
     
     // 格式化序列号
@@ -101,6 +121,13 @@ export async function generateInvoiceNumber(accountSetId) {
     // 如果出错，使用时间戳作为回退方案
     const timestamp = Date.now();
     return `INV-${timestamp}`;
+  } finally {
+    // 关闭数据库连接
+    db.close((err) => {
+      if (err) {
+        console.error('关闭数据库连接失败:', err);
+      }
+    });
   }
 }
 

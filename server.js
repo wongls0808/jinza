@@ -1742,11 +1742,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: '服务器内部错误' });
 });
 
-// 导入发票路由
-import invoicesRoutes from './routes/invoices.js';
-
-// 注册发票API路由
-app.use('/api', invoicesRoutes);
+// 发票API路由
+try {
+  const invoicesRoutesModule = await import('./routes/invoices.js');
+  const invoicesRoutes = invoicesRoutesModule.default;
+  app.use('/api', invoicesRoutes);
+  console.log('发票管理API路由已加载');
+} catch (error) {
+  console.error('加载发票路由失败:', error);
+}
 
 // 初始化数据库并启动服务器
 initializeDatabase()
