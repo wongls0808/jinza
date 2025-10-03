@@ -305,7 +305,7 @@ async function fetchInvoices() {
     }
 
     // 使用正确的API路径
-    const apiUrl = `/api?${queryParams.toString()}`;
+    const apiUrl = `/api/invoices?${queryParams.toString()}`;
     console.log('发送请求到:', apiUrl);
     const response = await fetch(apiUrl);
     console.log('获取响应状态:', response.status, response.statusText);
@@ -349,7 +349,7 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/stats');
+    const response = await fetch('/api/invoices/stats');
     console.log('统计数据响应状态:', response.status, response.statusText);
     
     if (response.ok) {
