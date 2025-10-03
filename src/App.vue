@@ -19,114 +19,18 @@
         @click="toggleSidebar(false)"
       ></div>
       
-      <el-container class="layout" :class="{'no-sidebar': isDashboardActive}">
-        <!-- 侧边栏 - 只在非Dashboard页面显示 -->
-        <el-aside v-if="!isDashboardActive" width="240px" class="sidebar" :class="{ 'expanded': sidebarExpanded }">
-          <div class="sidebar-header">
-            <div class="logo">
-              <div class="logo-icon">📊</div>
-              <span class="logo-text">企业管理系统</span>
-            </div>
-            <button class="close-sidebar-btn" @click="toggleSidebar(false)">✕</button>
-          </div>
-          
-          <!-- 用户信息 -->
-          <div class="user-info-sidebar">
-            <div class="avatar">
-              {{ user.name.charAt(0) }}
-            </div>
-            <div class="user-details">
-              <div class="user-name">{{ user.name }}</div>
-              <div class="user-role">{{ user.role === 'admin' ? '管理员' : '用户' }}</div>
-            </div>
-          </div>
-
-          <!-- 导航菜单 -->
-          <el-menu
-            :default-active="activeMenu"
-            class="sidebar-menu"
-            background-color="transparent"
-            text-color="#e0e0e0"
-            active-text-color="#ffffff"
-          >
-            <el-menu-item index="dashboard" @click="navigateAndCloseSidebar('dashboard')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><HomeFilled /></el-icon>
-                </div>
-                <span class="menu-text">主页</span>
-              </div>
-            </el-menu-item>
-
-            <el-menu-item index="customers" @click="navigateAndCloseSidebar('customers')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><User /></el-icon>
-                </div>
-                <span class="menu-text">客户管理</span>
-              </div>
-            </el-menu-item>
-            
-            <el-menu-item index="suppliers" @click="navigateAndCloseSidebar('suppliers')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><Shop /></el-icon>
-                </div>
-                <span class="menu-text">供应商管理</span>
-              </div>
-            </el-menu-item>
-            
-            <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigateAndCloseSidebar('users')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><Document /></el-icon>
-                </div>
-                <span class="menu-text">用户管理</span>
-              </div>
-            </el-menu-item>
-            
-            <el-menu-item index="accountSets" @click="navigateAndCloseSidebar('accountSets')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><Folder /></el-icon>
-                </div>
-                <span class="menu-text">账套管理</span>
-              </div>
-            </el-menu-item>
-
-            <el-menu-item index="products" @click="navigateAndCloseSidebar('products')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><ShoppingBag /></el-icon>
-                </div>
-                <span class="menu-text">商品库</span>
-              </div>
-            </el-menu-item>
-            
-            <el-menu-item index="salespeople" @click="navigateAndCloseSidebar('salespeople')">
-              <div class="menu-item-content">
-                <div class="menu-icon">
-                  <el-icon><UserFilled /></el-icon>
-                </div>
-                <span class="menu-text">业务员管理</span>
-              </div>
-            </el-menu-item>
-          </el-menu>
-        </el-aside>
-
+      <el-container class="layout no-sidebar">
         <!-- 主内容区 -->
         <el-container>
           <!-- 顶部导航栏 -->
           <el-header class="header" :class="{'dashboard-header': isDashboardActive}">
             <div class="header-left">
-              <!-- 汉堡菜单按钮 - 非Dashboard页面或移动设备显示 -->
-              <button v-if="!isDashboardActive || isMobileDevice" class="menu-toggle-btn" @click="toggleSidebar()">
-                <el-icon><Menu /></el-icon>
-              </button>
-              <!-- 返回主页按钮 - 非Dashboard页面且非移动设备时显示 -->
-              <button v-if="!isDashboardActive && !isMobileDevice" class="back-to-home-btn" @click="navigate('dashboard')">
-                <el-icon><HomeFilled /></el-icon>
-                <span>回到主页</span>
+              <!-- 返回主页按钮 - 非Dashboard页面时显示 -->
+              <button v-if="!isDashboardActive" class="back-to-home-btn" @click="navigate('dashboard')">
+                <div class="home-btn-icon">
+                  <el-icon><HomeFilled /></el-icon>
+                </div>
+                <span>返回主页</span>
               </button>
               <div class="breadcrumb">
                 <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
@@ -153,10 +57,9 @@
           <!-- 内容主区域 -->
           <el-main class="main-content" :class="{
             'has-mobile-tabbar': isMobileDevice,
-            'dashboard-content': isDashboardActive,
-            'with-sidebar': !isDashboardActive
+            'dashboard-content': isDashboardActive
           }">
-            <div class="page-container" :class="{'full-width': isDashboardActive}">
+            <div class="page-container full-width">
               <!-- 如果是移动设备且显示更多菜单，则显示更多菜单组件 -->
               <mobile-more-menu
                 v-if="isMobileDevice && showMoreMenu"
@@ -916,6 +819,44 @@ onBeforeUnmount(() => {
   font-weight: 500;
 }
 
+/* 回到主页按钮样式 */
+.back-to-home-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: rgba(58, 109, 240, 0.08);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--color-primary, #3a6df0);
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(58, 109, 240, 0.1);
+}
+
+.back-to-home-btn:hover {
+  background: rgba(58, 109, 240, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(58, 109, 240, 0.15);
+}
+
+.back-to-home-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(58, 109, 240, 0.1);
+}
+
+.home-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--color-primary, #3a6df0);
+  color: white;
+}
+
 /* 主内容区 */
 .main-content {
   padding: 0;
@@ -939,15 +880,16 @@ onBeforeUnmount(() => {
   transition: all 0.3s ease;
 }
 
-/* 仪表盘全宽容器样式 */
+/* 全宽容器样式 */
 .page-container.full-width {
   max-width: 100%;
   padding: 0;
 }
 
-/* 仪表盘模式下的布局调整 */
+/* 无侧边栏布局调整 */
 .layout.no-sidebar {
   grid-template-columns: 1fr;
+  width: 100%;
 }
 
 /* 仪表盘头部样式 */
@@ -955,6 +897,27 @@ onBeforeUnmount(() => {
   background-color: transparent;
   border-bottom: none;
   box-shadow: none;
+}
+
+/* 重设标题样式 */
+.header-left .page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary, #303133);
+  position: relative;
+  padding-left: 5px;
+}
+
+.header-left .page-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 16px;
+  width: 3px;
+  background: var(--color-primary, #3a6df0);
+  border-radius: 3px;
 }
 
 /* 登录页样式 */
