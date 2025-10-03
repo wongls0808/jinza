@@ -83,7 +83,7 @@ function dbRun(db, sql, params = []) {
 }
 
 // 获取所有发票
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   const db = getDb();
   
   try {
@@ -860,7 +860,7 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
 }
 
 // 获取发票统计数据
-router.get('/stats', requireAuth, async (req, res) => {
+router.get('/stats', async (req, res) => {
   const db = getDb();
   
   try {

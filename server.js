@@ -1746,7 +1746,7 @@ app.use((err, req, res, next) => {
 try {
   const invoicesRoutesModule = await import('./routes/invoices.js');
   const invoicesRoutes = invoicesRoutesModule.default;
-  app.use('/api', invoicesRoutes);
+  app.use('/api/invoices', invoicesRoutes);
   console.log('发票管理API路由已加载');
 } catch (error) {
   console.error('加载发票路由失败:', error);
