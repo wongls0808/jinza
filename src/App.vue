@@ -49,44 +49,65 @@
             text-color="#e0e0e0"
             active-text-color="#ffffff"
           >
+            <el-menu-item index="dashboard" @click="navigateAndCloseSidebar('dashboard')">
+              <div class="menu-item-content">
+                <div class="menu-icon">
+                  <el-icon><HomeFilled /></el-icon>
+                </div>
+                <span class="menu-text">主页</span>
+              </div>
+            </el-menu-item>
+
             <el-menu-item index="customers" @click="navigateAndCloseSidebar('customers')">
               <div class="menu-item-content">
-                <div class="menu-icon">👥</div>
+                <div class="menu-icon">
+                  <el-icon><User /></el-icon>
+                </div>
                 <span class="menu-text">客户管理</span>
               </div>
             </el-menu-item>
             
             <el-menu-item index="suppliers" @click="navigateAndCloseSidebar('suppliers')">
               <div class="menu-item-content">
-                <div class="menu-icon">🏭</div>
+                <div class="menu-icon">
+                  <el-icon><Shop /></el-icon>
+                </div>
                 <span class="menu-text">供应商管理</span>
               </div>
             </el-menu-item>
             
             <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigateAndCloseSidebar('users')">
               <div class="menu-item-content">
-                <div class="menu-icon">👨‍💼</div>
+                <div class="menu-icon">
+                  <el-icon><Document /></el-icon>
+                </div>
                 <span class="menu-text">用户管理</span>
               </div>
             </el-menu-item>
             
             <el-menu-item index="accountSets" @click="navigateAndCloseSidebar('accountSets')">
               <div class="menu-item-content">
-                <div class="menu-icon">📁</div>
+                <div class="menu-icon">
+                  <el-icon><Folder /></el-icon>
+                </div>
                 <span class="menu-text">账套管理</span>
               </div>
             </el-menu-item>
 
             <el-menu-item index="products" @click="navigateAndCloseSidebar('products')">
               <div class="menu-item-content">
-                <div class="menu-icon">🛒</div>
+                <div class="menu-icon">
+                  <el-icon><ShoppingBag /></el-icon>
+                </div>
                 <span class="menu-text">商品库</span>
               </div>
             </el-menu-item>
             
             <el-menu-item index="salespeople" @click="navigateAndCloseSidebar('salespeople')">
               <div class="menu-item-content">
-                <div class="menu-icon">👨‍💼</div>
+                <div class="menu-icon">
+                  <el-icon><UserFilled /></el-icon>
+                </div>
                 <span class="menu-text">业务员管理</span>
               </div>
             </el-menu-item>
@@ -263,6 +284,7 @@ import {
 } from '@element-plus/icons-vue';
 
 // 导入组件
+import Dashboard from './views/Dashboard.vue';
 import Customers from './views/Customers.vue';
 import Users from './views/Users.vue';
 import AccountSets from './views/AccountSets.vue';
@@ -277,7 +299,7 @@ import MobileMoreMenu from './components/MobileMoreMenu.vue';
 
 // 核心应用状态
 const user = ref(null);
-const activeMenu = ref('customers');
+const activeMenu = ref('dashboard');
 const loginForm = ref({ username: '', password: '' });
 const loading = ref(false);
 const capsLockOn = ref(false);
@@ -295,6 +317,7 @@ const showMoreMenu = ref(false); // 是否显示"更多"菜单页面
 
 // 路由组件映射
 const routes = {
+  dashboard: markRaw(Dashboard),
   customers: markRaw(Customers),
   users: markRaw(Users),
   accountSets: markRaw(AccountSets),
@@ -305,7 +328,7 @@ const routes = {
 };
 
 // 当前组件
-const currentComponent = ref(routes.customers);
+const currentComponent = ref(routes.dashboard);
 
 // 导航函数
 const navigate = (route) => {
@@ -321,6 +344,7 @@ const navigate = (route) => {
 // 获取页面标题
 const getPageTitle = (route) => {
   const titles = {
+    dashboard: '主页',
     customers: '客户管理',
     users: '用户管理',
     accountSets: '账套管理',
@@ -544,8 +568,8 @@ const logout = async () => {
     await fetch('/api/logout', { method: 'POST' });
     
     // 更新状态和CSS类
-    currentComponent.value = routes.customers;
-    activeMenu.value = 'customers';
+    currentComponent.value = routes.dashboard;
+    activeMenu.value = 'dashboard';
     
     // 确保用户对象先清空，并更新CSS类
     user.value = null;

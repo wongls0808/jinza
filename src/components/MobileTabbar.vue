@@ -24,7 +24,8 @@ import {
   Shop, 
   ShoppingBag, 
   UserFilled, 
-  More
+  More,
+  HomeFilled
 } from '@element-plus/icons-vue';
 
 // 属性定义
@@ -58,14 +59,14 @@ const isVisible = computed(() => props.isMobile);
 const navItems = computed(() => {
   const items = [
     { 
+      route: 'dashboard',
+      label: '主页', 
+      icon: HomeFilled
+    },
+    { 
       route: 'customers',
       label: '客户', 
       icon: User
-    },
-    { 
-      route: 'suppliers', 
-      label: '供应商', 
-      icon: Shop
     },
     { 
       route: 'products',
@@ -73,9 +74,9 @@ const navItems = computed(() => {
       icon: ShoppingBag
     },
     {
-      route: 'salespeople',
-      label: '业务员',
-      icon: UserFilled
+      route: 'suppliers', 
+      label: '供应商', 
+      icon: Shop
     },
     {
       route: 'more',

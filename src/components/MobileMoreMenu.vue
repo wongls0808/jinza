@@ -34,7 +34,7 @@ import { computed } from 'vue';
 import { 
   Folder, 
   User, 
-  DataAnalysis, 
+  UserFilled, 
   Setting, 
   SwitchButton 
 } from '@element-plus/icons-vue';
@@ -81,9 +81,9 @@ const menuItems = computed(() => [
     adminOnly: true
   },
   {
-    route: 'dashboard',
-    label: '仪表盘',
-    icon: DataAnalysis,
+    route: 'salespeople',
+    label: '业务员',
+    icon: UserFilled,
     adminOnly: false
   },
   {
