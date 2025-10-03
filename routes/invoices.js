@@ -30,28 +30,55 @@ const router = express.Router();
 // 数据库查询工具函数
 function dbQuery(db, sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
+    try {
+      db.all(sql, params, (err, rows) => {
+        if (err) {
+          console.error('SQL错误(all):', err, '执行的SQL:', sql);
+          reject(err);
+        } else {
+          resolve(rows || []);  // 确保始终返回数组，即使为空
+        }
+      });
+    } catch (error) {
+      console.error('执行查询异常:', error);
+      reject(error);
+    }
   });
 }
 
 function dbGet(db, sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
+    try {
+      db.get(sql, params, (err, row) => {
+        if (err) {
+          console.error('SQL错误(get):', err, '执行的SQL:', sql);
+          reject(err);
+        } else {
+          resolve(row);  // 可能为undefined，这是正常的
+        }
+      });
+    } catch (error) {
+      console.error('执行get异常:', error);
+      reject(error);
+    }
   });
 }
 
 function dbRun(db, sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
+    try {
+      db.run(sql, params, function(err) {
+        if (err) {
+          console.error('SQL错误(run):', err, '执行的SQL:', sql);
+          reject(err);
+        } else {
+          resolve({ lastID: this.lastID, changes: this.changes });
+        }
+      });
+    } catch (error) {
+      console.error('执行run异常:', error);
+      reject(error);
+    }
   });
 }
 
@@ -173,18 +200,24 @@ router.get('/invoices', requireAuth, async (req, res) => {
     console.error('获取发票列表失败:', error);
     res.status(500).json({ error: '获取发票列表失败' });
   } finally {
-    // 关闭数据库连接
-    db.close();
+    // 关闭数据库连接，但捕获可能的错误
+    try {
+      db.close();
+    } catch (dbError) {
+      console.error('关闭数据库连接失败:', dbError);
+    }
   }
 });
 
 // 获取单个发票详情
 router.get('/invoices/:id', requireAuth, async (req, res) => {
+  const db = getDb();
+  
   try {
     const { id } = req.params;
     
     // 获取发票主表信息
-    const invoice = await db.get(`
+    const invoice = await dbGet(db, `
       SELECT i.*, 
         c.name as customer_name, 
         c.address as customer_address,
@@ -197,27 +230,27 @@ router.get('/invoices/:id', requireAuth, async (req, res) => {
       LEFT JOIN salespeople s ON i.salesperson_id = s.id
       LEFT JOIN account_sets a ON i.account_set_id = a.id
       WHERE i.id = ?
-    `, id);
+    `, [id]);
     
     if (!invoice) {
       return res.status(404).json({ error: '发票不存在' });
     }
     
     // 获取发票明细项
-    const items = await db.all(`
+    const items = await dbQuery(db, `
       SELECT i.*, p.name as product_name, p.sku as product_sku
       FROM invoice_items i
       LEFT JOIN products p ON i.product_id = p.id
       WHERE i.invoice_id = ?
       ORDER BY i.id
-    `, id);
+    `, [id]);
     
     // 获取付款记录
-    const payments = await db.all(`
+    const payments = await dbQuery(db, `
       SELECT * FROM invoice_payments
       WHERE invoice_id = ?
       ORDER BY payment_date DESC
-    `, id);
+    `, [id]);
     
     res.json({
       ...invoice,
@@ -227,6 +260,12 @@ router.get('/invoices/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('获取发票详情失败:', error);
     res.status(500).json({ error: '获取发票详情失败' });
+  } finally {
+    try {
+      db.close();
+    } catch (dbError) {
+      console.error('关闭数据库连接失败:', dbError);
+    }
   }
 });
 
@@ -668,47 +707,59 @@ router.post('/invoices/:id/pdf', requireAuth, async (req, res) => {
 
 // 辅助函数：获取带详细信息的发票
 async function getInvoiceWithDetails(id) {
-  // 获取发票主表信息
-  const invoice = await db.get(`
-    SELECT i.*, 
-      c.name as customer_name, 
-      c.address as customer_address,
-      c.contact_person as customer_contact,
-      c.phone as customer_phone,
-      s.name as salesperson_name,
-      a.name as account_set_name
-    FROM invoices i
-    LEFT JOIN customers c ON i.customer_id = c.id
-    LEFT JOIN salespeople s ON i.salesperson_id = s.id
-    LEFT JOIN account_sets a ON i.account_set_id = a.id
-    WHERE i.id = ?
-  `, id);
-  
-  if (!invoice) {
+  const db = getDb();
+  try {
+    // 获取发票主表信息
+    const invoice = await dbGet(db, `
+      SELECT i.*, 
+        c.name as customer_name, 
+        c.address as customer_address,
+        c.contact_person as customer_contact,
+        c.phone as customer_phone,
+        s.name as salesperson_name,
+        a.name as account_set_name
+      FROM invoices i
+      LEFT JOIN customers c ON i.customer_id = c.id
+      LEFT JOIN salespeople s ON i.salesperson_id = s.id
+      LEFT JOIN account_sets a ON i.account_set_id = a.id
+      WHERE i.id = ?
+    `, [id]);
+    
+    if (!invoice) {
+      return null;
+    }
+    
+    // 获取发票明细项
+    const items = await dbQuery(db, `
+      SELECT i.*, p.name as product_name, p.sku as product_sku
+      FROM invoice_items i
+      LEFT JOIN products p ON i.product_id = p.id
+      WHERE i.invoice_id = ?
+      ORDER BY i.id
+    `, [id]);
+    
+    // 获取付款记录
+    const payments = await dbQuery(db, `
+      SELECT * FROM invoice_payments
+      WHERE invoice_id = ?
+      ORDER BY payment_date DESC
+    `, [id]);
+    
+    return {
+      ...invoice,
+      items,
+      payments
+    };
+  } catch (error) {
+    console.error('获取发票详情失败:', error);
     return null;
+  } finally {
+    try {
+      db.close();
+    } catch (dbError) {
+      console.error('关闭数据库连接失败:', dbError);
+    }
   }
-  
-  // 获取发票明细项
-  const items = await db.all(`
-    SELECT i.*, p.name as product_name, p.sku as product_sku
-    FROM invoice_items i
-    LEFT JOIN products p ON i.product_id = p.id
-    WHERE i.invoice_id = ?
-    ORDER BY i.id
-  `, id);
-  
-  // 获取付款记录
-  const payments = await db.all(`
-    SELECT * FROM invoice_payments
-    WHERE invoice_id = ?
-    ORDER BY payment_date DESC
-  `, id);
-  
-  return {
-    ...invoice,
-    items,
-    payments
-  };
 }
 
 // 辅助函数：生成发票HTML
@@ -807,5 +858,48 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
   
   return html;
 }
+
+// 获取发票统计数据
+router.get('/invoices/stats', requireAuth, async (req, res) => {
+  const db = getDb();
+  
+  try {
+    // 获取总发票数
+    const totalResult = await dbGet(db, `SELECT COUNT(*) as total FROM invoices`);
+    
+    // 获取未付款发票数
+    const unpaidResult = await dbGet(db, `
+      SELECT COUNT(*) as count 
+      FROM invoices 
+      WHERE payment_status = 'unpaid' OR payment_status = 'partial'
+    `);
+    
+    // 获取已付款发票数
+    const paidResult = await dbGet(db, `
+      SELECT COUNT(*) as count 
+      FROM invoices 
+      WHERE payment_status = 'paid'
+    `);
+    
+    // 获取总金额
+    const amountResult = await dbGet(db, `SELECT SUM(total_amount) as sum FROM invoices`);
+    
+    res.json({
+      total: totalResult ? totalResult.total : 0,
+      unpaid: unpaidResult ? unpaidResult.count : 0,
+      paid: paidResult ? paidResult.count : 0,
+      totalAmount: amountResult && amountResult.sum ? amountResult.sum : 0
+    });
+  } catch (error) {
+    console.error('获取发票统计失败:', error);
+    res.status(500).json({ error: '获取发票统计失败' });
+  } finally {
+    try {
+      db.close();
+    } catch (dbError) {
+      console.error('关闭数据库连接失败:', dbError);
+    }
+  }
+});
 
 export default router;
