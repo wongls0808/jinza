@@ -216,6 +216,7 @@ import AccountSets from './views/AccountSets.vue';
 import Salespeople from './views/Salespeople.vue';
 import Products from './views/Products.vue';
 import Suppliers from './views/Suppliers.vue';
+import Invoices from './views/Invoices.vue';
 // 移除回收站组件导入
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
 // 导入新的移动端组件
@@ -249,6 +250,7 @@ const routes = {
   products: markRaw(Products),
   suppliers: markRaw(Suppliers),
   salespeople: markRaw(Salespeople),
+  invoices: markRaw(Invoices), // 添加发票管理路由
   // 移除回收站组件
 };
 
@@ -281,6 +283,7 @@ const getPageTitle = (route) => {
     products: '商品库',
     suppliers: '供应商管理',
     salespeople: '业务员管理',
+    invoices: '发票管理',
     // 移除回收站标题
   };
   return titles[route] || '企业管理系统';

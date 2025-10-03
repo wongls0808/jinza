@@ -72,7 +72,8 @@ import {
   Document,
   Folder,
   Setting,
-  HomeFilled
+  HomeFilled,
+  Ticket
 } from '@element-plus/icons-vue';
 
 // Props定义
@@ -139,6 +140,13 @@ const availableModules = computed(() => {
       icon: Folder,
       route: 'accountSets',
       color: 'teal'
+    },
+    {
+      title: '发票管理',
+      description: '创建和管理发票',
+      icon: Ticket,
+      route: 'invoices',
+      color: 'cyan'
     }
   ];
   
