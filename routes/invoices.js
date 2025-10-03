@@ -83,7 +83,7 @@ function dbRun(db, sql, params = []) {
 }
 
 // 获取所有发票
-router.get('/invoices', requireAuth, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const db = getDb();
   
   try {
@@ -210,7 +210,7 @@ router.get('/invoices', requireAuth, async (req, res) => {
 });
 
 // 获取单个发票详情
-router.get('/invoices/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   const db = getDb();
   
   try {
@@ -270,7 +270,7 @@ router.get('/invoices/:id', requireAuth, async (req, res) => {
 });
 
 // 创建新发票
-router.post('/invoices', requireAuth, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const {
     customer_id, 
     account_set_id, 
@@ -367,7 +367,7 @@ router.post('/invoices', requireAuth, async (req, res) => {
 });
 
 // 更新发票
-router.put('/invoices/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const {
     customer_id, 
@@ -460,7 +460,7 @@ router.put('/invoices/:id', requireAuth, async (req, res) => {
 });
 
 // 删除发票
-router.delete('/invoices/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -487,7 +487,7 @@ router.delete('/invoices/:id', requireAuth, async (req, res) => {
 });
 
 // 发票状态变更
-router.put('/invoices/:id/status', requireAuth, async (req, res) => {
+router.put('/:id/status', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -527,7 +527,7 @@ router.put('/invoices/:id/status', requireAuth, async (req, res) => {
 });
 
 // 发票付款
-router.post('/invoices/:id/payments', requireAuth, async (req, res) => {
+router.post('/:id/payments', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { payment_date, amount, payment_method, transaction_reference, notes } = req.body;
   
@@ -606,7 +606,7 @@ router.post('/invoices/:id/payments', requireAuth, async (req, res) => {
 });
 
 // 生成发票预览
-router.post('/invoices/:id/preview', requireAuth, async (req, res) => {
+router.post('/:id/preview', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { template_id, paper_size } = req.body;
@@ -648,7 +648,7 @@ router.post('/invoices/:id/preview', requireAuth, async (req, res) => {
 });
 
 // 生成发票PDF
-router.post('/invoices/:id/pdf', requireAuth, async (req, res) => {
+router.post('/:id/pdf', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { template_id, paper_size } = req.body;
@@ -860,7 +860,7 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
 }
 
 // 获取发票统计数据
-router.get('/invoices/stats', requireAuth, async (req, res) => {
+router.get('/stats', requireAuth, async (req, res) => {
   const db = getDb();
   
   try {
