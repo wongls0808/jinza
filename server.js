@@ -1746,6 +1746,8 @@ app.use((err, req, res, next) => {
 try {
   const invoicesRoutesModule = await import('./routes/invoices.js');
   const invoicesRoutes = invoicesRoutesModule.default;
+  
+  // 使用 /api/invoices 路径注册路由
   app.use('/api/invoices', invoicesRoutes);
   console.log('发票管理API路由已加载在/api/invoices路径');
 } catch (error) {

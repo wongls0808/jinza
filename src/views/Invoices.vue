@@ -6,7 +6,10 @@
         <h1 class="page-title">发票管理</h1>
         <p class="page-description">创建、管理和跟踪企业发票，支持关联客户、商品和业务员</p>
       </div>
-      <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
+      <el-button type="primary" size="large" @cl    // 使用正确的API路径，确保末尾有斜杠
+    const apiUrl = `/api/invoices/?${queryParams.toString()}`;
+    console.log('发送请求到:', apiUrl);
+    const response = await fetch(apiUrl);"showAddDialog = true" class="add-button">
         <el-icon><Plus /></el-icon>
         新建发票
       </el-button>
@@ -304,8 +307,8 @@ async function fetchInvoices() {
       queryParams.append('end_date', filters.dateRange[1]);
     }
 
-    // 使用正确的API路径
-    const apiUrl = `/api/invoices?${queryParams.toString()}`;
+    // 使用正确的API路径，确保末尾有斜杠
+    const apiUrl = `/api/invoices/?${queryParams.toString()}`;
     console.log('发送请求到:', apiUrl);
     const response = await fetch(apiUrl);
     console.log('获取响应状态:', response.status, response.statusText);
@@ -349,7 +352,7 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/invoices/stats');
+    const response = await fetch('/api/invoices/stats/');
     console.log('统计数据响应状态:', response.status, response.statusText);
     
     if (response.ok) {
