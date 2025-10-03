@@ -5,10 +5,10 @@
 
 // 启用/禁用不同类型的调试输出
 const debugConfig = {
-    auth: true,    // 认证相关
-    api: true,     // API调用
-    view: true,    // 视图变化
-    error: true    // 错误信息
+    auth: false,    // 认证相关，设置为false避免重复消息
+    api: false,     // API调用，设置为false避免重复消息
+    view: false,    // 视图变化，设置为false避免重复消息
+    error: true     // 错误信息，保持启用以便调试错误
 };
 
 /**

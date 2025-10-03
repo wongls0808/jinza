@@ -199,6 +199,33 @@
 <script setup>
 import { ref, onMounted, markRaw, nextTick, watch } from 'vue';
 import { ElMessage } from 'element-plus';
+
+// 自定义消息函数，避免重复消息
+const showMessage = (() => {
+  // 记录最近的消息，防止短时间内显示相同消息
+  let lastMsg = '';
+  let lastType = '';
+  let lastTime = 0;
+  
+  return (type, message) => {
+    const now = Date.now();
+    // 如果相同消息在1秒内重复出现，则跳过
+    if (message === lastMsg && type === lastType && now - lastTime < 1000) {
+      return;
+    }
+    
+    lastMsg = message;
+    lastType = type;
+    lastTime = now;
+    
+    ElMessage({
+      type,
+      message,
+      grouping: true, // 相同内容的消息会被合并
+      showClose: true
+    });
+  };
+})();
 import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 import { reportAuthChange, reportApiResult, reportViewChange, reportError, checkAppState } from './utils/debug';
 
@@ -220,10 +247,10 @@ const loading = ref(false);
 const capsLockOn = ref(false);
 const appLoading = ref(true); // 添加应用加载状态变量
 
-// 监控用户状态变化
-watch(user, (newVal, oldVal) => {
-  reportAuthChange('用户状态发生变化', { before: oldVal, after: newVal });
-}, { deep: true });
+// 禁用用户状态变化的监听器，避免重复消息
+// watch(user, (newVal, oldVal) => {
+//   reportAuthChange('用户状态发生变化', { before: oldVal, after: newVal });
+// }, { deep: true });
 
 // 路由组件映射
 const routes = {
@@ -245,6 +272,8 @@ const navigate = (route) => {
   activeMenu.value = route;
   if (routes[route]) {
     currentComponent.value = routes[route];
+    // 保存当前页面状态到本地存储，以便页面刷新后恢复
+    localStorage.setItem('jinza_last_page', route);
   }
 };
 
@@ -267,9 +296,9 @@ const handleCommand = (command) => {
   if (command === 'logout') {
     logout();
   } else if (command === 'profile') {
-    ElMessage.info('个人资料功能开发中');
+    showMessage('info', '个人资料功能开发中');
   } else if (command === 'settings') {
-    ElMessage.info('系统设置功能开发中');
+    showMessage('info', '系统设置功能开发中');
   }
 };
 
@@ -307,6 +336,14 @@ onMounted(async () => {
           showForcePwd.value = true;
         }
         
+        // 恢复上次访问的页面
+        const lastPage = localStorage.getItem('jinza_last_page');
+        if (lastPage && routes[lastPage]) {
+          reportViewChange('App', `恢复上次访问的页面: ${lastPage}`);
+          activeMenu.value = lastPage;
+          currentComponent.value = routes[lastPage];
+        }
+        
         reportViewChange('App', '已设置用户状态为已登录');
         checkAppState(user, routes, activeMenu, currentComponent);
       } else {
@@ -329,7 +366,7 @@ onMounted(async () => {
 const login = async () => {
   // 表单验证
   if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.error('请输入用户名和密码');
+    showMessage('error', '请输入用户名和密码');
     return;
   }
 
@@ -375,7 +412,7 @@ const login = async () => {
       setTimeout(() => checkAppState(user, routes, activeMenu, currentComponent), 100);
       // 仅在直接登录时显示欢迎消息，避免重复显示
       if (credentials && credentials.username) {
-        ElMessage.success(`欢迎回来，${data.user.name}`);
+        showMessage('success', `欢迎回来，${data.user.name}`);
       }
       
       // 处理强制密码更改
@@ -385,11 +422,11 @@ const login = async () => {
       }
     } else {
       reportError('登录失败', data);
-      ElMessage.error(data.error || '登录失败');
+      showMessage('error', data.error || '登录失败');
     }
   } catch (error) {
     reportError('登录过程', error);
-    ElMessage.error('登录失败，请检查网络连接');
+    showMessage('error', '登录失败，请检查网络连接');
   } finally {
     loading.value = false;
   }
@@ -422,14 +459,14 @@ const logout = async () => {
     document.body.classList.remove('logged-in');
     
     await nextTick();
-    ElMessage.success('已退出登录');
+            showMessage('success', '已退出登录');
     reportAuthChange('退出登录成功', null);
     
     // 检查并输出最终状态
     setTimeout(() => checkAppState(user, routes, activeMenu, currentComponent), 100);
   } catch (error) {
     reportError('退出登录', error);
-    ElMessage.error('退出失败');
+    showMessage('error', '退出失败');
   }
 };
 
