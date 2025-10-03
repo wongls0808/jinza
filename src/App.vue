@@ -359,7 +359,10 @@ const login = async () => {
       
       // 检查并输出最终状态
       setTimeout(() => checkAppState(user, routes, activeMenu, currentComponent), 100);
-      ElMessage.success(`欢迎回来，${data.user.name}`);
+      // 仅在直接登录时显示欢迎消息，避免重复显示
+      if (credentials && credentials.username) {
+        ElMessage.success(`欢迎回来，${data.user.name}`);
+      }
       
       // 处理强制密码更改
       if (data.user.forcePasswordChange) {
