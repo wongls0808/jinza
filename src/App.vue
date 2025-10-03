@@ -94,62 +94,75 @@
 
     <!-- 未登录状态 - 登录页 -->
     <div v-else-if="!appLoading && !user" class="login-container">
-      <div class="login-background">
-        <div class="login-card">
-          <!-- 登录页标题 -->
-          <div class="login-header">
-            <div class="login-logo">
-              <div class="logo-large">📊</div>
-              <h1>企业管理系统</h1>
-            </div>
-            <p class="login-subtitle">专业的企业管理解决方案</p>
+      <div class="login-content">
+        <div class="login-left">
+          <div class="login-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
           </div>
-          
-          <!-- 登录表单 -->
-          <el-form class="login-form" @submit.prevent="login">
-            <el-form-item>
-              <el-input
-                v-model="loginForm.username"
-                placeholder="用户名"
-                size="large"
-                :prefix-icon="User"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-input
-                v-model="loginForm.password"
-                type="password"
-                placeholder="密码"
-                size="large"
-                :prefix-icon="Lock"
-                show-password
-                @keyup="handlePasswordKey"
-                @keyup.enter="login"
-                @blur="capsLockOn = false"
-              />
-            </el-form-item>
-            <el-form-item v-if="capsLockOn">
-              <el-alert
-                type="warning"
-                title="已开启大写锁定 (Caps Lock)，可能导致密码输入错误"
-                :closable="false"
-                show-icon
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button 
-                type="primary" 
-                size="large" 
-                @click="login" 
-                class="login-button"
-                :loading="loading"
-                :disabled="loading"
-              >
-                {{ loading ? '登录中...' : '登录系统' }}
-              </el-button>
-            </el-form-item>
-          </el-form>
-          <div class="login-hint">安全提示：请勿在公共设备保存密码。</div>
+          <div class="login-brand">
+            <div class="brand-icon">
+              <span class="icon-symbol">📊</span>
+            </div>
+            <h1 class="brand-title">企业管理系统</h1>
+            <p class="brand-subtitle">高效管理·数据驱动·智能决策</p>
+          </div>
+        </div>
+        
+        <div class="login-right">
+          <div class="login-form-container">
+            <h2 class="login-greeting">欢迎回来</h2>
+            <p class="login-message">请登录您的账户继续使用系统</p>
+            
+            <!-- 登录表单 -->
+            <el-form class="login-form" @submit.prevent="login">
+              <el-form-item>
+                <el-input
+                  v-model="loginForm.username"
+                  placeholder="用户名"
+                  size="large"
+                  class="modern-input"
+                  :prefix-icon="User"
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-input
+                  v-model="loginForm.password"
+                  type="password"
+                  placeholder="密码"
+                  size="large"
+                  class="modern-input"
+                  :prefix-icon="Lock"
+                  show-password
+                  @keyup="handlePasswordKey"
+                  @keyup.enter="login"
+                  @blur="capsLockOn = false"
+                />
+              </el-form-item>
+              <el-form-item v-if="capsLockOn">
+                <el-alert
+                  type="warning"
+                  title="已开启大写锁定 (Caps Lock)，可能导致密码输入错误"
+                  :closable="false"
+                  show-icon
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button 
+                  type="primary" 
+                  size="large" 
+                  @click="login" 
+                  class="login-button"
+                  :loading="loading"
+                  :disabled="loading"
+                >
+                  {{ loading ? '登录中...' : '登录系统' }}
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <div class="login-hint">安全提示：请勿在公共设备保存密码。</div>
+          </div>
         </div>
       </div>
     </div>
@@ -924,73 +937,259 @@ onBeforeUnmount(() => {
 .login-container {
   height: 100vh;
   width: 100vw;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f9fafb;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000; /* 确保登录页在最高层级 */
+  overflow: hidden;
 }
 
-.login-background {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+.login-content {
+  width: 80%;
+  max-width: 1200px;
+  height: 80vh;
+  display: flex;
   border-radius: 20px;
-  padding: 2px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  overflow: hidden;
 }
 
-.login-card {
-  background: white;
-  border-radius: 18px;
+/* 左侧品牌区域 */
+.login-left {
+  width: 55%;
+  background: linear-gradient(135deg, #3a6df0 0%, #4a7ff7 100%);
   padding: 40px;
-  width: 400px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-}
-
-.login-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.login-logo {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-shapes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shape-1 {
+  width: 300px;
+  height: 300px;
+  top: -100px;
+  left: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.shape-2 {
+  width: 200px;
+  height: 200px;
+  top: 60%;
+  left: 60%;
+  animation: float 12s ease-in-out infinite;
+}
+
+.shape-3 {
+  width: 150px;
+  height: 150px;
+  bottom: -50px;
+  right: 10%;
+  animation: float 10s ease-in-out infinite 2s;
+}
+
+@keyframes float {
+  0% {
+    transform: translatey(0px);
+  }
+  50% {
+    transform: translatey(-20px);
+  }
+  100% {
+    transform: translatey(0px);
+  }
+}
+
+.login-brand {
+  position: relative;
+  z-index: 2;
+  color: white;
+  text-align: center;
+}
+
+.brand-icon {
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  margin: 0 auto 30px;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
-.logo-large {
-  font-size: 48px;
+.icon-symbol {
+  font-size: 56px;
 }
 
-.login-logo h1 {
+.brand-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 15px 0;
+  letter-spacing: 1px;
+}
+
+.brand-subtitle {
+  font-size: 16px;
+  opacity: 0.9;
   margin: 0;
-  color: #303133;
-  font-size: 24px;
-  font-weight: 600;
+  font-weight: 300;
+  letter-spacing: 0.5px;
 }
 
-.login-subtitle {
-  margin: 8px 0 0 0;
-  color: #909399;
-  font-size: 14px;
+/* 右侧表单区域 */
+.login-right {
+  width: 45%;
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-greeting {
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+
+.login-message {
+  font-size: 15px;
+  color: #666;
+  margin: 0 0 30px 0;
 }
 
 .login-form {
   margin-bottom: 20px;
 }
 
+.modern-input :deep(.el-input__wrapper) {
+  border-radius: 12px !important;
+  padding: 10px 15px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+  background: #f5f7fa;
+}
+
+.modern-input :deep(.el-input__inner) {
+  height: 22px;
+}
+
+.modern-input :deep(.el-input__prefix) {
+  color: #909399;
+}
+
 .login-button {
   width: 100%;
-  height: 44px;
-  font-weight: 500;
+  height: 48px;
+  font-weight: 600;
+  font-size: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(58, 109, 240, 0.25);
+  transition: all 0.3s ease;
+}
+
+.login-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(58, 109, 240, 0.3);
+}
+
+.login-button:active {
+  transform: translateY(1px);
 }
 
 .login-hint {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 12px;
+  font-size: 13px;
   color: #909399;
   text-align: center;
   user-select: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 992px) {
+  .login-content {
+    width: 95%;
+    height: auto;
+    flex-direction: column;
+  }
+  
+  .login-left, .login-right {
+    width: 100%;
+    padding: 30px;
+  }
+  
+  .login-left {
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+  
+  .brand-title {
+    font-size: 28px;
+  }
+  
+  .login-form-container {
+    margin: 20px auto;
+  }
+  
+  .login-greeting {
+    text-align: center;
+  }
+  
+  .login-message {
+    text-align: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .login-content {
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  
+  .login-left {
+    padding: 30px 20px;
+    padding-bottom: 40px;
+  }
+  
+  .brand-icon {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .brand-title {
+    font-size: 24px;
+  }
+  
+  .login-right {
+    padding: 20px;
+  }
 }
 
 /* 移动端菜单按钮 */
