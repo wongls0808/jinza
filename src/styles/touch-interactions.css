@@ -1,0 +1,171 @@
+/* 触控设备的交互优化 */
+:root {
+  /* 定义触控反馈动画时间 */
+  --touch-feedback-duration: 0.2s;
+}
+
+/* 触控反馈效果 */
+@media (pointer: coarse) {
+  /* 按钮点击效果 */
+  .el-button:active {
+    transform: scale(0.97);
+    transition: transform var(--touch-feedback-duration);
+  }
+  
+  /* 卡片点击效果 */
+  .card:active, .el-card:active {
+    transform: scale(0.99);
+    transition: transform var(--touch-feedback-duration);
+  }
+  
+  /* 列表项点击效果 */
+  .el-menu-item:active {
+    transform: scale(0.98);
+    opacity: 0.8;
+    transition: all var(--touch-feedback-duration);
+  }
+  
+  /* 表格行点击效果 */
+  .el-table__row:active {
+    background-color: #f0f9ff !important;
+    transition: background-color var(--touch-feedback-duration);
+  }
+  
+  /* 提升点击区域大小 */
+  .el-button {
+    min-height: 44px;
+  }
+  
+  .el-checkbox, .el-radio {
+    padding: 8px 0;
+  }
+  
+  .el-menu-item {
+    height: 56px !important;
+    line-height: 56px !important;
+  }
+  
+  /* 表单控件增大 */
+  .el-input__wrapper, .el-select__wrapper {
+    min-height: 44px !important;
+  }
+  
+  .el-input__inner {
+    font-size: 16px !important;
+  }
+  
+  /* 下拉菜单项大小 */
+  .el-dropdown-menu__item {
+    font-size: 16px !important;
+    padding: 12px 20px !important;
+    min-height: 44px;
+    line-height: 22px;
+  }
+  
+  /* 滑动操作 - 实现左右滑动删除等功能 */
+  .swipe-action {
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+  
+  .swipe-action__content {
+    position: relative;
+    transition: transform 0.3s;
+    z-index: 1;
+    background: #fff;
+  }
+  
+  .swipe-action__actions {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: stretch;
+    z-index: 0;
+  }
+  
+  .swipe-action__actions--right {
+    right: 0;
+  }
+  
+  .swipe-action__actions--left {
+    left: 0;
+  }
+  
+  .swipe-action__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    color: #fff;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  
+  .swipe-action__btn--delete {
+    background-color: #f56c6c;
+  }
+  
+  .swipe-action__btn--edit {
+    background-color: #409eff;
+  }
+  
+  /* 点击涟漪效果 */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .ripple:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform 0.5s, opacity 1s;
+  }
+  
+  .ripple:active:after {
+    transform: scale(0, 0);
+    opacity: 0.3;
+    transition: 0s;
+  }
+  
+  /* 下拉刷新和上拉加载更多动效 */
+  .pull-refresh {
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+  }
+  
+  .pull-refresh__track {
+    position: relative;
+    transition-property: transform;
+  }
+  
+  .pull-refresh__head {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .pull-refresh__loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

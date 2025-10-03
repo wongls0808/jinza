@@ -125,13 +125,30 @@
           </el-header>
           
           <!-- 内容主区域 -->
-          <el-main class="main-content">
+          <el-main class="main-content" :class="{'has-mobile-tabbar': isMobileDevice}">
             <div class="page-container">
-              <component :is="currentComponent" :user="user" />
+              <!-- 如果是移动设备且显示更多菜单，则显示更多菜单组件 -->
+              <mobile-more-menu
+                v-if="isMobileDevice && showMoreMenu"
+                :user-role="user.role"
+                @navigate="handleMoreMenuNavigation"
+                @logout="handleMobileLogout"
+              />
+              <!-- 否则显示常规内容组件 -->
+              <component v-else :is="currentComponent" :user="user" />
             </div>
           </el-main>
         </el-container>
       </el-container>
+      
+      <!-- 移动设备底部导航栏 -->
+      <mobile-tabbar
+        v-if="user"
+        :is-mobile="isMobileDevice"
+        :active-menu="activeMenu"
+        :user-role="user.role"
+        @navigate="handleMobileNavigation"
+      />
       
       <!-- 强制密码修改对话框 -->
       <ForcePasswordChange 
@@ -238,6 +255,13 @@ const showMessage = (() => {
 })();
 import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 import { reportAuthChange, reportApiResult, reportViewChange, reportError, checkAppState } from './utils/debug';
+// 导入更多 Element Plus 图标
+import {
+  User, Lock, ArrowDown, Menu as IconMenu, More, Setting,
+  ShoppingCart, OfficeBuilding, Document, 
+  UserFilled, HomeFilled, 
+  Grid, Histogram, Briefcase, Shop
+} from '@element-plus/icons-vue';
 
 // 导入组件
 import Customers from './views/Customers.vue';
@@ -248,6 +272,9 @@ import Products from './views/Products.vue';
 import Suppliers from './views/Suppliers.vue';
 // 移除回收站组件导入
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
+// 导入新的移动端组件
+import MobileTabbar from './components/MobileTabbar.vue';
+import MobileMoreMenu from './components/MobileMoreMenu.vue';
 
 // 核心应用状态
 const user = ref(null);
@@ -259,6 +286,8 @@ const appLoading = ref(true); // 添加应用加载状态变量
 const sessionInfo = ref(null); // 会话信息
 const sessionCheckInterval = ref(null); // 保存定时器ID
 const sidebarExpanded = ref(false); // 控制侧边栏在移动设备上的展开状态
+const isMobileDevice = ref(false); // 是否为移动设备
+const showMoreMenu = ref(false); // 是否显示"更多"菜单页面
 
 // 禁用用户状态变化的监听器，避免重复消息
 // watch(user, (newVal, oldVal) => {
@@ -328,12 +357,46 @@ const navigateAndCloseSidebar = (route) => {
   toggleSidebar(false);
 };
 
+// 检测设备类型
+const checkDeviceType = () => {
+  // 检测是否为移动设备（最大宽度为767px）
+  isMobileDevice.value = window.innerWidth <= 767;
+};
+
+// 底部导航栏导航处理
+const handleMobileNavigation = (route) => {
+  if (route === 'more') {
+    showMoreMenu.value = true;
+  } else {
+    showMoreMenu.value = false;
+    navigate(route);
+  }
+};
+
+// 从更多菜单导航
+const handleMoreMenuNavigation = (route) => {
+  showMoreMenu.value = false;
+  navigate(route);
+};
+
+// 处理移动端登出
+const handleMobileLogout = () => {
+  showMoreMenu.value = false;
+  logout();
+};
+
 // 应用初始化 - 检查登录状态
 onMounted(async () => {
   reportViewChange('App', '应用挂载完成，检查登录状态');
   try {
     // 设置应用为加载状态，不显示登录界面
     appLoading.value = true;
+    
+    // 检测设备类型
+    checkDeviceType();
+    
+    // 添加窗口大小变化的监听器，以便在屏幕尺寸变化时更新设备类型
+    window.addEventListener('resize', checkDeviceType);
     
     // 输出调试状态
     checkAppState(user, routes, activeMenu, currentComponent);
@@ -551,11 +614,13 @@ const checkSessionStatus = () => {
   }
 };
 
-// 在组件卸载时清除定时器
+// 在组件卸载时清除定时器和事件监听器
 onBeforeUnmount(() => {
   if (sessionCheckInterval.value) {
     clearInterval(sessionCheckInterval.value);
   }
+  // 移除窗口大小变化的事件监听器
+  window.removeEventListener('resize', checkDeviceType);
 });
 </script>
 
@@ -893,6 +958,11 @@ onBeforeUnmount(() => {
     padding: 10px !important;
   }
   
+  /* 为底部导航栏留出空间 */
+  .el-main.has-mobile-tabbar {
+    padding-bottom: 66px !important;
+  }
+  
   /* 调整表单在移动端的样式 */
   .el-form-item {
     margin-bottom: 15px !important;
@@ -909,6 +979,19 @@ onBeforeUnmount(() => {
   .form-actions .el-button {
     width: 100%;
     margin: 5px 0;
+  }
+  
+  /* 强化汉堡菜单按钮的可见性 */
+  .menu-toggle-btn {
+    display: flex !important;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 8px;
+  }
+  
+  .menu-toggle-icon {
+    font-size: 22px;
+    color: white;
   }
 }
 </style>
