@@ -253,14 +253,13 @@ const showMessage = (() => {
     });
   };
 })();
-import { User, Lock, ArrowDown } from '@element-plus/icons-vue';
 import { reportAuthChange, reportApiResult, reportViewChange, reportError, checkAppState } from './utils/debug';
-// 导入更多 Element Plus 图标
+// 导入 Element Plus 图标
 import {
   User, Lock, ArrowDown, Menu as IconMenu, More, Setting,
-  ShoppingCart, OfficeBuilding, Document, 
+  ShoppingBag, Shop, Document, 
   UserFilled, HomeFilled, 
-  Grid, Histogram, Briefcase, Shop
+  Grid, Histogram, Briefcase
 } from '@element-plus/icons-vue';
 
 // 导入组件
