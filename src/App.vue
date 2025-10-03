@@ -19,9 +19,9 @@
         @click="toggleSidebar(false)"
       ></div>
       
-      <el-container class="layout">
-        <!-- 侧边栏 -->
-        <el-aside width="240px" class="sidebar" :class="{ 'expanded': sidebarExpanded }">
+      <el-container class="layout" :class="{'no-sidebar': isDashboardActive}">
+        <!-- 侧边栏 - 只在非Dashboard页面显示 -->
+        <el-aside v-if="!isDashboardActive" width="240px" class="sidebar" :class="{ 'expanded': sidebarExpanded }">
           <div class="sidebar-header">
             <div class="logo">
               <div class="logo-icon">📊</div>
@@ -117,11 +117,16 @@
         <!-- 主内容区 -->
         <el-container>
           <!-- 顶部导航栏 -->
-          <el-header class="header">
+          <el-header class="header" :class="{'dashboard-header': isDashboardActive}">
             <div class="header-left">
-              <!-- 汉堡菜单按钮 - 移动设备显示 -->
-              <button class="menu-toggle-btn" @click="toggleSidebar()">
+              <!-- 汉堡菜单按钮 - 非Dashboard页面或移动设备显示 -->
+              <button v-if="!isDashboardActive || isMobileDevice" class="menu-toggle-btn" @click="toggleSidebar()">
                 <el-icon><Menu /></el-icon>
+              </button>
+              <!-- 返回主页按钮 - 非Dashboard页面且非移动设备时显示 -->
+              <button v-if="!isDashboardActive && !isMobileDevice" class="back-to-home-btn" @click="navigate('dashboard')">
+                <el-icon><HomeFilled /></el-icon>
+                <span>回到主页</span>
               </button>
               <div class="breadcrumb">
                 <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
@@ -146,8 +151,12 @@
           </el-header>
           
           <!-- 内容主区域 -->
-          <el-main class="main-content" :class="{'has-mobile-tabbar': isMobileDevice}">
-            <div class="page-container">
+          <el-main class="main-content" :class="{
+            'has-mobile-tabbar': isMobileDevice,
+            'dashboard-content': isDashboardActive,
+            'with-sidebar': !isDashboardActive
+          }">
+            <div class="page-container" :class="{'full-width': isDashboardActive}">
               <!-- 如果是移动设备且显示更多菜单，则显示更多菜单组件 -->
               <mobile-more-menu
                 v-if="isMobileDevice && showMoreMenu"
@@ -156,7 +165,7 @@
                 @logout="handleMobileLogout"
               />
               <!-- 否则显示常规内容组件 -->
-              <component v-else :is="currentComponent" :user="user" />
+              <component v-else :is="currentComponent" :user="user" @navigate="navigate" />
             </div>
           </el-main>
         </el-container>
@@ -329,6 +338,11 @@ const routes = {
 
 // 当前组件
 const currentComponent = ref(routes.dashboard);
+
+// 判断当前是否为Dashboard页面
+const isDashboardActive = computed(() => {
+  return activeMenu.value === 'dashboard';
+});
 
 // 导航函数
 const navigate = (route) => {
@@ -925,6 +939,24 @@ onBeforeUnmount(() => {
   transition: all 0.3s ease;
 }
 
+/* 仪表盘全宽容器样式 */
+.page-container.full-width {
+  max-width: 100%;
+  padding: 0;
+}
+
+/* 仪表盘模式下的布局调整 */
+.layout.no-sidebar {
+  grid-template-columns: 1fr;
+}
+
+/* 仪表盘头部样式 */
+.header.dashboard-header {
+  background-color: transparent;
+  border-bottom: none;
+  box-shadow: none;
+}
+
 /* 登录页样式 */
 .login-container {
   height: 100vh;
@@ -1050,6 +1082,16 @@ onBeforeUnmount(() => {
   /* 为底部导航栏留出空间 */
   .el-main.has-mobile-tabbar {
     padding-bottom: 66px !important;
+  }
+  
+  /* 仪表盘页面全宽样式 */
+  .el-main.dashboard-content {
+    padding: 15px !important;
+  }
+  
+  .el-main .page-container.full-width {
+    max-width: 100% !important;
+    padding: 0 !important;
   }
   
   /* 调整表单在移动端的样式 */

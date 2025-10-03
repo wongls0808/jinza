@@ -179,14 +179,18 @@ onMounted(async () => {
 <style scoped>
 .dashboard-container {
   padding: 20px;
-  max-width: 1200px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 }
 
 .dashboard-welcome {
   text-align: center;
   margin-bottom: 30px;
-  padding: 20px;
+  padding: 20px 20px 10px;
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .dashboard-welcome h1 {
@@ -203,8 +207,11 @@ onMounted(async () => {
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  gap: 24px;
   margin-bottom: 40px;
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .dashboard-card {
@@ -264,6 +271,10 @@ onMounted(async () => {
 
 .system-stats {
   margin-top: 20px;
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 20px;
 }
 
 .stats-title {
