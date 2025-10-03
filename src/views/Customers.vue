@@ -2,14 +2,14 @@
   <div class="customers">
     <div class="header">
       <h2>客户管理</h2>
-      <el-button type="primary" @click="showAddDialog = true">新增客户</el-button>
+      <el-button type="primary" @click="openCreate">新增客户</el-button>
     </div>
 
     <div v-if="loading" class="loading-tip">加载中...</div>
     <div v-else>
       <div v-if="!customers.length" class="empty-state">
         <div class="empty-text">暂无客户数据</div>
-        <el-button type="primary" link @click="showAddDialog = true">+ 新增客户</el-button>
+        <el-button type="primary" link @click="openCreate">+ 新增客户</el-button>
       </div>
       <div v-else class="card-grid">
         <div class="customer-card data-card" v-for="c in customers" :key="c.id">
@@ -238,6 +238,8 @@ const submitForm = () => {
         });
         if (!resp.ok) throw new Error('创建失败');
         ElMessage.success('创建成功');
+        // 创建成功后重置表单，确保下次打开时是空白的
+        resetForm();
       }
       showAddDialog.value = false;
       await loadCustomers();
