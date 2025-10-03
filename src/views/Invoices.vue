@@ -304,19 +304,38 @@ async function fetchInvoices() {
       queryParams.append('end_date', filters.dateRange[1]);
     }
 
-    console.log('发送请求到:', `/api/invoices?${queryParams.toString()}`);
-    const response = await fetch(`/api/invoices?${queryParams.toString()}`);
+    // 使用正确的API路径
+    const apiUrl = `/api?${queryParams.toString()}`;
+    console.log('发送请求到:', apiUrl);
+    const response = await fetch(apiUrl);
     console.log('获取响应状态:', response.status, response.statusText);
+    console.log('响应头:', [...response.headers.entries()].reduce((obj, [key, val]) => {
+      obj[key] = val;
+      return obj;
+    }, {}));
+    
+    // 克隆响应以便我们可以同时获取文本和JSON（如果可能的话）
+    const responseClone = response.clone();
+    
+    // 总是尝试获取响应文本以便调试
+    const responseText = await responseClone.text();
+    console.log('响应内容前100个字符:', responseText.slice(0, 100));
     
     if (response.ok) {
-      const data = await response.json();
-      console.log('获取发票数据成功:', data);
-      invoices.value = data.invoices;
-      total.value = data.total;
+      try {
+        // 尝试解析为JSON
+        const data = JSON.parse(responseText);
+        console.log('获取发票数据成功:', data);
+        invoices.value = data.invoices;
+        total.value = data.total;
+      } catch (jsonError) {
+        console.error('JSON解析错误:', jsonError);
+        console.error('完整响应内容:', responseText);
+        throw new Error(`JSON解析失败: ${jsonError.message}`);
+      }
     } else {
-      const errorText = await response.text();
-      console.error('API错误响应:', response.status, errorText);
-      throw new Error(`获取数据失败: ${response.status} - ${errorText || response.statusText}`);
+      console.error('API错误响应:', response.status, responseText);
+      throw new Error(`获取数据失败: ${response.status} - ${response.statusText}`);
     }
   } catch (error) {
     console.error('获取发票列表失败:', error);
@@ -330,7 +349,7 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/invoices/stats');
+    const response = await fetch('/api/stats');
     console.log('统计数据响应状态:', response.status, response.statusText);
     
     if (response.ok) {
