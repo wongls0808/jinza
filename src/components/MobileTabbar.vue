@@ -21,8 +21,8 @@
 import { ref, computed } from 'vue';
 import { 
   User, 
-  OfficeBuilding, 
-  ShoppingCart, 
+  Shop, 
+  Shopping, 
   UserFilled, 
   More
 } from '@element-plus/icons-vue';
@@ -65,12 +65,12 @@ const navItems = computed(() => {
     { 
       route: 'suppliers', 
       label: '供应商', 
-      icon: OfficeBuilding
+      icon: Shop
     },
     { 
       route: 'products',
       label: '商品',
-      icon: ShoppingCart
+      icon: Shopping
     },
     {
       route: 'salespeople',
