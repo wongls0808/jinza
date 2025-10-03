@@ -254,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, markRaw, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, markRaw, nextTick, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 
 // 自定义消息函数，避免重复消息
