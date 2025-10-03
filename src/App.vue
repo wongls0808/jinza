@@ -121,7 +121,7 @@
             <div class="header-left">
               <!-- 汉堡菜单按钮 - 移动设备显示 -->
               <button class="menu-toggle-btn" @click="toggleSidebar()">
-                <span class="menu-toggle-icon">☰</span>
+                <el-icon><Menu /></el-icon>
               </button>
               <div class="breadcrumb">
                 <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
@@ -719,13 +719,21 @@ onBeforeUnmount(() => {
 
 /* 侧边栏样式 */
 .sidebar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3a6df0 0%, #2758e5 100%);
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, width 0.3s ease;
+  position: relative;
+  z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-header {
   padding: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .logo {
@@ -736,6 +744,13 @@ onBeforeUnmount(() => {
 
 .logo-icon {
   font-size: 24px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .logo-text {
@@ -783,56 +798,95 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
+.sidebar-menu {
+  border-right: none;
+  margin-top: 10px;
+}
+
 .sidebar-menu .el-menu-item {
   height: 50px;
-  margin: 4px 12px;
+  margin: 6px 12px;
   border-radius: 8px;
   transition: all 0.3s ease;
+  padding-left: 16px !important;
 }
 
 .sidebar-menu .el-menu-item.is-active {
   background: rgba(255, 255, 255, 0.2) !important;
-  border-left: 3px solid #ffffff;
+  border-left: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-menu .el-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .menu-item-content {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
 .menu-icon {
-  font-size: 18px;
+  font-size: 20px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
 }
 
 .menu-text {
   font-weight: 500;
+  font-size: 15px;
 }
 
 /* 头部样式 */
 .header {
   background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
   z-index: 10; /* 确保顶部导航在更高层级 */
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .header-left .page-title {
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: var(--color-text-primary, #303133);
+  position: relative;
+}
+
+.header-left .page-title::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 30px;
+  height: 3px;
+  background: var(--color-primary, #3a6df0);
+  border-radius: 3px;
 }
 
 .header-right .user-dropdown {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s;
   transition: background 0.3s;
 }
 
@@ -945,6 +999,10 @@ onBeforeUnmount(() => {
   border: none;
   width: 40px;
   height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 40px;
   margin-right: 10px;
   color: #fff;
   font-size: 20px;
@@ -1007,13 +1065,17 @@ onBeforeUnmount(() => {
   /* 强化汉堡菜单按钮的可见性 */
   .menu-toggle-btn {
     display: flex !important;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    background-color: var(--color-primary, #3a6df0);
+    color: white;
+    border-radius: 8px;
     padding: 8px;
+    font-size: 20px;
+    box-shadow: 0 2px 8px rgba(58, 109, 240, 0.3);
   }
   
-  .menu-toggle-icon {
-    font-size: 22px;
+  .menu-toggle-btn:active {
+    transform: scale(0.95);
+  }
     color: white;
   }
 }
