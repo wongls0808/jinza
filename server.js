@@ -105,6 +105,9 @@ app.use(session({
   }
 }));
 
+// 应用用户活动跟踪中间件，在每个API请求中更新用户最后活动时间
+app.use(trackUserActivity);
+
 // 登录接口限流（防暴力破解）
 const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '60000', 10),
@@ -141,6 +144,7 @@ function initializeDatabase() {
         is_active INTEGER DEFAULT 1,
         needs_password_reset INTEGER DEFAULT 0,
         password_updated_at DATETIME,
+        last_active DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
@@ -172,6 +176,7 @@ function initializeDatabase() {
           const userAlters = [];
           if (!colNames.includes('needs_password_reset')) userAlters.push('ALTER TABLE users ADD COLUMN needs_password_reset INTEGER DEFAULT 0');
             if (!colNames.includes('password_updated_at')) userAlters.push('ALTER TABLE users ADD COLUMN password_updated_at DATETIME');
+            if (!colNames.includes('last_active')) userAlters.push('ALTER TABLE users ADD COLUMN last_active DATETIME');
           if (userAlters.length) {
             userAlters.forEach(sql => db.run(sql, e => e && console.warn('ALTER users 失败:', sql, e.message)));
           }
@@ -346,6 +351,24 @@ function initializeDatabase() {
   });
 }
 
+// 用户活动跟踪中间件
+const trackUserActivity = (req, res, next) => {
+  if (req.session && req.session.userId) {
+    // 更新用户最后活动时间
+    db.run(
+      "UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?",
+      [req.session.userId],
+      (err) => {
+        if (err) console.error('更新用户活动时间失败:', err);
+        // 继续处理请求，即使更新失败
+        next();
+      }
+    );
+  } else {
+    next();
+  }
+};
+
 // 认证中间件
 const requireAuth = (req, res, next) => {
   if (!req.session.userId) {
@@ -451,6 +474,9 @@ app.post('/api/login', loginLimiter, (req, res) => {
       if (forceChange && !user.needs_password_reset) {
         db.run(`UPDATE users SET needs_password_reset = 1 WHERE id = ?`, [user.id]);
       }
+      
+      // 更新用户的最后活动时间
+      db.run(`UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
       res.json({
         success: true,
         user: {
@@ -534,7 +560,7 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', requireAuth, (req, res) => {
   db.get(
-    "SELECT id, username, name, role, department, needs_password_reset FROM users WHERE id = ?",
+    "SELECT id, username, name, role, department, needs_password_reset, last_active FROM users WHERE id = ?",
     [req.session.userId],
     (err, user) => {
       if (err) {
@@ -545,9 +571,15 @@ app.get('/api/me', requireAuth, (req, res) => {
       // 检查是否需要强制修改密码（仅基于needs_password_reset标记）
       const forceChange = !!user.needs_password_reset;
       
-      // 去除敏感字段，然后添加forcePasswordChange标志
+      // 计算在线状态
+      const now = new Date();
+      const isOnline = user.last_active && (now - new Date(user.last_active) < 15 * 60 * 1000);
+      
+      // 去除敏感字段，然后添加forcePasswordChange标志和在线状态
       const { needs_password_reset, ...safeUser } = user;
       safeUser.forcePasswordChange = forceChange;
+      safeUser.online = isOnline;
+      safeUser.lastActiveTime = user.last_active;
       
       res.json({ user: safeUser });
     }
@@ -557,13 +589,25 @@ app.get('/api/me', requireAuth, (req, res) => {
 // 用户管理路由
 app.get('/api/users', requireAuth, (req, res) => {
   db.all(
-    "SELECT id, username, name, role, department, is_active, created_at FROM users ORDER BY created_at DESC",
+    "SELECT id, username, name, role, department, is_active, created_at, last_active FROM users ORDER BY created_at DESC",
     (err, rows) => {
       if (err) {
         console.error('获取用户列表失败:', err);
         return res.status(500).json({ error: '服务器错误' });
       }
-      res.json(rows);
+      
+      // 计算每个用户的在线状态
+      const now = new Date();
+      const users = rows.map(user => {
+        // 如果用户在15分钟内有活动，则视为在线
+        const isOnline = user.last_active && (now - new Date(user.last_active) < 15 * 60 * 1000);
+        return {
+          ...user,
+          online: isOnline
+        };
+      });
+      
+      res.json(users);
     }
   );
 });
