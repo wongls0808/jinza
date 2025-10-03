@@ -1,0 +1,181 @@
+/* 响应式设计 - 媒体查询断点 */
+:root {
+  /* 颜色变量 - 方便主题统一管理 */
+  --primary-color: #3a6df0;
+  --sidebar-bg: #1e293b;
+  --sidebar-hover: #334155;
+  --text-light: #e2e8f0;
+  --text-dark: #334155;
+  --card-bg: #ffffff;
+}
+
+/* 移动设备断点 - 小于768px */
+@media (max-width: 767px) {
+  /* 侧边栏在移动设备上默认收起 */
+  .layout .sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    height: 100%;
+    z-index: 100;
+    transition: left 0.3s ease;
+    width: 80% !important; /* 覆盖固定宽度 */
+    max-width: 300px;
+  }
+
+  /* 侧边栏展开状态 */
+  .layout .sidebar.expanded {
+    left: 0;
+  }
+
+  /* 侧边栏遮罩层 */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    display: none;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* 移动端顶部导航栏 */
+  .header {
+    padding: 0 10px !important;
+  }
+
+  /* 显示汉堡菜单按钮 */
+  .menu-toggle-btn {
+    display: flex !important;
+  }
+
+  /* 调整页面容器内边距 */
+  .page-container {
+    padding: 10px !important;
+  }
+
+  /* 调整表格在移动设备上的显示 */
+  .el-table {
+    width: 100% !important;
+    overflow-x: auto;
+  }
+
+  /* 登录框在移动设备上的宽度 */
+  .login-card {
+    width: 90% !important;
+    max-width: 400px;
+    padding: 20px !important;
+  }
+
+  /* 用户下拉菜单 */
+  .user-name {
+    display: none !important; /* 在移动设备上隐藏用户名，只显示头像 */
+  }
+}
+
+/* 平板断点 - 768px至1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* 侧边栏在平板上宽度调整 */
+  .layout .sidebar {
+    width: 200px !important;
+  }
+
+  /* 表格在平板上的调整 */
+  .el-table {
+    width: 100%;
+  }
+
+  /* 登录框在平板上的宽度 */
+  .login-card {
+    width: 70%;
+    max-width: 400px;
+  }
+}
+
+/* 小型笔记本断点 - 1024px至1279px */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  /* 侧边栏宽度适配 */
+  .layout .sidebar {
+    width: 220px !important;
+  }
+}
+
+/* 桌面断点 - 大于等于1280px */
+@media (min-width: 1280px) {
+  /* 可以在这里添加大屏幕特有的样式 */
+}
+
+/* 触控设备优化 */
+@media (pointer: coarse) {
+  /* 增大可点击区域 */
+  .el-button, .el-menu-item, .el-dropdown-menu__item {
+    min-height: 44px;
+  }
+
+  /* 增大表单输入框 */
+  .el-input__wrapper {
+    min-height: 44px;
+  }
+
+  /* 增大选择器 */
+  .el-select-dropdown__item {
+    padding: 12px 20px;
+  }
+}
+
+/* 通用响应式类 */
+.d-sm-none { /* 在小屏幕上隐藏 */
+  @media (max-width: 767px) {
+    display: none !important;
+  }
+}
+
+.d-md-none { /* 在中等屏幕上隐藏 */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    display: none !important;
+  }
+}
+
+.d-sm-flex { /* 在小屏幕上显示为flex */
+  @media (max-width: 767px) {
+    display: flex !important;
+  }
+}
+
+.d-md-flex { /* 在中等屏幕上显示为flex */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    display: flex !important;
+  }
+}
+
+/* 响应式工具栏 */
+.responsive-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 767px) {
+  .responsive-toolbar {
+    flex-direction: column;
+  }
+}
+
+/* 响应式卡片网格 */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 767px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}

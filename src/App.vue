@@ -12,14 +12,22 @@
     
     <!-- 已登录状态 -->
     <div v-else-if="user" class="app-main">
+      <!-- 侧边栏遮罩层 - 移动设备菜单展开时显示 -->
+      <div 
+        class="sidebar-overlay" 
+        :class="{ 'visible': sidebarExpanded }"
+        @click="toggleSidebar(false)"
+      ></div>
+      
       <el-container class="layout">
         <!-- 侧边栏 -->
-        <el-aside width="240px" class="sidebar">
+        <el-aside width="240px" class="sidebar" :class="{ 'expanded': sidebarExpanded }">
           <div class="sidebar-header">
             <div class="logo">
               <div class="logo-icon">📊</div>
               <span class="logo-text">企业管理系统</span>
             </div>
+            <button class="close-sidebar-btn" @click="toggleSidebar(false)">✕</button>
           </div>
           
           <!-- 用户信息 -->
@@ -41,42 +49,42 @@
             text-color="#e0e0e0"
             active-text-color="#ffffff"
           >
-            <el-menu-item index="customers" @click="navigate('customers')">
+            <el-menu-item index="customers" @click="navigateAndCloseSidebar('customers')">
               <div class="menu-item-content">
                 <div class="menu-icon">👥</div>
                 <span class="menu-text">客户管理</span>
               </div>
             </el-menu-item>
             
-            <el-menu-item index="suppliers" @click="navigate('suppliers')">
+            <el-menu-item index="suppliers" @click="navigateAndCloseSidebar('suppliers')">
               <div class="menu-item-content">
                 <div class="menu-icon">🏭</div>
                 <span class="menu-text">供应商管理</span>
               </div>
             </el-menu-item>
             
-            <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigate('users')">
+            <el-menu-item v-if="user.role === 'admin'" index="users" @click="navigateAndCloseSidebar('users')">
               <div class="menu-item-content">
                 <div class="menu-icon">👨‍💼</div>
                 <span class="menu-text">用户管理</span>
               </div>
             </el-menu-item>
             
-            <el-menu-item index="accountSets" @click="navigate('accountSets')">
+            <el-menu-item index="accountSets" @click="navigateAndCloseSidebar('accountSets')">
               <div class="menu-item-content">
                 <div class="menu-icon">📁</div>
                 <span class="menu-text">账套管理</span>
               </div>
             </el-menu-item>
 
-            <el-menu-item index="products" @click="navigate('products')">
+            <el-menu-item index="products" @click="navigateAndCloseSidebar('products')">
               <div class="menu-item-content">
                 <div class="menu-icon">🛒</div>
                 <span class="menu-text">商品库</span>
               </div>
             </el-menu-item>
             
-            <el-menu-item index="salespeople" @click="navigate('salespeople')">
+            <el-menu-item index="salespeople" @click="navigateAndCloseSidebar('salespeople')">
               <div class="menu-item-content">
                 <div class="menu-icon">👨‍💼</div>
                 <span class="menu-text">业务员管理</span>
@@ -90,6 +98,10 @@
           <!-- 顶部导航栏 -->
           <el-header class="header">
             <div class="header-left">
+              <!-- 汉堡菜单按钮 - 移动设备显示 -->
+              <button class="menu-toggle-btn" @click="toggleSidebar()">
+                <span class="menu-toggle-icon">☰</span>
+              </button>
               <div class="breadcrumb">
                 <span class="page-title">{{ getPageTitle(activeMenu) }}</span>
               </div>
@@ -246,6 +258,7 @@ const capsLockOn = ref(false);
 const appLoading = ref(true); // 添加应用加载状态变量
 const sessionInfo = ref(null); // 会话信息
 const sessionCheckInterval = ref(null); // 保存定时器ID
+const sidebarExpanded = ref(false); // 控制侧边栏在移动设备上的展开状态
 
 // 禁用用户状态变化的监听器，避免重复消息
 // watch(user, (newVal, oldVal) => {
@@ -296,6 +309,23 @@ const handleCommand = (command) => {
   if (command === 'logout') {
     logout();
   }
+};
+
+// 控制侧边栏在移动设备上的展开/收起
+const toggleSidebar = (value) => {
+  sidebarExpanded.value = typeof value !== 'undefined' ? value : !sidebarExpanded.value;
+  // 当侧边栏展开时，禁止body滚动以防止背景内容滚动
+  if (sidebarExpanded.value) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+};
+
+// 在导航到新页面时自动收起侧边栏（移动设备）
+const navigateAndCloseSidebar = (route) => {
+  navigate(route);
+  toggleSidebar(false);
 };
 
 // 应用初始化 - 检查登录状态
@@ -816,5 +846,69 @@ onBeforeUnmount(() => {
   color: #909399;
   text-align: center;
   user-select: none;
+}
+
+/* 移动端菜单按钮 */
+.menu-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 侧边栏关闭按钮 */
+.close-sidebar-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  position: absolute;
+  right: 10px;
+  top: 15px;
+  cursor: pointer;
+}
+
+/* 在移动设备上显示关闭按钮 */
+@media (max-width: 767px) {
+  .close-sidebar-btn {
+    display: block;
+  }
+  
+  .sidebar-header {
+    position: relative;
+    padding-right: 40px;
+  }
+  
+  /* 调整主内容区域在移动端的样式 */
+  .el-main {
+    padding: 10px !important;
+  }
+  
+  /* 调整表单在移动端的样式 */
+  .el-form-item {
+    margin-bottom: 15px !important;
+  }
+  
+  /* 移动端表格调整 */
+  .el-table .cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* 表单按钮在移动端占满宽度 */
+  .form-actions .el-button {
+    width: 100%;
+    margin: 5px 0;
+  }
 }
 </style>

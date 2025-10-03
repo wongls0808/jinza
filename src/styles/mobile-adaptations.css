@@ -1,0 +1,192 @@
+/* 表单组件的移动设备适配 */
+.mobile-form {
+  width: 100%;
+}
+
+/* 移动设备上的表单项垂直布局 */
+@media (max-width: 767px) {
+  /* 表单标签换行 */
+  .el-form-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .el-form-item__label {
+    text-align: left !important;
+    width: 100% !important;
+    padding-bottom: 5px;
+    line-height: 1.2;
+  }
+  
+  .el-form-item__content {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+  
+  /* 移动设备上的日期选择器适配 */
+  .el-date-editor.el-input {
+    width: 100% !important;
+  }
+  
+  /* 移动设备上的选择器适配 */
+  .el-select {
+    width: 100% !important;
+  }
+  
+  /* 表单操作按钮组 */
+  .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  /* 表单操作按钮 */
+  .form-actions .el-button {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+}
+
+/* 表格的移动设备适配 */
+@media (max-width: 767px) {
+  /* 表格容器使用横向滚动 */
+  .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+  
+  /* 表格工具栏垂直布局 */
+  .table-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .table-toolbar .el-button-group,
+  .table-toolbar .el-input {
+    width: 100%;
+  }
+  
+  /* 分页组件适配 */
+  .el-pagination {
+    white-space: normal !important;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    padding: 10px 0;
+  }
+  
+  .el-pagination .el-pagination__total,
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pagination__jump {
+    margin: 5px 0 !important;
+  }
+}
+
+/* 卡片布局的移动设备适配 */
+@media (max-width: 767px) {
+  .el-card {
+    margin-bottom: 15px;
+  }
+  
+  .el-card__header {
+    padding: 12px 15px !important;
+  }
+  
+  .el-card__body {
+    padding: 15px !important;
+  }
+}
+
+/* 对话框的移动设备适配 */
+@media (max-width: 767px) {
+  .el-dialog {
+    width: 90% !important;
+    margin-top: 10vh !important;
+  }
+  
+  .el-dialog__header {
+    padding: 15px !important;
+  }
+  
+  .el-dialog__body {
+    padding: 15px !important;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  
+  .el-dialog__footer {
+    padding: 10px 15px !important;
+  }
+}
+
+/* 下拉菜单的移动设备适配 */
+@media (max-width: 767px) {
+  .el-dropdown-menu {
+    min-width: 120px !important;
+  }
+  
+  .el-dropdown-menu__item {
+    padding: 10px 15px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+}
+
+/* 改进触摸设备上的交互元素大小 */
+@media (pointer: coarse) {
+  /* 按钮尺寸增大 */
+  .el-button {
+    min-height: 44px !important;
+    padding: 10px 16px !important;
+  }
+  
+  /* 输入框尺寸增大 */
+  .el-input__wrapper {
+    min-height: 44px !important;
+  }
+  
+  /* 选择器选项增大 */
+  .el-select-dropdown__item {
+    height: 40px !important;
+    line-height: 40px !important;
+  }
+  
+  /* 表格行高增大，便于触摸选择 */
+  .el-table__row td {
+    padding: 12px 0 !important;
+  }
+  
+  /* 菜单项增大 */
+  .el-menu-item {
+    height: 56px !important;
+    line-height: 56px !important;
+  }
+  
+  /* 选项卡标签增大 */
+  .el-tabs__item {
+    height: 44px !important;
+    line-height: 44px !important;
+  }
+}
+
+/* 提高操作按钮的可见性 */
+.action-button {
+  font-size: 18px !important;
+  padding: 8px !important;
+}
+
+/* 移动设备上的操作按钮组 */
+@media (max-width: 767px) {
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .action-buttons .el-button {
+    margin-left: 0 !important;
+  }
+}
