@@ -1742,6 +1742,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: '服务器内部错误' });
 });
 
+// 导入发票路由
+import invoicesRoutes from './routes/invoices.js';
+
+// 注册发票API路由
+app.use('/api', invoicesRoutes);
+
 // 初始化数据库并启动服务器
 initializeDatabase()
   .then(() => {
