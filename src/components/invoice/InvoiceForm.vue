@@ -148,8 +148,6 @@
             <div class="form-section">
               <h3 class="section-title">{{ $t('invoiceForm.details') }}</h3>
 
-              
-              
               <!-- 明细表格 -->
               <el-table 
                 :data="form.items" 
@@ -236,7 +234,7 @@
                 
                 <el-table-column :label="$t('invoiceForm.item.amount')" width="120">
                   <template #default="scope">
-                    <div class="amount-cell">{{ formatAmount(scope.row.amount) }}</div>
+                    <div class="amount-cell">¥{{ formatAmount(scope.row.amount) }}</div>
                   </template>
                 </el-table-column>
                 
@@ -346,8 +344,6 @@ const accountSetOptions = ref([]);
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
-// 统一税率
-
 
 // Selected customer details
 const selectedCustomer = ref(null);
@@ -355,7 +351,9 @@ const selectedAccountSet = ref(null);
 
 // Validation rules
 const rules = {
-  // 去除账套必填校验（UI层面不再强制绑定）
+  account_set_id: [
+    { required: true, message: '请选择账套', trigger: 'change' }
+  ],
   invoice_number: [
     { required: true, message: '请生成发票编号', trigger: 'blur' }
   ],
@@ -380,9 +378,8 @@ onMounted(async () => {
     await fetchInvoiceDetails();
   } else {
     addEmptyItem();
-    // 自动选择默认账套（若存在），以满足后端必填，但在UI隐藏
+    // 选择默认账套后生成发票编号
     if (accountSetOptions.value.length > 0) {
-      // 优先选 is_active 或第一个
       const def = accountSetOptions.value.find(a => a.is_active === 1) || accountSetOptions.value[0];
       form.account_set_id = def?.id || null;
       if (form.account_set_id) await generateInvoiceNumber();
@@ -609,12 +606,13 @@ async function save(status) {
       publishing.value = true;
     }
     
-    // 构造与后端契合的字段
+    // 构造发送数据
     const data = {
+      invoice_number: form.invoice_number,
       customer_id: form.customer_id,
       account_set_id: form.account_set_id,
       salesperson_id: form.salesperson_id,
-      invoice_date: form.issue_date,
+      issue_date: form.issue_date,
       due_date: form.due_date,
       status: form.status,
       payment_status: form.payment_status,
