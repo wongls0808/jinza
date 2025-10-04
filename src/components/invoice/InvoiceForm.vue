@@ -467,6 +467,9 @@ onMounted(async () => {
 // Watch for changes
 watch(() => form.account_set_id, async (newValue) => {
   if (newValue && !isEditing.value) {
+    // 清空之前的发票编号
+    form.invoice_number = '';
+    // 尝试生成新的发票编号
     await generateInvoiceNumber();
   }
 });
@@ -597,7 +600,10 @@ function removeItem(index) {
 }
 
 async function generateInvoiceNumber() {
-  if (!form.account_set_id) return;
+  if (!form.account_set_id) {
+    ElMessage.error('请先选择账套');
+    return false;
+  }
   
   try {
     const response = await fetch('/api/generate-code', {
@@ -613,13 +619,26 @@ async function generateInvoiceNumber() {
     
     if (response.ok) {
       const data = await response.json();
-      form.invoice_number = data.code;
+      if (data.code) {
+        form.invoice_number = data.code;
+        return true;
+      } else {
+        ElMessage.error('所选账套未正确配置发票编号规则，请在账套管理中设置');
+        return false;
+      }
     } else {
-      throw new Error('生成发票号码失败');
+      const errorData = await response.json();
+      if (errorData.error === 'no_rule_found') {
+        ElMessage.error('所选账套未配置发票编号规则，请在账套管理中添加发票编号规则');
+      } else {
+        ElMessage.error('生成发票号码失败: ' + (errorData.error || '未知错误'));
+      }
+      return false;
     }
   } catch (error) {
     console.error('生成发票号码失败:', error);
-    ElMessage.warning('无法自动生成发票号码，请手动填写');
+    ElMessage.error('无法自动生成发票号码，请在账套管理中正确配置发票编号规则');
+    return false;
   }
 }
 
@@ -822,6 +841,15 @@ async function saveAndPublish() {
 
 async function save(status) {
   try {
+    // 先检查发票编号是否已经生成，如果没有，尝试生成
+    if (!form.invoice_number) {
+      const success = await generateInvoiceNumber();
+      if (!success) {
+        ElMessage.error('请确保账套已正确配置发票编号规则后再保存');
+        return;
+      }
+    }
+    
     await formRef.value.validate();
     
     if (form.items.length === 0 || 

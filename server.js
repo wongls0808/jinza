@@ -1467,21 +1467,18 @@ app.delete('/api/code-rules/:id', requireAuth, (req, res) => {
 
 // 生成编码
 app.post('/api/generate-code', requireAuth, (req, res) => {
-  const { rule_id } = req.body;
+  const { rule_id, account_set_id, type } = req.body;
   
-  db.get(`SELECT * FROM code_rules WHERE id = ?`, [rule_id], (err, rule) => {
-    if (err || !rule) {
-      return res.status(400).json({ error: '编码规则不存在' });
-    }
-    
+  // 根据规则生成编码的辅助函数
+  function generateCodeFromRule(rule, res) {
     // 更新当前编号
     const newNumber = rule.current_number + 1;
     db.run(
       `UPDATE code_rules SET current_number = ? WHERE id = ?`,
-      [newNumber, rule_id],
+      [newNumber, rule.id],
       function(err) {
         if (err) {
-          return res.status(500).json({ error: '生成编码失败' });
+          return res.status(500).json({ error: '生成编码失败', error_code: 'update_error' });
         }
         
         // 根据格式生成编码
@@ -1495,10 +1492,76 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
           .replace('{hour}', new Date().getHours().toString().padStart(2, '0'))
           .replace('{minute}', new Date().getMinutes().toString().padStart(2, '0'));
         
-        res.json({ code: generatedCode, rule_id, current_number: newNumber });
+        res.json({ code: generatedCode, rule_id: rule.id, current_number: newNumber });
       }
     );
-  });
+  }
+  
+  // 如果提供了rule_id，直接使用该规则
+  if (rule_id) {
+    db.get(`SELECT * FROM code_rules WHERE id = ?`, [rule_id], (err, rule) => {
+      if (err || !rule) {
+        return res.status(400).json({ error: '编码规则不存在', error_code: 'rule_not_found' });
+      }
+      
+      generateCodeFromRule(rule, res);
+    });
+  } 
+  // 如果提供了account_set_id和type，查找对应的规则
+  else if (account_set_id && type) {
+    // 查询该账套下指定类型的编码规则
+    let query = '';
+    let params = [];
+    
+    if (type === 'invoice') {
+      // 查询发票编号规则
+      query = `
+        SELECT cr.* FROM code_rules cr
+        JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
+        WHERE icr.account_set_id = ? AND icr.is_default = 1
+      `;
+      params = [account_set_id];
+    } else {
+      return res.status(400).json({ error: '不支持的编码类型', error_code: 'unsupported_type' });
+    }
+    
+    db.get(query, params, (err, rule) => {
+      if (err) {
+        console.error('查询编码规则失败:', err);
+        return res.status(500).json({ error: '查询编码规则失败', error_code: 'db_error' });
+      }
+      
+      if (!rule) {
+        // 找不到默认规则，尝试查找非默认规则
+        let fallbackQuery = '';
+        if (type === 'invoice') {
+          fallbackQuery = `
+            SELECT cr.* FROM code_rules cr
+            JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
+            WHERE icr.account_set_id = ?
+            LIMIT 1
+          `;
+        }
+        
+        if (fallbackQuery) {
+          db.get(fallbackQuery, [account_set_id], (err, fallbackRule) => {
+            if (err || !fallbackRule) {
+              // 没有找到任何规则
+              return res.status(404).json({ error: '找不到编码规则，请先在账套管理中配置', error_code: 'no_rule_found' });
+            }
+            
+            generateCodeFromRule(fallbackRule, res);
+          });
+        } else {
+          return res.status(404).json({ error: '找不到编码规则', error_code: 'no_rule_found' });
+        }
+      } else {
+        generateCodeFromRule(rule, res);
+      }
+    });
+  } else {
+    return res.status(400).json({ error: '请提供rule_id或(account_set_id和type)', error_code: 'missing_params' });
+  }
 });
 
 // 商品管理API
