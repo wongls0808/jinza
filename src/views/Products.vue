@@ -34,6 +34,7 @@
         <el-table-column prop="id" label="序号" width="70" />
         <el-table-column prop="code" label="商品编码" width="150" />
         <el-table-column prop="description" label="商品描述" min-width="200" />
+        <el-table-column prop="unit" label="单位" width="100" />
         <el-table-column prop="purchase_price" label="采购价" width="120">
           <template #default="scope">
             {{ formatPrice(scope.row.purchase_price) }}
@@ -74,6 +75,9 @@
         </el-form-item>
         <el-form-item label="商品描述" prop="description">
           <el-input v-model="dialogData.description" placeholder="请输入商品描述" />
+        </el-form-item>
+        <el-form-item label="单位" prop="unit">
+          <el-input v-model="dialogData.unit" placeholder="请输入商品单位" />
         </el-form-item>
         <el-form-item label="采购价" prop="purchase_price">
           <el-input-number 
@@ -151,6 +155,7 @@ export default {
       id: null,
       code: '',
       description: '',
+      unit: '',
       purchase_price: 0,
       selling_price: 0
     });
@@ -227,6 +232,7 @@ export default {
           id: product.id,
           code: product.code,
           description: product.description,
+          unit: product.unit || '',
           purchase_price: product.purchase_price,
           selling_price: product.selling_price
         });
@@ -236,6 +242,7 @@ export default {
           id: null,
           code: '',
           description: '',
+          unit: '',
           purchase_price: 0,
           selling_price: 0
         });
@@ -260,6 +267,7 @@ export default {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 description: dialogData.description,
+                unit: dialogData.unit,
                 purchase_price: dialogData.purchase_price,
                 selling_price: dialogData.selling_price
               })
@@ -271,6 +279,7 @@ export default {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 description: dialogData.description,
+                unit: dialogData.unit,
                 purchase_price: dialogData.purchase_price,
                 selling_price: dialogData.selling_price
               })

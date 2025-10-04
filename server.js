@@ -301,6 +301,7 @@ function initializeDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT UNIQUE NOT NULL,
         description TEXT NOT NULL,
+        unit TEXT DEFAULT '',
         purchase_price DECIMAL(10,2) DEFAULT 0,
         selling_price DECIMAL(10,2) DEFAULT 0,
         created_by INTEGER,
@@ -1528,7 +1529,7 @@ app.get('/api/products', requireAuth, (req, res) => {
 });
 
 app.post('/api/products', requireAuth, (req, res) => {
-  const { description, purchase_price, selling_price } = req.body;
+  const { description, unit, purchase_price, selling_price } = req.body;
   
   if (!description) {
     return res.status(400).json({ error: '商品描述不能为空' });
@@ -1566,9 +1567,9 @@ app.post('/api/products', requireAuth, (req, res) => {
       
       // 插入新商品
       db.run(
-        `INSERT INTO products (code, description, purchase_price, selling_price, created_by) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [code, description, purchase_price || 0, selling_price || 0, req.session.userId],
+        `INSERT INTO products (code, description, unit, purchase_price, selling_price, created_by) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [code, description, unit || '', purchase_price || 0, selling_price || 0, req.session.userId],
         function(err) {
           if (err) {
             console.error('创建商品失败:', err);
@@ -1578,7 +1579,8 @@ app.post('/api/products', requireAuth, (req, res) => {
           res.json({ 
             id: this.lastID, 
             code,
-            description, 
+            description,
+            unit: unit || '', 
             purchase_price: purchase_price || 0,
             selling_price: selling_price || 0,
             created_by: req.session.userId
@@ -1594,7 +1596,7 @@ app.post('/api/products', requireAuth, (req, res) => {
 
 app.put('/api/products/:id', requireAuth, (req, res) => {
   const productId = req.params.id;
-  const { description, purchase_price, selling_price } = req.body;
+  const { description, unit, purchase_price, selling_price } = req.body;
   
   if (!description) {
     return res.status(400).json({ error: '商品描述不能为空' });
@@ -1602,9 +1604,9 @@ app.put('/api/products/:id', requireAuth, (req, res) => {
   
   db.run(
     `UPDATE products 
-     SET description = ?, purchase_price = ?, selling_price = ?, updated_at = CURRENT_TIMESTAMP
+     SET description = ?, unit = ?, purchase_price = ?, selling_price = ?, updated_at = CURRENT_TIMESTAMP
      WHERE id = ?`,
-    [description, purchase_price || 0, selling_price || 0, productId],
+    [description, unit || '', purchase_price || 0, selling_price || 0, productId],
     function(err) {
       if (err) {
         console.error('更新商品失败:', err);
