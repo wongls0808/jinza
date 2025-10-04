@@ -58,7 +58,7 @@
           <el-input
             v-model="filters.search"
             placeholder="搜索发票号/客户名称"
-            prefix-icon="el-icon-search"
+            :prefix-icon="Search"
             clearable
           />
         </el-form-item>
@@ -138,7 +138,7 @@
             <el-button size="small" type="primary" @click.stop="editInvoice(scope.row)">编辑</el-button>
             <el-dropdown trigger="click" @click.stop>
               <el-button size="small">
-                更多<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -210,7 +210,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { Plus, ArrowDown } from '@element-plus/icons-vue';
+import { Plus, ArrowDown, Search } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 
 // 引入发票组件
