@@ -42,108 +42,136 @@
                 </el-select>
               </el-form-item>
               
-              <!-- 发票编号 -->
-              <el-form-item label="发票编号" prop="invoice_number" required>
-                <div class="invoice-number-container">
-                  <el-input v-model="form.invoice_number" placeholder="自动生成" :disabled="true">
-                    <template #append>
-                      <el-button @click="generateInvoiceNumber">
-                        <el-icon><Refresh /></el-icon>
-                      </el-button>
-                    </template>
-                  </el-input>
-                </div>
-              </el-form-item>
-              
-              <!-- 客户选择 -->
-              <el-form-item label="客户" prop="customer_id" required>
-                <el-select 
-                  v-model="form.customer_id" 
-                  placeholder="选择客户"
-                  filterable
-                  @change="handleCustomerChange"
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="item in customerOptions"
-                    :key="item.id"
-                    :label="item.name"
-                    :value="item.id"
-                  >
-                    <div class="customer-option">
-                      <span>{{ item.name }}</span>
-                      <small v-if="item.contact">联系人: {{ item.contact }}</small>
+              <!-- 第一行: 开票日期、发票编号 -->
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <!-- 开票日期 -->
+                  <el-form-item label="开票日期" prop="issue_date" required>
+                    <el-date-picker
+                      v-model="form.issue_date"
+                      type="date"
+                      placeholder="选择日期"
+                      format="YYYY-MM-DD"
+                      value-format="YYYY-MM-DD"
+                      style="width: 100%"
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <!-- 发票编号 -->
+                  <el-form-item label="发票编号" prop="invoice_number" required>
+                    <div class="invoice-number-container">
+                      <el-input v-model="form.invoice_number" placeholder="自动生成" :disabled="true">
+                        <template #append>
+                          <el-button @click="generateInvoiceNumber">
+                            <el-icon><Refresh /></el-icon>
+                          </el-button>
+                        </template>
+                      </el-input>
                     </div>
-                  </el-option>
-                </el-select>
-              </el-form-item>
+                  </el-form-item>
+                </el-col>
+              </el-row>
               
-              <!-- 业务员选择 -->
-              <el-form-item label="业务员" prop="salesperson_id">
-                <el-select 
-                  v-model="form.salesperson_id" 
-                  placeholder="选择业务员"
-                  filterable
-                  style="width: 100%"
-                  @change="handleSalespersonChange"
-                >
-                  <el-option
-                    v-for="item in salespersonOptions"
-                    :key="item.id"
-                    :label="item.code || item.name"
-                    :value="item.id"
-                  >
-                    <div class="salesperson-option">
-                      <span>{{ item.code || item.name }}</span>
-                      <small>{{ item.name }}</small>
-                    </div>
-                  </el-option>
-                </el-select>
-              </el-form-item>
+              <!-- 第二行: 业务员、付款条款、币种 -->
+              <el-row :gutter="12">
+                <el-col :span="8">
+                  <!-- 业务员选择 -->
+                  <el-form-item label="业务员" prop="salesperson_id">
+                    <el-select 
+                      v-model="form.salesperson_id" 
+                      placeholder="选择业务员"
+                      filterable
+                      style="width: 100%"
+                      @change="handleSalespersonChange"
+                    >
+                      <el-option
+                        v-for="item in salespersonOptions"
+                        :key="item.id"
+                        :label="item.code || item.name"
+                        :value="item.id"
+                      >
+                        <div class="salesperson-option">
+                          <span>{{ item.code || item.name }}</span>
+                          <small>{{ item.name }}</small>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <!-- 付款条款 -->
+                  <el-form-item label="付款条款" prop="payment_terms">
+                    <el-select
+                      v-model="form.payment_terms"
+                      placeholder="选择付款条款"
+                      style="width: 100%"
+                      @change="updateDueDate"
+                    >
+                      <el-option label="已付款" value="0" />
+                      <el-option label="30天" value="30" />
+                      <el-option label="60天" value="60" />
+                      <el-option label="90天" value="90" />
+                      <el-option label="180天" value="180" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <!-- 币种 -->
+                  <el-form-item label="币种" prop="currency">
+                    <el-input v-model="form.currency" placeholder="马币" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              
+              <!-- 第三行: 客户 -->
+              <el-row>
+                <el-col :span="24">
+                  <!-- 客户选择 -->
+                  <el-form-item label="客户" prop="customer_id" required>
+                    <el-select 
+                      v-model="form.customer_id" 
+                      placeholder="选择客户"
+                      filterable
+                      @change="handleCustomerChange"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="item in customerOptions"
+                        :key="item.id"
+                        :label="item.name"
+                        :value="item.id"
+                      >
+                        <div class="customer-option">
+                          <span>{{ item.name }}</span>
+                          <small v-if="item.contact">联系人: {{ item.contact }}</small>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              
+              <!-- 第四行: 备注 -->
+              <el-row>
+                <el-col :span="24">
+                  <!-- 备注信息 -->
+                  <el-form-item label="备注" prop="notes">
+                    <el-input
+                      v-model="form.notes"
+                      type="textarea"
+                      :rows="3"
+                      placeholder="添加备注信息"
+                    />
+                  </el-form-item>
+                </el-col>
+              </el-row>
               
               <!-- 业务员代号 -->
               <div v-if="selectedSalesperson && selectedSalesperson.code" class="field-display">
                 <div class="field-label">业务员代号</div>
                 <div class="field-value">{{ selectedSalesperson.code }}</div>
               </div>
-
-              <!-- 开票日期 -->
-              <el-form-item label="开票日期" prop="issue_date" required>
-                <el-date-picker
-                  v-model="form.issue_date"
-                  type="date"
-                  placeholder="选择日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  style="width: 100%"
-                />
-              </el-form-item>
-
-              <!-- 付款条款 -->
-              <el-form-item label="付款条款" prop="payment_terms">
-                <el-select
-                  v-model="form.payment_terms"
-                  placeholder="选择付款条款"
-                  style="width: 100%"
-                  @change="updateDueDate"
-                >
-                  <el-option label="已付款" value="0" />
-                  <el-option label="30天" value="30" />
-                  <el-option label="60天" value="60" />
-                  <el-option label="90天" value="90" />
-                  <el-option label="180天" value="180" />
-                </el-select>
-              </el-form-item>
-
-              <!-- 备注信息 -->
-              <el-form-item label="备注" prop="notes">
-                <el-input
-                  v-model="form.notes"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="添加备注信息"
-                />
-              </el-form-item>
             </div>
 
             <!-- 客户信息预览 -->
@@ -363,7 +391,7 @@ const invoiceGrandTotal = computed(() => {
 
 // 金额大写
 const amountInWords = computed(() => {
-  return numberToEnglishWords(invoiceGrandTotal.value);
+  return numberToEnglishWords(invoiceGrandTotal.value, form.currency || '马币');
 });
 
 // Form state
@@ -375,6 +403,7 @@ const form = reactive({
   issue_date: new Date().toISOString().slice(0, 10), // Today's date in YYYY-MM-DD format
   due_date: null,
   payment_terms: '30', // 默认30天
+  currency: '马币', // 默认马币
   status: 'draft',
   payment_status: 'unpaid',
   notes: '',
@@ -793,6 +822,7 @@ async function save(status) {
       payment_method: form.payment_method || null,
       payment_date: form.payment_date || null,
       payment_terms: form.payment_terms,
+      currency: form.currency || '马币',
       subtotal: invoiceTotal.value,
       tax_amount: invoiceTaxTotal.value,
       discount_rate: parseFloat(discountRate.value) || 0,
@@ -867,7 +897,7 @@ function hasChanges() {
 }
 
 // 金额转英文大写
-function numberToEnglishWords(num) {
+function numberToEnglishWords(num, currency = '马币') {
   const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -878,7 +908,7 @@ function numberToEnglishWords(num) {
   let dollars = parseInt(parts[0]);
   let cents = parseInt(parts[1]);
 
-  if (dollars === 0) return 'Zero Dollars';
+  if (dollars === 0) return `Zero ${currency} Only`;
 
   let words = '';
   let scaleIndex = 0;
@@ -915,23 +945,28 @@ function numberToEnglishWords(num) {
     scaleIndex++;
   }
 
-  words = words.trim() + ' Dollars';
+  // 使用自定义币种
+  words = words.trim() + ` ${currency}`;
 
-  // 添加美分部分
+  // 添加分部分
   if (cents > 0) {
     words += ' and ';
     if (cents < 10) {
-      words += units[cents] + ' Cents';
+      words += units[cents] + ' Sen';
     } else if (cents < 20) {
-      words += teens[cents - 10] + ' Cents';
+      words += teens[cents - 10] + ' Sen';
     } else {
       words += tens[Math.floor(cents / 10)];
       if (cents % 10 > 0) {
         words += '-' + units[cents % 10];
       }
-      words += ' Cents';
+      words += ' Sen';
     }
+  } else {
+    words += ' Only'; // 如果没有分，添加"Only"
   }
+  
+  return words;
 
   return words;
 }
