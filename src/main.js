@@ -1,9 +1,7 @@
 import { createApp } from 'vue';
 import ElementPlus from 'element-plus';
-import enLocale from 'element-plus/es/locale/lang/en';
 import 'element-plus/dist/index.css';
 import App from './App.vue';
-import i18n from './i18n';
 import './styles/global.css'; // 引入全局样式，修复滚动条问题
 import './styles/unified-ui.css'; // 引入统一UI样式
 import './styles/responsive.css'; // 引入响应式设计样式
@@ -28,6 +26,5 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 }
 
 const app = createApp(App);
-app.use(i18n);
-app.use(ElementPlus, { locale: enLocale });
+app.use(ElementPlus);
 app.mount('#app');

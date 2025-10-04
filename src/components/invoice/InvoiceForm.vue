@@ -9,11 +9,11 @@
     >
       <!-- 顶部操作栏 -->
       <div class="form-header">
-  <div class="form-title">{{ isEditing ? $t('invoiceForm.titleEdit') : $t('invoiceForm.titleNew') }}</div>
+        <div class="form-title">{{ isEditing ? '编辑发票' : '新建发票' }}</div>
         <div class="form-actions">
-          <el-button @click="cancel">{{ $t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="saveAsDraft" :loading="saving">{{ $t('common.saveDraft') }}</el-button>
-          <el-button type="success" @click="saveAndPublish" :loading="publishing">{{ $t('common.saveAndPublish') }}</el-button>
+          <el-button @click="cancel">取消</el-button>
+          <el-button type="primary" @click="saveAsDraft" :loading="saving">保存草稿</el-button>
+          <el-button type="success" @click="saveAndPublish" :loading="publishing">保存并发布</el-button>
         </div>
       </div>
 
@@ -23,10 +23,10 @@
           <!-- 左侧 - 基本信息 -->
           <el-col :xs="24" :sm="24" :md="10" :lg="8">
             <div class="form-section">
-              <h3 class="section-title">{{ $t('invoiceForm.basicInfo') }}</h3>
+              <h3 class="section-title">基本信息</h3>
               
-              <!-- 账套选择 -->
-              <el-form-item label="账套" prop="account_set_id" required>
+              <!-- 账套选择（隐藏，自动选择默认账套） -->
+              <el-form-item label="账套" prop="account_set_id" required style="display:none;">
                 <el-select 
                   v-model="form.account_set_id" 
                   placeholder="选择账套"
@@ -43,7 +43,7 @@
               </el-form-item>
               
               <!-- 发票编号 -->
-              <el-form-item :label="$t('invoiceForm.invoiceNumber')" prop="invoice_number" required>
+              <el-form-item label="发票编号" prop="invoice_number" required>
                 <div class="invoice-number-container">
                   <el-input v-model="form.invoice_number" placeholder="自动生成" :disabled="true">
                     <template #append>
@@ -56,7 +56,7 @@
               </el-form-item>
               
               <!-- 客户选择 -->
-              <el-form-item :label="$t('invoiceForm.customer')" prop="customer_id" required>
+              <el-form-item label="客户" prop="customer_id" required>
                 <el-select 
                   v-model="form.customer_id" 
                   placeholder="选择客户"
@@ -79,7 +79,7 @@
               </el-form-item>
               
               <!-- 业务员选择 -->
-              <el-form-item :label="$t('invoiceForm.salesperson')" prop="salesperson_id">
+              <el-form-item label="业务员" prop="salesperson_id">
                 <el-select 
                   v-model="form.salesperson_id" 
                   placeholder="选择业务员"
@@ -96,7 +96,7 @@
               </el-form-item>
 
               <!-- 开票日期 -->
-              <el-form-item :label="$t('invoiceForm.issueDate')" prop="issue_date" required>
+              <el-form-item label="开票日期" prop="issue_date" required>
                 <el-date-picker
                   v-model="form.issue_date"
                   type="date"
@@ -108,7 +108,7 @@
               </el-form-item>
 
               <!-- 到期日期 -->
-              <el-form-item :label="$t('invoiceForm.dueDate')" prop="due_date">
+              <el-form-item label="到期日期" prop="due_date">
                 <el-date-picker
                   v-model="form.due_date"
                   type="date"
@@ -120,7 +120,7 @@
               </el-form-item>
 
               <!-- 备注信息 -->
-              <el-form-item :label="$t('invoiceForm.notes')" prop="notes">
+              <el-form-item label="备注" prop="notes">
                 <el-input
                   v-model="form.notes"
                   type="textarea"
@@ -146,8 +146,21 @@
           <!-- 右侧 - 发票明细 -->
           <el-col :xs="24" :sm="24" :md="14" :lg="16">
             <div class="form-section">
-              <h3 class="section-title">{{ $t('invoiceForm.details') }}</h3>
+              <h3 class="section-title">发票明细</h3>
 
+              <!-- 统一税率设置 -->
+              <div style="display:flex; gap:16px; align-items:center; margin: 10px 0;">
+                <span style="color: var(--el-text-color-regular);">统一税率(%)</span>
+                <el-input-number 
+                  v-model="unifiedTaxRate" 
+                  :min="0" 
+                  :max="100" 
+                  :precision="2" 
+                  controls-position="right"
+                  @change="recalculateAllItems"
+                />
+              </div>
+              
               <!-- 明细表格 -->
               <el-table 
                 :data="form.items" 
@@ -155,14 +168,16 @@
                 style="width: 100%"
                 class="invoice-items-table"
               >
-                <el-table-column label="商品" width="220">
+                <el-table-column label="商品/描述" min-width="320">
                   <template #default="scope">
                     <el-select 
-                      v-model="scope.row.product_id" 
-                      placeholder="选择商品"
+                      :model-value="getItemSelection(scope.row)"
+                      placeholder="选择商品或直接输入描述"
                       filterable
+                      allow-create
+                      default-first-option
                       clearable
-                      @change="handleProductChange($event, scope.$index)"
+                      @update:model-value="handleItemSelectionChange($event, scope.$index)"
                       style="width: 100%"
                     >
                       <el-option
@@ -180,19 +195,13 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="描述" min-width="200">
-                  <template #default="scope">
-                    <el-input v-model="scope.row.description" placeholder="商品描述" />
-                  </template>
-                </el-table-column>
-                
-                <el-table-column :label="$t('invoiceForm.item.unit')" width="100">
+                <el-table-column label="单位" width="100">
                   <template #default="scope">
                     <el-input v-model="scope.row.unit" placeholder="单位" />
                   </template>
                 </el-table-column>
                 
-                <el-table-column :label="$t('invoiceForm.item.qty')" width="120">
+                <el-table-column label="数量" width="120">
                   <template #default="scope">
                     <el-input-number 
                       v-model="scope.row.quantity" 
@@ -205,7 +214,7 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column :label="$t('invoiceForm.item.price')" width="120">
+                <el-table-column label="单价" width="120">
                   <template #default="scope">
                     <el-input-number 
                       v-model="scope.row.unit_price" 
@@ -218,23 +227,11 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="税率(%)" width="120">
-                  <template #default="scope">
-                    <el-input-number 
-                      v-model="scope.row.tax_rate" 
-                      :min="0"
-                      :max="100"
-                      :precision="2"
-                      controls-position="right"
-                      @change="calculateItemAmount(scope.$index)"
-                      style="width: 100%"
-                    />
-                  </template>
-                </el-table-column>
+                <!-- 移除行级税率列，改为统一税率设置 -->
                 
-                <el-table-column :label="$t('invoiceForm.item.amount')" width="120">
+                <el-table-column label="金额" width="120">
                   <template #default="scope">
-                    <div class="amount-cell">¥{{ formatAmount(scope.row.amount) }}</div>
+                    <div class="amount-cell">{{ formatAmount(scope.row.amount) }}</div>
                   </template>
                 </el-table-column>
                 
@@ -258,7 +255,7 @@
                   plain
                   @click="addItem"
                 >
-                  <el-icon><Plus /></el-icon> {{ $t('invoiceForm.item.add') }}
+                  <el-icon><Plus /></el-icon> 添加明细项
                 </el-button>
               </div>
               
@@ -266,15 +263,15 @@
               <div class="invoice-summary">
                 <div class="summary-item">
                   <span class="summary-label">合计金额：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceTotal) }}</span>
                 </div>
                 <div class="summary-item">
                   <span class="summary-label">税额合计：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceTaxTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
                 <div class="summary-item total">
                   <span class="summary-label">应付总计：</span>
-                  <span class="summary-value">¥{{ formatAmount(invoiceGrandTotal) }}</span>
+                  <span class="summary-value">{{ formatAmount(invoiceGrandTotal) }}</span>
                 </div>
               </div>
             </div>
@@ -344,6 +341,8 @@ const accountSetOptions = ref([]);
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
+// 统一税率
+const unifiedTaxRate = ref(0);
 
 // Selected customer details
 const selectedCustomer = ref(null);
@@ -351,9 +350,7 @@ const selectedAccountSet = ref(null);
 
 // Validation rules
 const rules = {
-  account_set_id: [
-    { required: true, message: '请选择账套', trigger: 'change' }
-  ],
+  // 去除账套必填校验（UI层面不再强制绑定）
   invoice_number: [
     { required: true, message: '请生成发票编号', trigger: 'blur' }
   ],
@@ -378,8 +375,9 @@ onMounted(async () => {
     await fetchInvoiceDetails();
   } else {
     addEmptyItem();
-    // 选择默认账套后生成发票编号
+    // 自动选择默认账套（若存在），以满足后端必填，但在UI隐藏
     if (accountSetOptions.value.length > 0) {
+      // 优先选 is_active 或第一个
       const def = accountSetOptions.value.find(a => a.is_active === 1) || accountSetOptions.value[0];
       form.account_set_id = def?.id || null;
       if (form.account_set_id) await generateInvoiceNumber();
@@ -543,10 +541,15 @@ function calculateItemAmount(index) {
   
   const quantity = parseFloat(item.quantity) || 0;
   const unitPrice = parseFloat(item.unit_price) || 0;
-  const taxRate = parseFloat(item.tax_rate) || 0;
+  const taxRate = parseFloat(unifiedTaxRate.value) || 0;
   
   item.amount = quantity * unitPrice;
   item.tax_amount = item.amount * (taxRate / 100);
+}
+
+// 统一税率变化后重算所有行
+function recalculateAllItems() {
+  form.items.forEach((_, idx) => calculateItemAmount(idx));
 }
 
 function handleAccountSetChange(value) {
@@ -571,6 +574,30 @@ function handleProductChange(productId, index) {
     item.unit_price = parseFloat(product.price) || 0;
     calculateItemAmount(index);
   }
+}
+
+// 用于商品/描述合并选择的值
+function getItemSelection(row) {
+  // 若选择过商品，返回商品ID；否则返回描述文本
+  return row.product_id || row.description || '';
+}
+
+// 处理商品/描述合并列的变更
+function handleItemSelectionChange(val, index) {
+  const row = form.items[index];
+  if (!row) return;
+  const matched = productOptions.value.find(p => p.id === val);
+  if (matched) {
+    row.product_id = matched.id;
+    row.description = matched.name;
+    row.unit = matched.unit || '';
+    row.unit_price = parseFloat(matched.price) || 0;
+  } else {
+    // 自由文本，清除product_id，仅作为描述
+    row.product_id = null;
+    row.description = String(val || '').trim();
+  }
+  calculateItemAmount(index);
 }
 
 function formatAmount(amount) {
@@ -606,13 +633,12 @@ async function save(status) {
       publishing.value = true;
     }
     
-    // 构造发送数据
+    // 构造与后端契合的字段
     const data = {
-      invoice_number: form.invoice_number,
       customer_id: form.customer_id,
       account_set_id: form.account_set_id,
       salesperson_id: form.salesperson_id,
-      issue_date: form.issue_date,
+      invoice_date: form.issue_date,
       due_date: form.due_date,
       status: form.status,
       payment_status: form.payment_status,
@@ -629,7 +655,7 @@ async function save(status) {
         quantity: parseFloat(item.quantity) || 0,
         unit_price: parseFloat(item.unit_price) || 0,
         unit: item.unit || '',
-        tax_rate: parseFloat(item.tax_rate) || 0,
+        tax_rate: parseFloat(unifiedTaxRate.value) || 0,
         tax_amount: parseFloat(item.tax_amount) || 0,
         discount_rate: 0,
         discount_amount: 0,

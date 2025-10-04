@@ -210,7 +210,7 @@ router.get('/', async (req, res) => {
 });
 
 // 获取单个发票详情
-router.get('/:id(\\d+)', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   const db = getDb();
   
   try {
