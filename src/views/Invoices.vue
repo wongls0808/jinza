@@ -137,7 +137,7 @@
       >
         <el-table-column prop="invoice_number" label="发票号" min-width="120" />
         <el-table-column prop="customer_name" label="客户" min-width="150" />
-        <el-table-column prop="issue_date" label="开票日期" min-width="120" />
+  <el-table-column prop="invoice_date" label="开票日期" min-width="120" />
         <el-table-column prop="total_amount" label="金额" min-width="120">
           <template #default="scope">
             ¥{{ formatAmount(scope.row.total_amount) }}
@@ -235,7 +235,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { Plus, ArrowDown, Check } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 

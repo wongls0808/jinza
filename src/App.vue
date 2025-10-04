@@ -351,10 +351,8 @@ const handleAccountSetChange = async (accountSetId) => {
     
     if (response.ok) {
       showMessage('success', `已切换到账套: ${selectedSet.name}`);
-      // 如果当前在发票页面，刷新发票数据
-      if (activeMenu.value === 'invoices') {
-        window.dispatchEvent(new CustomEvent('account-set-changed', { detail: selectedSet }));
-      }
+      // 无论当前在哪个页面，都广播账套切换事件，页面可选择性监听
+      window.dispatchEvent(new CustomEvent('account-set-changed', { detail: selectedSet }));
     } else {
       showMessage('warning', '设置默认账套失败，但已在本地切换');
     }
