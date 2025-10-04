@@ -648,19 +648,42 @@ app.get('/api/me', requireAuth, (req, res) => {
       safeUser.online = isOnline;
       safeUser.lastActiveTime = user.last_active;
       
-      // 添加会话过期信息到响应
-      const sessionInfo = {
-        expiresAt: req.sessionExpiresAt || null,
-        maxAge: req.session.cookie.maxAge,
-        // 计算会话剩余时间（毫秒）
-        remainingTime: req.sessionExpiresAt ? 
-          Math.max(0, new Date(req.sessionExpiresAt) - now) : null
-      };
+      // 获取用户可访问的账套
+      db.all(
+        `SELECT a.*, uas.is_default 
+         FROM account_sets a 
+         JOIN user_account_sets uas ON a.id = uas.account_set_id 
+         WHERE uas.user_id = ? 
+         ORDER BY uas.is_default DESC, a.name ASC`,
+        [req.session.userId],
+        (err, accountSets) => {
+          if (err) {
+            console.error('获取用户账套失败:', err);
+            // 即使获取账套失败，也会返回用户信息
+            return res.json({ user: safeUser });
+          }
+          
+          // 查找默认账套
+          const defaultAccountSet = accountSets.find(set => set.is_default === 1) || 
+                                    (accountSets.length > 0 ? accountSets[0] : null);
       
-      res.json({ 
-        user: safeUser, 
-        session: sessionInfo
-      });
+          // 添加会话过期信息到响应
+          const sessionInfo = {
+            expiresAt: req.sessionExpiresAt || null,
+            maxAge: req.session.cookie.maxAge,
+            // 计算会话剩余时间（毫秒）
+            remainingTime: req.sessionExpiresAt ? 
+              Math.max(0, new Date(req.sessionExpiresAt) - now) : null
+          };
+          
+          res.json({ 
+            user: safeUser, 
+            session: sessionInfo,
+            accountSets: accountSets,
+            defaultAccountSet: defaultAccountSet || null
+          });
+        }
+      );
     }
   );
 });

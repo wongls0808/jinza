@@ -37,6 +37,29 @@
               </div>
             </div>
             <div class="header-right">
+              <!-- 账套选择器 -->
+              <el-dropdown @command="handleAccountSetChange" v-if="userAccountSets.length > 0" class="account-set-dropdown">
+                <span class="account-set-selector">
+                  <el-icon><Folder /></el-icon>
+                  <span class="account-set-name">{{ currentAccountSet?.name || '选择账套' }}</span>
+                  <el-icon><ArrowDown /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item 
+                      v-for="set in userAccountSets" 
+                      :key="set.id" 
+                      :command="set.id"
+                      :class="{'active-account-set': set.id === currentAccountSet?.id}"
+                    >
+                      {{ set.name }}
+                      <el-icon v-if="set.id === currentAccountSet?.id"><Check /></el-icon>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              
+              <!-- 用户菜单 -->
               <el-dropdown @command="handleCommand">
                 <span class="user-dropdown">
                   <el-avatar :size="32" :src="user.avatar" class="header-avatar">
@@ -205,7 +228,8 @@ import {
   User, Lock, ArrowDown, Menu as IconMenu, More, Setting,
   ShoppingBag, Shop, Document, 
   UserFilled, HomeFilled, 
-  Grid, Histogram, Briefcase
+  Grid, Histogram, Briefcase,
+  Folder, Check
 } from '@element-plus/icons-vue';
 
 // 导入组件
@@ -235,6 +259,10 @@ const sessionCheckInterval = ref(null); // 保存定时器ID
 const sidebarExpanded = ref(false); // 控制侧边栏在移动设备上的展开状态
 const isMobileDevice = ref(false); // 是否为移动设备
 const showMoreMenu = ref(false); // 是否显示"更多"菜单页面
+
+// 账套相关状态
+const userAccountSets = ref([]); // 用户可访问的账套列表
+const currentAccountSet = ref(null); // 当前选择的账套
 
 // 禁用用户状态变化的监听器，避免重复消息
 // watch(user, (newVal, oldVal) => {
@@ -300,6 +328,39 @@ const getPageTitle = (route) => {
 const handleCommand = (command) => {
   if (command === 'logout') {
     logout();
+  }
+};
+
+// 处理账套选择变化
+const handleAccountSetChange = async (accountSetId) => {
+  try {
+    // 找到选择的账套
+    const selectedSet = userAccountSets.value.find(set => set.id === accountSetId);
+    if (!selectedSet) return;
+    
+    // 更新当前账套
+    currentAccountSet.value = selectedSet;
+    localStorage.setItem('currentAccountSet', JSON.stringify(selectedSet));
+    
+    // 更新默认账套（与服务器同步）
+    const response = await fetch(`/api/user/${user.value.id}/default-account-set`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_set_id: accountSetId })
+    });
+    
+    if (response.ok) {
+      showMessage('success', `已切换到账套: ${selectedSet.name}`);
+      // 如果当前在发票页面，刷新发票数据
+      if (activeMenu.value === 'invoices') {
+        window.dispatchEvent(new CustomEvent('account-set-changed', { detail: selectedSet }));
+      }
+    } else {
+      showMessage('warning', '设置默认账套失败，但已在本地切换');
+    }
+  } catch (error) {
+    console.error('切换账套失败:', error);
+    showMessage('error', '切换账套失败，请重试');
   }
 };
 
@@ -385,6 +446,35 @@ onMounted(async () => {
         document.body.classList.add('logged-in');
         document.body.classList.remove('logged-out');
         
+        // 加载账套数据
+        if (data.accountSets) {
+          userAccountSets.value = data.accountSets;
+          localStorage.setItem('userAccountSets', JSON.stringify(data.accountSets));
+          localStorage.setItem('userId', data.user.id);
+          
+          // 设置当前选择的账套
+          if (data.defaultAccountSet) {
+            currentAccountSet.value = data.defaultAccountSet;
+            localStorage.setItem('currentAccountSet', JSON.stringify(data.defaultAccountSet));
+          } else if (data.accountSets.length > 0) {
+            currentAccountSet.value = data.accountSets[0];
+            localStorage.setItem('currentAccountSet', JSON.stringify(data.accountSets[0]));
+          }
+        } else {
+          // 尝试从本地存储加载账套数据
+          const storedSets = localStorage.getItem('userAccountSets');
+          const storedCurrentSet = localStorage.getItem('currentAccountSet');
+          
+          if (storedSets) {
+            userAccountSets.value = JSON.parse(storedSets);
+            if (storedCurrentSet) {
+              currentAccountSet.value = JSON.parse(storedCurrentSet);
+            } else if (userAccountSets.value.length > 0) {
+              currentAccountSet.value = userAccountSets.value[0];
+            }
+          }
+        }
+        
         // 检查是否需要强制修改密码
         if (data.user.forcePasswordChange) {
           reportViewChange('App', '会话恢复: 检测到需要强制修改密码');
@@ -460,15 +550,19 @@ const login = async () => {
       // 强制延时，确保DOM完全更新
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // 保存账套信息到本地存储
+      // 保存账套信息到状态和本地存储
       if (data.accountSets) {
+        userAccountSets.value = data.accountSets;
         localStorage.setItem('userAccountSets', JSON.stringify(data.accountSets));
+        localStorage.setItem('userId', data.user.id);
         
         // 设置当前选择的账套
         if (data.defaultAccountSet) {
+          currentAccountSet.value = data.defaultAccountSet;
           localStorage.setItem('currentAccountSet', JSON.stringify(data.defaultAccountSet));
           console.log('已设置默认账套:', data.defaultAccountSet.name);
         } else if (data.accountSets.length > 0) {
+          currentAccountSet.value = data.accountSets[0];
           localStorage.setItem('currentAccountSet', JSON.stringify(data.accountSets[0]));
           console.log('已设置第一个账套:', data.accountSets[0].name);
         }
@@ -833,7 +927,8 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
-.header-right .user-dropdown {
+.header-right .user-dropdown,
+.header-right .account-set-dropdown {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -844,8 +939,31 @@ onBeforeUnmount(() => {
   transition: background 0.3s;
 }
 
-.header-right .user-dropdown:hover {
+.header-right .user-dropdown:hover,
+.header-right .account-set-dropdown:hover {
   background: #f5f7fa;
+}
+
+.header-right .account-set-dropdown {
+  margin-right: 12px;
+}
+
+.account-set-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-set-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-account-set {
+  font-weight: 500;
+  color: var(--color-primary, #409eff);
 }
 
 .header-avatar {
