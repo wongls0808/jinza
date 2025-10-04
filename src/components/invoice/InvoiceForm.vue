@@ -88,11 +88,11 @@
                       <el-option
                         v-for="item in salespersonOptions"
                         :key="item.id"
-                        :label="item.code || item.name"
+                        :label="item.nickname || item.name"
                         :value="item.id"
                       >
                         <div class="salesperson-option">
-                          <span class="salesperson-code">{{ item.code || '无代号' }}</span>
+                          <span class="salesperson-code">{{ item.nickname || '无简称' }}</span>
                           <small>{{ item.name }}</small>
                         </div>
                       </el-option>
@@ -662,9 +662,9 @@ function handleCustomerChange(value) {
 
 function handleSalespersonChange(value) {
   selectedSalesperson.value = salespersonOptions.value.find(item => item.id === value) || null;
-  // 如果选中了业务员，但业务员没有代号，可以显示提示
-  if (selectedSalesperson.value && !selectedSalesperson.value.code) {
-    ElMessage.info('所选业务员无代号，建议在业务员管理中添加代号');
+  // 如果选中了业务员，但业务员没有简称，可以显示提示
+  if (selectedSalesperson.value && !selectedSalesperson.value.nickname) {
+    ElMessage.info('所选业务员无简称，建议在业务员管理中添加简称');
   }
 }
 
@@ -719,54 +719,43 @@ async function handleItemSelectionChange(val, index) {
     row.unit_price = parseFloat(matched.selling_price) || 0;
     calculateItemAmount(index);
   } else if (val) {
-    // 新商品，需要自动添加到商品库
+    // 新商品，仅设置描述，不立即添加到商品库
     const description = String(val || '').trim();
     if (description) {
+      // 先查询商品是否已存在
       try {
-        // 使用新的API查询或创建商品
-        const response = await fetch('/api/products/find-or-create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            description: description,
-            unit: row.unit || '',
-            selling_price: parseFloat(row.unit_price) || 0
-          })
-        });
-        
+        const response = await fetch(`/api/products/search?query=${encodeURIComponent(description)}`);
         if (response.ok) {
-          const newProduct = await response.json();
-          // 更新当前行的商品信息
-          row.product_id = newProduct.id;
-          row.description = newProduct.description;
-          row.unit = newProduct.unit || '';
+          const products = await response.json();
+          const exactMatch = products.find(p => p.description.toLowerCase() === description.toLowerCase());
           
-          // 如果用户没有输入价格，或者价格为0，则使用商品库的价格
-          if (!row.unit_price || parseFloat(row.unit_price) === 0) {
-            row.unit_price = parseFloat(newProduct.selling_price) || 0;
+          if (exactMatch) {
+            // 如果找到完全匹配的商品，使用该商品
+            row.product_id = exactMatch.id;
+            row.description = exactMatch.description;
+            row.unit = exactMatch.unit || '';
+            // 如果用户没有输入价格，或者价格为0，则使用商品库的价格
+            if (!row.unit_price || parseFloat(row.unit_price) === 0) {
+              row.unit_price = parseFloat(exactMatch.selling_price) || 0;
+            }
+          } else {
+            // 如果没有找到匹配的商品，只设置描述，等待发票保存时一并创建
+            row.product_id = null;
+            row.description = description;
           }
-          
-          calculateItemAmount(index);
-          
-          // 刷新商品库选项
-          await fetchProducts();
-          
-          ElMessage.success({
-            message: `商品「${description}」已自动添加到商品库`,
-            duration: 2000
-          });
         } else {
-          throw new Error('新增商品失败');
+          // API调用失败，仅设置描述
+          row.product_id = null;
+          row.description = description;
         }
       } catch (error) {
-        console.error('处理新商品失败:', error);
+        console.error('查询商品失败:', error);
         // 如果出错，仍然将描述设置为用户输入的值
         row.product_id = null;
         row.description = description;
-        calculateItemAmount(index);
       }
+      
+      calculateItemAmount(index);
     } else {
       // 空描述，清除product_id
       row.product_id = null;
@@ -782,6 +771,44 @@ async function handleItemSelectionChange(val, index) {
 
 function formatAmount(amount) {
   return parseFloat(amount || 0).toFixed(2);
+}
+
+// 批量创建新商品到商品库
+async function batchCreateNewProducts() {
+  // 筛选出没有product_id但有描述的项，这些是需要创建的新商品
+  const newProducts = form.items
+    .filter(item => !item.product_id && item.description && item.description.trim())
+    .map(item => ({
+      description: item.description.trim(),
+      unit: item.unit || '',
+      selling_price: parseFloat(item.unit_price) || 0
+    }));
+  
+  if (newProducts.length === 0) return;
+  
+  try {
+    // 调用批量创建API
+    const response = await fetch('/api/products/batch-create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        products: newProducts
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      ElMessage.success(`成功添加 ${result.created} 个新商品到商品库`);
+      // 刷新商品库选项
+      await fetchProducts();
+    } else {
+      console.error('批量创建商品失败');
+    }
+  } catch (error) {
+    console.error('批量创建商品时出错:', error);
+  }
 }
 
 // Form submission methods
@@ -865,6 +892,10 @@ async function save(status) {
     
     if (response.ok) {
       const result = await response.json();
+      
+      // 批量添加新商品到商品库
+      await batchCreateNewProducts();
+      
       ElMessage.success(status === 'draft' ? '发票已保存为草稿' : '发票已发布');
       emit('saved', result);
     } else {

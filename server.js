@@ -1726,6 +1726,117 @@ app.post('/api/products/find-or-create', requireAuth, (req, res) => {
   });
 });
 
+// 批量创建商品的API
+app.post('/api/products/batch-create', requireAuth, (req, res) => {
+  const { products } = req.body;
+  
+  if (!Array.isArray(products) || products.length === 0) {
+    return res.status(400).json({ error: '无效的商品数据' });
+  }
+  
+  // 开始数据库事务
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+    
+    let created = 0;
+    let errors = 0;
+    
+    // 生成9位随机商品编码
+    const generateRandomCode = () => {
+      const digits = '0123456789';
+      let code = '';
+      for (let i = 0; i < 9; i++) {
+        code += digits[Math.floor(Math.random() * 10)];
+      }
+      return code;
+    };
+    
+    // 为每个商品创建一个Promise
+    const promises = products.map(product => {
+      return new Promise((resolve) => {
+        const { description, unit, selling_price } = product;
+        
+        if (!description) {
+          errors++;
+          return resolve();
+        }
+        
+        // 首先检查商品是否已存在
+        db.get('SELECT * FROM products WHERE description = ? COLLATE NOCASE', [description], (err, existingProduct) => {
+          if (err || existingProduct) {
+            // 跳过已存在的商品或查询出错的情况
+            return resolve();
+          }
+          
+          // 生成唯一编码（简化版，实际应用中可能需要更复杂的唯一性检查）
+          const code = generateRandomCode();
+          
+          // 插入新商品
+          db.run(
+            `INSERT INTO products (code, description, unit, selling_price, created_by) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [code, description, unit || '', selling_price || 0, req.session.userId],
+            function(err) {
+              if (err) {
+                errors++;
+              } else {
+                created++;
+              }
+              resolve();
+            }
+          );
+        });
+      });
+    });
+    
+    // 等待所有商品处理完成
+    Promise.all(promises)
+      .then(() => {
+        db.run('COMMIT', (err) => {
+          if (err) {
+            console.error('提交事务失败:', err);
+            return res.status(500).json({ error: '批量创建商品失败' });
+          }
+          
+          res.json({ 
+            success: true, 
+            created, 
+            errors,
+            message: `成功创建 ${created} 个商品，失败 ${errors} 个`
+          });
+        });
+      })
+      .catch(() => {
+        db.run('ROLLBACK');
+        res.status(500).json({ error: '批量创建商品失败' });
+      });
+  });
+});
+
+// 搜索商品API
+app.get('/api/products/search', requireAuth, (req, res) => {
+  const { query } = req.query;
+  
+  if (!query) {
+    return res.status(400).json({ error: '搜索关键词不能为空' });
+  }
+  
+  db.all(
+    `SELECT * FROM products 
+     WHERE description LIKE ? COLLATE NOCASE
+     ORDER BY description ASC`, 
+    [`%${query}%`], 
+    (err, products) => {
+      if (err) {
+        console.error('搜索商品失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      res.json(products);
+    }
+  );
+});
+
 app.delete('/api/products/:id', requireAuth, (req, res) => {
   const productId = req.params.id;
   
