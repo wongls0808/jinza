@@ -262,6 +262,7 @@ onMounted(async () => {
 .module-icon.red { background: linear-gradient(135deg, #eb3b5a 0%, #fc5c65 100%); }
 .module-icon.teal { background: linear-gradient(135deg, #2bcbba 0%, #0fb9b1 100%); }
 .module-icon.grey { background: linear-gradient(135deg, #778ca3 0%, #4b6584 100%); }
+.module-icon.cyan { background: linear-gradient(135deg, #00b2e3 0%, #0096c7 100%); }
 
 .module-title {
   font-size: 18px;
