@@ -85,15 +85,27 @@
                   placeholder="选择业务员"
                   filterable
                   style="width: 100%"
+                  @change="handleSalespersonChange"
                 >
                   <el-option
                     v-for="item in salespersonOptions"
                     :key="item.id"
                     :label="item.name"
                     :value="item.id"
-                  />
+                  >
+                    <div class="salesperson-option">
+                      <span>{{ item.name }}</span>
+                      <small v-if="item.code">[{{ item.code }}]</small>
+                    </div>
+                  </el-option>
                 </el-select>
               </el-form-item>
+              
+              <!-- 业务员代号 -->
+              <div v-if="selectedSalesperson && selectedSalesperson.code" class="field-display">
+                <div class="field-label">业务员代号</div>
+                <div class="field-value">{{ selectedSalesperson.code }}</div>
+              </div>
 
               <!-- 开票日期 -->
               <el-form-item label="开票日期" prop="issue_date" required>
@@ -107,16 +119,20 @@
                 />
               </el-form-item>
 
-              <!-- 到期日期 -->
-              <el-form-item label="到期日期" prop="due_date">
-                <el-date-picker
-                  v-model="form.due_date"
-                  type="date"
-                  placeholder="选择日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
+              <!-- 付款条款 -->
+              <el-form-item label="付款条款" prop="payment_terms">
+                <el-select
+                  v-model="form.payment_terms"
+                  placeholder="选择付款条款"
                   style="width: 100%"
-                />
+                  @change="updateDueDate"
+                >
+                  <el-option label="已付款" value="0" />
+                  <el-option label="30天" value="30" />
+                  <el-option label="60天" value="60" />
+                  <el-option label="90天" value="90" />
+                  <el-option label="180天" value="180" />
+                </el-select>
               </el-form-item>
 
               <!-- 备注信息 -->
@@ -148,18 +164,7 @@
             <div class="form-section">
               <h3 class="section-title">发票明细</h3>
 
-              <!-- 统一税率设置 -->
-              <div style="display:flex; gap:16px; align-items:center; margin: 10px 0;">
-                <span style="color: var(--el-text-color-regular);">统一税率(%)</span>
-                <el-input-number 
-                  v-model="unifiedTaxRate" 
-                  :min="0" 
-                  :max="100" 
-                  :precision="2" 
-                  controls-position="right"
-                  @change="recalculateAllItems"
-                />
-              </div>
+              <!-- 统一税率在合计部分显示 -->
               
               <!-- 明细表格 -->
               <el-table 
@@ -265,13 +270,51 @@
                   <span class="summary-label">合计金额：</span>
                   <span class="summary-value">{{ formatAmount(invoiceTotal) }}</span>
                 </div>
+                <div class="summary-item tax-rate-row">
+                  <span class="summary-label">税率(%)：</span>
+                  <div class="summary-value-with-input">
+                    <el-input-number 
+                      v-model="unifiedTaxRate" 
+                      :min="0" 
+                      :max="100" 
+                      :precision="2" 
+                      controls-position="right"
+                      size="small"
+                      @change="recalculateAllItems"
+                      style="width: 120px;"
+                    />
+                  </div>
+                </div>
                 <div class="summary-item">
                   <span class="summary-label">税额合计：</span>
                   <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
+                <div class="summary-item">
+                  <span class="summary-label">折扣(%)：</span>
+                  <div class="summary-value-with-input">
+                    <el-input-number 
+                      v-model="discountRate" 
+                      :min="0" 
+                      :max="100" 
+                      :precision="2" 
+                      controls-position="right"
+                      size="small"
+                      @change="recalculateAllItems"
+                      style="width: 120px;"
+                    />
+                  </div>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">折扣金额：</span>
+                  <span class="summary-value">{{ formatAmount(invoiceDiscountAmount) }}</span>
+                </div>
                 <div class="summary-item total">
                   <span class="summary-label">应付总计：</span>
                   <span class="summary-value">{{ formatAmount(invoiceGrandTotal) }}</span>
+                </div>
+                <div class="summary-item amount-in-words">
+                  <span class="summary-label">金额大写：</span>
+                  <span class="summary-value">{{ amountInWords }}</span>
                 </div>
               </div>
             </div>
@@ -318,8 +361,18 @@ const invoiceTaxTotal = computed(() => {
   }, 0);
 });
 
+const invoiceDiscountAmount = computed(() => {
+  const subTotal = invoiceTotal.value + invoiceTaxTotal.value;
+  return subTotal * (discountRate.value / 100);
+});
+
 const invoiceGrandTotal = computed(() => {
-  return invoiceTotal.value + invoiceTaxTotal.value;
+  return invoiceTotal.value + invoiceTaxTotal.value - invoiceDiscountAmount.value;
+});
+
+// 金额大写
+const amountInWords = computed(() => {
+  return numberToEnglishWords(invoiceGrandTotal.value);
 });
 
 // Form state
@@ -330,6 +383,7 @@ const form = reactive({
   salesperson_id: null,
   issue_date: new Date().toISOString().slice(0, 10), // Today's date in YYYY-MM-DD format
   due_date: null,
+  payment_terms: '30', // 默认30天
   status: 'draft',
   payment_status: 'unpaid',
   notes: '',
@@ -341,12 +395,14 @@ const accountSetOptions = ref([]);
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
-// 统一税率
+// 统一税率和折扣率
 const unifiedTaxRate = ref(0);
+const discountRate = ref(0);
 
-// Selected customer details
+// Selected details
 const selectedCustomer = ref(null);
 const selectedAccountSet = ref(null);
+const selectedSalesperson = ref(null);
 
 // Validation rules
 const rules = {
@@ -563,6 +619,28 @@ function handleCustomerChange(value) {
   selectedCustomer.value = customerOptions.value.find(item => item.id === value) || null;
 }
 
+function handleSalespersonChange(value) {
+  selectedSalesperson.value = salespersonOptions.value.find(item => item.id === value) || null;
+}
+
+// 根据付款条款更新到期日期
+function updateDueDate() {
+  if (!form.issue_date) return;
+  
+  const days = parseInt(form.payment_terms) || 0;
+  if (days === 0) {
+    form.due_date = form.issue_date; // 已付款，到期日与开票日相同
+    return;
+  }
+  
+  const issueDate = new Date(form.issue_date);
+  if (isNaN(issueDate.getTime())) return;
+  
+  const dueDate = new Date(issueDate);
+  dueDate.setDate(issueDate.getDate() + days);
+  form.due_date = dueDate.toISOString().slice(0, 10);
+}
+
 function handleProductChange(productId, index) {
   if (!productId) return;
   
@@ -644,9 +722,11 @@ async function save(status) {
       payment_status: form.payment_status,
       payment_method: form.payment_method || null,
       payment_date: form.payment_date || null,
+      payment_terms: form.payment_terms,
       subtotal: invoiceTotal.value,
       tax_amount: invoiceTaxTotal.value,
-      discount_amount: 0,
+      discount_rate: parseFloat(discountRate.value) || 0,
+      discount_amount: invoiceDiscountAmount.value,
       total_amount: invoiceGrandTotal.value,
       notes: form.notes,
       items: form.items.map(item => ({
@@ -714,6 +794,76 @@ function hasChanges() {
   // For simplicity, always assume there are changes
   // In a real application, you'd compare with original values
   return true;
+}
+
+// 金额转英文大写
+function numberToEnglishWords(num) {
+  const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const scales = ['', 'Thousand', 'Million', 'Billion', 'Trillion'];
+
+  // 处理小数点
+  const parts = num.toFixed(2).toString().split('.');
+  let dollars = parseInt(parts[0]);
+  let cents = parseInt(parts[1]);
+
+  if (dollars === 0) return 'Zero Dollars';
+
+  let words = '';
+  let scaleIndex = 0;
+
+  while (dollars > 0) {
+    const hundreds = dollars % 1000;
+    if (hundreds !== 0) {
+      let groupWords = '';
+
+      // 处理百位
+      if (hundreds >= 100) {
+        groupWords += units[Math.floor(hundreds / 100)] + ' Hundred ';
+      }
+
+      // 处理十位和个位
+      const remainder = hundreds % 100;
+      if (remainder > 0) {
+        if (remainder < 10) {
+          groupWords += units[remainder] + ' ';
+        } else if (remainder < 20) {
+          groupWords += teens[remainder - 10] + ' ';
+        } else {
+          groupWords += tens[Math.floor(remainder / 10)] + ' ';
+          if (remainder % 10 > 0) {
+            groupWords += units[remainder % 10] + ' ';
+          }
+        }
+      }
+
+      words = groupWords + scales[scaleIndex] + ' ' + words;
+    }
+
+    dollars = Math.floor(dollars / 1000);
+    scaleIndex++;
+  }
+
+  words = words.trim() + ' Dollars';
+
+  // 添加美分部分
+  if (cents > 0) {
+    words += ' and ';
+    if (cents < 10) {
+      words += units[cents] + ' Cents';
+    } else if (cents < 20) {
+      words += teens[cents - 10] + ' Cents';
+    } else {
+      words += tens[Math.floor(cents / 10)];
+      if (cents % 10 > 0) {
+        words += '-' + units[cents % 10];
+      }
+      words += ' Cents';
+    }
+  }
+
+  return words;
 }
 </script>
 
@@ -827,14 +977,49 @@ function hasChanges() {
   font-weight: bold;
 }
 
-.customer-option, .product-option {
+.customer-option, .product-option, .salesperson-option {
   display: flex;
   flex-direction: column;
 }
 
-.customer-option small, .product-option small {
+.customer-option small, .product-option small, .salesperson-option small {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.field-display {
+  margin: 10px 0;
+  padding: 8px 12px;
+  background-color: var(--el-color-info-light-9);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-label {
+  font-weight: bold;
+  color: var(--el-text-color-secondary);
+  min-width: 100px;
+}
+
+.field-value {
+  color: var(--el-text-color-primary);
+  flex: 1;
+}
+
+.summary-value-with-input {
+  min-width: 120px;
+  text-align: right;
+}
+
+.amount-in-words .summary-value {
+  font-style: italic;
+  font-size: 14px;
+}
+
+.tax-rate-row {
+  margin-top: 15px;
 }
 
 @media (max-width: 768px) {
