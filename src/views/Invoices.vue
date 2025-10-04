@@ -3,12 +3,12 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
-  <h1 class="page-title">{{ $t('invoices.title') }}</h1>
-  <p class="page-description">{{ $t('invoices.description') }}</p>
+        <h1 class="page-title">{{ $t('invoices.title') }}</h1>
+        <p class="page-description">{{ $t('invoices.description') }}</p>
       </div>
       <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
         <el-icon><Plus /></el-icon>
-  {{ $t('invoices.new') }}
+        {{ $t('invoices.new') }}
       </el-button>
     </div>
 
@@ -289,6 +289,7 @@ async function fetchSalespeople() {
 async function fetchInvoices() {
   loading.value = true;
   try {
+    console.log('开始获取发票列表...');
     let queryParams = new URLSearchParams({
       page: currentPage.value,
       limit: pageSize.value
@@ -340,6 +341,9 @@ async function fetchInvoices() {
   } catch (error) {
     console.error('获取发票列表失败:', error);
     ElMessage.error(`获取发票数据失败: ${error.message || '未知错误'}`);
+    // 确保即使API失败也能显示空列表
+    invoices.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }
@@ -349,22 +353,43 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/invoices/stats');
+    
+    // 使用显式的URL，确保不会有路径问题
+    const statsUrl = '/api/invoices/stats';
+    console.log('请求统计数据URL:', statsUrl);
+    
+    const response = await fetch(statsUrl);
     console.log('统计数据响应状态:', response.status, response.statusText);
     
+    // 克隆响应以便同时获取文本和JSON
+    const clonedResponse = response.clone();
+    const responseText = await clonedResponse.text();
+    console.log('统计响应内容:', responseText.slice(0, 100));
+    
     if (response.ok) {
-      const data = await response.json();
-      console.log('统计数据:', data);
-      stats.total = data.total || 0;
-      stats.unpaid = data.unpaid || 0;
-      stats.paid = data.paid || 0;
-      stats.totalAmount = data.totalAmount || 0;
+      try {
+        const data = JSON.parse(responseText);
+        console.log('统计数据解析成功:', data);
+        stats.total = data.total || 0;
+        stats.unpaid = data.unpaid || 0;
+        stats.paid = data.paid || 0;
+        stats.totalAmount = data.totalAmount || 0;
+      } catch (jsonError) {
+        console.error('统计数据JSON解析错误:', jsonError);
+        ElMessage.error('统计数据格式错误');
+      }
     } else {
-      const errorText = await response.text();
-      console.error('统计API错误响应:', response.status, errorText);
+      console.error('统计API错误响应:', response.status, responseText);
+      ElMessage.error(`获取统计数据失败: ${response.status}`);
     }
   } catch (error) {
     console.error('获取统计数据失败:', error);
+    ElMessage.error(`无法连接到统计API: ${error.message}`);
+    // 设置默认值，确保UI能正常显示
+    stats.total = 0;
+    stats.unpaid = 0;
+    stats.paid = 0;
+    stats.totalAmount = 0;
   }
 }
 

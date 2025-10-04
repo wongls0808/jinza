@@ -10,7 +10,7 @@ const messages = {
 const i18n = createI18n({
   legacy: false,
   globalInjection: true,
-  locale: 'en',
+  locale: 'zh-CN', // 默认使用中文
   fallbackLocale: 'en',
   messages
 });
