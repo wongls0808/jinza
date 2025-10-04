@@ -86,8 +86,11 @@ app.use(helmet({
       "img-src": ["'self'", 'data:', 'blob:'],
       // 允许内联样式（Element Plus + 动态注入），可逐步替换为哈希/nonce
       "style-src": ["'self'", "'unsafe-inline'", 'https:'],
-      // 允许 blob: 脚本（若未来使用 worker，可保留），暂不开放 'unsafe-inline'
-      "script-src": ["'self'", 'blob:'],
+      // 允许 blob: 脚本。为解决本地运行期间第三方库使用 new Function 的场景，开发阶段放开 'unsafe-eval'
+      // 注意：生产环境建议移除 'unsafe-eval'，并通过预编译/替代方案规避
+      "script-src": process.env.NODE_ENV === 'production'
+        ? ["'self'", 'blob:']
+        : ["'self'", 'blob:', "'unsafe-eval'"],
       // 若部署在 Render，需要允许同源即可，若有外部字体：
       "font-src": ["'self'", 'data:'],
     }
