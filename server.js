@@ -516,7 +516,7 @@ app.post('/api/login', loginLimiter, (req, res) => {
       // 更新用户的最后活动时间
       db.run(`UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
       
-      // 获取用户可访问的账套
+      // 获取用户可访问的账套（若为空则自动分配一个默认账套）
       db.all(
         `SELECT a.*, uas.is_default 
          FROM account_sets a 
@@ -530,29 +530,68 @@ app.post('/api/login', loginLimiter, (req, res) => {
             // 即使获取账套失败，也不影响登录，返回空数组
             accountSets = [];
           }
-          
-          // 查找默认账套
-          const defaultAccountSet = accountSets.find(set => set.is_default === 1) || 
-                                    (accountSets.length > 0 ? accountSets[0] : null);
-          
-          // 如果找到默认账套，将其ID存入session
-          if (defaultAccountSet) {
-            req.session.accountSetId = defaultAccountSet.id;
+
+          const finalizeResponse = (sets) => {
+            // 查找默认账套
+            const defaultAccountSet = sets.find(set => set.is_default === 1) ||
+              (sets.length > 0 ? sets[0] : null);
+            // 如果找到默认账套，将其ID存入session
+            if (defaultAccountSet) {
+              req.session.accountSetId = defaultAccountSet.id;
+            }
+            res.json({
+              success: true,
+              user: {
+                id: user.id,
+                username: user.username,
+                name: user.name,
+                role: user.role,
+                department: user.department,
+                forcePasswordChange: forceChange
+              },
+              accountSets: sets,
+              defaultAccountSet: defaultAccountSet || null
+            });
+          };
+
+          if (!accountSets || accountSets.length === 0) {
+            // 没有关联账套，尝试为用户自动分配一个默认账套（选择第一个启用的账套）
+            db.get(`SELECT * FROM account_sets WHERE is_active = 1 ORDER BY id ASC LIMIT 1`, [], (e2, firstSet) => {
+              if (e2) {
+                console.error('读取默认账套失败:', e2);
+                return finalizeResponse([]);
+              }
+              if (!firstSet) {
+                // 系统还没有任何账套
+                return finalizeResponse([]);
+              }
+              // 创建关联并设为默认
+              db.run(
+                `INSERT OR IGNORE INTO user_account_sets (user_id, account_set_id, is_default) VALUES (?, ?, 1)`,
+                [user.id, firstSet.id],
+                (e3) => {
+                  if (e3) {
+                    console.error('为用户自动分配账套失败:', e3);
+                    return finalizeResponse([]);
+                  }
+                  // 重新读取该用户的账套列表
+                  db.all(
+                    `SELECT a.*, uas.is_default FROM account_sets a JOIN user_account_sets uas ON a.id = uas.account_set_id WHERE uas.user_id = ? ORDER BY uas.is_default DESC, a.name ASC`,
+                    [user.id],
+                    (e4, sets2) => {
+                      if (e4) {
+                        console.error('重新读取用户账套失败:', e4);
+                        return finalizeResponse([]);
+                      }
+                      finalizeResponse(sets2 || []);
+                    }
+                  );
+                }
+              );
+            });
+          } else {
+            finalizeResponse(accountSets);
           }
-          
-          res.json({
-            success: true,
-            user: {
-              id: user.id,
-              username: user.username,
-              name: user.name,
-              role: user.role,
-              department: user.department,
-              forcePasswordChange: forceChange
-            },
-            accountSets: accountSets,
-            defaultAccountSet: defaultAccountSet || null
-          });
         }
       );
     }
@@ -648,7 +687,7 @@ app.get('/api/me', requireAuth, (req, res) => {
       safeUser.online = isOnline;
       safeUser.lastActiveTime = user.last_active;
       
-      // 获取用户可访问的账套
+      // 获取用户可访问的账套（若为空则自动分配一个默认账套）
       db.all(
         `SELECT a.*, uas.is_default 
          FROM account_sets a 
@@ -662,26 +701,54 @@ app.get('/api/me', requireAuth, (req, res) => {
             // 即使获取账套失败，也会返回用户信息
             return res.json({ user: safeUser });
           }
-          
-          // 查找默认账套
-          const defaultAccountSet = accountSets.find(set => set.is_default === 1) || 
-                                    (accountSets.length > 0 ? accountSets[0] : null);
-      
-          // 添加会话过期信息到响应
-          const sessionInfo = {
-            expiresAt: req.sessionExpiresAt || null,
-            maxAge: req.session.cookie.maxAge,
-            // 计算会话剩余时间（毫秒）
-            remainingTime: req.sessionExpiresAt ? 
-              Math.max(0, new Date(req.sessionExpiresAt) - now) : null
+
+          const finalizeResponse = (sets) => {
+            // 查找默认账套
+            const defaultAccountSet = sets.find(set => set.is_default === 1) ||
+              (sets.length > 0 ? sets[0] : null);
+            
+            // 添加会话过期信息到响应
+            const sessionInfo = {
+              expiresAt: req.sessionExpiresAt || null,
+              maxAge: req.session.cookie?.maxAge,
+              remainingTime: req.sessionExpiresAt ? Math.max(0, new Date(req.sessionExpiresAt) - now) : null
+            };
+            
+            res.json({ 
+              user: safeUser, 
+              session: sessionInfo,
+              accountSets: sets,
+              defaultAccountSet: defaultAccountSet || null
+            });
           };
-          
-          res.json({ 
-            user: safeUser, 
-            session: sessionInfo,
-            accountSets: accountSets,
-            defaultAccountSet: defaultAccountSet || null
-          });
+
+          if (!accountSets || accountSets.length === 0) {
+            // 没有关联账套，尝试为用户自动分配一个默认账套
+            db.get(`SELECT * FROM account_sets WHERE is_active = 1 ORDER BY id ASC LIMIT 1`, [], (e2, firstSet) => {
+              if (e2) {
+                console.error('读取默认账套失败:', e2);
+                return finalizeResponse([]);
+              }
+              if (!firstSet) return finalizeResponse([]);
+              db.run(
+                `INSERT OR IGNORE INTO user_account_sets (user_id, account_set_id, is_default) VALUES (?, ?, 1)`,
+                [req.session.userId, firstSet.id],
+                (e3) => {
+                  if (e3) {
+                    console.error('为用户自动分配账套失败:', e3);
+                    return finalizeResponse([]);
+                  }
+                  db.all(
+                    `SELECT a.*, uas.is_default FROM account_sets a JOIN user_account_sets uas ON a.id = uas.account_set_id WHERE uas.user_id = ? ORDER BY uas.is_default DESC, a.name ASC`,
+                    [req.session.userId],
+                    (e4, sets2) => finalizeResponse(sets2 || [])
+                  );
+                }
+              );
+            });
+          } else {
+            finalizeResponse(accountSets);
+          }
         }
       );
     }
