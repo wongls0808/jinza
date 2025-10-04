@@ -8,6 +8,9 @@ import './styles/responsive.css'; // 引入响应式设计样式
 import './styles/mobile-adaptations.css'; // 引入移动设备适配样式
 import './styles/touch-interactions.css'; // 引入触控交互优化
 
+// 导入所有Element Plus图标
+import * as ElementPlusIconsVue from '@element-plus/icons-vue';
+
 // 在客户端运行时且符合条件时才加载测试工具
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   // 检查是否在测试模式
@@ -27,4 +30,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 
 const app = createApp(App);
 app.use(ElementPlus);
+
+// 全局注册所有Element Plus图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component);
+}
+
 app.mount('#app');
