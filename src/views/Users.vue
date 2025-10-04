@@ -83,6 +83,43 @@
               <el-input v-model="form.department" placeholder="所属部门" />
             </el-form-item>
           </el-col>
+          <el-col :span="24">
+            <el-form-item label="账套分配">
+              <el-select
+                v-model="form.accountSets"
+                multiple
+                collapse-tags
+                placeholder="选择可访问的账套"
+                style="width: 100%"
+                :loading="loadingAccountSets"
+              >
+                <el-option
+                  v-for="item in accountSetOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                >
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24" v-if="form.accountSets && form.accountSets.length > 0">
+            <el-form-item label="默认账套">
+              <el-select
+                v-model="form.defaultAccountSet"
+                placeholder="选择默认账套"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="id in form.accountSets"
+                  :key="id"
+                  :label="getAccountSetName(id)"
+                  :value="id"
+                >
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="24" v-if="editMode">
             <el-form-item label="状态">
               <el-switch v-model="form.is_active" active-text="启用" inactive-text="禁用" />
@@ -109,12 +146,27 @@ import { userApi } from '@/utils/api';
 const users = ref([]);
 const showAddDialog = ref(false);
 const editMode = ref(false);
-const form = ref({ id:null, username:'', password:'', name:'', role:'user', department:'', is_active:1 });
+const form = ref({ 
+  id: null, 
+  username: '', 
+  password: '', 
+  name: '', 
+  role: 'user', 
+  department: '', 
+  is_active: 1,
+  accountSets: [],
+  defaultAccountSet: null
+});
 const loading = ref(false);
 const saving = ref(false);
+const accountSetOptions = ref([]);
+const loadingAccountSets = ref(false);
 
 onMounted(async () => {
-  await loadUsers();
+  await Promise.all([
+    loadUsers(),
+    loadAccountSets()
+  ]);
 });
 
 const loadUsers = async () => {
@@ -129,14 +181,72 @@ const loadUsers = async () => {
   }
 };
 
+const loadAccountSets = async () => {
+  loadingAccountSets.value = true;
+  try {
+    const response = await fetch('/api/account-sets');
+    if (response.ok) {
+      accountSetOptions.value = await response.json();
+    } else {
+      throw new Error('获取账套列表失败');
+    }
+  } catch (err) {
+    console.error('加载账套列表失败:', err);
+    ElMessage.warning('加载账套列表失败，可能无法分配账套');
+  } finally {
+    loadingAccountSets.value = false;
+  }
+};
+
+const getAccountSetName = (id) => {
+  const set = accountSetOptions.value.find(item => item.id === id);
+  return set ? set.name : `账套 ID: ${id}`;
+};
+
 function openAddDialog(){
   editMode.value = false;
-  form.value = { id:null, username:'', password:'', name:'', role:'user', department:'', is_active:1 };
+  form.value = { 
+    id: null, 
+    username: '', 
+    password: '', 
+    name: '', 
+    role: 'user', 
+    department: '', 
+    is_active: 1,
+    accountSets: [],
+    defaultAccountSet: null
+  };
   showAddDialog.value = true;
 }
-function openEdit(row){
+
+async function openEdit(row){
   editMode.value = true;
-  form.value = { id:row.id, username:row.username, password:'', name:row.name, role:row.role, department:row.department||'', is_active: !!row.is_active };
+  // 先设置基本信息
+  form.value = { 
+    id: row.id, 
+    username: row.username, 
+    password: '', 
+    name: row.name, 
+    role: row.role, 
+    department: row.department || '', 
+    is_active: !!row.is_active,
+    accountSets: [],
+    defaultAccountSet: null
+  };
+  
+  // 加载用户的账套信息
+  try {
+    const response = await fetch(`/api/users/${row.id}/account-sets`);
+    if (response.ok) {
+      const data = await response.json();
+      form.value.accountSets = data.accountSets || [];
+      form.value.defaultAccountSet = data.defaultAccountSet || (form.value.accountSets.length > 0 ? form.value.accountSets[0] : null);
+    }
+  } catch (err) {
+    console.error('加载用户账套信息失败:', err);
+    ElMessage.warning('无法加载用户账套信息');
+  }
+  
   showAddDialog.value = true;
 }
 async function submitForm(){
@@ -144,13 +254,39 @@ async function submitForm(){
     ElMessage.warning('请完整填写必填项');
     return;
   }
+  
+  if (form.value.accountSets.length === 0) {
+    ElMessage.warning('请至少分配一个账套给用户');
+    return;
+  }
+  
+  // 确保默认账套是已选择的账套之一
+  if (form.value.accountSets.length > 0 && !form.value.accountSets.includes(form.value.defaultAccountSet)) {
+    form.value.defaultAccountSet = form.value.accountSets[0];
+  }
+  
   saving.value = true;
   try {
     if (editMode.value) {
-      await userApi.update(form.value.id, { name: form.value.name, role: form.value.role, department: form.value.department, is_active: form.value.is_active ? 1 : 0 });
+      await userApi.update(form.value.id, { 
+        name: form.value.name, 
+        role: form.value.role, 
+        department: form.value.department, 
+        is_active: form.value.is_active ? 1 : 0,
+        accountSets: form.value.accountSets,
+        defaultAccountSet: form.value.defaultAccountSet
+      });
       ElMessage.success('已保存');
     } else {
-      await userApi.create({ username: form.value.username, password: form.value.password, name: form.value.name, role: form.value.role, department: form.value.department });
+      await userApi.create({ 
+        username: form.value.username, 
+        password: form.value.password, 
+        name: form.value.name, 
+        role: form.value.role, 
+        department: form.value.department,
+        accountSets: form.value.accountSets,
+        defaultAccountSet: form.value.defaultAccountSet
+      });
       ElMessage.success('创建成功');
     }
     showAddDialog.value = false;

@@ -265,6 +265,13 @@ const isDashboardActive = computed(() => {
 // 导航函数
 const navigate = (route) => {
   reportViewChange('Navigation', `切换到 ${route} 路由`);
+  
+  // 检查权限：非管理员用户不能访问 accountSets 页面
+  if (route === 'accountSets' && user.value && user.value.role !== 'admin') {
+    ElMessage.warning('您没有访问账套管理页面的权限');
+    return;
+  }
+  
   activeMenu.value = route;
   if (routes[route]) {
     currentComponent.value = routes[route];

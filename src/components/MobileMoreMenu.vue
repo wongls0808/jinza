@@ -72,7 +72,7 @@ const menuItems = computed(() => [
     route: 'accountSets',
     label: '账套管理',
     icon: Folder,
-    adminOnly: false
+    adminOnly: true  // 修改为仅管理员可见
   },
   {
     route: 'users',

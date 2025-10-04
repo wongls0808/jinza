@@ -134,13 +134,7 @@ const availableModules = computed(() => {
       route: 'salespeople',
       color: 'purple'
     },
-    {
-      title: '账套管理',
-      description: '财务账套管理',
-      icon: Folder,
-      route: 'accountSets',
-      color: 'teal'
-    },
+    // 账套管理移到管理员专属模块
     {
       title: '发票管理',
       description: '创建和管理发票',
@@ -153,6 +147,13 @@ const availableModules = computed(() => {
   // 管理员专属模块
   if (props.user && props.user.role === 'admin') {
     modules.push({
+      title: '账套管理',
+      description: '财务账套管理',
+      icon: Folder,
+      route: 'accountSets',
+      color: 'teal'
+    },
+    {
       title: '用户管理',
       description: '系统用户权限管理',
       icon: Document,
