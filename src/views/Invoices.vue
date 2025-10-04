@@ -305,8 +305,11 @@ function loadAccountSets() {
 // 切换账套
 async function switchAccountSet(accountSetId) {
   try {
+    // 统一 id 类型，避免字符串/数字不一致导致匹配失败
+    const idNum = typeof accountSetId === 'string' ? parseInt(accountSetId, 10) : accountSetId;
+    if (Number.isNaN(idNum)) return;
     // 找到选择的账套
-    const selectedSet = accountSets.value.find(set => set.id === accountSetId);
+    const selectedSet = accountSets.value.find(set => Number(set.id) === Number(idNum));
     if (!selectedSet) return;
     
     // 设置新的当前账套
@@ -317,13 +320,15 @@ async function switchAccountSet(accountSetId) {
     const response = await fetch(`/api/user/${localStorage.getItem('userId')}/default-account-set`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_set_id: accountSetId })
+      body: JSON.stringify({ account_set_id: idNum })
     });
     
     if (response.ok) {
       ElMessage.success(`已切换到账套: ${selectedSet.name}`);
       
-      // 刷新发票数据
+  // 广播全局事件，保持与 App.vue 行为一致
+  window.dispatchEvent(new CustomEvent('account-set-changed', { detail: selectedSet }));
+  // 刷新发票数据
       currentPage.value = 1;
       await fetchInvoices();
       await fetchStats();

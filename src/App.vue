@@ -334,8 +334,11 @@ const handleCommand = (command) => {
 // 处理账套选择变化
 const handleAccountSetChange = async (accountSetId) => {
   try {
-    // 找到选择的账套
-    const selectedSet = userAccountSets.value.find(set => set.id === accountSetId);
+    // 统一将下拉回传的 command 转成数字，避免字符串/数字类型不一致导致匹配失败
+    const idNum = typeof accountSetId === 'string' ? parseInt(accountSetId, 10) : accountSetId;
+    if (Number.isNaN(idNum)) return;
+    // 找到选择的账套（宽松对齐类型）
+    const selectedSet = userAccountSets.value.find(set => Number(set.id) === Number(idNum));
     if (!selectedSet) return;
     
     // 更新当前账套
@@ -346,7 +349,7 @@ const handleAccountSetChange = async (accountSetId) => {
     const response = await fetch(`/api/user/${user.value.id}/default-account-set`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_set_id: accountSetId })
+      body: JSON.stringify({ account_set_id: idNum })
     });
     
     if (response.ok) {
@@ -454,9 +457,12 @@ onMounted(async () => {
           if (data.defaultAccountSet) {
             currentAccountSet.value = data.defaultAccountSet;
             localStorage.setItem('currentAccountSet', JSON.stringify(data.defaultAccountSet));
+            // 初始化时广播一次，便于页面立即感知当前账套
+            window.dispatchEvent(new CustomEvent('account-set-changed', { detail: data.defaultAccountSet }));
           } else if (data.accountSets.length > 0) {
             currentAccountSet.value = data.accountSets[0];
             localStorage.setItem('currentAccountSet', JSON.stringify(data.accountSets[0]));
+            window.dispatchEvent(new CustomEvent('account-set-changed', { detail: data.accountSets[0] }));
           }
         } else {
           // 尝试从本地存储加载账套数据
@@ -467,8 +473,10 @@ onMounted(async () => {
             userAccountSets.value = JSON.parse(storedSets);
             if (storedCurrentSet) {
               currentAccountSet.value = JSON.parse(storedCurrentSet);
+              window.dispatchEvent(new CustomEvent('account-set-changed', { detail: currentAccountSet.value }));
             } else if (userAccountSets.value.length > 0) {
               currentAccountSet.value = userAccountSets.value[0];
+              window.dispatchEvent(new CustomEvent('account-set-changed', { detail: currentAccountSet.value }));
             }
           }
         }
