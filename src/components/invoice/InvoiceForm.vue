@@ -484,7 +484,16 @@ async function fetchProducts() {
   try {
     const response = await fetch('/api/products');
     if (response.ok) {
-      productOptions.value = await response.json();
+      const products = await response.json();
+      // 将服务器返回的商品数据转换为下拉选项格式
+      productOptions.value = products.map(product => ({
+        id: product.id,
+        description: product.description,
+        name: product.description, // 用于显示
+        code: product.code,
+        unit: product.unit || '',
+        selling_price: parseFloat(product.selling_price) || 0
+      }));
     }
   } catch (error) {
     console.error('获取商品数据失败:', error);
@@ -645,15 +654,15 @@ function updateDueDate() {
   form.due_date = dueDate.toISOString().slice(0, 10);
 }
 
-function handleProductChange(productId, index) {
+async function handleProductChange(productId, index) {
   if (!productId) return;
   
   const product = productOptions.value.find(p => p.id === productId);
   if (product && index !== undefined && form.items[index]) {
     const item = form.items[index];
-    item.description = product.name;
+    item.description = product.description;
     item.unit = product.unit || '';
-    item.unit_price = parseFloat(product.price) || 0;
+    item.unit_price = parseFloat(product.selling_price) || 0;
     calculateItemAmount(index);
   }
 }
@@ -665,21 +674,78 @@ function getItemSelection(row) {
 }
 
 // 处理商品/描述合并列的变更
-function handleItemSelectionChange(val, index) {
+async function handleItemSelectionChange(val, index) {
   const row = form.items[index];
   if (!row) return;
   const matched = productOptions.value.find(p => p.id === val);
+  
   if (matched) {
+    // 已存在商品，直接使用
     row.product_id = matched.id;
-    row.description = matched.name;
+    row.description = matched.description;
     row.unit = matched.unit || '';
-    row.unit_price = parseFloat(matched.price) || 0;
+    row.unit_price = parseFloat(matched.selling_price) || 0;
+    calculateItemAmount(index);
+  } else if (val) {
+    // 新商品，需要自动添加到商品库
+    const description = String(val || '').trim();
+    if (description) {
+      try {
+        // 使用新的API查询或创建商品
+        const response = await fetch('/api/products/find-or-create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            description: description,
+            unit: row.unit || '',
+            selling_price: parseFloat(row.unit_price) || 0
+          })
+        });
+        
+        if (response.ok) {
+          const newProduct = await response.json();
+          // 更新当前行的商品信息
+          row.product_id = newProduct.id;
+          row.description = newProduct.description;
+          row.unit = newProduct.unit || '';
+          
+          // 如果用户没有输入价格，或者价格为0，则使用商品库的价格
+          if (!row.unit_price || parseFloat(row.unit_price) === 0) {
+            row.unit_price = parseFloat(newProduct.selling_price) || 0;
+          }
+          
+          calculateItemAmount(index);
+          
+          // 刷新商品库选项
+          await fetchProducts();
+          
+          ElMessage.success({
+            message: `商品「${description}」已自动添加到商品库`,
+            duration: 2000
+          });
+        } else {
+          throw new Error('新增商品失败');
+        }
+      } catch (error) {
+        console.error('处理新商品失败:', error);
+        // 如果出错，仍然将描述设置为用户输入的值
+        row.product_id = null;
+        row.description = description;
+        calculateItemAmount(index);
+      }
+    } else {
+      // 空描述，清除product_id
+      row.product_id = null;
+      row.description = '';
+    }
   } else {
-    // 自由文本，清除product_id，仅作为描述
+    // 清空选择
     row.product_id = null;
-    row.description = String(val || '').trim();
+    row.description = '';
+    calculateItemAmount(index);
   }
-  calculateItemAmount(index);
 }
 
 function formatAmount(amount) {
