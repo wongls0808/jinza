@@ -782,7 +782,7 @@ app.get('/api/users', requireAuth, (req, res) => {
 });
 
 app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
-  const { username, password, name, role, department } = req.body;
+  const { username, password, name, role, department, accountSets, defaultAccountSet } = req.body || {};
   
   if (!username || !password || !name) {
     return res.status(400).json({ error: '用户名、密码和姓名不能为空' });
@@ -810,14 +810,74 @@ app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
           console.error('创建用户失败:', err);
           return res.status(500).json({ error: '创建用户失败' });
         }
-        
-        res.json({ 
-          id: this.lastID, 
-          username, 
-          name, 
-          role: role || 'user', 
-          department: department || '',
-          is_active: 1
+        const newUserId = this.lastID;
+        // 处理账套分配（可选）
+        const sets = Array.isArray(accountSets) ? accountSets.map(v => parseInt(v, 10)).filter(v => !Number.isNaN(v)) : [];
+        let defSet = defaultAccountSet !== undefined && defaultAccountSet !== null ? parseInt(defaultAccountSet, 10) : null;
+
+        // 使用事务保证一致性
+        db.serialize(() => {
+          db.run('BEGIN');
+          const finalize = (err) => {
+            if (err) {
+              console.error('分配账套失败:', err);
+              return db.run('ROLLBACK', () => {
+                // 即使账套分配失败，仍然返回用户已创建，前端可在用户编辑中补救
+                return res.json({ 
+                  id: newUserId, username, name, role: role || 'user', department: department || '', is_active: 1,
+                  warning: '用户已创建，但账套分配失败，请稍后在用户编辑中重试'
+                });
+              });
+            }
+            db.run('COMMIT', () => {
+              return res.json({ 
+                id: newUserId, username, name, role: role || 'user', department: department || '', is_active: 1
+              });
+            });
+          };
+
+          const assignAndDone = (ids, defaultId) => {
+            if (!Array.isArray(ids) || ids.length === 0) return finalize();
+            // 重置默认
+            db.run('UPDATE user_account_sets SET is_default = 0 WHERE user_id = ?', [newUserId], (e0) => {
+              if (e0) return finalize(e0);
+              // 插入所有
+              const stmt = db.prepare('INSERT OR IGNORE INTO user_account_sets (user_id, account_set_id, is_default) VALUES (?, ?, 0)');
+              ids.forEach(id => stmt.run(newUserId, id));
+              stmt.finalize((e1) => {
+                if (e1) return finalize(e1);
+                // 校验默认是否在集合中
+                let def = defaultId && ids.includes(defaultId) ? defaultId : ids[0];
+                db.run('UPDATE user_account_sets SET is_default = 1 WHERE user_id = ? AND account_set_id = ?', [newUserId, def], (e2) => finalize(e2));
+              });
+            });
+          };
+
+          if (sets.length > 0) {
+            assignAndDone(sets, defSet);
+          } else {
+            // 未传账套：尝试使用当前操作者的会话账套或系统首个激活账套
+            const tryAssignFallback = () => {
+              db.get('SELECT id FROM account_sets WHERE is_active = 1 ORDER BY id ASC LIMIT 1', [], (ge, row) => {
+                if (ge || !row) return finalize();
+                assignAndDone([row.id], row.id);
+              });
+            };
+            if (req.session.accountSetId) {
+              const asId = parseInt(req.session.accountSetId, 10);
+              if (!Number.isNaN(asId)) {
+                // 验证该账套是否存在且激活
+                db.get('SELECT id FROM account_sets WHERE id = ? AND is_active = 1', [asId], (e, row) => {
+                  if (e || !row) return tryAssignFallback();
+                  assignAndDone([row.id], row.id);
+                });
+              } else {
+                tryAssignFallback();
+              }
+            } else {
+              tryAssignFallback();
+            }
+          }
         });
       }
     );
@@ -826,7 +886,7 @@ app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
 
 app.put('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
   const userId = req.params.id;
-  const { name, role, department, is_active } = req.body;
+  const { name, role, department, is_active, accountSets, defaultAccountSet } = req.body || {};
   
   db.run(
     "UPDATE users SET name = ?, role = ?, department = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -841,7 +901,58 @@ app.put('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
         return res.status(404).json({ error: '用户不存在' });
       }
       
-      res.json({ success: true });
+      // 如果携带账套信息，则一并更新
+      const sets = Array.isArray(accountSets) ? accountSets.map(v => parseInt(v, 10)).filter(v => !Number.isNaN(v)) : null;
+      const defSet = defaultAccountSet !== undefined && defaultAccountSet !== null ? parseInt(defaultAccountSet, 10) : null;
+
+      if (!sets) {
+        return res.json({ success: true });
+      }
+
+      if (sets.length === 0) {
+        return res.status(400).json({ error: '至少需要分配一个账套' });
+      }
+
+      db.serialize(() => {
+        db.run('BEGIN');
+        const finalize = (err) => {
+          if (err) {
+            console.error('更新用户账套失败:', err);
+            return db.run('ROLLBACK', () => res.status(500).json({ error: '更新用户账套失败' }));
+          }
+          db.run('COMMIT', () => res.json({ success: true }));
+        };
+
+        db.run('DELETE FROM user_account_sets WHERE user_id = ?', [userId], (e0) => {
+          if (e0) return finalize(e0);
+          const stmt = db.prepare('INSERT OR IGNORE INTO user_account_sets (user_id, account_set_id, is_default) VALUES (?, ?, 0)');
+          sets.forEach(id => stmt.run(userId, id));
+          stmt.finalize((e1) => {
+            if (e1) return finalize(e1);
+            const def = defSet && sets.includes(defSet) ? defSet : sets[0];
+            db.run('UPDATE user_account_sets SET is_default = 1 WHERE user_id = ? AND account_set_id = ?', [userId, def], (e2) => finalize(e2));
+          });
+        });
+      });
+    }
+  );
+});
+
+// 提供符合前端 Users.vue 期望的读取接口：返回纯ID列表与默认ID
+app.get('/api/users/:id/account-sets', requireAuth, requireAdmin, (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (Number.isNaN(userId)) return res.status(400).json({ error: '无效的用户ID' });
+  db.all(
+    `SELECT uas.account_set_id as id, uas.is_default FROM user_account_sets uas WHERE uas.user_id = ?`,
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('读取用户账套失败:', err);
+        return res.status(500).json({ error: '读取用户账套失败' });
+      }
+      const ids = rows.map(r => r.id);
+      const def = rows.find(r => r.is_default === 1)?.id || (ids.length > 0 ? ids[0] : null);
+      res.json({ accountSets: ids, defaultAccountSet: def });
     }
   );
 });
