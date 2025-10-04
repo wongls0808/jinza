@@ -77,7 +77,7 @@
               <el-row :gutter="12">
                 <el-col :span="8">
                   <!-- 业务员选择 -->
-                  <el-form-item label="业务员" prop="salesperson_id">
+                  <el-form-item label="业务员" prop="salesperson_id" required>
                     <el-select 
                       v-model="form.salesperson_id" 
                       placeholder="选择业务员"
@@ -92,7 +92,7 @@
                         :value="item.id"
                       >
                         <div class="salesperson-option">
-                          <span>{{ item.code || item.name }}</span>
+                          <span class="salesperson-code">{{ item.code || '无代号' }}</span>
                           <small>{{ item.name }}</small>
                         </div>
                       </el-option>
@@ -167,11 +167,7 @@
                 </el-col>
               </el-row>
               
-              <!-- 业务员代号 -->
-              <div v-if="selectedSalesperson && selectedSalesperson.code" class="field-display">
-                <div class="field-label">业务员代号</div>
-                <div class="field-value">{{ selectedSalesperson.code }}</div>
-              </div>
+              <!-- 业务员代号显示已集成到下拉选择中 -->
             </div>
 
             <!-- 客户信息预览 -->
@@ -437,6 +433,9 @@ const rules = {
   customer_id: [
     { required: true, message: '请选择客户', trigger: 'change' }
   ],
+  salesperson_id: [
+    { required: true, message: '请选择业务员', trigger: 'change' }
+  ],
   issue_date: [
     { required: true, message: '请选择开票日期', trigger: 'change' }
   ],
@@ -663,6 +662,10 @@ function handleCustomerChange(value) {
 
 function handleSalespersonChange(value) {
   selectedSalesperson.value = salespersonOptions.value.find(item => item.id === value) || null;
+  // 如果选中了业务员，但业务员没有代号，可以显示提示
+  if (selectedSalesperson.value && !selectedSalesperson.value.code) {
+    ElMessage.info('所选业务员无代号，建议在业务员管理中添加代号');
+  }
 }
 
 // 根据付款条款更新到期日期
@@ -1071,6 +1074,11 @@ function numberToEnglishWords(num, currency = 'RINGGIT MALAYSIA') {
 .customer-option small, .product-option small, .salesperson-option small {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.salesperson-code {
+  font-weight: bold;
+  color: var(--el-color-primary);
 }
 
 .field-display {
