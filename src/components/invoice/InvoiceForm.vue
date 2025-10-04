@@ -25,8 +25,8 @@
             <div class="form-section">
               <h3 class="section-title">{{ $t('invoiceForm.basicInfo') }}</h3>
               
-              <!-- 账套选择（隐藏，自动选择默认账套） -->
-              <el-form-item :label="$t('invoiceForm.accountSet')" prop="account_set_id" required style="display:none;">
+              <!-- 账套选择 -->
+              <el-form-item label="账套" prop="account_set_id" required>
                 <el-select 
                   v-model="form.account_set_id" 
                   placeholder="选择账套"
@@ -148,18 +148,7 @@
             <div class="form-section">
               <h3 class="section-title">{{ $t('invoiceForm.details') }}</h3>
 
-              <!-- 统一税率设置 -->
-              <div style="display:flex; gap:16px; align-items:center; margin: 10px 0;">
-                <span style="color: var(--el-text-color-regular);">{{ $t('invoiceForm.unifiedTax') }}</span>
-                <el-input-number 
-                  v-model="unifiedTaxRate" 
-                  :min="0" 
-                  :max="100" 
-                  :precision="2" 
-                  controls-position="right"
-                  @change="recalculateAllItems"
-                />
-              </div>
+              
               
               <!-- 明细表格 -->
               <el-table 
@@ -168,16 +157,14 @@
                 style="width: 100%"
                 class="invoice-items-table"
               >
-                <el-table-column :label="$t('invoiceForm.item.itemOrDesc')" min-width="320">
+                <el-table-column label="商品" width="220">
                   <template #default="scope">
                     <el-select 
-                      :model-value="getItemSelection(scope.row)"
-                      placeholder="选择商品或直接输入描述"
+                      v-model="scope.row.product_id" 
+                      placeholder="选择商品"
                       filterable
-                      allow-create
-                      default-first-option
                       clearable
-                      @update:model-value="handleItemSelectionChange($event, scope.$index)"
+                      @change="handleProductChange($event, scope.$index)"
                       style="width: 100%"
                     >
                       <el-option
@@ -192,6 +179,12 @@
                         </div>
                       </el-option>
                     </el-select>
+                  </template>
+                </el-table-column>
+                
+                <el-table-column label="描述" min-width="200">
+                  <template #default="scope">
+                    <el-input v-model="scope.row.description" placeholder="商品描述" />
                   </template>
                 </el-table-column>
                 
@@ -227,7 +220,19 @@
                   </template>
                 </el-table-column>
                 
-                <!-- 移除行级税率列，改为统一税率设置 -->
+                <el-table-column label="税率(%)" width="120">
+                  <template #default="scope">
+                    <el-input-number 
+                      v-model="scope.row.tax_rate" 
+                      :min="0"
+                      :max="100"
+                      :precision="2"
+                      controls-position="right"
+                      @change="calculateItemAmount(scope.$index)"
+                      style="width: 100%"
+                    />
+                  </template>
+                </el-table-column>
                 
                 <el-table-column :label="$t('invoiceForm.item.amount')" width="120">
                   <template #default="scope">
@@ -262,16 +267,16 @@
               <!-- 合计金额 -->
               <div class="invoice-summary">
                 <div class="summary-item">
-                  <span class="summary-label">{{ $t('invoiceForm.summary.subtotal') }}：</span>
-                  <span class="summary-value">{{ formatAmount(invoiceTotal) }}</span>
+                  <span class="summary-label">合计金额：</span>
+                  <span class="summary-value">¥{{ formatAmount(invoiceTotal) }}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">{{ $t('invoiceForm.summary.taxTotal') }}：</span>
-                  <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
+                  <span class="summary-label">税额合计：</span>
+                  <span class="summary-value">¥{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
                 <div class="summary-item total">
-                  <span class="summary-label">{{ $t('invoiceForm.summary.grandTotal') }}：</span>
-                  <span class="summary-value">{{ formatAmount(invoiceGrandTotal) }}</span>
+                  <span class="summary-label">应付总计：</span>
+                  <span class="summary-value">¥{{ formatAmount(invoiceGrandTotal) }}</span>
                 </div>
               </div>
             </div>
@@ -342,7 +347,7 @@ const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
 // 统一税率
-const unifiedTaxRate = ref(0);
+
 
 // Selected customer details
 const selectedCustomer = ref(null);
@@ -541,15 +546,10 @@ function calculateItemAmount(index) {
   
   const quantity = parseFloat(item.quantity) || 0;
   const unitPrice = parseFloat(item.unit_price) || 0;
-  const taxRate = parseFloat(unifiedTaxRate.value) || 0;
+  const taxRate = parseFloat(item.tax_rate) || 0;
   
   item.amount = quantity * unitPrice;
   item.tax_amount = item.amount * (taxRate / 100);
-}
-
-// 统一税率变化后重算所有行
-function recalculateAllItems() {
-  form.items.forEach((_, idx) => calculateItemAmount(idx));
 }
 
 function handleAccountSetChange(value) {
@@ -574,30 +574,6 @@ function handleProductChange(productId, index) {
     item.unit_price = parseFloat(product.price) || 0;
     calculateItemAmount(index);
   }
-}
-
-// 用于商品/描述合并选择的值
-function getItemSelection(row) {
-  // 若选择过商品，返回商品ID；否则返回描述文本
-  return row.product_id || row.description || '';
-}
-
-// 处理商品/描述合并列的变更
-function handleItemSelectionChange(val, index) {
-  const row = form.items[index];
-  if (!row) return;
-  const matched = productOptions.value.find(p => p.id === val);
-  if (matched) {
-    row.product_id = matched.id;
-    row.description = matched.name;
-    row.unit = matched.unit || '';
-    row.unit_price = parseFloat(matched.price) || 0;
-  } else {
-    // 自由文本，清除product_id，仅作为描述
-    row.product_id = null;
-    row.description = String(val || '').trim();
-  }
-  calculateItemAmount(index);
 }
 
 function formatAmount(amount) {
@@ -655,7 +631,7 @@ async function save(status) {
         quantity: parseFloat(item.quantity) || 0,
         unit_price: parseFloat(item.unit_price) || 0,
         unit: item.unit || '',
-        tax_rate: parseFloat(unifiedTaxRate.value) || 0,
+        tax_rate: parseFloat(item.tax_rate) || 0,
         tax_amount: parseFloat(item.tax_amount) || 0,
         discount_rate: 0,
         discount_amount: 0,
