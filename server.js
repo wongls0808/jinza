@@ -296,6 +296,18 @@ function initializeDatabase() {
         FOREIGN KEY(account_set_id) REFERENCES account_sets(id)
       )`);
 
+      // 用户-账套关联表
+      db.run(`CREATE TABLE IF NOT EXISTS user_account_sets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        account_set_id INTEGER NOT NULL,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(account_set_id) REFERENCES account_sets(id),
+        UNIQUE(user_id, account_set_id)
+      )`);
+        
       // 商品表
       db.run(`CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -503,17 +515,46 @@ app.post('/api/login', loginLimiter, (req, res) => {
       
       // 更新用户的最后活动时间
       db.run(`UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
-      res.json({
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          role: user.role,
-          department: user.department,
-          forcePasswordChange: forceChange
+      
+      // 获取用户可访问的账套
+      db.all(
+        `SELECT a.*, uas.is_default 
+         FROM account_sets a 
+         JOIN user_account_sets uas ON a.id = uas.account_set_id 
+         WHERE uas.user_id = ? 
+         ORDER BY uas.is_default DESC, a.name ASC`,
+        [user.id],
+        (err, accountSets) => {
+          if (err) {
+            console.error('获取用户账套失败:', err);
+            // 即使获取账套失败，也不影响登录，返回空数组
+            accountSets = [];
+          }
+          
+          // 查找默认账套
+          const defaultAccountSet = accountSets.find(set => set.is_default === 1) || 
+                                    (accountSets.length > 0 ? accountSets[0] : null);
+          
+          // 如果找到默认账套，将其ID存入session
+          if (defaultAccountSet) {
+            req.session.accountSetId = defaultAccountSet.id;
+          }
+          
+          res.json({
+            success: true,
+            user: {
+              id: user.id,
+              username: user.username,
+              name: user.name,
+              role: user.role,
+              department: user.department,
+              forcePasswordChange: forceChange
+            },
+            accountSets: accountSets,
+            defaultAccountSet: defaultAccountSet || null
+          });
         }
-      });
+      );
     }
   );
 });
@@ -1231,6 +1272,182 @@ app.put('/api/account-sets/:id', requireAuth, (req, res) => {
       }
       
       res.json({ success: true });
+    }
+  );
+});
+
+// 用户账套关联管理API
+// 获取用户关联的账套列表
+app.get('/api/user/:userId/account-sets', requireAuth, (req, res) => {
+  // 仅管理员或用户本人可查看
+  if (req.session.userRole !== 'admin' && req.session.userId !== parseInt(req.params.userId)) {
+    return res.status(403).json({ error: '无权操作' });
+  }
+  
+  const userId = req.params.userId;
+  
+  // 查询用户关联的所有账套，包括是否为默认账套
+  db.all(
+    `SELECT a.*, uas.is_default 
+     FROM account_sets a 
+     JOIN user_account_sets uas ON a.id = uas.account_set_id 
+     WHERE uas.user_id = ? 
+     ORDER BY uas.is_default DESC, a.name ASC`,
+    [userId],
+    (err, rows) => {
+      if (err) {
+        console.error('查询用户账套失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      res.json(rows);
+    }
+  );
+});
+
+// 分配账套给用户
+app.post('/api/user/:userId/account-sets', requireAuth, (req, res) => {
+  // 仅管理员可分配账套
+  if (req.session.userRole !== 'admin') {
+    return res.status(403).json({ error: '无权操作' });
+  }
+  
+  const { account_set_id, is_default } = req.body;
+  const userId = req.params.userId;
+  
+  if (!account_set_id) {
+    return res.status(400).json({ error: '账套ID不能为空' });
+  }
+  
+  // 首先检查用户和账套是否存在
+  db.get('SELECT id FROM users WHERE id = ?', [userId], (err, user) => {
+    if (err || !user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    db.get('SELECT id FROM account_sets WHERE id = ?', [account_set_id], (err, accountSet) => {
+      if (err || !accountSet) {
+        return res.status(404).json({ error: '账套不存在' });
+      }
+      
+      // 如果设置为默认账套，先将该用户的所有账套设为非默认
+      if (is_default) {
+        db.run(
+          'UPDATE user_account_sets SET is_default = 0 WHERE user_id = ?',
+          [userId],
+          (err) => {
+            if (err) {
+              console.error('更新默认账套失败:', err);
+              return res.status(500).json({ error: '服务器错误' });
+            }
+          }
+        );
+      }
+      
+      // 插入或更新用户账套关联
+      db.run(
+        `INSERT INTO user_account_sets (user_id, account_set_id, is_default)
+         VALUES (?, ?, ?)
+         ON CONFLICT(user_id, account_set_id) 
+         DO UPDATE SET is_default = ?`,
+        [userId, account_set_id, is_default ? 1 : 0, is_default ? 1 : 0],
+        function(err) {
+          if (err) {
+            console.error('分配账套失败:', err);
+            return res.status(500).json({ error: '分配账套失败' });
+          }
+          
+          res.json({ 
+            success: true, 
+            message: `账套已${this.changes > 0 ? '分配' : '更新'}给用户` 
+          });
+        }
+      );
+    });
+  });
+});
+
+// 移除用户的账套关联
+app.delete('/api/user/:userId/account-sets/:accountSetId', requireAuth, (req, res) => {
+  // 仅管理员可移除账套
+  if (req.session.userRole !== 'admin') {
+    return res.status(403).json({ error: '无权操作' });
+  }
+  
+  const userId = req.params.userId;
+  const accountSetId = req.params.accountSetId;
+  
+  db.run(
+    'DELETE FROM user_account_sets WHERE user_id = ? AND account_set_id = ?',
+    [userId, accountSetId],
+    function(err) {
+      if (err) {
+        console.error('移除账套关联失败:', err);
+        return res.status(500).json({ error: '移除账套关联失败' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '未找到指定的用户账套关联' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// 设置用户的默认账套
+app.put('/api/user/:userId/default-account-set', requireAuth, (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const { account_set_id } = req.body;
+  
+  // 只允许管理员或用户本人设置默认账套
+  if (req.session.userRole !== 'admin' && req.session.userId !== userId) {
+    return res.status(403).json({ error: '无权操作' });
+  }
+  
+  if (!account_set_id) {
+    return res.status(400).json({ error: '账套ID不能为空' });
+  }
+  
+  // 首先检查该用户是否有权限使用这个账套
+  db.get(
+    'SELECT * FROM user_account_sets WHERE user_id = ? AND account_set_id = ?',
+    [userId, account_set_id],
+    (err, association) => {
+      if (err) {
+        console.error('查询用户账套关联失败:', err);
+        return res.status(500).json({ error: '服务器错误' });
+      }
+      
+      if (!association) {
+        return res.status(404).json({ error: '您没有权限使用该账套' });
+      }
+      
+      // 将所有账套设为非默认
+      db.run(
+        'UPDATE user_account_sets SET is_default = 0 WHERE user_id = ?',
+        [userId],
+        (err) => {
+          if (err) {
+            console.error('更新默认账套状态失败:', err);
+            return res.status(500).json({ error: '服务器错误' });
+          }
+          
+          // 设置指定账套为默认
+          db.run(
+            'UPDATE user_account_sets SET is_default = 1 WHERE user_id = ? AND account_set_id = ?',
+            [userId, account_set_id],
+            function(err) {
+              if (err) {
+                console.error('设置默认账套失败:', err);
+                return res.status(500).json({ error: '设置默认账套失败' });
+              }
+              
+              res.json({ success: true });
+            }
+          );
+        }
+      );
     }
   );
 });

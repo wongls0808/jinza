@@ -864,25 +864,40 @@ router.get('/stats', async (req, res) => {
   const db = getDb();
   
   try {
+    // 处理账套过滤条件
+    let accountSetFilter = '';
+    let params = [];
+    
+    if (req.query.account_set_id) {
+      accountSetFilter = 'WHERE account_set_id = ?';
+      params.push(req.query.account_set_id);
+    }
+    
     // 获取总发票数
-    const totalResult = await dbGet(db, `SELECT COUNT(*) as total FROM invoices`);
+    const totalResult = await dbGet(db, 
+      `SELECT COUNT(*) as total FROM invoices ${accountSetFilter}`, 
+      params
+    );
     
     // 获取未付款发票数
     const unpaidResult = await dbGet(db, `
       SELECT COUNT(*) as count 
       FROM invoices 
-      WHERE payment_status = 'unpaid' OR payment_status = 'partial'
-    `);
+      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} (payment_status = 'unpaid' OR payment_status = 'partial')
+    `, params);
     
     // 获取已付款发票数
     const paidResult = await dbGet(db, `
       SELECT COUNT(*) as count 
       FROM invoices 
-      WHERE payment_status = 'paid'
-    `);
+      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} payment_status = 'paid'
+    `, params);
     
     // 获取总金额
-    const amountResult = await dbGet(db, `SELECT SUM(total_amount) as sum FROM invoices`);
+    const amountResult = await dbGet(db, 
+      `SELECT SUM(total_amount) as sum FROM invoices ${accountSetFilter}`, 
+      params
+    );
     
     res.json({
       total: totalResult ? totalResult.total : 0,

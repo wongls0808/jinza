@@ -453,6 +453,20 @@ const login = async () => {
       // 强制延时，确保DOM完全更新
       await new Promise(resolve => setTimeout(resolve, 50));
       
+      // 保存账套信息到本地存储
+      if (data.accountSets) {
+        localStorage.setItem('userAccountSets', JSON.stringify(data.accountSets));
+        
+        // 设置当前选择的账套
+        if (data.defaultAccountSet) {
+          localStorage.setItem('currentAccountSet', JSON.stringify(data.defaultAccountSet));
+          console.log('已设置默认账套:', data.defaultAccountSet.name);
+        } else if (data.accountSets.length > 0) {
+          localStorage.setItem('currentAccountSet', JSON.stringify(data.accountSets[0]));
+          console.log('已设置第一个账套:', data.accountSets[0].name);
+        }
+      }
+      
       // 然后通过同步方式设置用户并更新CSS类
       user.value = {...data.user};
       document.body.classList.add('logged-in');

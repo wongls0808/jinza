@@ -5,6 +5,32 @@
       <div class="header-content">
         <h1 class="page-title">发票管理</h1>
         <p class="page-description">创建、管理和跟踪企业发票，支持关联客户、商品和业务员</p>
+        
+        <!-- 账套信息和切换 -->
+        <div class="account-set-selector" v-if="accountSets.length > 0">
+          <span class="current-account-label">当前账套:</span>
+          <el-dropdown @command="switchAccountSet" trigger="click">
+            <span class="el-dropdown-link">
+              {{ currentAccountSet?.name || '请选择账套' }}
+              <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item 
+                  v-for="set in accountSets" 
+                  :key="set.id" 
+                  :command="set.id"
+                  :disabled="set.id === currentAccountSet?.id"
+                >
+                  <span :class="{'active-account-set': set.id === currentAccountSet?.id}">
+                    {{ set.name }}
+                    <el-icon v-if="set.id === currentAccountSet?.id"><Check /></el-icon>
+                  </span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
       <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
         <el-icon><Plus /></el-icon>
@@ -210,7 +236,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { Plus, ArrowDown } from '@element-plus/icons-vue';
+import { Plus, ArrowDown, Check } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 
 // 引入发票组件
@@ -222,6 +248,10 @@ const loading = ref(false);
 const invoices = ref([]);
 const total = ref(0);
 const currentPage = ref(1);
+
+// 账套状态
+const accountSets = ref([]);
+const currentAccountSet = ref(null);
 const pageSize = ref(20);
 const showViewDialog = ref(false);
 const showAddDialog = ref(false);
@@ -249,8 +279,66 @@ const filters = reactive({
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 
+// 加载账套数据
+function loadAccountSets() {
+  try {
+    // 从本地存储获取账套列表
+    const storedAccountSets = localStorage.getItem('userAccountSets');
+    if (storedAccountSets) {
+      accountSets.value = JSON.parse(storedAccountSets);
+    }
+    
+    // 获取当前选择的账套
+    const storedCurrentSet = localStorage.getItem('currentAccountSet');
+    if (storedCurrentSet) {
+      currentAccountSet.value = JSON.parse(storedCurrentSet);
+    } else if (accountSets.value.length > 0) {
+      // 如果没有当前账套但有可用账套，使用第一个
+      currentAccountSet.value = accountSets.value[0];
+      localStorage.setItem('currentAccountSet', JSON.stringify(currentAccountSet.value));
+    }
+  } catch (error) {
+    console.error('加载账套数据失败:', error);
+  }
+}
+
+// 切换账套
+async function switchAccountSet(accountSetId) {
+  try {
+    // 找到选择的账套
+    const selectedSet = accountSets.value.find(set => set.id === accountSetId);
+    if (!selectedSet) return;
+    
+    // 设置新的当前账套
+    currentAccountSet.value = selectedSet;
+    localStorage.setItem('currentAccountSet', JSON.stringify(selectedSet));
+    
+    // 设置为默认账套（与服务器同步）
+    const response = await fetch(`/api/user/${localStorage.getItem('userId')}/default-account-set`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_set_id: accountSetId })
+    });
+    
+    if (response.ok) {
+      ElMessage.success(`已切换到账套: ${selectedSet.name}`);
+      
+      // 刷新发票数据
+      currentPage.value = 1;
+      await fetchInvoices();
+      await fetchStats();
+    } else {
+      ElMessage.warning('设置默认账套失败，但已在本地切换');
+    }
+  } catch (error) {
+    console.error('切换账套失败:', error);
+    ElMessage.error('切换账套失败，请重试');
+  }
+}
+
 // 生命周期钩子
 onMounted(async () => {
+  loadAccountSets();
   await Promise.all([
     fetchCustomers(),
     fetchSalespeople(),
@@ -293,6 +381,11 @@ async function fetchInvoices() {
       page: currentPage.value,
       limit: pageSize.value
     });
+
+    // 添加当前账套ID过滤条件
+    if (currentAccountSet.value && currentAccountSet.value.id) {
+      queryParams.append('account_set_id', currentAccountSet.value.id);
+    }
 
     if (filters.customerId) queryParams.append('customer_id', filters.customerId);
     if (filters.salespersonId) queryParams.append('salesperson_id', filters.salespersonId);
@@ -349,7 +442,14 @@ async function fetchInvoices() {
 async function fetchStats() {
   try {
     console.log('正在获取统计数据...');
-    const response = await fetch('/api/invoices/stats');
+    
+    // 构建包含账套ID的请求URL
+    let url = '/api/invoices/stats';
+    if (currentAccountSet.value && currentAccountSet.value.id) {
+      url += `?account_set_id=${currentAccountSet.value.id}`;
+    }
+    
+    const response = await fetch(url);
     console.log('统计数据响应状态:', response.status, response.statusText);
     
     if (response.ok) {
@@ -528,8 +628,13 @@ function handleInvoiceSaved() {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20px;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .page-title {
@@ -542,6 +647,40 @@ function handleInvoiceSaved() {
   margin: 5px 0 0 0;
   color: var(--el-text-color-secondary);
   font-size: 14px;
+}
+
+/* 账套选择器样式 */
+.account-set-selector {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  background-color: #f5f7fa;
+  padding: 6px 12px;
+  border-radius: 6px;
+  max-width: fit-content;
+}
+
+.current-account-label {
+  margin-right: 8px;
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+}
+
+.el-dropdown-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--el-color-primary);
+  font-weight: 500;
+}
+
+.active-account-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-weight: 500;
+  color: var(--el-color-primary);
 }
 
 .filter-container {
