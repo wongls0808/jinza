@@ -90,12 +90,12 @@
                   <el-option
                     v-for="item in salespersonOptions"
                     :key="item.id"
-                    :label="item.name"
+                    :label="item.code || item.name"
                     :value="item.id"
                   >
                     <div class="salesperson-option">
-                      <span>{{ item.name }}</span>
-                      <small v-if="item.code">[{{ item.code }}]</small>
+                      <span>{{ item.code || item.name }}</span>
+                      <small>{{ item.name }}</small>
                     </div>
                   </el-option>
                 </el-select>
@@ -290,23 +290,19 @@
                   <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">折扣(%)：</span>
+                  <span class="summary-label">折扣金额：</span>
                   <div class="summary-value-with-input">
                     <el-input-number 
-                      v-model="discountRate" 
+                      v-model="discountAmount" 
                       :min="0" 
-                      :max="100" 
+                      :max="invoiceTotal + invoiceTaxTotal" 
                       :precision="2" 
                       controls-position="right"
                       size="small"
-                      @change="recalculateAllItems"
+                      @change="updateDiscountRate"
                       style="width: 120px;"
                     />
                   </div>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-label">折扣金额：</span>
-                  <span class="summary-value">{{ formatAmount(invoiceDiscountAmount) }}</span>
                 </div>
                 <div class="summary-item total">
                   <span class="summary-label">应付总计：</span>
@@ -361,13 +357,8 @@ const invoiceTaxTotal = computed(() => {
   }, 0);
 });
 
-const invoiceDiscountAmount = computed(() => {
-  const subTotal = invoiceTotal.value + invoiceTaxTotal.value;
-  return subTotal * (discountRate.value / 100);
-});
-
 const invoiceGrandTotal = computed(() => {
-  return invoiceTotal.value + invoiceTaxTotal.value - invoiceDiscountAmount.value;
+  return invoiceTotal.value + invoiceTaxTotal.value - discountAmount.value;
 });
 
 // 金额大写
@@ -395,9 +386,13 @@ const accountSetOptions = ref([]);
 const customerOptions = ref([]);
 const salespersonOptions = ref([]);
 const productOptions = ref([]);
-// 统一税率和折扣率
+// 统一税率和折扣
 const unifiedTaxRate = ref(0);
-const discountRate = ref(0);
+const discountAmount = ref(0);
+const discountRate = computed(() => {
+  const subTotal = invoiceTotal.value + invoiceTaxTotal.value;
+  return subTotal > 0 ? (discountAmount.value / subTotal) * 100 : 0;
+});
 
 // Selected details
 const selectedCustomer = ref(null);
@@ -608,6 +603,15 @@ function recalculateAllItems() {
   form.items.forEach((_, idx) => calculateItemAmount(idx));
 }
 
+// 根据输入的折扣金额限制最大值
+function updateDiscountRate() {
+  const subTotal = invoiceTotal.value + invoiceTaxTotal.value;
+  // 确保折扣金额不超过总金额
+  if (discountAmount.value > subTotal) {
+    discountAmount.value = subTotal;
+  }
+}
+
 function handleAccountSetChange(value) {
   selectedAccountSet.value = accountSetOptions.value.find(item => item.id === value) || null;
   if (!isEditing.value) {
@@ -726,7 +730,7 @@ async function save(status) {
       subtotal: invoiceTotal.value,
       tax_amount: invoiceTaxTotal.value,
       discount_rate: parseFloat(discountRate.value) || 0,
-      discount_amount: invoiceDiscountAmount.value,
+      discount_amount: parseFloat(discountAmount.value) || 0,
       total_amount: invoiceGrandTotal.value,
       notes: form.notes,
       items: form.items.map(item => ({
