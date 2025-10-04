@@ -152,44 +152,43 @@ router.get('/', async (req, res) => {
     const invoices = await dbQuery(db, query, params);
     
     // 获取总数
-    const totalQuery = `
+    // 统计总数时也需要构建相同的过滤语句与参数（否则会出现占位符数量不匹配导致500）
+    let totalQuery = `
       SELECT COUNT(*) as total
       FROM invoices i
       LEFT JOIN customers c ON i.customer_id = c.id
       WHERE 1=1
     `;
-    
-    // 应用相同的过滤条件
-    let totalParams = [];
+    const totalParams = [];
     if (req.query.customer_id) {
+      totalQuery += ' AND i.customer_id = ?';
       totalParams.push(req.query.customer_id);
     }
-    
     if (req.query.account_set_id) {
+      totalQuery += ' AND i.account_set_id = ?';
       totalParams.push(req.query.account_set_id);
     }
-    
     if (req.query.salesperson_id) {
+      totalQuery += ' AND i.salesperson_id = ?';
       totalParams.push(req.query.salesperson_id);
     }
-    
     if (req.query.status) {
+      totalQuery += ' AND i.status = ?';
       totalParams.push(req.query.status);
     }
-    
     if (req.query.payment_status) {
+      totalQuery += ' AND i.payment_status = ?';
       totalParams.push(req.query.payment_status);
     }
-    
     if (req.query.start_date && req.query.end_date) {
+      totalQuery += ' AND i.invoice_date BETWEEN ? AND ?';
       totalParams.push(req.query.start_date, req.query.end_date);
     }
-    
     if (req.query.search) {
+      totalQuery += ' AND (i.invoice_number LIKE ? OR c.name LIKE ?)';
       const searchTerm = `%${req.query.search}%`;
       totalParams.push(searchTerm, searchTerm);
     }
-    
     const countResult = await dbGet(db, totalQuery, totalParams);
     
     res.json({
@@ -292,16 +291,16 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: '缺少必要参数' });
   }
   
-  const db = await db.getConnection();
+  const db = getDb();
   
   try {
-    await db.beginTransaction();
+    await dbRun(db, 'BEGIN');
     
     // 生成发票编号
     const invoiceNumber = await generateInvoiceNumber(account_set_id);
     
     // 插入发票主表
-    const result = await db.run(`
+    const result = await dbRun(db, `
       INSERT INTO invoices (
         invoice_number, customer_id, account_set_id, salesperson_id, 
         invoice_date, due_date, status, payment_status, payment_method, 
@@ -314,14 +313,14 @@ router.post('/', requireAuth, async (req, res) => {
       payment_date ? 'paid' : 'unpaid',
       payment_method, payment_date, subtotal, tax_amount, 
       discount_amount, total_amount, notes, 
-      req.user.id, req.user.id
+      req.session.userId, req.session.userId
     ]);
     
     const invoiceId = result.lastID;
     
     // 插入发票明细项
     for (const item of items) {
-      await db.run(`
+      await dbRun(db, `
         INSERT INTO invoice_items (
           invoice_id, product_id, description, quantity, unit_price,
           unit, tax_rate, tax_amount, discount_rate, discount_amount,
@@ -338,7 +337,7 @@ router.post('/', requireAuth, async (req, res) => {
     
     // 如果有付款信息，则添加付款记录
     if (payment_date && payment_method && total_amount > 0) {
-      await db.run(`
+      await dbRun(db, `
         INSERT INTO invoice_payments (
           invoice_id, payment_date, amount, payment_method,
           transaction_reference, notes, created_by
@@ -346,11 +345,11 @@ router.post('/', requireAuth, async (req, res) => {
       `, [
         invoiceId, payment_date, total_amount, payment_method,
         req.body.transaction_reference || null,
-        '初始付款', req.user.id
+        '初始付款', req.session.userId
       ]);
     }
     
-    await db.commit();
+    await dbRun(db, 'COMMIT');
     
     res.status(201).json({
       id: invoiceId,
@@ -358,11 +357,11 @@ router.post('/', requireAuth, async (req, res) => {
       message: '发票创建成功'
     });
   } catch (error) {
-    await db.rollback();
+    try { await dbRun(db, 'ROLLBACK'); } catch (e) {}
     console.error('创建发票失败:', error);
     res.status(500).json({ error: '创建发票失败' });
   } finally {
-    db.release();
+    try { db.close(); } catch (e) {}
   }
 });
 
@@ -391,13 +390,13 @@ router.put('/:id', requireAuth, async (req, res) => {
     return res.status(400).json({ error: '缺少必要参数' });
   }
   
-  const db = await db.getConnection();
+  const db = getDb();
   
   try {
-    await db.beginTransaction();
+    await dbRun(db, 'BEGIN');
     
     // 更新发票主表
-    await db.run(`
+    await dbRun(db, `
       UPDATE invoices SET
         customer_id = ?, 
         account_set_id = ?, 
@@ -421,17 +420,17 @@ router.put('/:id', requireAuth, async (req, res) => {
       invoice_date, due_date, status, payment_status,
       payment_method, payment_date, subtotal, tax_amount, 
       discount_amount, total_amount, notes, 
-      req.user.id, id
+      req.session.userId, id
     ]);
     
     // 如果提供了明细项，则先删除现有的，再添加新的
     if (items && items.length > 0) {
       // 删除现有明细项
-      await db.run(`DELETE FROM invoice_items WHERE invoice_id = ?`, id);
+  await dbRun(db, `DELETE FROM invoice_items WHERE invoice_id = ?`, [id]);
       
       // 添加新明细项
       for (const item of items) {
-        await db.run(`
+        await dbRun(db, `
           INSERT INTO invoice_items (
             invoice_id, product_id, description, quantity, unit_price,
             unit, tax_rate, tax_amount, discount_rate, discount_amount,
@@ -447,42 +446,39 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
     
-    await db.commit();
+    await dbRun(db, 'COMMIT');
     
     res.json({ message: '发票更新成功' });
   } catch (error) {
-    await db.rollback();
+    try { await dbRun(db, 'ROLLBACK'); } catch (e) {}
     console.error('更新发票失败:', error);
     res.status(500).json({ error: '更新发票失败' });
   } finally {
-    db.release();
+    try { db.close(); } catch (e) {}
   }
 });
 
 // 删除发票
 router.delete('/:id', requireAuth, async (req, res) => {
+  const db = getDb();
   try {
     const { id } = req.params;
-    
     // 检查发票是否存在
-    const invoice = await db.get('SELECT * FROM invoices WHERE id = ?', id);
-    
+    const invoice = await dbGet(db, 'SELECT * FROM invoices WHERE id = ?', [id]);
     if (!invoice) {
       return res.status(404).json({ error: '发票不存在' });
     }
-    
-    // 检查发票状态，只能删除草稿状态的发票
+    // 仅允许删除草稿状态
     if (invoice.status !== 'draft') {
       return res.status(400).json({ error: '只能删除草稿状态的发票' });
     }
-    
-    // 删除发票及其关联的明细项（依赖外键级联删除）
-    await db.run('DELETE FROM invoices WHERE id = ?', id);
-    
+    await dbRun(db, 'DELETE FROM invoices WHERE id = ?', [id]);
     res.json({ message: '发票删除成功' });
   } catch (error) {
     console.error('删除发票失败:', error);
     res.status(500).json({ error: '删除发票失败' });
+  } finally {
+    try { db.close(); } catch (e) {}
   }
 });
 

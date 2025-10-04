@@ -339,6 +339,8 @@ async function switchAccountSet(accountSetId) {
 // 生命周期钩子
 onMounted(async () => {
   loadAccountSets();
+  // 监听来自全局的账套切换事件（由 App.vue 派发）
+  window.addEventListener('account-set-changed', onGlobalAccountSetChanged);
   await Promise.all([
     fetchCustomers(),
     fetchSalespeople(),
@@ -346,6 +348,26 @@ onMounted(async () => {
   fetchInvoices();
   fetchStats();
 });
+
+// 组件卸载时移除监听
+onUnmounted(() => {
+  window.removeEventListener('account-set-changed', onGlobalAccountSetChanged);
+});
+
+function onGlobalAccountSetChanged(e) {
+  try {
+    const set = e?.detail;
+    if (set && set.id) {
+      currentAccountSet.value = set;
+      localStorage.setItem('currentAccountSet', JSON.stringify(set));
+      currentPage.value = 1;
+      fetchInvoices();
+      fetchStats();
+    }
+  } catch (err) {
+    console.error('处理账套切换事件失败:', err);
+  }
+}
 
 // 获取客户列表
 async function fetchCustomers() {

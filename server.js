@@ -1853,14 +1853,23 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
         if (fallbackQuery) {
           db.get(fallbackQuery, [account_set_id], (err, fallbackRule) => {
             if (err || !fallbackRule) {
-              // 没有找到任何规则
-              return res.status(404).json({ error: '找不到编码规则，请先在账套管理中配置', error_code: 'no_rule_found' });
+              // 没有找到任何规则，使用时间戳回退编码，避免阻塞业务
+              const now = new Date();
+              const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+              const rnd = Math.floor(Math.random() * 900) + 100;
+              const prefix = type === 'invoice' ? 'INV' : 'CODE';
+              const generatedCode = `${prefix}-${stamp}-${rnd}`;
+              return res.json({ code: generatedCode, fallback: true });
             }
-            
             generateCodeFromRule(fallbackRule, res);
           });
         } else {
-          return res.status(404).json({ error: '找不到编码规则', error_code: 'no_rule_found' });
+          // 类型不支持，兜底（理论不会到达这里）
+          const now = new Date();
+          const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+          const rnd = Math.floor(Math.random() * 900) + 100;
+          const generatedCode = `CODE-${stamp}-${rnd}`;
+          return res.json({ code: generatedCode, fallback: true });
         }
       } else {
         generateCodeFromRule(rule, res);
