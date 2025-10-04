@@ -3,12 +3,12 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
-        <h1 class="page-title">发票管理</h1>
-        <p class="page-description">创建、管理和跟踪企业发票，支持关联客户、商品和业务员</p>
+  <h1 class="page-title">{{ $t('invoices.title') }}</h1>
+  <p class="page-description">{{ $t('invoices.description') }}</p>
       </div>
       <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
         <el-icon><Plus /></el-icon>
-        新建发票
+  {{ $t('invoices.new') }}
       </el-button>
     </div>
 

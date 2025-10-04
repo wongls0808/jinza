@@ -9,11 +9,11 @@
     >
       <!-- 顶部操作栏 -->
       <div class="form-header">
-        <div class="form-title">{{ isEditing ? '编辑发票' : '新建发票' }}</div>
+  <div class="form-title">{{ isEditing ? $t('invoiceForm.titleEdit') : $t('invoiceForm.titleNew') }}</div>
         <div class="form-actions">
-          <el-button @click="cancel">取消</el-button>
-          <el-button type="primary" @click="saveAsDraft" :loading="saving">保存草稿</el-button>
-          <el-button type="success" @click="saveAndPublish" :loading="publishing">保存并发布</el-button>
+          <el-button @click="cancel">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="saveAsDraft" :loading="saving">{{ $t('common.saveDraft') }}</el-button>
+          <el-button type="success" @click="saveAndPublish" :loading="publishing">{{ $t('common.saveAndPublish') }}</el-button>
         </div>
       </div>
 
@@ -23,10 +23,10 @@
           <!-- 左侧 - 基本信息 -->
           <el-col :xs="24" :sm="24" :md="10" :lg="8">
             <div class="form-section">
-              <h3 class="section-title">基本信息</h3>
+              <h3 class="section-title">{{ $t('invoiceForm.basicInfo') }}</h3>
               
               <!-- 账套选择（隐藏，自动选择默认账套） -->
-              <el-form-item label="账套" prop="account_set_id" required style="display:none;">
+              <el-form-item :label="$t('invoiceForm.accountSet')" prop="account_set_id" required style="display:none;">
                 <el-select 
                   v-model="form.account_set_id" 
                   placeholder="选择账套"
@@ -43,7 +43,7 @@
               </el-form-item>
               
               <!-- 发票编号 -->
-              <el-form-item label="发票编号" prop="invoice_number" required>
+              <el-form-item :label="$t('invoiceForm.invoiceNumber')" prop="invoice_number" required>
                 <div class="invoice-number-container">
                   <el-input v-model="form.invoice_number" placeholder="自动生成" :disabled="true">
                     <template #append>
@@ -56,7 +56,7 @@
               </el-form-item>
               
               <!-- 客户选择 -->
-              <el-form-item label="客户" prop="customer_id" required>
+              <el-form-item :label="$t('invoiceForm.customer')" prop="customer_id" required>
                 <el-select 
                   v-model="form.customer_id" 
                   placeholder="选择客户"
@@ -79,7 +79,7 @@
               </el-form-item>
               
               <!-- 业务员选择 -->
-              <el-form-item label="业务员" prop="salesperson_id">
+              <el-form-item :label="$t('invoiceForm.salesperson')" prop="salesperson_id">
                 <el-select 
                   v-model="form.salesperson_id" 
                   placeholder="选择业务员"
@@ -96,7 +96,7 @@
               </el-form-item>
 
               <!-- 开票日期 -->
-              <el-form-item label="开票日期" prop="issue_date" required>
+              <el-form-item :label="$t('invoiceForm.issueDate')" prop="issue_date" required>
                 <el-date-picker
                   v-model="form.issue_date"
                   type="date"
@@ -108,7 +108,7 @@
               </el-form-item>
 
               <!-- 到期日期 -->
-              <el-form-item label="到期日期" prop="due_date">
+              <el-form-item :label="$t('invoiceForm.dueDate')" prop="due_date">
                 <el-date-picker
                   v-model="form.due_date"
                   type="date"
@@ -120,7 +120,7 @@
               </el-form-item>
 
               <!-- 备注信息 -->
-              <el-form-item label="备注" prop="notes">
+              <el-form-item :label="$t('invoiceForm.notes')" prop="notes">
                 <el-input
                   v-model="form.notes"
                   type="textarea"
@@ -146,11 +146,11 @@
           <!-- 右侧 - 发票明细 -->
           <el-col :xs="24" :sm="24" :md="14" :lg="16">
             <div class="form-section">
-              <h3 class="section-title">发票明细</h3>
+              <h3 class="section-title">{{ $t('invoiceForm.details') }}</h3>
 
               <!-- 统一税率设置 -->
               <div style="display:flex; gap:16px; align-items:center; margin: 10px 0;">
-                <span style="color: var(--el-text-color-regular);">统一税率(%)</span>
+                <span style="color: var(--el-text-color-regular);">{{ $t('invoiceForm.unifiedTax') }}</span>
                 <el-input-number 
                   v-model="unifiedTaxRate" 
                   :min="0" 
@@ -168,7 +168,7 @@
                 style="width: 100%"
                 class="invoice-items-table"
               >
-                <el-table-column label="商品/描述" min-width="320">
+                <el-table-column :label="$t('invoiceForm.item.itemOrDesc')" min-width="320">
                   <template #default="scope">
                     <el-select 
                       :model-value="getItemSelection(scope.row)"
@@ -195,13 +195,13 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="单位" width="100">
+                <el-table-column :label="$t('invoiceForm.item.unit')" width="100">
                   <template #default="scope">
                     <el-input v-model="scope.row.unit" placeholder="单位" />
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="数量" width="120">
+                <el-table-column :label="$t('invoiceForm.item.qty')" width="120">
                   <template #default="scope">
                     <el-input-number 
                       v-model="scope.row.quantity" 
@@ -214,7 +214,7 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="单价" width="120">
+                <el-table-column :label="$t('invoiceForm.item.price')" width="120">
                   <template #default="scope">
                     <el-input-number 
                       v-model="scope.row.unit_price" 
@@ -229,7 +229,7 @@
                 
                 <!-- 移除行级税率列，改为统一税率设置 -->
                 
-                <el-table-column label="金额" width="120">
+                <el-table-column :label="$t('invoiceForm.item.amount')" width="120">
                   <template #default="scope">
                     <div class="amount-cell">{{ formatAmount(scope.row.amount) }}</div>
                   </template>
@@ -255,22 +255,22 @@
                   plain
                   @click="addItem"
                 >
-                  <el-icon><Plus /></el-icon> 添加明细项
+                  <el-icon><Plus /></el-icon> {{ $t('invoiceForm.item.add') }}
                 </el-button>
               </div>
               
               <!-- 合计金额 -->
               <div class="invoice-summary">
                 <div class="summary-item">
-                  <span class="summary-label">合计金额：</span>
+                  <span class="summary-label">{{ $t('invoiceForm.summary.subtotal') }}：</span>
                   <span class="summary-value">{{ formatAmount(invoiceTotal) }}</span>
                 </div>
                 <div class="summary-item">
-                  <span class="summary-label">税额合计：</span>
+                  <span class="summary-label">{{ $t('invoiceForm.summary.taxTotal') }}：</span>
                   <span class="summary-value">{{ formatAmount(invoiceTaxTotal) }}</span>
                 </div>
                 <div class="summary-item total">
-                  <span class="summary-label">应付总计：</span>
+                  <span class="summary-label">{{ $t('invoiceForm.summary.grandTotal') }}：</span>
                   <span class="summary-value">{{ formatAmount(invoiceGrandTotal) }}</span>
                 </div>
               </div>
