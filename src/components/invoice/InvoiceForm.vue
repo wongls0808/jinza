@@ -119,7 +119,7 @@
                 <el-col :span="8">
                   <!-- 币种 -->
                   <el-form-item label="币种" prop="currency">
-                    <el-input v-model="form.currency" placeholder="马币" />
+                    <el-input v-model="form.currency" placeholder="RINGGIT MALAYSIA" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -403,7 +403,7 @@ const form = reactive({
   issue_date: new Date().toISOString().slice(0, 10), // Today's date in YYYY-MM-DD format
   due_date: null,
   payment_terms: '30', // 默认30天
-  currency: '马币', // 默认马币
+  currency: 'RINGGIT MALAYSIA', // 默认马来西亚币
   status: 'draft',
   payment_status: 'unpaid',
   notes: '',
@@ -897,18 +897,19 @@ function hasChanges() {
 }
 
 // 金额转英文大写
-function numberToEnglishWords(num, currency = '马币') {
-  const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const scales = ['', 'Thousand', 'Million', 'Billion', 'Trillion'];
+function numberToEnglishWords(num, currency = 'RINGGIT MALAYSIA') {
+  const units = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+  const teens = ['TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+  const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+  const scales = ['', 'THOUSAND', 'MILLION', 'BILLION', 'TRILLION'];
 
   // 处理小数点
   const parts = num.toFixed(2).toString().split('.');
   let dollars = parseInt(parts[0]);
   let cents = parseInt(parts[1]);
 
-  if (dollars === 0) return `Zero ${currency} Only`;
+  // 如果金额为0
+  if (dollars === 0) return `${currency} : ZERO ONLY`;
 
   let words = '';
   let scaleIndex = 0;
@@ -920,7 +921,7 @@ function numberToEnglishWords(num, currency = '马币') {
 
       // 处理百位
       if (hundreds >= 100) {
-        groupWords += units[Math.floor(hundreds / 100)] + ' Hundred ';
+        groupWords += units[Math.floor(hundreds / 100)] + ' HUNDRED ';
       }
 
       // 处理十位和个位
@@ -931,10 +932,11 @@ function numberToEnglishWords(num, currency = '马币') {
         } else if (remainder < 20) {
           groupWords += teens[remainder - 10] + ' ';
         } else {
-          groupWords += tens[Math.floor(remainder / 10)] + ' ';
+          groupWords += tens[Math.floor(remainder / 10)];
           if (remainder % 10 > 0) {
-            groupWords += units[remainder % 10] + ' ';
+            groupWords += ' ' + units[remainder % 10];
           }
+          groupWords += ' ';
         }
       }
 
@@ -945,30 +947,9 @@ function numberToEnglishWords(num, currency = '马币') {
     scaleIndex++;
   }
 
-  // 使用自定义币种
-  words = words.trim() + ` ${currency}`;
+  // 按格式返回币种 + " : " + 金额 + " ONLY"
+  return `${currency} : ${words.trim()} ONLY`;
 
-  // 添加分部分
-  if (cents > 0) {
-    words += ' and ';
-    if (cents < 10) {
-      words += units[cents] + ' Sen';
-    } else if (cents < 20) {
-      words += teens[cents - 10] + ' Sen';
-    } else {
-      words += tens[Math.floor(cents / 10)];
-      if (cents % 10 > 0) {
-        words += '-' + units[cents % 10];
-      }
-      words += ' Sen';
-    }
-  } else {
-    words += ' Only'; // 如果没有分，添加"Only"
-  }
-  
-  return words;
-
-  return words;
 }
 </script>
 
