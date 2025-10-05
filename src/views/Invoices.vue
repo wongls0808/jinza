@@ -32,7 +32,7 @@
           </el-dropdown>
         </div>
       </div>
-      <el-button type="primary" size="large" @click="showAddDialog = true" class="add-button">
+      <el-button type="primary" size="large" @click="openCreateDialog" class="add-button">
         <el-icon><Plus /></el-icon>
         新建发票
       </el-button>
@@ -223,9 +223,11 @@
       custom-class="invoice-form-dialog"
       :close-on-click-modal="false"
       :destroy-on-close="true"
+      @closed="onFormDialogClosed"
     >
       <invoice-form
         v-if="showAddDialog"
+        :key="isEditing ? `edit-${currentInvoiceId}` : 'create'"
         :invoice-id="isEditing ? currentInvoiceId : null"
         @saved="handleInvoiceSaved"
         @cancel="showAddDialog = false"
@@ -577,6 +579,19 @@ function editInvoice(invoice) {
   currentInvoiceId.value = invoice.id;
   isEditing.value = true;
   showAddDialog.value = true;
+}
+
+// 新建对话框入口，确保清空编辑状态与ID，避免沿用上次编辑的数据
+function openCreateDialog() {
+  isEditing.value = false;
+  currentInvoiceId.value = null;
+  showAddDialog.value = true;
+}
+
+// 表单对话框关闭时重置状态，防止下次打开沿用脏状态
+function onFormDialogClosed() {
+  isEditing.value = false;
+  currentInvoiceId.value = null;
 }
 
 // 打印发票

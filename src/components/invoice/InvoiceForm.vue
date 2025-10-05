@@ -59,15 +59,9 @@
                 </el-col>
                 <el-col :span="12">
                   <!-- 发票编号 -->
-                  <el-form-item label="发票编号" prop="invoice_number" required>
+                  <el-form-item label="发票编号">
                     <div class="invoice-number-container">
-                      <el-input v-model="form.invoice_number" placeholder="自动生成" :disabled="true">
-                        <template #append>
-                          <el-button @click="generateInvoiceNumber">
-                            <el-icon><Refresh /></el-icon>
-                          </el-button>
-                        </template>
-                      </el-input>
+                      <el-input v-model="form.invoice_number" placeholder="保存时自动生成" :disabled="true" />
                     </div>
                   </el-form-item>
                 </el-col>
@@ -347,7 +341,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
-import { Delete, Refresh, Plus } from '@element-plus/icons-vue';
+import { Delete, Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 // Props
@@ -426,10 +420,7 @@ const selectedSalesperson = ref(null);
 
 // Validation rules
 const rules = {
-  // 去除账套必填校验（UI层面不再强制绑定）
-  invoice_number: [
-    { required: true, message: '请生成发票编号', trigger: 'blur' }
-  ],
+  // 发票编号由后端在保存时自动生成，因此不再前端校验必填
   customer_id: [
     { required: true, message: '请选择客户', trigger: 'change' }
   ],
@@ -454,25 +445,18 @@ onMounted(async () => {
     await fetchInvoiceDetails();
   } else {
     addEmptyItem();
-    // 自动选择默认账套（若存在），以满足后端必填，但在UI隐藏
+    // 自动选择默认账套（若存在），以满足后端必填，但不再预生成发票号，避免跳号
     if (accountSetOptions.value.length > 0) {
       // 优先选 is_active 或第一个
       const def = accountSetOptions.value.find(a => a.is_active === 1) || accountSetOptions.value[0];
       form.account_set_id = def?.id || null;
-      if (form.account_set_id) await generateInvoiceNumber();
+      // 不调用 generateInvoiceNumber()
     }
   }
 });
 
 // Watch for changes
-watch(() => form.account_set_id, async (newValue) => {
-  if (newValue && !isEditing.value) {
-    // 清空之前的发票编号
-    form.invoice_number = '';
-    // 尝试生成新的发票编号
-    await generateInvoiceNumber();
-  }
-});
+// 不在账套切换时预生成发票编号，避免用户取消导致编号跳号
 
 // Methods for fetching data
 async function fetchAccountSets() {
@@ -552,9 +536,14 @@ async function fetchInvoiceDetails() {
           tax_rate: parseFloat(item.tax_rate || 0),
           quantity: parseFloat(item.quantity || 0),
           unit_price: parseFloat(item.unit_price || 0),
-          amount: parseFloat(item.amount || 0),
+          // 后端字段为 subtotal/total，这里映射到表单使用的 amount
+          amount: parseFloat(item.subtotal ?? item.amount ?? (parseFloat(item.quantity||0) * parseFloat(item.unit_price||0)) || 0),
           tax_amount: parseFloat(item.tax_amount || 0)
         }));
+        // 以第一行税率作为统一税率（如果存在）
+        if (form.items.length > 0) unifiedTaxRate.value = parseFloat(form.items[0].tax_rate || 0);
+        // 确保重新计算金额
+        recalculateAllItems();
       } else {
         addEmptyItem();
       }
@@ -672,9 +661,7 @@ function updateDiscountRate() {
 
 function handleAccountSetChange(value) {
   selectedAccountSet.value = accountSetOptions.value.find(item => item.id === value) || null;
-  if (!isEditing.value) {
-    generateInvoiceNumber();
-  }
+  // 不自动生成编号
 }
 
 function handleCustomerChange(value) {
@@ -843,15 +830,6 @@ async function saveAndPublish() {
 
 async function save(status) {
   try {
-    // 先检查发票编号是否已经生成，如果没有，尝试生成
-    if (!form.invoice_number) {
-      const success = await generateInvoiceNumber();
-      if (!success) {
-        ElMessage.error('请确保账套已正确配置发票编号规则后再保存');
-        return;
-      }
-    }
-    
     await formRef.value.validate();
     
     if (form.items.length === 0 || 
@@ -923,6 +901,10 @@ async function save(status) {
     
     if (response.ok) {
       const result = await response.json();
+      // 保存后将服务器返回的实际发票号写回本地状态，便于后续提示或二次编辑
+      if (result && result.invoice_number) {
+        form.invoice_number = result.invoice_number;
+      }
       
       // 批量添加新商品到商品库
       await batchCreateNewProducts();
@@ -974,7 +956,7 @@ function numberToEnglishWords(num, currency = 'RINGGIT MALAYSIA') {
   let cents = parseInt(parts[1]);
 
   // 如果金额为0
-  if (dollars === 0) return `${currency} : ZERO ONLY`;
+  if (dollars === 0 && cents === 0) return `${currency} : ZERO ONLY`;
 
   let words = '';
   let scaleIndex = 0;
@@ -1012,8 +994,14 @@ function numberToEnglishWords(num, currency = 'RINGGIT MALAYSIA') {
     scaleIndex++;
   }
 
-  // 按格式返回币种 + " : " + 金额 + " ONLY"
-  return `${currency} : ${words.trim()} ONLY`;
+  words = words.trim();
+  // 处理小数部分
+  let centsWords = '';
+  if (cents && cents > 0) {
+    // 直接用两位数字表示分更清晰（XX CENTS）
+    centsWords = ` AND ${String(cents).padStart(2, '0')} CENTS`;
+  }
+  return `${currency} : ${words}${centsWords} ONLY`;
 
 }
 </script>
