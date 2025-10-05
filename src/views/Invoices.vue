@@ -170,7 +170,7 @@
           <template #default="scope">
             <el-popover trigger="click" placement="bottom-end" width="140">
               <template #reference>
-                <el-button size="small">操作</el-button>
+                <el-button size="small" @click.stop>操作</el-button>
               </template>
               <div class="ops-menu">
                 <el-button text size="small" @click.stop="previewInvoice(scope.row)">预览</el-button>
@@ -207,80 +207,7 @@
       </div>
     </div>
 
-    <!-- 发票列表 -->
-    <div class="invoice-list-container">
-      <el-table 
-        v-loading="loading"
-        :data="invoices"
-        border
-        stripe
-        style="width: 100%"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="invoice_date" label="开票时间" min-width="140" />
-        <el-table-column prop="invoice_number" label="发票号" min-width="140" />
-        <el-table-column prop="customer_name" label="客户" min-width="160" />
-        <el-table-column prop="total_amount" label="金额" min-width="120">
-          <template #default="scope">
-            RM {{ formatAmount(scope.row.total_amount) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="salesperson_nickname" label="业务员" min-width="100">
-          <template #default="scope">
-            {{ scope.row.salesperson_nickname || scope.row.salesperson_name || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_by_name" label="提交人" min-width="100" />
-        <el-table-column prop="created_at" label="提交时间" min-width="160" />
-        <el-table-column prop="updated_at" label="更新时间" min-width="160" />
-        <el-table-column prop="status" label="状态" min-width="100">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="payment_status" label="付款状态" min-width="100">
-          <template #default="scope">
-            <el-tag :type="getPaymentStatusType(scope.row.payment_status)">
-              {{ getPaymentStatusText(scope.row.payment_status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" fixed="right" width="260">
-          <template #default="scope">
-            <el-button size="small" @click.stop="viewInvoice(scope.row)">查看</el-button>
-            <el-button size="small" type="primary" @click.stop="editInvoice(scope.row)">编辑</el-button>
-            <el-button size="small" type="warning" plain @click.stop="voidInvoice(scope.row)" v-if="scope.row.status !== 'cancelled'">作废</el-button>
-            <el-dropdown trigger="click" @click.stop>
-              <el-button size="small">
-                更多<el-icon class="el-icon--right"><arrow-down /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="printInvoice(scope.row)">打印</el-dropdown-item>
-                  <el-dropdown-item @click="duplicateInvoice(scope.row)">复制</el-dropdown-item>
-                  <el-dropdown-item v-if="scope.row.status === 'draft'" @click="deleteInvoice(scope.row)" divided class="text-danger">删除</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页控件 -->
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </div>
+    
 
     <!-- 发票详情对话框 -->
     <el-dialog
