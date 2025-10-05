@@ -212,17 +212,21 @@
     <!-- 发票详情对话框 -->
     <el-dialog
       v-model="showViewDialog"
-      title="发票详情"
-      width="80%"
+      title="预览发票"
+      width="90%"
       custom-class="invoice-detail-dialog"
+      :close-on-click-modal="true"
     >
-      <invoice-detail
+      <invoice-form
         v-if="showViewDialog"
         :invoice-id="currentInvoiceId"
-        @close="showViewDialog = false"
-        @edit="handleEditFromView"
-        @print="handlePrintFromView"
-      />
+        :read-only="true"
+      >
+        <template #header-actions>
+          <el-button @click="showViewDialog = false">关闭</el-button>
+          <el-button type="primary" @click="handlePrintFromView(currentInvoiceId)">打印</el-button>
+        </template>
+      </invoice-form>
     </el-dialog>
 
     <!-- 新增/编辑发票对话框 -->

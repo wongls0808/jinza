@@ -4,16 +4,22 @@
       ref="formRef" 
       :model="form" 
       :rules="rules"
+      :disabled="isReadOnly"
       label-position="top" 
       class="invoice-form"
     >
       <!-- 顶部操作栏 -->
       <div class="form-header">
-        <div class="form-title">{{ isEditing ? '编辑发票' : '新建发票' }}</div>
+        <div class="form-title">{{ isEditing ? (isReadOnly ? '预览发票' : '编辑发票') : '新建发票' }}</div>
         <div class="form-actions">
-          <el-button @click="cancel">取消</el-button>
-          <el-button type="primary" @click="saveAsDraft" :loading="saving">保存草稿</el-button>
-          <el-button type="success" @click="saveAndPublish" :loading="publishing">保存并发布</el-button>
+          <template v-if="isReadOnly">
+            <slot name="header-actions"></slot>
+          </template>
+          <template v-else>
+            <el-button @click="cancel">取消</el-button>
+            <el-button type="primary" @click="saveAsDraft" :loading="saving">保存草稿</el-button>
+            <el-button type="success" @click="saveAndPublish" :loading="publishing">保存并发布</el-button>
+          </template>
         </div>
       </div>
 
@@ -198,7 +204,7 @@
                       :model-value="getItemSelection(scope.row)"
                       placeholder="选择商品或直接输入描述"
                       filterable
-                      allow-create
+                      :allow-create="!isReadOnly"
                       default-first-option
                       clearable
                       @update:model-value="handleItemSelectionChange($event, scope.$index)"
@@ -259,7 +265,7 @@
                   </template>
                 </el-table-column>
                 
-                <el-table-column label="操作" width="80" align="center">
+                <el-table-column v-if="!isReadOnly" label="操作" width="80" align="center">
                   <template #default="scope">
                     <el-button 
                       type="danger" 
@@ -273,7 +279,7 @@
               </el-table>
               
               <!-- 添加明细项按钮 -->
-              <div class="add-item-container">
+              <div class="add-item-container" v-if="!isReadOnly">
                 <el-button 
                   type="primary" 
                   plain
@@ -350,6 +356,10 @@ const props = defineProps({
   invoiceId: {
     type: [Number, String],
     default: null
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -363,6 +373,7 @@ const publishing = ref(false);
 
 // Computed properties
 const isEditing = computed(() => !!props.invoiceId);
+const isReadOnly = computed(() => props.readOnly === true);
 
 const invoiceTotal = computed(() => {
   return form.items.reduce((sum, item) => {
