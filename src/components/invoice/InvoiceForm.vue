@@ -537,7 +537,7 @@ async function fetchInvoiceDetails() {
           quantity: parseFloat(item.quantity || 0),
           unit_price: parseFloat(item.unit_price || 0),
           // 后端字段为 subtotal/total，这里映射到表单使用的 amount
-          amount: parseFloat(item.subtotal ?? item.amount ?? (parseFloat(item.quantity||0) * parseFloat(item.unit_price||0)) || 0),
+          amount: parseFloat(((item.subtotal ?? item.amount ?? (parseFloat(item.quantity ?? 0) * parseFloat(item.unit_price ?? 0))) ?? 0)),
           tax_amount: parseFloat(item.tax_amount || 0)
         }));
         // 以第一行税率作为统一税率（如果存在）
