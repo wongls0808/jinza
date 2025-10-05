@@ -379,7 +379,7 @@ router.post('/', requireAuth, async (req, res) => {
         // 若前端已生成发票号则使用，否则服务端生成
         const invoiceNumber = invoice_number && String(invoice_number).trim().length > 0
           ? String(invoice_number).trim()
-          : await generateInvoiceNumber(account_set_id);
+          : await generateInvoiceNumber(account_set_id, invoice_date);
 
         // 插入发票主表
         const result = await dbRun(db, `
