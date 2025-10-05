@@ -82,6 +82,38 @@ function dbRun(db, sql, params = []) {
   });
 }
 
+// 生成唯一9位商品编码
+async function generateUniqueProductCode(db) {
+  function randomCode() {
+    const digits = '0123456789';
+    let code = '';
+    for (let i = 0; i < 9; i++) {
+      code += digits[Math.floor(Math.random() * 10)];
+    }
+    return code;
+  }
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = randomCode();
+    const existing = await dbGet(db, 'SELECT id FROM products WHERE code = ?', [code]);
+    if (!existing) return code;
+  }
+  throw new Error('无法生成唯一商品编码');
+}
+
+// 解析或创建商品：根据描述（不区分大小写）查找，不存在则创建（仅在需要入库时）
+async function resolveOrCreateProduct(db, description, unit, price, userId) {
+  if (!description || !description.trim()) return null;
+  const existing = await dbGet(db, 'SELECT * FROM products WHERE description = ? COLLATE NOCASE', [description.trim()]);
+  if (existing) return { id: existing.id, code: existing.code, unit: existing.unit };
+  // 创建新商品
+  const code = await generateUniqueProductCode(db);
+  const result = await dbRun(db, `
+    INSERT INTO products (code, description, unit, selling_price, created_by)
+    VALUES (?, ?, ?, ?, ?)
+  `, [code, description.trim(), unit || '', parseFloat(price || 0) || 0, userId]);
+  return { id: result.lastID, code, unit: unit || '' };
+}
+
 // 获取所有发票
 router.get('/', async (req, res) => {
   const db = getDb();
@@ -343,13 +375,13 @@ router.get('/:id', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   const {
     invoice_number,
-    customer_id, 
-    account_set_id, 
-    salesperson_id, 
-    invoice_date, 
-    due_date, 
+    customer_id,
+    account_set_id,
+    salesperson_id,
+    invoice_date,
+    due_date,
     status,
-    payment_method, 
+    payment_method,
     payment_date,
     subtotal,
     tax_amount,
@@ -358,32 +390,30 @@ router.post('/', requireAuth, async (req, res) => {
     notes,
     items
   } = req.body;
-  
+
   if (!customer_id || !account_set_id || !invoice_date || !items || !items.length) {
     return res.status(400).json({ error: '缺少必要参数' });
   }
-  
+
   const db = getDb();
-  
-  // 尝试插入发票（处理发票号唯一性冲突自动重试有限次）
+
   const MAX_RETRY = 3;
   let attempt = 0;
   let created = null;
   let lastError = null;
-  
+
   try {
     while (attempt < MAX_RETRY && !created) {
       attempt++;
       try {
         await dbRun(db, 'BEGIN');
-        // 若前端已生成发票号则使用，否则服务端生成
+
         const invoiceNumber = invoice_number && String(invoice_number).trim().length > 0
           ? String(invoice_number).trim()
           : await generateInvoiceNumber(account_set_id, invoice_date);
 
-        // 插入发票主表
-        // 规范化状态：将 published 视为 issued
         const normalizedStatus = (status === 'published') ? 'issued' : (status || 'draft');
+
         const result = await dbRun(db, `
       INSERT INTO invoices (
         invoice_number, customer_id, account_set_id, salesperson_id, 
@@ -393,17 +423,33 @@ router.post('/', requireAuth, async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
           invoiceNumber, customer_id, account_set_id, salesperson_id,
-          invoice_date, due_date, normalizedStatus, 
+          invoice_date, due_date, normalizedStatus,
           payment_date ? 'paid' : 'unpaid',
-          payment_method, payment_date, subtotal, tax_amount, 
-          discount_amount, total_amount, notes, 
+          payment_method, payment_date, subtotal, tax_amount,
+          discount_amount, total_amount, notes,
           req.session.userId, req.session.userId
         ]);
-        
+
         const invoiceId = result.lastID;
-        
-        // 插入发票明细项
+
+        // 处理明细：如需入库（issued/paid）则尽量补齐商品ID/编码
+        const effectiveItems = [];
         for (const item of items) {
+          let productId = item.product_id || null;
+          let productCode = null;
+          if ((normalizedStatus === 'issued' || normalizedStatus === 'paid') && !productId && item.description) {
+            try {
+              const p = await resolveOrCreateProduct(db, item.description, item.unit, item.unit_price, req.session.userId);
+              if (p) {
+                productId = p.id;
+                productCode = p.code;
+              }
+            } catch (e) {
+              console.warn('解析/创建商品失败，继续使用描述:', e?.message || e);
+            }
+          }
+          effectiveItems.push({ ...item, product_id: productId, _product_code: productCode });
+
           await dbRun(db, `
         INSERT INTO invoice_items (
           invoice_id, product_id, description, quantity, unit_price,
@@ -411,18 +457,18 @@ router.post('/', requireAuth, async (req, res) => {
           subtotal, total, notes
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            invoiceId, item.product_id, item.description, item.quantity,
-            item.unit_price, item.unit, item.tax_rate || 0, 
+            invoiceId, productId, item.description, item.quantity,
+            item.unit_price, item.unit, item.tax_rate || 0,
             item.tax_amount || 0, item.discount_rate || 0,
             item.discount_amount || 0, item.subtotal, item.total,
             item.notes
           ]);
         }
 
-        // 若发票保存为已开具(issued)，将明细写入采购记录
+        // 若发票保存为已开具(issued/paid)，将明细写入采购记录
         const isIssued = (normalizedStatus === 'issued' || normalizedStatus === 'paid');
         if (isIssued) {
-          for (const item of items) {
+          for (const item of effectiveItems) {
             await dbRun(db, `
               INSERT INTO purchase_records (
                 account_set_id, invoice_id, record_date, product_id, product_code, product_description, unit, quantity, unit_price, created_by
@@ -430,7 +476,7 @@ router.post('/', requireAuth, async (req, res) => {
             `, [
               account_set_id, invoiceId, invoice_date,
               item.product_id || null,
-              null,
+              item._product_code || null,
               item.description,
               item.unit || null,
               item.quantity || 0,
@@ -439,7 +485,7 @@ router.post('/', requireAuth, async (req, res) => {
             ]);
           }
         }
-        
+
         // 如果有付款信息，则添加付款记录
         if (payment_date && payment_method && total_amount > 0) {
           await dbRun(db, `
@@ -453,11 +499,10 @@ router.post('/', requireAuth, async (req, res) => {
             '初始付款', req.session.userId
           ]);
         }
-        
+
         await dbRun(db, 'COMMIT');
         created = { id: invoiceId, invoice_number: invoiceNumber };
       } catch (err) {
-        // 唯一键冲突，重试
         await dbRun(db, 'ROLLBACK').catch(()=>{});
         lastError = err;
         const msg = String(err?.message || '');
@@ -466,11 +511,9 @@ router.post('/', requireAuth, async (req, res) => {
             continue;
           }
         }
-        // 编码规则未配置或无效，直接返回 400
         if (err && (err.code === 'no_rule_found' || err.code === 'invalid_rule_format')) {
           return res.status(400).json({ error: err.code === 'no_rule_found' ? 'no_rule_found' : 'invalid_rule_format', message: '账套未正确配置“发票编号”编码规则，请在账套中配置后重试' });
         }
-        // 其他错误或超出重试
         throw err;
       }
     }
@@ -549,13 +592,29 @@ router.put('/:id', requireAuth, async (req, res) => {
       req.session.userId, id
     ]);
     
-    // 如果提供了明细项，则先删除现有的，再添加新的
+  // 如果提供了明细项，则先删除现有的，再添加新的
     if (items && items.length > 0) {
       // 删除现有明细项
   await dbRun(db, `DELETE FROM invoice_items WHERE invoice_id = ?`, [id]);
       
-      // 添加新明细项
+      // 添加新明细项（如需入库则尽量补齐商品ID/编码）
+      const normalizedStatus = (status === 'published') ? 'issued' : (status || 'draft');
+      const effectiveItems = [];
       for (const item of items) {
+        let productId = item.product_id || null;
+        let productCode = null;
+        if ((normalizedStatus === 'issued' || normalizedStatus === 'paid') && !productId && item.description) {
+          try {
+            const p = await resolveOrCreateProduct(db, item.description, item.unit, item.unit_price, req.session.userId);
+            if (p) {
+              productId = p.id;
+              productCode = p.code;
+            }
+          } catch(e) {
+            console.warn('解析/创建商品失败(更新)：', e?.message || e);
+          }
+        }
+        effectiveItems.push({ ...item, product_id: productId, _product_code: productCode });
         await dbRun(db, `
           INSERT INTO invoice_items (
             invoice_id, product_id, description, quantity, unit_price,
@@ -563,7 +622,7 @@ router.put('/:id', requireAuth, async (req, res) => {
             subtotal, total, notes
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          id, item.product_id, item.description, item.quantity,
+          id, productId, item.description, item.quantity,
           item.unit_price, item.unit, item.tax_rate || 0, 
           item.tax_amount || 0, item.discount_rate || 0,
           item.discount_amount || 0, item.subtotal, item.total,
@@ -573,10 +632,9 @@ router.put('/:id', requireAuth, async (req, res) => {
 
       // 同步采购记录：先清除本发票相关记录，再视状态写入
       await dbRun(db, `DELETE FROM purchase_records WHERE invoice_id = ?`, [id]);
-      const normalizedStatus = (status === 'published') ? 'issued' : (status || 'draft');
       const isIssued = (normalizedStatus === 'issued' || normalizedStatus === 'paid');
       if (isIssued) {
-        for (const item of items) {
+        for (const item of effectiveItems) {
           await dbRun(db, `
             INSERT INTO purchase_records (
               account_set_id, invoice_id, record_date, product_id, product_code, product_description, unit, quantity, unit_price, created_by
@@ -584,7 +642,7 @@ router.put('/:id', requireAuth, async (req, res) => {
           `, [
             account_set_id, id, invoice_date,
             item.product_id || null,
-            null,
+            item._product_code || null,
             item.description,
             item.unit || null,
             item.quantity || 0,
@@ -665,9 +723,10 @@ router.put('/:id/status', requireAuth, async (req, res) => {
     // 同步采购记录：
     // 若状态变为 issued，则写入采购记录；若变为非 issued（如 cancelled/draft/paid），则移除相关记录
     const items = await dbQuery(db, `
-      SELECT ii.*, inv.account_set_id, inv.invoice_date
+      SELECT ii.*, inv.account_set_id, inv.invoice_date, p.code AS product_code
       FROM invoice_items ii
       JOIN invoices inv ON inv.id = ii.invoice_id
+      LEFT JOIN products p ON p.id = ii.product_id
       WHERE ii.invoice_id = ?
     `, [id]);
     if (['issued','paid','overdue'].includes(status)) {
@@ -681,7 +740,7 @@ router.put('/:id/status', requireAuth, async (req, res) => {
         `, [
           item.account_set_id, id, item.invoice_date,
           item.product_id || null,
-          null,
+          item.product_code || null,
           item.description,
           item.unit || null,
           item.quantity || 0,
