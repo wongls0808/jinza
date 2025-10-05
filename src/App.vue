@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- 强制分离登录和主应用视图，避免重叠 -->
-    
+
     <!-- 应用加载状态 -->
     <div v-if="appLoading" class="app-loading">
       <div class="loading-content">
@@ -9,21 +9,21 @@
         <span>加载中...</span>
       </div>
     </div>
-    
+
     <!-- 已登录状态 -->
     <div v-else-if="user" class="app-main">
       <!-- 侧边栏遮罩层 - 移动设备菜单展开时显示 -->
-      <div 
-        class="sidebar-overlay" 
+      <div
+        class="sidebar-overlay"
         :class="{ 'visible': sidebarExpanded }"
         @click="toggleSidebar(false)"
       ></div>
-      
+
       <el-container class="layout no-sidebar">
         <!-- 主内容区 -->
         <el-container>
           <!-- 顶部导航栏 -->
-          <el-header class="header" :class="{'dashboard-header': isDashboardActive}">
+          <el-header class="header" :class="{ 'dashboard-header': isDashboardActive }">
             <div class="header-left">
               <!-- 返回主页按钮 - 非Dashboard页面时显示 -->
               <button v-if="!isDashboardActive" class="back-to-home-btn" @click="navigate('dashboard')">
@@ -54,11 +54,48 @@
               </el-dropdown>
             </div>
           </el-header>
-          
+
           <!-- 内容主区域 -->
-          <el-main class="main-content" :class="{
-            'has-mobile-tabbar': isMobileDevice,
-                /* 全局账套切换样式已移除 */
+          <el-main class="main-content" :class="{ 'has-mobile-tabbar': isMobileDevice, 'dashboard-content': isDashboardActive }">
+            <div class="page-container full-width">
+              <!-- 如果是移动设备且显示更多菜单，则显示更多菜单组件 -->
+              <mobile-more-menu
+                v-if="isMobileDevice && showMoreMenu"
+                :user-role="user.role"
+                @navigate="handleMoreMenuNavigation"
+                @logout="handleMobileLogout"
+              />
+              <!-- 否则显示常规内容组件 -->
+              <component v-else :is="currentComponent" :user="user" @navigate="navigate" />
+            </div>
+          </el-main>
+        </el-container>
+      </el-container>
+
+      <!-- 移动设备底部导航栏 -->
+      <mobile-tabbar
+        v-if="user"
+        :is-mobile="isMobileDevice"
+        :active-menu="activeMenu"
+        :user-role="user.role"
+        @navigate="handleMobileNavigation"
+      />
+
+      <!-- 强制密码修改对话框 -->
+      <ForcePasswordChange
+        v-if="showForcePwd"
+        :user-id="user.id"
+        :require-old="true"
+        @done="handlePwdUpdated"
+      />
+    </div>
+
+    <!-- 未登录状态 - 登录页 -->
+    <div v-else-if="!appLoading && !user" class="login-container">
+      <div class="login-content">
+        <div class="login-left">
+          <div class="login-shapes">
+            <div class="shape shape-1"></div>
             <div class="shape shape-2"></div>
             <div class="shape shape-3"></div>
           </div>
@@ -70,12 +107,12 @@
             <p class="brand-subtitle">高效管理·数据驱动·智能决策</p>
           </div>
         </div>
-        
+
         <div class="login-right">
           <div class="login-form-container">
             <h2 class="login-greeting">欢迎回来</h2>
             <p class="login-message">请登录您的账户继续使用系统</p>
-            
+
             <!-- 登录表单 -->
             <el-form class="login-form" @submit.prevent="login">
               <el-form-item>
@@ -110,10 +147,10 @@
                 />
               </el-form-item>
               <el-form-item>
-                <el-button 
-                  type="primary" 
-                  size="large" 
-                  @click="login" 
+                <el-button
+                  type="primary"
+                  size="large"
+                  @click="login"
                   class="login-button"
                   :loading="loading"
                   :disabled="loading"
