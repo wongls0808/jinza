@@ -220,7 +220,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       SELECT i.*, 
         c.name as customer_name, 
         c.address as customer_address,
-        c.contact_person as customer_contact,
+        c.contact as customer_contact,
         c.phone as customer_phone,
         s.name as salesperson_name,
         a.name as account_set_name
@@ -371,6 +371,10 @@ router.post('/', requireAuth, async (req, res) => {
           if (attempt < MAX_RETRY) {
             continue;
           }
+        }
+        // 编码规则未配置或无效，直接返回 400
+        if (err && (err.code === 'no_rule_found' || err.code === 'invalid_rule_format')) {
+          return res.status(400).json({ error: err.code === 'no_rule_found' ? 'no_rule_found' : 'invalid_rule_format', message: '账套未正确配置“发票编号”编码规则，请在账套中配置后重试' });
         }
         // 其他错误或超出重试
         throw err;
@@ -738,7 +742,7 @@ async function getInvoiceWithDetails(id) {
       SELECT i.*, 
         c.name as customer_name, 
         c.address as customer_address,
-        c.contact_person as customer_contact,
+        c.contact as customer_contact,
         c.phone as customer_phone,
         s.name as salesperson_name,
         a.name as account_set_name

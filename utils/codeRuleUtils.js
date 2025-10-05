@@ -31,29 +31,21 @@ export async function generateInvoiceNumber(accountSetId) {
       db.run(sql, params, function(err){ err ? reject(err) : resolve(this); });
     });
 
-    // 优先找默认规则
-    let rule = await getOne(`
-      SELECT cr.* FROM code_rules cr
-      JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
-      WHERE icr.account_set_id = ? AND icr.is_default = 1
-    `, [accountSetId]);
+    // 读取当前账套中名称为“发票编号”的编码规则
+    const rule = await getOne(
+      `SELECT * FROM code_rules WHERE account_set_id = ? AND name = ? LIMIT 1`,
+      [accountSetId, '发票编号']
+    );
 
-    // 兜底找任一规则
     if (!rule) {
-      rule = await getOne(`
-        SELECT cr.* FROM code_rules cr
-        JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
-        WHERE icr.account_set_id = ?
-        LIMIT 1
-      `, [accountSetId]);
+      const err = new Error('no_rule_found');
+      err.code = 'no_rule_found';
+      throw err;
     }
-
-    if (!rule) {
-      // 无任何规则，使用时间戳回退
-      const now = new Date();
-      const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-      const rnd = Math.floor(Math.random() * 900) + 100;
-      return `INV-${stamp}-${rnd}`;
+    if (!rule.format || typeof rule.format !== 'string' || rule.format.trim() === '') {
+      const err = new Error('invalid_rule_format');
+      err.code = 'invalid_rule_format';
+      throw err;
     }
 
     // 原子地将 current_number + 1 后生成编码
@@ -61,7 +53,7 @@ export async function generateInvoiceNumber(accountSetId) {
     await run(`UPDATE code_rules SET current_number = ? WHERE id = ?`, [newNumber, rule.id]);
 
     // 生成编码，沿用 /api/generate-code 的占位规则
-    let generatedCode = (rule.format || '{prefix}{year}{month}{day}-{number}')
+    let generatedCode = (rule.format)
       .replace('{prefix}', rule.prefix || '')
       .replace('{suffix}', rule.suffix || '')
       .replace('{number}', String(newNumber).padStart(4, '0'))
@@ -73,11 +65,8 @@ export async function generateInvoiceNumber(accountSetId) {
 
     return generatedCode;
   } catch (error) {
-    console.error('生成发票编号失败:', error);
-    const now = new Date();
-    const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-    const rnd = Math.floor(Math.random() * 900) + 100;
-    return `INV-${stamp}-${rnd}`;
+    // 将错误抛给调用方处理（用于给前端明确提示）
+    throw error;
   } finally {
     try { db.close(); } catch (e) {}
   }

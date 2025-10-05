@@ -623,13 +623,15 @@ async function generateInvoiceNumber() {
         form.invoice_number = data.code;
         return true;
       } else {
-        ElMessage.error('所选账套未正确配置发票编号规则，请在账套管理中设置');
+        ElMessage.error('所选账套未正确配置“发票编号”规则，请在账套管理中设置');
         return false;
       }
     } else {
       const errorData = await response.json();
       if (errorData.error === 'no_rule_found') {
-        ElMessage.error('所选账套未配置发票编号规则，请在账套管理中添加发票编号规则');
+        ElMessage.error('所选账套未配置名为“发票编号”的编码规则，请在账套管理中添加后重试');
+      } else if (errorData.error === 'invalid_rule_format') {
+        ElMessage.error('“发票编号”规则的格式无效，请在账套管理中完善规则格式');
       } else {
         ElMessage.error('生成发票号码失败: ' + (errorData.error || '未知错误'));
       }
@@ -637,7 +639,7 @@ async function generateInvoiceNumber() {
     }
   } catch (error) {
     console.error('生成发票号码失败:', error);
-    ElMessage.error('无法自动生成发票号码，请在账套管理中正确配置发票编号规则');
+    ElMessage.error('无法自动生成发票号码，请在账套管理中正确配置名为“发票编号”的规则');
     return false;
   }
 }

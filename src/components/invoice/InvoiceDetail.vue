@@ -2,7 +2,7 @@
   <div class="invoice-detail-container" v-loading="loading">
     <div class="detail-header">
       <div class="header-left">
-        <h2 class="invoice-title">发票 {{ invoice.invoice_number }}</h2>
+  <h2 class="invoice-title">发票 {{ invoice.invoice_number }}</h2>
         <div class="invoice-status">
           <el-tag :type="getStatusType(invoice.status)">
             {{ getStatusText(invoice.status) }}
@@ -32,7 +32,7 @@
               </li>
               <li>
                 <span class="info-label">开票日期：</span>
-                <span class="info-value">{{ formatDate(invoice.issue_date) }}</span>
+                <span class="info-value">{{ formatDate(invoice.invoice_date) }}</span>
               </li>
               <li v-if="invoice.due_date">
                 <span class="info-label">到期日期：</span>
@@ -40,11 +40,11 @@
               </li>
               <li>
                 <span class="info-label">账套：</span>
-                <span class="info-value">{{ invoice.account_set?.name || '-' }}</span>
+                <span class="info-value">{{ invoice.account_set_name || '-' }}</span>
               </li>
               <li>
                 <span class="info-label">业务员：</span>
-                <span class="info-value">{{ invoice.salesperson?.name || '-' }}</span>
+                <span class="info-value">{{ invoice.salesperson_name || '-' }}</span>
               </li>
               <li>
                 <span class="info-label">创建时间：</span>
@@ -58,28 +58,28 @@
           </div>
 
           <!-- 客户信息 -->
-          <div class="detail-section" v-if="invoice.customer">
+          <div class="detail-section" v-if="invoice.customer_name">
             <h3 class="section-title">客户信息</h3>
             <ul class="info-list">
               <li>
                 <span class="info-label">名称：</span>
-                <span class="info-value">{{ invoice.customer.name }}</span>
+                <span class="info-value">{{ invoice.customer_name }}</span>
               </li>
-              <li v-if="invoice.customer.contact">
+              <li v-if="invoice.customer_contact">
                 <span class="info-label">联系人：</span>
-                <span class="info-value">{{ invoice.customer.contact }}</span>
+                <span class="info-value">{{ invoice.customer_contact }}</span>
               </li>
-              <li v-if="invoice.customer.phone">
+              <li v-if="invoice.customer_phone">
                 <span class="info-label">电话：</span>
-                <span class="info-value">{{ invoice.customer.phone }}</span>
+                <span class="info-value">{{ invoice.customer_phone }}</span>
               </li>
-              <li v-if="invoice.customer.email">
+              <li v-if="invoice.customer_email">
                 <span class="info-label">邮箱：</span>
-                <span class="info-value">{{ invoice.customer.email }}</span>
+                <span class="info-value">{{ invoice.customer_email }}</span>
               </li>
-              <li v-if="invoice.customer.address">
+              <li v-if="invoice.customer_address">
                 <span class="info-label">地址：</span>
-                <span class="info-value">{{ invoice.customer.address }}</span>
+                <span class="info-value">{{ invoice.customer_address }}</span>
               </li>
             </ul>
           </div>
@@ -130,15 +130,15 @@
             <div class="invoice-summary">
               <div class="summary-row">
                 <span class="summary-label">合计金额：</span>
-                <span class="summary-value">¥{{ formatAmount(invoice.total_amount) }}</span>
+                <span class="summary-value">¥{{ formatAmount(invoice.subtotal ?? invoice.total_amount) }}</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">税额合计：</span>
-                <span class="summary-value">¥{{ formatAmount(invoice.tax_total) }}</span>
+                <span class="summary-value">¥{{ formatAmount(invoice.tax_amount || 0) }}</span>
               </div>
               <div class="summary-row total">
                 <span class="summary-label">应付总计：</span>
-                <span class="summary-value">¥{{ formatAmount(parseFloat(invoice.total_amount) + parseFloat(invoice.tax_total)) }}</span>
+                <span class="summary-value">¥{{ formatAmount(parseFloat(invoice.total_amount || 0)) }}</span>
               </div>
             </div>
           </div>
@@ -180,7 +180,13 @@ async function fetchInvoiceDetails() {
   try {
     const response = await fetch(`/api/invoices/${props.invoiceId}`);
     if (response.ok) {
-      invoice.value = await response.json();
+      const data = await response.json();
+      // 直接使用后端已联表的别名字段
+      invoice.value = {
+        ...data,
+        // 确保 items 数组存在
+        items: Array.isArray(data.items) ? data.items : []
+      };
     } else {
       throw new Error('获取发票详情失败');
     }
