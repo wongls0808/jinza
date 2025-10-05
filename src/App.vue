@@ -37,28 +37,6 @@
               </div>
             </div>
             <div class="header-right">
-              <!-- 账套选择器 -->
-              <el-dropdown @command="handleAccountSetChange" v-if="userAccountSets.length > 0" class="account-set-dropdown">
-                <span class="account-set-selector">
-                  <el-icon><Folder /></el-icon>
-                  <span class="account-set-name">{{ currentAccountSet?.name || '选择账套' }}</span>
-                  <el-icon><ArrowDown /></el-icon>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item 
-                      v-for="set in userAccountSets" 
-                      :key="set.id" 
-                      :command="set.id"
-                      :class="{'active-account-set': set.id === currentAccountSet?.id}"
-                    >
-                      {{ set.name }}
-                      <el-icon v-if="set.id === currentAccountSet?.id"><Check /></el-icon>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-              
               <!-- 用户菜单 -->
               <el-dropdown @command="handleCommand">
                 <span class="user-dropdown">
@@ -80,47 +58,7 @@
           <!-- 内容主区域 -->
           <el-main class="main-content" :class="{
             'has-mobile-tabbar': isMobileDevice,
-            'dashboard-content': isDashboardActive
-          }">
-            <div class="page-container full-width">
-              <!-- 如果是移动设备且显示更多菜单，则显示更多菜单组件 -->
-              <mobile-more-menu
-                v-if="isMobileDevice && showMoreMenu"
-                :user-role="user.role"
-                @navigate="handleMoreMenuNavigation"
-                @logout="handleMobileLogout"
-              />
-              <!-- 否则显示常规内容组件 -->
-              <component v-else :is="currentComponent" :user="user" @navigate="navigate" />
-            </div>
-          </el-main>
-        </el-container>
-      </el-container>
-      
-      <!-- 移动设备底部导航栏 -->
-      <mobile-tabbar
-        v-if="user"
-        :is-mobile="isMobileDevice"
-        :active-menu="activeMenu"
-        :user-role="user.role"
-        @navigate="handleMobileNavigation"
-      />
-      
-      <!-- 强制密码修改对话框 -->
-      <ForcePasswordChange 
-        v-if="showForcePwd" 
-        :user-id="user.id" 
-        :require-old="true" 
-        @done="handlePwdUpdated" 
-      />
-    </div>
-
-    <!-- 未登录状态 - 登录页 -->
-    <div v-else-if="!appLoading && !user" class="login-container">
-      <div class="login-content">
-        <div class="login-left">
-          <div class="login-shapes">
-            <div class="shape shape-1"></div>
+                /* 全局账套切换样式已移除 */
             <div class="shape shape-2"></div>
             <div class="shape shape-3"></div>
           </div>
@@ -331,39 +269,7 @@ const handleCommand = (command) => {
   }
 };
 
-// 处理账套选择变化
-const handleAccountSetChange = async (accountSetId) => {
-  try {
-    // 统一将下拉回传的 command 转成数字，避免字符串/数字类型不一致导致匹配失败
-    const idNum = typeof accountSetId === 'string' ? parseInt(accountSetId, 10) : accountSetId;
-    if (Number.isNaN(idNum)) return;
-    // 找到选择的账套（宽松对齐类型）
-    const selectedSet = userAccountSets.value.find(set => Number(set.id) === Number(idNum));
-    if (!selectedSet) return;
-    
-    // 更新当前账套
-    currentAccountSet.value = selectedSet;
-    localStorage.setItem('currentAccountSet', JSON.stringify(selectedSet));
-    
-    // 更新默认账套（与服务器同步）
-    const response = await fetch(`/api/user/${user.value.id}/default-account-set`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_set_id: idNum })
-    });
-    
-    if (response.ok) {
-      showMessage('success', `已切换到账套: ${selectedSet.name}`);
-      // 无论当前在哪个页面，都广播账套切换事件，页面可选择性监听
-      window.dispatchEvent(new CustomEvent('account-set-changed', { detail: selectedSet }));
-    } else {
-      showMessage('warning', '设置默认账套失败，但已在本地切换');
-    }
-  } catch (error) {
-    console.error('切换账套失败:', error);
-    showMessage('error', '切换账套失败，请重试');
-  }
-};
+// 全局不再提供账套切换入口；发票页面内已有切换能力
 
 // 控制侧边栏在移动设备上的展开/收起
 const toggleSidebar = (value) => {
