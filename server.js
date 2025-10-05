@@ -1927,65 +1927,27 @@ app.post('/api/generate-code', requireAuth, (req, res) => {
   } 
   // 如果提供了account_set_id和type，查找对应的规则
   else if (account_set_id && type) {
-    // 查询该账套下指定类型的编码规则
-    let query = '';
-    let params = [];
-    
-    if (type === 'invoice') {
-      // 查询发票编号规则
-      query = `
-        SELECT cr.* FROM code_rules cr
-        JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
-        WHERE icr.account_set_id = ? AND icr.is_default = 1
-      `;
-      params = [account_set_id];
-    } else {
+    if (type !== 'invoice') {
       return res.status(400).json({ error: '不支持的编码类型', error_code: 'unsupported_type' });
     }
-    
-    db.get(query, params, (err, rule) => {
-      if (err) {
-        console.error('查询编码规则失败:', err);
-        return res.status(500).json({ error: '查询编码规则失败', error_code: 'db_error' });
-      }
-      
-      if (!rule) {
-        // 找不到默认规则，尝试查找非默认规则
-        let fallbackQuery = '';
-        if (type === 'invoice') {
-          fallbackQuery = `
-            SELECT cr.* FROM code_rules cr
-            JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
-            WHERE icr.account_set_id = ?
-            LIMIT 1
-          `;
+    // 严格要求：账套内必须存在名称为“发票编号”的编码规则
+    db.get(
+      `SELECT * FROM code_rules WHERE account_set_id = ? AND name = ? LIMIT 1`,
+      [account_set_id, '发票编号'],
+      (err, rule) => {
+        if (err) {
+          console.error('查询编码规则失败:', err);
+          return res.status(500).json({ error: '查询编码规则失败', error_code: 'db_error' });
         }
-        
-        if (fallbackQuery) {
-          db.get(fallbackQuery, [account_set_id], (err, fallbackRule) => {
-            if (err || !fallbackRule) {
-              // 没有找到任何规则，使用时间戳回退编码，避免阻塞业务
-              const now = new Date();
-              const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-              const rnd = Math.floor(Math.random() * 900) + 100;
-              const prefix = type === 'invoice' ? 'INV' : 'CODE';
-              const generatedCode = `${prefix}-${stamp}-${rnd}`;
-              return res.json({ code: generatedCode, fallback: true });
-            }
-            generateCodeFromRule(fallbackRule, res);
-          });
-        } else {
-          // 类型不支持，兜底（理论不会到达这里）
-          const now = new Date();
-          const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-          const rnd = Math.floor(Math.random() * 900) + 100;
-          const generatedCode = `CODE-${stamp}-${rnd}`;
-          return res.json({ code: generatedCode, fallback: true });
+        if (!rule) {
+          return res.status(400).json({ error: 'no_rule_found' });
         }
-      } else {
+        if (!rule.format || typeof rule.format !== 'string' || rule.format.trim() === '') {
+          return res.status(400).json({ error: 'invalid_rule_format' });
+        }
         generateCodeFromRule(rule, res);
       }
-    });
+    );
   } else {
     return res.status(400).json({ error: '请提供rule_id或(account_set_id和type)', error_code: 'missing_params' });
   }

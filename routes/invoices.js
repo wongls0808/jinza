@@ -208,6 +208,65 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 注意：在声明 '/:id' 之前注册更具体的路由以避免被参数路由截获
+// 获取发票统计数据
+router.get('/stats', async (req, res) => {
+  const db = getDb();
+  
+  try {
+    // 处理账套过滤条件
+    let accountSetFilter = '';
+    let params = [];
+    
+    if (req.query.account_set_id) {
+      accountSetFilter = 'WHERE account_set_id = ?';
+      params.push(req.query.account_set_id);
+    }
+    
+    // 获取总发票数
+    const totalResult = await dbGet(db, 
+      `SELECT COUNT(*) as total FROM invoices ${accountSetFilter}`, 
+      params
+    );
+    
+    // 获取未付款发票数
+    const unpaidResult = await dbGet(db, `
+      SELECT COUNT(*) as count 
+      FROM invoices 
+      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} (payment_status = 'unpaid' OR payment_status = 'partial')
+    `, params);
+    
+    // 获取已付款发票数
+    const paidResult = await dbGet(db, `
+      SELECT COUNT(*) as count 
+      FROM invoices 
+      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} payment_status = 'paid'
+    `, params);
+    
+    // 获取总金额
+    const amountResult = await dbGet(db, 
+      `SELECT SUM(total_amount) as sum FROM invoices ${accountSetFilter}`, 
+      params
+    );
+    
+    res.json({
+      total: totalResult ? totalResult.total : 0,
+      unpaid: unpaidResult ? unpaidResult.count : 0,
+      paid: paidResult ? paidResult.count : 0,
+      totalAmount: amountResult && amountResult.sum ? amountResult.sum : 0
+    });
+  } catch (error) {
+    console.error('获取发票统计失败:', error);
+    res.status(500).json({ error: '获取发票统计失败' });
+  } finally {
+    try {
+      db.close();
+    } catch (dbError) {
+      console.error('关闭数据库连接失败:', dbError);
+    }
+  }
+});
+
 // 获取单个发票详情
 router.get('/:id', requireAuth, async (req, res) => {
   const db = getDb();
@@ -887,62 +946,6 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
   return html;
 }
 
-// 获取发票统计数据
-router.get('/stats', async (req, res) => {
-  const db = getDb();
-  
-  try {
-    // 处理账套过滤条件
-    let accountSetFilter = '';
-    let params = [];
-    
-    if (req.query.account_set_id) {
-      accountSetFilter = 'WHERE account_set_id = ?';
-      params.push(req.query.account_set_id);
-    }
-    
-    // 获取总发票数
-    const totalResult = await dbGet(db, 
-      `SELECT COUNT(*) as total FROM invoices ${accountSetFilter}`, 
-      params
-    );
-    
-    // 获取未付款发票数
-    const unpaidResult = await dbGet(db, `
-      SELECT COUNT(*) as count 
-      FROM invoices 
-      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} (payment_status = 'unpaid' OR payment_status = 'partial')
-    `, params);
-    
-    // 获取已付款发票数
-    const paidResult = await dbGet(db, `
-      SELECT COUNT(*) as count 
-      FROM invoices 
-      ${accountSetFilter ? accountSetFilter + ' AND' : 'WHERE'} payment_status = 'paid'
-    `, params);
-    
-    // 获取总金额
-    const amountResult = await dbGet(db, 
-      `SELECT SUM(total_amount) as sum FROM invoices ${accountSetFilter}`, 
-      params
-    );
-    
-    res.json({
-      total: totalResult ? totalResult.total : 0,
-      unpaid: unpaidResult ? unpaidResult.count : 0,
-      paid: paidResult ? paidResult.count : 0,
-      totalAmount: amountResult && amountResult.sum ? amountResult.sum : 0
-    });
-  } catch (error) {
-    console.error('获取发票统计失败:', error);
-    res.status(500).json({ error: '获取发票统计失败' });
-  } finally {
-    try {
-      db.close();
-    } catch (dbError) {
-      console.error('关闭数据库连接失败:', dbError);
-    }
-  }
-});
+// （已上移到 '/:id' 之前）
 
 export default router;
