@@ -69,61 +69,68 @@
             <el-option label="已作废" value="cancelled" />
           </el-select>
         </el-form-item>
-        <el-form-item label="日期范围">
+        <el-table 
           <el-date-picker
             v-model="filters.dateRange"
             type="daterange"
             range-separator="至"
             start-placeholder="开始日期"
-            end-placeholder="结束日期"
+          @row-click="handleRowClick"
+          @header-dragend="onHeaderDragEnd"
             format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-        <el-form-item>
+          <el-table-column prop="invoice_date" label="开票时间" :width="colWidths.invoice_date || 140" />
+          <el-table-column prop="invoice_number" label="发票号" :width="colWidths.invoice_number || 140" />
+          <el-table-column prop="customer_name" label="客户" :width="colWidths.customer_name || 160" />
+          <el-table-column prop="total_amount" label="金额" :width="colWidths.total_amount || 120">
           <el-input
             v-model="filters.search"
             placeholder="搜索发票号/客户名称"
             prefix-icon="el-icon-search"
-            clearable
+          <el-table-column prop="salesperson_nickname" label="业务员" :width="colWidths.salesperson_nickname || 100">
           />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="fetchInvoices">搜索</el-button>
-          <el-button @click="resetFilters">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </div>
+          <el-table-column prop="created_by_name" label="提交人" :width="colWidths.created_by_name || 100" />
+          <el-table-column prop="created_at" label="提交时间" :width="colWidths.created_at || 160" />
+          <el-table-column prop="updated_at" label="更新时间" :width="colWidths.updated_at || 160" />
+          <el-table-column prop="status" label="状态" :width="colWidths.status || 100">
 
     <!-- 数据统计卡片 -->
     <div class="stats-container">
       <el-row :gutter="20">
         <el-col :span="6">
           <el-card class="stats-card total">
-            <div class="stats-title">总发票数</div>
+          <el-table-column prop="payment_status" label="付款状态" :width="colWidths.payment_status || 100">
             <div class="stats-value">{{ stats.total }}</div>
           </el-card>
         </el-col>
         <el-col :span="6">
           <el-card class="stats-card pending">
             <div class="stats-title">未付款</div>
-            <div class="stats-value">{{ stats.unpaid }}</div>
+          <el-table-column label="操作" fixed="right" :width="colWidths.actions || 120">
           </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card class="stats-card paid">
-            <div class="stats-title">已付款</div>
-            <div class="stats-value">{{ stats.paid }}</div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card class="stats-card amount">
-            <div class="stats-title">总金额</div>
-            <div class="stats-value">RM {{ formatAmount(stats.totalAmount) }}</div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
+              <el-popover trigger="click" placement="bottom-end" width="140">
+                <template #reference>
+                  <el-button size="small">操作</el-button>
+                </template>
+                <div class="ops-menu">
+                  <el-button text size="small" @click.stop="previewInvoice(scope.row)">预览</el-button>
+                  <el-button text size="small" type="primary" @click.stop="editInvoice(scope.row)">编辑</el-button>
+                  <el-button
+                    v-if="scope.row.status !== 'cancelled'"
+                    text size="small" type="warning"
+                    @click.stop="voidInvoice(scope.row)"
+                  >作废</el-button>
+                  <el-button
+                    v-else
+                    text size="small" type="success"
+                    @click.stop="issueInvoice(scope.row)"
+                  >开具</el-button>
+                  <el-button text size="small" @click.stop="printInvoice(scope.row)">打印</el-button>
+                  <el-button v-if="scope.row.status === 'draft'" text size="small" class="text-danger" @click.stop="deleteInvoice(scope.row)">删除</el-button>
+                </div>
+              </el-popover>
 
     <!-- 发票列表 -->
     <div class="invoice-list-container">
@@ -260,6 +267,8 @@ const showViewDialog = ref(false);
 const showAddDialog = ref(false);
 const currentInvoiceId = ref(null);
 const isEditing = ref(false);
+// 列宽持久化
+const colWidths = reactive({});
 
 // 统计数据
 const stats = reactive({
@@ -346,6 +355,7 @@ async function switchAccountSet(accountSetId) {
 
 // 生命周期钩子
 onMounted(async () => {
+  loadColumnWidths();
   loadAccountSets();
   // 监听来自全局的账套切换事件（由 App.vue 派发）
   window.addEventListener('account-set-changed', onGlobalAccountSetChanged);
@@ -571,6 +581,12 @@ function handleRowClick(row) {
   viewInvoice(row);
 }
 
+// 预览
+function previewInvoice(invoice) {
+  currentInvoiceId.value = invoice.id;
+  showViewDialog.value = true;
+}
+
 // 查看发票
 function viewInvoice(invoice) {
   currentInvoiceId.value = invoice.id;
@@ -691,6 +707,41 @@ function handleInvoiceSaved() {
   ElMessage.success('发票已保存');
   fetchInvoices();
   fetchStats();
+}
+
+// 列宽持久化
+function onHeaderDragEnd(newWidth, oldWidth, column, event) {
+  if (!column || !column.property) return;
+  colWidths[column.property] = newWidth;
+  try {
+    localStorage.setItem('invoiceListColWidths', JSON.stringify(colWidths));
+  } catch (e) {}
+}
+function loadColumnWidths() {
+  try {
+    const raw = localStorage.getItem('invoiceListColWidths');
+    if (raw) Object.assign(colWidths, JSON.parse(raw));
+  } catch (e) {}
+}
+
+// 状态切换：作废/开具
+async function issueInvoice(invoice) {
+  try {
+    const resp = await fetch(`/api/invoices/${invoice.id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'issued' })
+    });
+    if (resp.ok) {
+      ElMessage.success('已开具');
+      fetchInvoices();
+      fetchStats();
+    } else {
+      throw new Error(await resp.text());
+    }
+  } catch (e) {
+    ElMessage.error('操作失败');
+  }
 }
 </script>
 

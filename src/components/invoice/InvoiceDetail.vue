@@ -13,9 +13,9 @@
         </div>
       </div>
       <div class="header-right">
-        <el-button @click="$emit('close')" icon="Close">关闭</el-button>
-        <el-button type="primary" @click="$emit('edit', invoiceId)" icon="Edit">编辑</el-button>
-        <el-button type="success" @click="printInvoice" icon="Printer">打印</el-button>
+  <el-button @click="$emit('close')" icon="Close">关闭</el-button>
+  <el-button type="primary" @click="$emit('edit', invoiceId)" icon="Edit">编辑</el-button>
+  <el-button type="success" @click="printInvoice" icon="Printer">打印</el-button>
       </div>
     </div>
 
@@ -140,15 +140,15 @@
             <div class="invoice-summary">
               <div class="summary-row">
                 <span class="summary-label">合计金额：</span>
-                <span class="summary-value">¥{{ formatAmount(invoice.subtotal ?? invoice.total_amount) }}</span>
+                <span class="summary-value">RM {{ formatAmount(invoice.subtotal ?? invoice.total_amount) }}</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">税额合计：</span>
-                <span class="summary-value">¥{{ formatAmount(invoice.tax_amount || 0) }}</span>
+                <span class="summary-value">RM {{ formatAmount(invoice.tax_amount || 0) }}</span>
               </div>
               <div class="summary-row total">
                 <span class="summary-label">应付总计：</span>
-                <span class="summary-value">¥{{ formatAmount(parseFloat(invoice.total_amount || 0)) }}</span>
+                <span class="summary-value">RM {{ formatAmount(parseFloat(invoice.total_amount || 0)) }}</span>
               </div>
             </div>
           </div>

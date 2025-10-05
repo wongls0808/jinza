@@ -191,6 +191,7 @@
                 style="width: 100%"
                 class="invoice-items-table"
               >
+                <el-table-column type="index" label="序号" width="60" align="center" />
                 <el-table-column label="商品/描述" min-width="320">
                   <template #default="scope">
                     <el-select 
