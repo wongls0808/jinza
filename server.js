@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import crypto from 'crypto';
+import purchasesRoutes from './routes/purchases.js';
 
 // 加载环境变量 (.env 可选)
 dotenv.config();
@@ -2400,6 +2401,7 @@ try {
   const invoicesRoutesModule = await import('./routes/invoices.js');
   const invoicesRoutes = invoicesRoutesModule.default;
   app.use('/api/invoices', invoicesRoutes);
+  app.use('/api/purchases', purchasesRoutes);
   console.log('发票管理API路由已加载在/api/invoices路径');
 } catch (error) {
   console.error('加载发票路由失败:', error);

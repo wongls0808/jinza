@@ -382,6 +382,8 @@ router.post('/', requireAuth, async (req, res) => {
           : await generateInvoiceNumber(account_set_id, invoice_date);
 
         // 插入发票主表
+        // 规范化状态：将 published 视为 issued
+        const normalizedStatus = (status === 'published') ? 'issued' : (status || 'draft');
         const result = await dbRun(db, `
       INSERT INTO invoices (
         invoice_number, customer_id, account_set_id, salesperson_id, 
@@ -391,7 +393,7 @@ router.post('/', requireAuth, async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
           invoiceNumber, customer_id, account_set_id, salesperson_id,
-          invoice_date, due_date, status || 'draft', 
+          invoice_date, due_date, normalizedStatus, 
           payment_date ? 'paid' : 'unpaid',
           payment_method, payment_date, subtotal, tax_amount, 
           discount_amount, total_amount, notes, 
@@ -415,6 +417,27 @@ router.post('/', requireAuth, async (req, res) => {
             item.discount_amount || 0, item.subtotal, item.total,
             item.notes
           ]);
+        }
+
+        // 若发票保存为已开具(issued)，将明细写入采购记录
+        const isIssued = (normalizedStatus === 'issued' || normalizedStatus === 'paid');
+        if (isIssued) {
+          for (const item of items) {
+            await dbRun(db, `
+              INSERT INTO purchase_records (
+                account_set_id, invoice_id, record_date, product_id, product_code, product_description, unit, quantity, unit_price, created_by
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              account_set_id, invoiceId, invoice_date,
+              item.product_id || null,
+              null,
+              item.description,
+              item.unit || null,
+              item.quantity || 0,
+              item.unit_price || 0,
+              req.session.userId
+            ]);
+          }
         }
         
         // 如果有付款信息，则添加付款记录
@@ -547,6 +570,29 @@ router.put('/:id', requireAuth, async (req, res) => {
           item.notes
         ]);
       }
+
+      // 同步采购记录：先清除本发票相关记录，再视状态写入
+      await dbRun(db, `DELETE FROM purchase_records WHERE invoice_id = ?`, [id]);
+      const normalizedStatus = (status === 'published') ? 'issued' : (status || 'draft');
+      const isIssued = (normalizedStatus === 'issued' || normalizedStatus === 'paid');
+      if (isIssued) {
+        for (const item of items) {
+          await dbRun(db, `
+            INSERT INTO purchase_records (
+              account_set_id, invoice_id, record_date, product_id, product_code, product_description, unit, quantity, unit_price, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            account_set_id, id, invoice_date,
+            item.product_id || null,
+            null,
+            item.description,
+            item.unit || null,
+            item.quantity || 0,
+            item.unit_price || 0,
+            req.session.userId
+          ]);
+        }
+      }
     }
     
     await dbRun(db, 'COMMIT');
@@ -615,6 +661,37 @@ router.put('/:id/status', requireAuth, async (req, res) => {
         updated_by = ?
       WHERE id = ?
     `, [status, notes ?? null, notes ?? null, req.session.userId, id]);
+
+    // 同步采购记录：
+    // 若状态变为 issued，则写入采购记录；若变为非 issued（如 cancelled/draft/paid），则移除相关记录
+    const items = await dbQuery(db, `
+      SELECT ii.*, inv.account_set_id, inv.invoice_date
+      FROM invoice_items ii
+      JOIN invoices inv ON inv.id = ii.invoice_id
+      WHERE ii.invoice_id = ?
+    `, [id]);
+    if (['issued','paid','overdue'].includes(status)) {
+      // 先清理旧记录，后写入
+      await dbRun(db, `DELETE FROM purchase_records WHERE invoice_id = ?`, [id]);
+      for (const item of items) {
+        await dbRun(db, `
+          INSERT INTO purchase_records (
+            account_set_id, invoice_id, record_date, product_id, product_code, product_description, unit, quantity, unit_price, created_by
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          item.account_set_id, id, item.invoice_date,
+          item.product_id || null,
+          null,
+          item.description,
+          item.unit || null,
+          item.quantity || 0,
+          item.unit_price || 0,
+          req.session.userId
+        ]);
+      }
+    } else { // draft 或 cancelled 时删除
+      await dbRun(db, `DELETE FROM purchase_records WHERE invoice_id = ?`, [id]);
+    }
 
     // 返回更新后简要信息
     const updated = await dbGet(db, 'SELECT status, updated_at, updated_by FROM invoices WHERE id = ?', [id]);

@@ -216,6 +216,7 @@ import Salespeople from './views/Salespeople.vue';
 import Products from './views/Products.vue';
 import Suppliers from './views/Suppliers.vue';
 import Invoices from './views/Invoices.vue';
+import PurchaseLibrary from './views/PurchaseLibrary.vue';
 // 移除回收站组件导入
 import ForcePasswordChange from './views/ForcePasswordChange.vue';
 // 导入新的移动端组件
@@ -254,6 +255,7 @@ const routes = {
   suppliers: markRaw(Suppliers),
   salespeople: markRaw(Salespeople),
   invoices: markRaw(Invoices), // 添加发票管理路由
+  purchases: markRaw(PurchaseLibrary),
   // 移除回收站组件
 };
 
@@ -294,6 +296,7 @@ const getPageTitle = (route) => {
     suppliers: '供应商管理',
     salespeople: '业务员管理',
     invoices: '发票管理',
+    purchases: '采购库',
     // 移除回收站标题
   };
   return titles[route] || '企业管理系统';
