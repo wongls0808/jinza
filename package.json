@@ -2,6 +2,9 @@
   "name": "enterprise-management",
   "version": "1.4.1",
   "type": "module",
+  "engines": {
+    "node": ">=18 <=22"
+  },
   "scripts": {
     "dev": "node server.js",
     "build": "vite build",
