@@ -340,7 +340,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Delete, Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
@@ -434,6 +434,22 @@ const rules = {
 
 // Lifecycle hooks
 onMounted(async () => {
+  // 优先从本地存储同步当前账套（创建模式）
+  if (!isEditing.value) {
+    try {
+      const stored = localStorage.getItem('currentAccountSet');
+      if (stored) {
+        const set = JSON.parse(stored);
+        if (set && set.id) {
+          form.account_set_id = Number(set.id);
+          selectedAccountSet.value = set;
+        }
+      }
+    } catch (e) {
+      console.warn('读取当前账套失败:', e);
+    }
+  }
+
   await Promise.all([
     fetchAccountSets(),
     fetchCustomers(),
@@ -445,15 +461,38 @@ onMounted(async () => {
     await fetchInvoiceDetails();
   } else {
     addEmptyItem();
-    // 自动选择默认账套（若存在），以满足后端必填，但不再预生成发票号，避免跳号
-    if (accountSetOptions.value.length > 0) {
-      // 优先选 is_active 或第一个
+    // 若未能从本地读取到账套，则回退选择默认账套（不预生成发票号，避免跳号）
+    if (!form.account_set_id && accountSetOptions.value.length > 0) {
       const def = accountSetOptions.value.find(a => a.is_active === 1) || accountSetOptions.value[0];
       form.account_set_id = def?.id || null;
-      // 不调用 generateInvoiceNumber()
+    }
+    // 根据当前 account_set_id 更新本地选中项
+    if (form.account_set_id) {
+      handleAccountSetChange(form.account_set_id);
     }
   }
+
+  // 监听账套切换事件（在对话框打开期间实时同步，避免用户中途切换导致错账套保存）
+  window.addEventListener('account-set-changed', onAccountSetChanged);
 });
+
+onUnmounted(() => {
+  window.removeEventListener('account-set-changed', onAccountSetChanged);
+});
+
+function onAccountSetChanged(e) {
+  try {
+    const set = e?.detail;
+    if (!isEditing.value && set && set.id) {
+      form.account_set_id = Number(set.id);
+      selectedAccountSet.value = set;
+      // 若有账套选项列表，则刷新选中项
+      handleAccountSetChange(form.account_set_id);
+    }
+  } catch (err) {
+    console.error('处理账套切换事件失败:', err);
+  }
+}
 
 // Watch for changes
 // 不在账套切换时预生成发票编号，避免用户取消导致编号跳号
@@ -831,6 +870,11 @@ async function saveAndPublish() {
 async function save(status) {
   try {
     await formRef.value.validate();
+    // 确保账套已选择（创建时必需）
+    if (!form.account_set_id) {
+      ElMessage.error('请先选择账套后再保存发票');
+      return;
+    }
     
     if (form.items.length === 0 || 
         form.items.every(item => !item.description || !item.quantity || !item.unit_price)) {
