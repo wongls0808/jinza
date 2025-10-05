@@ -870,6 +870,7 @@ async function save(status) {
     
     // 构造与后端契合的字段
     const data = {
+      invoice_number: form.invoice_number || undefined,
       customer_id: form.customer_id,
       account_set_id: form.account_set_id,
       salesperson_id: form.salesperson_id,

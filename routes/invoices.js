@@ -271,6 +271,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 // 创建新发票
 router.post('/', requireAuth, async (req, res) => {
   const {
+    invoice_number,
     customer_id, 
     account_set_id, 
     salesperson_id, 
@@ -293,14 +294,24 @@ router.post('/', requireAuth, async (req, res) => {
   
   const db = getDb();
   
+  // 尝试插入发票（处理发票号唯一性冲突自动重试有限次）
+  const MAX_RETRY = 3;
+  let attempt = 0;
+  let created = null;
+  let lastError = null;
+  
   try {
-    await dbRun(db, 'BEGIN');
-    
-    // 生成发票编号
-    const invoiceNumber = await generateInvoiceNumber(account_set_id);
-    
-    // 插入发票主表
-    const result = await dbRun(db, `
+    while (attempt < MAX_RETRY && !created) {
+      attempt++;
+      try {
+        await dbRun(db, 'BEGIN');
+        // 若前端已生成发票号则使用，否则服务端生成
+        const invoiceNumber = invoice_number && String(invoice_number).trim().length > 0
+          ? String(invoice_number).trim()
+          : await generateInvoiceNumber(account_set_id);
+
+        // 插入发票主表
+        const result = await dbRun(db, `
       INSERT INTO invoices (
         invoice_number, customer_id, account_set_id, salesperson_id, 
         invoice_date, due_date, status, payment_status, payment_method, 
@@ -308,54 +319,71 @@ router.post('/', requireAuth, async (req, res) => {
         notes, created_by, updated_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      invoiceNumber, customer_id, account_set_id, salesperson_id,
-      invoice_date, due_date, status || 'draft', 
-      payment_date ? 'paid' : 'unpaid',
-      payment_method, payment_date, subtotal, tax_amount, 
-      discount_amount, total_amount, notes, 
-      req.session.userId, req.session.userId
-    ]);
-    
-    const invoiceId = result.lastID;
-    
-    // 插入发票明细项
-    for (const item of items) {
-      await dbRun(db, `
+          invoiceNumber, customer_id, account_set_id, salesperson_id,
+          invoice_date, due_date, status || 'draft', 
+          payment_date ? 'paid' : 'unpaid',
+          payment_method, payment_date, subtotal, tax_amount, 
+          discount_amount, total_amount, notes, 
+          req.session.userId, req.session.userId
+        ]);
+        
+        const invoiceId = result.lastID;
+        
+        // 插入发票明细项
+        for (const item of items) {
+          await dbRun(db, `
         INSERT INTO invoice_items (
           invoice_id, product_id, description, quantity, unit_price,
           unit, tax_rate, tax_amount, discount_rate, discount_amount,
           subtotal, total, notes
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        invoiceId, item.product_id, item.description, item.quantity,
-        item.unit_price, item.unit, item.tax_rate || 0, 
-        item.tax_amount || 0, item.discount_rate || 0,
-        item.discount_amount || 0, item.subtotal, item.total,
-        item.notes
-      ]);
-    }
-    
-    // 如果有付款信息，则添加付款记录
-    if (payment_date && payment_method && total_amount > 0) {
-      await dbRun(db, `
+        `, [
+            invoiceId, item.product_id, item.description, item.quantity,
+            item.unit_price, item.unit, item.tax_rate || 0, 
+            item.tax_amount || 0, item.discount_rate || 0,
+            item.discount_amount || 0, item.subtotal, item.total,
+            item.notes
+          ]);
+        }
+        
+        // 如果有付款信息，则添加付款记录
+        if (payment_date && payment_method && total_amount > 0) {
+          await dbRun(db, `
         INSERT INTO invoice_payments (
           invoice_id, payment_date, amount, payment_method,
           transaction_reference, notes, created_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        invoiceId, payment_date, total_amount, payment_method,
-        req.body.transaction_reference || null,
-        '初始付款', req.session.userId
-      ]);
+        `, [
+            invoiceId, payment_date, total_amount, payment_method,
+            req.body.transaction_reference || null,
+            '初始付款', req.session.userId
+          ]);
+        }
+        
+        await dbRun(db, 'COMMIT');
+        created = { id: invoiceId, invoice_number: invoiceNumber };
+      } catch (err) {
+        // 唯一键冲突，重试
+        await dbRun(db, 'ROLLBACK').catch(()=>{});
+        lastError = err;
+        const msg = String(err?.message || '');
+        if (/UNIQUE constraint failed: invoices\.invoice_number/i.test(msg)) {
+          if (attempt < MAX_RETRY) {
+            continue;
+          }
+        }
+        // 其他错误或超出重试
+        throw err;
+      }
     }
-    
-    await dbRun(db, 'COMMIT');
-    
-    res.status(201).json({
-      id: invoiceId,
-      invoice_number: invoiceNumber,
-      message: '发票创建成功'
-    });
+    if (created) {
+      return res.status(201).json({
+        id: created.id,
+        invoice_number: created.invoice_number,
+        message: '发票创建成功'
+      });
+    }
+    throw lastError || new Error('创建发票失败');
   } catch (error) {
     try { await dbRun(db, 'ROLLBACK'); } catch (e) {}
     console.error('创建发票失败:', error);

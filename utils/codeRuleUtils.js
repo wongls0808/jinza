@@ -1,10 +1,9 @@
 /**
- * 发票编号生成工具
+ * 发票编号生成工具（与 /api/generate-code 保持一致的实现）
  */
 import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,117 +17,68 @@ function getDb() {
 
 /**
  * 根据账套ID生成发票编号
- * @param {number} accountSetId 账套ID
- * @returns {Promise<string>} 生成的发票编号
+ * 规则来源：code_rules + invoice_code_rules；使用 code_rules.format 与 current_number
+ * 可用占位：{prefix} {suffix} {number} {year} {month} {day} {hour} {minute}
+ * {number} 默认左填充4位
  */
 export async function generateInvoiceNumber(accountSetId) {
   const db = getDb();
-  
   try {
-    // 使用Promise包装数据库操作
-    const getCodeRule = (query, params) => {
-      return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        });
-      });
-    };
-    
-    // 查找该账套下的默认编号规则
-    let codeRule = await getCodeRule(`
-      SELECT cr.*
-      FROM invoice_code_rules icr
-      JOIN code_rules cr ON icr.code_rule_id = cr.id
+    const getOne = (sql, params=[]) => new Promise((resolve, reject) => {
+      db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+    });
+    const run = (sql, params=[]) => new Promise((resolve, reject) => {
+      db.run(sql, params, function(err){ err ? reject(err) : resolve(this); });
+    });
+
+    // 优先找默认规则
+    let rule = await getOne(`
+      SELECT cr.* FROM code_rules cr
+      JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
       WHERE icr.account_set_id = ? AND icr.is_default = 1
     `, [accountSetId]);
-    
-    // 如果没有默认规则，选择第一个规则
-    if (!codeRule) {
-      codeRule = await getCodeRule(`
-        SELECT cr.*
-        FROM invoice_code_rules icr
-        JOIN code_rules cr ON icr.code_rule_id = cr.id
+
+    // 兜底找任一规则
+    if (!rule) {
+      rule = await getOne(`
+        SELECT cr.* FROM code_rules cr
+        JOIN invoice_code_rules icr ON cr.id = icr.code_rule_id
         WHERE icr.account_set_id = ?
         LIMIT 1
       `, [accountSetId]);
     }
-    
-    // 如果仍找不到规则，使用系统默认规则
-    if (!codeRule) {
-      codeRule = {
-        prefix: 'INV',
-        date_format: 'YYYYMMDD',
-        separator: '-',
-        sequence_length: 4,
-        sequence_start: 1,
-        sequence_current: 0
-      };
+
+    if (!rule) {
+      // 无任何规则，使用时间戳回退
+      const now = new Date();
+      const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+      const rnd = Math.floor(Math.random() * 900) + 100;
+      return `INV-${stamp}-${rnd}`;
     }
-    
-    // 解析规则
-    const { prefix, date_format, separator, sequence_length, sequence_current } = codeRule;
-    
-    // 生成日期部分
-    let dateStr = '';
-    const now = new Date();
-    
-    switch (date_format) {
-      case 'YYYYMMDD':
-        dateStr = now.getFullYear() +
-                 String(now.getMonth() + 1).padStart(2, '0') +
-                 String(now.getDate()).padStart(2, '0');
-        break;
-      case 'YYYYMM':
-        dateStr = now.getFullYear() +
-                 String(now.getMonth() + 1).padStart(2, '0');
-        break;
-      case 'YYYY':
-        dateStr = String(now.getFullYear());
-        break;
-      default:
-        dateStr = now.getFullYear() +
-                 String(now.getMonth() + 1).padStart(2, '0') +
-                 String(now.getDate()).padStart(2, '0');
-    }
-    
-    // 生成序列号部分
-    let sequenceNumber = sequence_current + 1;
-    
-    // 更新当前序列号
-    if (codeRule.id) {
-      await new Promise((resolve, reject) => {
-        db.run(`
-          UPDATE code_rules
-          SET sequence_current = ?
-          WHERE id = ?
-        `, [sequenceNumber, codeRule.id], function(err) {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    }
-    
-    // 格式化序列号
-    const sequenceStr = String(sequenceNumber).padStart(sequence_length, '0');
-    
-    // 组合生成编号
-    const invoiceNumber = [prefix, dateStr, sequenceStr].filter(Boolean).join(separator);
-    
-    return invoiceNumber;
+
+    // 原子地将 current_number + 1 后生成编码
+    const newNumber = (parseInt(rule.current_number || 0, 10) || 0) + 1;
+    await run(`UPDATE code_rules SET current_number = ? WHERE id = ?`, [newNumber, rule.id]);
+
+    // 生成编码，沿用 /api/generate-code 的占位规则
+    let generatedCode = (rule.format || '{prefix}{year}{month}{day}-{number}')
+      .replace('{prefix}', rule.prefix || '')
+      .replace('{suffix}', rule.suffix || '')
+      .replace('{number}', String(newNumber).padStart(4, '0'))
+      .replace('{year}', new Date().getFullYear().toString())
+      .replace('{month}', (new Date().getMonth() + 1).toString().padStart(2, '0'))
+      .replace('{day}', new Date().getDate().toString().padStart(2, '0'))
+      .replace('{hour}', new Date().getHours().toString().padStart(2, '0'))
+      .replace('{minute}', new Date().getMinutes().toString().padStart(2, '0'));
+
+    return generatedCode;
   } catch (error) {
     console.error('生成发票编号失败:', error);
-    // 如果出错，使用时间戳作为回退方案
-    const timestamp = Date.now();
-    return `INV-${timestamp}`;
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+    const rnd = Math.floor(Math.random() * 900) + 100;
+    return `INV-${stamp}-${rnd}`;
   } finally {
-    // 关闭数据库连接
-    db.close((err) => {
-      if (err) {
-        console.error('关闭数据库连接失败:', err);
-      }
-    });
+    try { db.close(); } catch (e) {}
   }
 }
-
-// ES模块导出已在函数声明处完成
