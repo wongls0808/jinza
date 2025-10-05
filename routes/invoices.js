@@ -281,6 +281,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         c.address as customer_address,
         c.contact as customer_contact,
         c.phone as customer_phone,
+        c.email as customer_email,
         s.name as salesperson_name,
         a.name as account_set_name
       FROM invoices i
@@ -296,7 +297,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     
     // 获取发票明细项
     const items = await dbQuery(db, `
-      SELECT i.*, p.name as product_name, p.sku as product_sku
+      SELECT i.*, p.description as product_name, p.code as product_code
       FROM invoice_items i
       LEFT JOIN products p ON i.product_id = p.id
       WHERE i.invoice_id = ?
@@ -802,6 +803,7 @@ async function getInvoiceWithDetails(id) {
         c.name as customer_name, 
         c.address as customer_address,
         c.contact as customer_contact,
+        c.email as customer_email,
         c.phone as customer_phone,
         s.name as salesperson_name,
         a.name as account_set_name
@@ -818,7 +820,7 @@ async function getInvoiceWithDetails(id) {
     
     // 获取发票明细项
     const items = await dbQuery(db, `
-      SELECT i.*, p.name as product_name, p.sku as product_sku
+      SELECT i.*, p.description as product_name, p.code as product_code
       FROM invoice_items i
       LEFT JOIN products p ON i.product_id = p.id
       WHERE i.invoice_id = ?

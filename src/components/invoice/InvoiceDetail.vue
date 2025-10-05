@@ -97,7 +97,17 @@
             <h3 class="section-title">发票明细</h3>
             
             <el-table :data="invoice.items" border stripe class="detail-table">
-              <el-table-column prop="description" label="商品描述" min-width="200" />
+              <el-table-column label="商品/编码" min-width="220">
+                <template #default="scope">
+                  <div class="product-cell">
+                    <div>{{ scope.row.description }}</div>
+                    <small v-if="scope.row.product_name || scope.row.product_code" class="muted">
+                      {{ scope.row.product_name || '' }}
+                      <span v-if="scope.row.product_code">[{{ scope.row.product_code }}]</span>
+                    </small>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column prop="quantity" label="数量" width="100" align="right">
                 <template #default="scope">
                   {{ formatQuantity(scope.row.quantity) }}
