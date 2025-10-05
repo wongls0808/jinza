@@ -130,6 +130,29 @@ const db = new sqlite3.Database(join(dataDir, 'app.db'), (err) => {
     // 开启 WAL 模式提升并发与崩溃恢复能力
     db.run("PRAGMA journal_mode=WAL;", (e)=>{ if(e) console.warn('设置 WAL 失败:', e.message); });
     db.run("PRAGMA synchronous=NORMAL;", (e)=>{ if(e) console.warn('设置 synchronous 失败:', e.message); });
+    // 应用迁移脚本（如果存在），确保发票相关表已创建
+    try {
+      const migrationsDir = join(dataDir, 'migrations');
+      if (fs.existsSync(migrationsDir)) {
+        const files = fs.readdirSync(migrationsDir)
+          .filter(f => f.toLowerCase().endsWith('.sql'))
+          .sort();
+        for (const f of files) {
+          const sql = fs.readFileSync(join(migrationsDir, f), 'utf-8');
+          if (sql && sql.trim()) {
+            db.exec(sql, (execErr) => {
+              if (execErr) {
+                console.warn(`执行迁移 ${f} 失败:`, execErr.message);
+              } else {
+                console.log(`迁移已应用: ${f}`);
+              }
+            });
+          }
+        }
+      }
+    } catch (migErr) {
+      console.warn('应用迁移时出错:', migErr.message);
+    }
   }
 });
 
