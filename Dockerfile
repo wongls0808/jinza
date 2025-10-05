@@ -24,6 +24,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.js ./server.js
 COPY --from=builder /app/index.html ./index.html
+COPY --from=builder /app/routes ./routes
+COPY --from=builder /app/utils ./utils
 COPY --from=builder /app/data/migrations ./data/migrations
 
 # Ensure data directory exists at runtime
