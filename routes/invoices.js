@@ -91,11 +91,16 @@ router.get('/', async (req, res) => {
       SELECT i.*, 
         c.name as customer_name, 
         s.name as salesperson_name,
-        a.name as account_set_name
+        s.nickname as salesperson_nickname,
+        a.name as account_set_name,
+        uc.name as created_by_name,
+        uu.name as updated_by_name
       FROM invoices i
       LEFT JOIN customers c ON i.customer_id = c.id
       LEFT JOIN salespeople s ON i.salesperson_id = s.id
       LEFT JOIN account_sets a ON i.account_set_id = a.id
+      LEFT JOIN users uc ON i.created_by = uc.id
+      LEFT JOIN users uu ON i.updated_by = uu.id
       WHERE 1=1
     `;
     
@@ -144,7 +149,13 @@ router.get('/', async (req, res) => {
     // 添加分页
     if (req.query.limit) {
       const limit = parseInt(req.query.limit) || 20;
-      const offset = parseInt(req.query.offset) || 0;
+      let offset = 0;
+      if (req.query.page) {
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        offset = (page - 1) * limit;
+      } else if (req.query.offset) {
+        offset = parseInt(req.query.offset) || 0;
+      }
       query += ' LIMIT ? OFFSET ?';
       params.push(limit, offset);
     }
@@ -576,41 +587,43 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
 // 发票状态变更
 router.put('/:id/status', requireAuth, async (req, res) => {
+  const db = getDb();
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
-    
+
     if (!status) {
       return res.status(400).json({ error: '缺少状态参数' });
     }
-    
-    // 验证状态值
+    // 允许的状态（与需求一致：已开具=issued、已作废=cancelled；保留 draft/paid/overdue 以兼容现有流程）
     const validStatuses = ['draft', 'issued', 'paid', 'cancelled', 'overdue'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: '无效的状态值' });
     }
-    
+
     // 获取当前发票
-    const invoice = await db.get('SELECT * FROM invoices WHERE id = ?', id);
-    
+    const invoice = await dbGet(db, 'SELECT * FROM invoices WHERE id = ?', [id]);
     if (!invoice) {
       return res.status(404).json({ error: '发票不存在' });
     }
-    
-    // 更新状态
-    await db.run(`
+
+    await dbRun(db, `
       UPDATE invoices SET
         status = ?,
         notes = CASE WHEN ? IS NOT NULL THEN ? ELSE notes END,
         updated_at = CURRENT_TIMESTAMP,
         updated_by = ?
       WHERE id = ?
-    `, [status, notes, notes, req.user.id, id]);
-    
-    res.json({ message: '发票状态更新成功' });
+    `, [status, notes ?? null, notes ?? null, req.session.userId, id]);
+
+    // 返回更新后简要信息
+    const updated = await dbGet(db, 'SELECT status, updated_at, updated_by FROM invoices WHERE id = ?', [id]);
+    res.json({ message: '发票状态更新成功', ...updated });
   } catch (error) {
     console.error('更新发票状态失败:', error);
     res.status(500).json({ error: '更新发票状态失败' });
+  } finally {
+    try { db.close(); } catch (e) {}
   }
 });
 

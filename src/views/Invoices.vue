@@ -64,9 +64,9 @@
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="选择状态" clearable>
             <el-option label="草稿" value="draft" />
-            <el-option label="已发布" value="published" />
+            <el-option label="已开具" value="issued" />
             <el-option label="已付款" value="paid" />
-            <el-option label="已取消" value="cancelled" />
+            <el-option label="已作废" value="cancelled" />
           </el-select>
         </el-form-item>
         <el-form-item label="日期范围">
@@ -119,7 +119,7 @@
         <el-col :span="6">
           <el-card class="stats-card amount">
             <div class="stats-title">总金额</div>
-            <div class="stats-value">¥{{ formatAmount(stats.totalAmount) }}</div>
+            <div class="stats-value">RM {{ formatAmount(stats.totalAmount) }}</div>
           </el-card>
         </el-col>
       </el-row>
@@ -135,15 +135,22 @@
         style="width: 100%"
         @row-click="handleRowClick"
       >
-        <el-table-column prop="invoice_number" label="发票号" min-width="120" />
-        <el-table-column prop="customer_name" label="客户" min-width="150" />
-  <el-table-column prop="invoice_date" label="开票日期" min-width="120" />
+        <el-table-column prop="invoice_date" label="开票时间" min-width="140" />
+        <el-table-column prop="invoice_number" label="发票号" min-width="140" />
+        <el-table-column prop="customer_name" label="客户" min-width="160" />
         <el-table-column prop="total_amount" label="金额" min-width="120">
           <template #default="scope">
-            ¥{{ formatAmount(scope.row.total_amount) }}
+            RM {{ formatAmount(scope.row.total_amount) }}
           </template>
         </el-table-column>
-        <el-table-column prop="salesperson_name" label="业务员" min-width="120" />
+        <el-table-column prop="salesperson_nickname" label="业务员" min-width="100">
+          <template #default="scope">
+            {{ scope.row.salesperson_nickname || scope.row.salesperson_name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_by_name" label="提交人" min-width="100" />
+        <el-table-column prop="created_at" label="提交时间" min-width="160" />
+        <el-table-column prop="updated_at" label="更新时间" min-width="160" />
         <el-table-column prop="status" label="状态" min-width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
@@ -158,10 +165,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="220">
+        <el-table-column label="操作" fixed="right" width="260">
           <template #default="scope">
             <el-button size="small" @click.stop="viewInvoice(scope.row)">查看</el-button>
             <el-button size="small" type="primary" @click.stop="editInvoice(scope.row)">编辑</el-button>
+            <el-button size="small" type="warning" plain @click.stop="voidInvoice(scope.row)" v-if="scope.row.status !== 'cancelled'">作废</el-button>
             <el-dropdown trigger="click" @click.stop>
               <el-button size="small">
                 更多<el-icon class="el-icon--right"><arrow-down /></el-icon>
@@ -170,14 +178,7 @@
                 <el-dropdown-menu>
                   <el-dropdown-item @click="printInvoice(scope.row)">打印</el-dropdown-item>
                   <el-dropdown-item @click="duplicateInvoice(scope.row)">复制</el-dropdown-item>
-                  <el-dropdown-item 
-                    v-if="scope.row.status === 'draft'" 
-                    @click="deleteInvoice(scope.row)"
-                    divided
-                    class="text-danger"
-                  >
-                    删除
-                  </el-dropdown-item>
+                  <el-dropdown-item v-if="scope.row.status === 'draft'" @click="deleteInvoice(scope.row)" divided class="text-danger">删除</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -527,9 +528,10 @@ function formatAmount(amount) {
 function getStatusType(status) {
   const types = {
     draft: 'info',
-    published: 'primary',
+    issued: 'primary',
     paid: 'success',
-    cancelled: 'danger'
+    cancelled: 'danger',
+    overdue: 'warning'
   };
   return types[status] || 'info';
 }
@@ -537,9 +539,10 @@ function getStatusType(status) {
 function getStatusText(status) {
   const texts = {
     draft: '草稿',
-    published: '已发布',
+    issued: '已开具',
     paid: '已付款',
-    cancelled: '已取消'
+    cancelled: '已作废',
+    overdue: '已逾期'
   };
   return texts[status] || status;
 }
@@ -604,6 +607,35 @@ function printInvoice(invoice) {
 function duplicateInvoice(invoice) {
   // 将在后续实现
   ElMessage.info(`复制发票: ${invoice.invoice_number}`);
+}
+
+// 作废发票
+async function voidInvoice(invoice) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要作废发票 ${invoice.invoice_number} 吗？此操作不可撤销。`,
+      '确认作废',
+      { confirmButtonText: '作废', cancelButtonText: '取消', type: 'warning' }
+    );
+    const resp = await fetch(`/api/invoices/${invoice.id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'cancelled' })
+    });
+    if (resp.ok) {
+      ElMessage.success('已作废');
+      fetchInvoices();
+      fetchStats();
+    } else {
+      const t = await resp.text();
+      throw new Error(t || '作废失败');
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e);
+      ElMessage.error('作废失败');
+    }
+  }
 }
 
 // 删除发票
