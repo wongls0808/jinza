@@ -127,9 +127,14 @@ onMounted(async () => {
 
 // 清理资源
 onBeforeUnmount(() => {
-  if (editor) {
-    editor.destroy();
-    editor = null;
+  console.log('组件卸载，清理GrapesJS资源...');
+  try {
+    if (editor) {
+      editor.destroy();
+      editor = null;
+    }
+  } catch (err) {
+    console.error('清理编辑器资源时出错:', err);
   }
 });
 
@@ -141,23 +146,34 @@ async function loadGrapesJS() {
   try {
     // 检查是否已经加载了GrapesJS
     if (window.grapesjs) {
+      console.log('GrapesJS已加载，初始化编辑器...');
       initEditor();
       return;
     }
     
-    // 尝试从本地加载
-    const localScript = document.createElement('script');
-    localScript.src = '/libs/grapesjs/grapes.min.js';
+    console.log('开始加载GrapesJS资源...');
     
+    // 先加载CSS
     const localStyles = document.createElement('link');
     localStyles.rel = 'stylesheet';
     localStyles.href = '/libs/grapesjs/css/grapes.min.css';
-    
     document.head.appendChild(localStyles);
+    
+    // 确保DOM更新并等待CSS加载
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // 尝试从本地加载JS
+    console.log('尝试从本地加载GrapesJS JS...');
+    const localScript = document.createElement('script');
+    localScript.src = '/libs/grapesjs/grapes.min.js';
     
     // 监听脚本加载情况
     const loadPromise = new Promise((resolve, reject) => {
-      localScript.onload = resolve;
+      localScript.onload = () => {
+        console.log('本地GrapesJS资源加载成功');
+        resolve();
+      };
+      
       localScript.onerror = () => {
         // 本地加载失败，尝试从CDN加载
         console.warn('本地GrapesJS资源加载失败，尝试从CDN加载...');
@@ -171,7 +187,11 @@ async function loadGrapesJS() {
         
         document.head.appendChild(cdnStyles);
         
-        cdnScript.onload = resolve;
+        cdnScript.onload = () => {
+          console.log('CDN GrapesJS资源加载成功');
+          resolve();
+        };
+        
         cdnScript.onerror = () => reject(new Error('无法加载GrapesJS资源'));
         
         document.head.appendChild(cdnScript);
@@ -180,6 +200,9 @@ async function loadGrapesJS() {
     
     document.head.appendChild(localScript);
     await loadPromise;
+    
+    // 确保脚本已完全执行
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     initEditor();
   } catch (error) {
@@ -197,8 +220,17 @@ function initEditor() {
     return;
   }
   
+  // 确保DOM元素已经准备好
   nextTick(() => {
     try {
+      // 检查DOM元素是否存在
+      if (!canvasContainer.value || !blocksPanel.value) {
+        console.error('编辑器容器元素不存在，等待DOM渲染完成...');
+        // 延迟重试
+        setTimeout(initEditor, 200);
+        return;
+      }
+      
       // 创建编辑器实例
       editor = window.grapesjs.init({
         container: canvasContainer.value,
@@ -316,7 +348,18 @@ function initEditor() {
 
 // 重试初始化编辑器
 function retryInitEditor() {
-  loadGrapesJS();
+  console.log('用户触发重试，重新加载GrapesJS...');
+  loading.value = true;
+  loadError.value = null;
+  
+  // 重置状态后开始加载
+  setTimeout(() => {
+    loadGrapesJS().catch(err => {
+      console.error('重试加载GrapesJS失败:', err);
+      loadError.value = err.message || '重试加载编辑器失败';
+      loading.value = false;
+    });
+  }, 100);
 }
 
 // 获取编辑器内容
