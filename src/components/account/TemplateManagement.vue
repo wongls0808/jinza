@@ -70,63 +70,89 @@
     <el-dialog 
       v-model="showAddTemplate" 
       :title="editingTemplate ? '编辑模板' : '新增模板'" 
-      width="600px"
+      width="90%"
+      :fullscreen="isBuilderMode"
       append-to-body
     >
-      <el-form :model="templateForm" label-width="100px">
-        <el-form-item label="模板名称" required>
-          <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
-        </el-form-item>
-        
-        <el-form-item label="模板类型" required>
-          <el-select v-model="templateForm.type" placeholder="请选择模板类型">
-            <el-option label="发票" value="invoice" />
-            <el-option label="收据" value="receipt" />
-            <el-option label="合同" value="contract" />
-            <el-option label="报价单" value="quotation" />
-            <el-option label="送货单" value="delivery" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="纸张规格">
-          <el-select v-model="templateForm.paper_size">
-            <el-option label="A4 (210×297mm)" value="A4" />
-            <el-option label="A5 (148×210mm)" value="A5" />
-            <el-option label="B5 (176×250mm)" value="B5" />
-            <el-option label="80mm 小票" value="80mm" />
-            <el-option label="58mm 小票" value="58mm" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="设为默认">
-          <el-switch v-model="templateForm.is_default" />
-        </el-form-item>
-        
-        <el-form-item label="模板内容">
-          <el-input 
-            v-model="templateForm.content" 
-            type="textarea" 
-            :rows="8" 
-            placeholder="请输入模板内容（支持HTML格式）"
-          />
-          <div class="template-tips">
-            <p>提示：可以使用以下变量：</p>
-            <ul>
-              <li><code>{company_name}</code> - 公司名称</li>
-              <li><code>{company_logo}</code> - 公司LOGO</li>
-              <li><code>{company_seal}</code> - 公司印章</li>
-              <li><code>{signature}</code> - 负责人签名</li>
-              <li><code>{current_date}</code> - 当前日期</li>
-              <li><code>{invoice_number}</code> - 发票编号</li>
-            </ul>
+      <div v-if="!isBuilderMode">
+        <el-form :model="templateForm" label-width="100px">
+          <el-form-item label="模板名称" required>
+            <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
+          </el-form-item>
+          
+          <el-form-item label="模板类型" required>
+            <el-select v-model="templateForm.type" placeholder="请选择模板类型">
+              <el-option label="发票" value="invoice" />
+              <el-option label="收据" value="receipt" />
+              <el-option label="合同" value="contract" />
+              <el-option label="报价单" value="quotation" />
+              <el-option label="送货单" value="delivery" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="纸张规格">
+            <el-select v-model="templateForm.paper_size">
+              <el-option label="A4 (210×297mm)" value="A4" />
+              <el-option label="A5 (148×210mm)" value="A5" />
+              <el-option label="B5 (176×250mm)" value="B5" />
+              <el-option label="80mm 小票" value="80mm" />
+              <el-option label="58mm 小票" value="58mm" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="设为默认">
+            <el-switch v-model="templateForm.is_default" />
+          </el-form-item>
+          
+          <div class="template-actions">
+            <el-button type="primary" @click="openVisualEditor">
+              <el-icon><Edit /></el-icon> 使用可视化编辑器
+            </el-button>
           </div>
-        </el-form-item>
-      </el-form>
+          
+          <el-form-item label="模板内容">
+            <el-input 
+              v-model="templateForm.content" 
+              type="textarea" 
+              :rows="12" 
+              placeholder="请输入模板内容（支持HTML格式）"
+            />
+            <div class="template-tips">
+              <p>提示：可以使用以下变量：</p>
+              <ul>
+                <li><code>{company_name}</code> - 公司名称</li>
+                <li><code>{company_logo}</code> - 公司LOGO</li>
+                <li><code>{company_seal}</code> - 公司印章</li>
+                <li><code>{signature}</code> - 负责人签名</li>
+                <li><code>{current_date}</code> - 当前日期</li>
+                <li><code>{invoice_number}</code> - 发票编号</li>
+                <li><code>{customer_name}</code> - 客户名称</li>
+                <li><code>{customer_address}</code> - 客户地址</li>
+                <li><code>{item_name}</code> - 商品名称</li>
+                <li><code>{quantity}</code> - 商品数量</li>
+                <li><code>{unit_price}</code> - 单价</li>
+                <li><code>{amount}</code> - 金额</li>
+                <li><code>{total_amount}</code> - 总金额</li>
+              </ul>
+            </div>
+          </el-form-item>
+        </el-form>
+        
+        <template #footer>
+          <el-button @click="showAddTemplate = false">取消</el-button>
+          <el-button type="primary" @click="saveTemplate">保存</el-button>
+        </template>
+      </div>
       
-      <template #footer>
-        <el-button @click="showAddTemplate = false">取消</el-button>
-        <el-button type="primary" @click="saveTemplate">保存</el-button>
-      </template>
+      <!-- 可视化编辑器模式 -->
+      <template-builder
+        v-if="isBuilderMode"
+        :initial-content="templateForm.content"
+        :paper-size="templateForm.paper_size"
+        @save="handleBuilderSave"
+        @cancel="isBuilderMode = false"
+        @update:paper-size="templateForm.paper_size = $event"
+      />
     </el-dialog>
 
     <template #footer>
@@ -141,6 +167,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Edit, Star, Delete } from '@element-plus/icons-vue';
+import TemplateBuilder from './TemplateBuilder.vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -148,6 +175,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+const isBuilderMode = ref(false);
 
 const dialogVisible = ref(false);
 const showAddTemplate = ref(false);
@@ -284,6 +312,18 @@ const getTemplateTypeText = (type) => {
 
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString();
+};
+
+// 打开可视化编辑器
+const openVisualEditor = () => {
+  isBuilderMode.value = true;
+};
+
+// 处理可视化编辑器保存
+const handleBuilderSave = (content) => {
+  templateForm.value.content = content;
+  isBuilderMode.value = false;
+  ElMessage.success('模板内容已更新');
 };
 </script>
 
