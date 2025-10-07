@@ -66,98 +66,100 @@
       </el-empty>
     </div>
 
-    <!-- 新增/编辑模板对话框 -->
-    <el-dialog 
-      v-model="showAddTemplate" 
-      :title="editingTemplate ? '编辑模板' : '新增模板'" 
-      width="90%"
-      :fullscreen="isBuilderMode"
-      append-to-body
-    >
-      <div v-if="!isBuilderMode">
-        <el-form :model="templateForm" label-width="100px">
-          <el-form-item label="模板名称" required>
-            <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
-          </el-form-item>
-          
-          <el-form-item label="模板类型" required>
-            <el-select v-model="templateForm.type" placeholder="请选择模板类型">
-              <el-option label="发票" value="invoice" />
-              <el-option label="收据" value="receipt" />
-              <el-option label="合同" value="contract" />
-              <el-option label="报价单" value="quotation" />
-              <el-option label="送货单" value="delivery" />
-            </el-select>
-          </el-form-item>
-          
-          <el-form-item label="纸张规格">
-            <el-select v-model="templateForm.paper_size">
-              <el-option label="A4 (210×297mm)" value="A4" />
-              <el-option label="A5 (148×210mm)" value="A5" />
-              <el-option label="B5 (176×250mm)" value="B5" />
-              <el-option label="80mm 小票" value="80mm" />
-              <el-option label="58mm 小票" value="58mm" />
-            </el-select>
-          </el-form-item>
-          
-          <el-form-item label="设为默认">
-            <el-switch v-model="templateForm.is_default" />
-          </el-form-item>
-          
-          <div class="template-actions">
-            <el-button type="primary" @click="openVisualEditor">
-              <el-icon><Edit /></el-icon> 使用可视化编辑器
-            </el-button>
-          </div>
-          
-          <el-form-item label="模板内容">
-            <el-input 
-              v-model="templateForm.content" 
-              type="textarea" 
-              :rows="12" 
-              placeholder="请输入模板内容（支持HTML格式）"
-            />
-            <div class="template-tips">
-              <p>提示：可以使用以下变量：</p>
-              <ul>
-                <li><code>{company_name}</code> - 公司名称</li>
-                <li><code>{company_logo}</code> - 公司LOGO</li>
-                <li><code>{company_seal}</code> - 公司印章</li>
-                <li><code>{signature}</code> - 负责人签名</li>
-                <li><code>{current_date}</code> - 当前日期</li>
-                <li><code>{invoice_number}</code> - 发票编号</li>
-                <li><code>{customer_name}</code> - 客户名称</li>
-                <li><code>{customer_address}</code> - 客户地址</li>
-                <li><code>{item_name}</code> - 商品名称</li>
-                <li><code>{quantity}</code> - 商品数量</li>
-                <li><code>{unit_price}</code> - 单价</li>
-                <li><code>{amount}</code> - 金额</li>
-                <li><code>{total_amount}</code> - 总金额</li>
-              </ul>
-            </div>
-          </el-form-item>
-        </el-form>
-        
-        <template #footer>
-          <el-button @click="showAddTemplate = false">取消</el-button>
-          <el-button type="primary" @click="saveTemplate">保存</el-button>
-        </template>
-      </div>
-      
-      <!-- 可视化编辑器模式 -->
-      <template-builder
-        v-if="isBuilderMode"
-        :initial-content="templateForm.content"
-        :paper-size="templateForm.paper_size"
-        @save="handleBuilderSave"
-        @cancel="isBuilderMode = false"
-        @update:paper-size="templateForm.paper_size = $event"
-      />
-    </el-dialog>
-
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="dialogVisible = false">关闭</el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 新增/编辑模板对话框 -->
+  <el-dialog 
+    v-model="showAddTemplate" 
+    :title="editingTemplate ? '编辑模板' : '新增模板'" 
+    width="90%"
+    :fullscreen="isBuilderMode"
+    append-to-body
+  >
+    <div v-if="!isBuilderMode">
+      <el-form :model="templateForm" label-width="100px">
+        <el-form-item label="模板名称" required>
+          <el-input v-model="templateForm.name" placeholder="请输入模板名称" />
+        </el-form-item>
+        
+        <el-form-item label="模板类型" required>
+          <el-select v-model="templateForm.type" placeholder="请选择模板类型">
+            <el-option label="发票" value="invoice" />
+            <el-option label="收据" value="receipt" />
+            <el-option label="合同" value="contract" />
+            <el-option label="报价单" value="quotation" />
+            <el-option label="送货单" value="delivery" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="纸张规格">
+          <el-select v-model="templateForm.paper_size">
+            <el-option label="A4 (210×297mm)" value="A4" />
+            <el-option label="A5 (148×210mm)" value="A5" />
+            <el-option label="B5 (176×250mm)" value="B5" />
+            <el-option label="80mm 小票" value="80mm" />
+            <el-option label="58mm 小票" value="58mm" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="设为默认">
+          <el-switch v-model="templateForm.is_default" />
+        </el-form-item>
+        
+        <div class="template-actions">
+          <el-button type="primary" @click="openVisualEditor">
+            <el-icon><Edit /></el-icon> 使用可视化编辑器
+          </el-button>
+        </div>
+        
+        <el-form-item label="模板内容">
+          <el-input 
+            v-model="templateForm.content" 
+            type="textarea" 
+            :rows="12" 
+            placeholder="请输入模板内容（支持HTML格式）"
+          />
+          <div class="template-tips">
+            <p>提示：可以使用以下变量：</p>
+            <ul>
+              <li><code>{company_name}</code> - 公司名称</li>
+              <li><code>{company_logo}</code> - 公司LOGO</li>
+              <li><code>{company_seal}</code> - 公司印章</li>
+              <li><code>{signature}</code> - 负责人签名</li>
+              <li><code>{current_date}</code> - 当前日期</li>
+              <li><code>{invoice_number}</code> - 发票编号</li>
+              <li><code>{customer_name}</code> - 客户名称</li>
+              <li><code>{customer_address}</code> - 客户地址</li>
+              <li><code>{item_name}</code> - 商品名称</li>
+              <li><code>{quantity}</code> - 商品数量</li>
+              <li><code>{unit_price}</code> - 单价</li>
+              <li><code>{amount}</code> - 金额</li>
+              <li><code>{total_amount}</code> - 总金额</li>
+            </ul>
+          </div>
+        </el-form-item>
+      </el-form>
+    </div>
+    
+    <!-- 可视化编辑器模式 -->
+    <template-builder
+      v-if="isBuilderMode"
+      :initial-content="templateForm.content"
+      :paper-size="templateForm.paper_size"
+      @save="handleBuilderSave"
+      @cancel="isBuilderMode = false"
+      @update:paper-size="templateForm.paper_size = $event"
+    />
+
+    <template #footer>
+      <div v-if="!isBuilderMode" class="dialog-footer">
+        <el-button @click="showAddTemplate = false">取消</el-button>
+        <el-button type="primary" @click="saveTemplate">保存</el-button>
       </div>
     </template>
   </el-dialog>
@@ -200,53 +202,101 @@ watch(dialogVisible, (val) => {
   emit('update:modelValue', val);
 });
 
-const loadPrintTemplates = async () => {
-  if (!props.accountSet) return;
+const formatDate = (dateString) => {
+  if (!dateString) return '';
   
+  const date = new Date(dateString);
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const loadPrintTemplates = async () => {
   try {
-    const response = await fetch(`/api/print-templates?account_set_id=${props.accountSet.id}`);
+    if (!props.accountSet || !props.accountSet.id) {
+      console.error('账套ID为空');
+      return;
+    }
+    
+    const response = await fetch(`/api/print-templates?accountSetId=${props.accountSet.id}`);
     if (response.ok) {
-      printTemplates.value = await response.json();
+      const data = await response.json();
+      printTemplates.value = data.templates || [];
+    } else {
+      console.error('获取打印模板失败', response.statusText);
     }
   } catch (error) {
-    console.error('加载打印模板失败:', error);
-    ElMessage.error('加载模板失败');
+    console.error('获取打印模板出错', error);
   }
 };
 
-const saveTemplate = async () => {
-  if (!templateForm.value.name || !templateForm.value.type) {
-    ElMessage.error('请填写模板名称和类型');
-    return;
-  }
+const getTemplateTypeText = (type) => {
+  const typeMap = {
+    invoice: '发票',
+    receipt: '收据',
+    contract: '合同',
+    quotation: '报价单',
+    delivery: '送货单'
+  };
+  
+  return typeMap[type] || type;
+};
 
+const saveTemplate = async () => {
   try {
-    const url = editingTemplate.value 
-      ? `/api/print-templates/${editingTemplate.value.id}`
+    // 表单验证
+    if (!templateForm.value.name) {
+      ElMessage.error('请输入模板名称');
+      return;
+    }
+    
+    if (!templateForm.value.type) {
+      ElMessage.error('请选择模板类型');
+      return;
+    }
+    
+    const isUpdate = editingTemplate.value !== null;
+    const url = isUpdate 
+      ? `/api/print-templates/${editingTemplate.value.id}` 
       : '/api/print-templates';
     
-    const method = editingTemplate.value ? 'PUT' : 'POST';
+    const method = isUpdate ? 'PUT' : 'POST';
+    
+    const payload = {
+      ...templateForm.value,
+      account_set_id: props.accountSet.id
+    };
     
     const response = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...templateForm.value,
-        account_set_id: props.accountSet.id
-      })
+      body: JSON.stringify(payload)
     });
     
     if (response.ok) {
+      await loadPrintTemplates();
       showAddTemplate.value = false;
       editingTemplate.value = null;
+      
+      ElMessage.success(isUpdate ? '更新成功' : '创建成功');
+      
+      // 重置表单
       templateForm.value = {
-        name: '', type: '', paper_size: 'A4', content: '', is_default: false
+        name: '',
+        type: '',
+        paper_size: 'A4',
+        content: '',
+        is_default: false
       };
-      await loadPrintTemplates();
-      ElMessage.success(editingTemplate.value ? '更新成功' : '创建成功');
+    } else {
+      throw new Error(response.statusText);
     }
   } catch (error) {
-    console.error('保存模板失败:', error);
+    console.error('保存模板出错:', error);
     ElMessage.error('保存模板失败');
   }
 };
@@ -299,21 +349,6 @@ const setDefaultTemplate = async (template) => {
   }
 };
 
-const getTemplateTypeText = (type) => {
-  const types = {
-    invoice: '发票',
-    receipt: '收据',
-    contract: '合同',
-    quotation: '报价单',
-    delivery: '送货单'
-  };
-  return types[type] || type;
-};
-
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString();
-};
-
 // 打开可视化编辑器
 const openVisualEditor = () => {
   isBuilderMode.value = true;
@@ -328,19 +363,25 @@ const handleBuilderSave = (content) => {
 </script>
 
 <style scoped>
+.template-dialog {
+  --el-dialog-width: 900px;
+}
+
+.template-management {
+  min-height: 500px;
+}
+
 .dialog-header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .dialog-header h3 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
+  margin-bottom: 8px;
   color: #303133;
 }
 
 .dialog-description {
-  margin: 0;
-  color: #909399;
+  color: #606266;
   font-size: 14px;
 }
 
@@ -355,28 +396,28 @@ const handleBuilderSave = (content) => {
 }
 
 .template-card {
-  transition: all 0.3s ease;
+  transition: all 0.3s;
+  position: relative;
 }
 
 .template-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .default-template {
-  border-left: 4px solid #409eff;
+  border-color: var(--el-color-success-light-5);
+  box-shadow: 0 0 8px var(--el-color-success-light-3);
 }
 
 .template-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
-.template-info h4 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+.template-name {
+  margin: 0 0 8px;
   color: #303133;
 }
 
@@ -398,7 +439,7 @@ const handleBuilderSave = (content) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .preview-placeholder {
@@ -407,43 +448,42 @@ const handleBuilderSave = (content) => {
 }
 
 .template-footer {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .create-time {
-  font-size: 12px;
   color: #909399;
+  font-size: 12px;
 }
 
+/* 可视化编辑器相关样式 */
 .template-tips {
-  margin-top: 8px;
+  margin-top: 12px;
+  background: #f5f7fa;
   padding: 12px;
-  background: #f8f9fa;
   border-radius: 4px;
-  font-size: 12px;
-  color: #606266;
 }
 
 .template-tips p {
-  margin: 0 0 8px 0;
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-weight: bold;
 }
 
 .template-tips ul {
   margin: 0;
-  padding-left: 16px;
+  padding-left: 20px;
+}
+
+.template-tips li {
+  margin-bottom: 6px;
 }
 
 .template-tips code {
-  background: #e6e6e6;
+  background: #ecf5ff;
   padding: 2px 4px;
-  border-radius: 2px;
-  font-family: monospace;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  border-radius: 3px;
+  color: #409eff;
 }
 </style>
