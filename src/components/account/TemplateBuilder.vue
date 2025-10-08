@@ -1281,145 +1281,224 @@ function printInvoice() {
 
 // 执行实际的打印操作
 function executePrint() {
-  // 创建一个临时的打印窗口内容
-  const printContent = document.createElement('div');
-  printContent.innerHTML = `
-    <html>
-      <head>
-        <title>发票打印</title>
-        <style>
-          @media print {
+  try {
+    // 获取要打印的内容
+    let printHtml = '';
+
+    // 检查是否是预览模式还是编辑模式
+    if (editorMode.value === 'preview') {
+      // 在预览模式下，直接获取预览的内容
+      const previewElement = document.querySelector('.paper-content');
+      if (previewElement) {
+        printHtml = previewElement.innerHTML;
+      }
+    } else {
+      // 从模板数据获取内容
+      printHtml = templateData.value.body || '<p>无内容</p>';
+    }
+
+    // 创建打印窗口
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      ElMessage.error('无法打开打印窗口，请检查浏览器是否阻止了弹出窗口');
+      return;
+    }
+
+    // 创建打印文档
+    printWindow.document.open();
+    const printTemplate = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>发票打印</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            /* 重置样式 */
+            * {
+              box-sizing: border-box;
+            }
+            
+            /* 基本样式 */
             body {
-              font-family: ${fontFamily.value};
-              font-size: ${fontSize.value}px;
+              font-family: ${fontFamily.value || 'Arial, sans-serif'};
+              font-size: ${fontSize.value || '12'}px;
+              line-height: 1.4;
+              color: #000;
+              background: white;
               margin: 0;
               padding: 0;
-              color: #000;
             }
-            .page {
-              width: 210mm;
-              min-height: 297mm;
-              padding: 10mm;
-              margin: 0 auto;
-              background-color: white;
-              box-shadow: none;
-              position: relative;
+            
+            /* 打印预览样式 */
+            @media screen {
+              body {
+                background: #f5f5f5;
+                padding: 20px;
+              }
+              .print-container {
+                max-width: 210mm;
+                margin: 0 auto;
+                background: white;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                padding: 10mm;
+              }
+              .print-header, .print-footer, .print-info {
+                background-color: #f8f8f8;
+                margin-bottom: 15px;
+                padding: 10px;
+                border-radius: 4px;
+              }
+              .no-print {
+                display: block;
+              }
             }
-            .page-content {
-              position: relative;
+            
+            /* 实际打印样式 */
+            @media print {
+              body {
+                margin: 0;
+                padding: 0;
+                background: white;
+              }
+              .print-container {
+                width: 100%;
+                padding: 0;
+                margin: 0;
+              }
+              .no-print, .print-header, .print-footer, .print-info {
+                display: none !important;
+              }
+              .page {
+                page-break-after: always;
+              }
             }
-            /* 隐藏控制元素 */
-            .component-controls,
-            .resize-handle {
-              display: none !important;
+            
+            /* 发票样式 */
+            .invoice-header {
+              text-align: center;
+              margin-bottom: 15px;
+              font-size: 20px;
+              font-weight: bold;
             }
-            /* 自定义CSS样式 */
+            
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 15px;
+            }
+            
+            th, td {
+              padding: 8px;
+              border: 1px solid #ddd;
+              text-align: left;
+            }
+            
+            th {
+              background-color: #f2f2f2;
+            }
+            
+            .text-right {
+              text-align: right;
+            }
+            
+            .text-center {
+              text-align: center;
+            }
+            
+            .info-section {
+              margin-bottom: 15px;
+            }
+            
+            .info-section h2 {
+              font-size: 16px;
+              margin-top: 0;
+              margin-bottom: 8px;
+              border-bottom: 1px solid #eee;
+              padding-bottom: 5px;
+            }
+            
+            .info-row {
+              display: flex;
+              flex-wrap: wrap;
+              margin-bottom: 5px;
+            }
+            
+            .info-label {
+              font-weight: bold;
+              margin-right: 10px;
+              min-width: 80px;
+            }
+            
+            .totals {
+              margin-top: 20px;
+              text-align: right;
+            }
+            
+            .total-row {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 5px;
+            }
+            
+            .total-label {
+              font-weight: bold;
+              margin-right: 20px;
+            }
+            
+            .total-value {
+              min-width: 100px;
+            }
+            
+            /* 用户自定义样式 */
             ${cssContent.value || ''}
-          }
-          /* 预览样式 */
-          body {
-            font-family: ${fontFamily.value};
-            font-size: ${fontSize.value}px;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-          }
-          .page {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 10mm;
-            margin: 0 auto;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            position: relative;
-          }
-          .page-content {
-            position: relative;
-          }
-          .print-header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #f8f8f8;
-            border-radius: 5px;
-          }
-          .print-header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .print-footer {
-            text-align: center;
-            font-size: 12px;
-            color: #888;
-            margin-top: 20px;
-          }
-          .no-print {
-            padding: 10px;
-            margin-bottom: 20px;
-            background-color: #e1f5fe;
-            border-left: 4px solid #039be5;
-            color: #01579b;
-          }
-          @media print {
-            .no-print {
-              display: none !important;
-            }
-          }
-          /* 自定义CSS样式 */
-          ${cssContent.value || ''}
-        </style>
-      </head>
-      <body>
-        <div class="no-print">
-          <p>提示: 打印对话框出现后，请设置为无边距打印以获得最佳效果。打印预览会自动删除此提示。</p>
-        </div>
-        <div class="print-header no-print">
-          <h1>${props.templateName || '发票打印'}</h1>
-        </div>
-        <div class="page">
-          <div class="page-content">
-            ${templateData.value.body || '<p>无内容</p>'}
+          </style>
+        </head>
+        <body>
+          <div class="print-info no-print">
+            <h3>打印预览</h3>
+            <p>提示: 点击"打印"按钮后，请在浏览器打印对话框中选择"无边距"选项以获得最佳效果。</p>
           </div>
-        </div>
-        <div class="print-footer no-print">
-          <p>打印时间: ${new Date().toLocaleString()}</p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  // 创建打印窗口
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    ElMessage.error('无法打开打印窗口，请检查浏览器是否阻止了弹出窗口');
-    return;
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(printContent.innerHTML);
-  printWindow.document.close();
-
-  // 加载完成后打印
-  printWindow.onload = function() {
-    try {
-      // 给打印机一点时间准备
-      setTimeout(() => {
-        printWindow.print();
-        // 打印完成后关闭窗口（某些浏览器可能会自动关闭）
-        // 不是所有浏览器都支持 afterprint 事件
-        if ('onafterprint' in window) {
-          printWindow.onafterprint = function() {
-            printWindow.close();
-          };
-        } else {
-          // 部分浏览器不支持 afterprint，则依赖用户关闭窗口
+          
+          <div class="print-header no-print">
+            <h2>${props.templateName || '发票打印'}</h2>
+            <p>打印时间: ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div class="print-container">
+            ${printHtml}
+          </div>
+          
+          <div class="print-footer no-print">
+            <button onclick="window.print()" style="padding: 8px 15px; background: #409EFF; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+              打印文档
+            </button>
+            <button onclick="window.close()" style="padding: 8px 15px; background: #909399; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;">
+              关闭窗口
+            </button>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printTemplate);
+    printWindow.document.close();
+    
+    // 添加打印功能
+    printWindow.onload = function() {
+      setTimeout(function() {
+        try {
+          printWindow.print();
+        } catch(e) {
+          console.error("打印过程中出现错误:", e);
         }
       }, 500);
-    } catch (e) {
-      console.error('打印过程中出错:', e);
-      ElMessage.error('打印过程中出错: ' + e.message);
-    }
-  };
+    };
+    
+  } catch (e) {
+    console.error('准备打印内容时出错:', e);
+    ElMessage.error('准备打印内容时出错: ' + e.message);
+  }
 }
 
 // =====================================
