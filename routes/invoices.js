@@ -844,6 +844,7 @@ router.post('/:id/payments', requireAuth, async (req, res) => {
 
 // 生成发票预览
 router.post('/:id/preview', requireAuth, async (req, res) => {
+  const db = getDb();
   try {
     const { id } = req.params;
     const { template_id, paper_size } = req.body;
@@ -859,20 +860,19 @@ router.post('/:id/preview', requireAuth, async (req, res) => {
       return res.status(404).json({ error: '发票不存在' });
     }
     
-    // 获取打印模板
-    const template = await db.get(`
-      SELECT * FROM templates WHERE id = ?
-    `, template_id);
+    // 获取打印模板（使用正确表名 print_templates）
+    const template = await dbGet(db, `
+      SELECT * FROM print_templates WHERE id = ?
+    `, [template_id]);
     
     if (!template) {
       return res.status(404).json({ error: '模板不存在' });
     }
     
-    // 获取账套资源（LOGO、公章、签名等）
-    const resources = await db.all(`
-      SELECT * FROM account_set_resources
-      WHERE account_set_id = ?
-    `, invoice.account_set_id);
+    // 获取账套资源（LOGO、公章、签名等）—从 account_sets 表读取 *_path 字段
+    const resources = await dbGet(db, `
+      SELECT logo_path, seal_path, signature_path FROM account_sets WHERE id = ?
+    `, [invoice.account_set_id]);
     
     // 生成HTML预览内容
     const html = await generateInvoiceHtml(invoice, template, resources, paper_size);
@@ -881,11 +881,14 @@ router.post('/:id/preview', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('生成预览失败:', error);
     res.status(500).json({ error: '生成预览失败' });
+  } finally {
+    try { db.close(); } catch (e) { console.error('关闭数据库连接失败:', e); }
   }
 });
 
 // 生成发票PDF
 router.post('/:id/pdf', requireAuth, async (req, res) => {
+  const db = getDb();
   try {
     const { id } = req.params;
     const { template_id, paper_size } = req.body;
@@ -901,20 +904,19 @@ router.post('/:id/pdf', requireAuth, async (req, res) => {
       return res.status(404).json({ error: '发票不存在' });
     }
     
-    // 获取打印模板
-    const template = await db.get(`
-      SELECT * FROM templates WHERE id = ?
-    `, template_id);
+    // 获取打印模板（使用正确表名 print_templates）
+    const template = await dbGet(db, `
+      SELECT * FROM print_templates WHERE id = ?
+    `, [template_id]);
     
     if (!template) {
       return res.status(404).json({ error: '模板不存在' });
     }
     
-    // 获取账套资源（LOGO、公章、签名等）
-    const resources = await db.all(`
-      SELECT * FROM account_set_resources
-      WHERE account_set_id = ?
-    `, invoice.account_set_id);
+    // 获取账套资源（LOGO、公章、签名等）—从 account_sets 表读取 *_path 字段
+    const resources = await dbGet(db, `
+      SELECT logo_path, seal_path, signature_path FROM account_sets WHERE id = ?
+    `, [invoice.account_set_id]);
     
     // 生成HTML预览内容
     const html = await generateInvoiceHtml(invoice, template, resources, paper_size);
@@ -939,6 +941,8 @@ router.post('/:id/pdf', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('生成PDF失败:', error);
     res.status(500).json({ error: '生成PDF失败' });
+  } finally {
+    try { db.close(); } catch (e) { console.error('关闭数据库连接失败:', e); }
   }
 });
 
@@ -1005,24 +1009,25 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
   // 这里将使用模板和资源生成发票HTML
   // 实际项目中可能会使用模板引擎如Handlebars、EJS等
   
-  // 查找LOGO、公章、签名等资源
-  const logo = resources.find(r => r.type === 'logo')?.path || '';
-  const seal = resources.find(r => r.type === 'seal')?.path || '';
-  const signature = resources.find(r => r.type === 'signature')?.path || '';
+  // 账套资源：使用 account_sets 表中的 *_path 字段
+  const logo = resources?.logo_path || '';
+  const seal = resources?.seal_path || '';
+  const signature = resources?.signature_path || '';
   
   // 使用模板内容替换变量
   let html = template.content;
   
   // 替换发票基本信息
-  html = html.replace(/\{\{invoice_number\}\}/g, invoice.invoice_number)
-             .replace(/\{\{invoice_date\}\}/g, invoice.invoice_date)
+  const n2 = (v) => Number.isFinite(parseFloat(v)) ? parseFloat(v).toFixed(2) : '0.00';
+  html = html.replace(/\{\{invoice_number\}\}/g, invoice.invoice_number || '')
+             .replace(/\{\{invoice_date\}\}/g, invoice.invoice_date || '')
              .replace(/\{\{due_date\}\}/g, invoice.due_date || '')
-             .replace(/\{\{status\}\}/g, invoice.status)
-             .replace(/\{\{payment_status\}\}/g, invoice.payment_status)
-             .replace(/\{\{subtotal\}\}/g, invoice.subtotal.toFixed(2))
-             .replace(/\{\{tax_amount\}\}/g, invoice.tax_amount.toFixed(2))
-             .replace(/\{\{discount_amount\}\}/g, invoice.discount_amount.toFixed(2))
-             .replace(/\{\{total_amount\}\}/g, invoice.total_amount.toFixed(2));
+             .replace(/\{\{status\}\}/g, invoice.status || '')
+             .replace(/\{\{payment_status\}\}/g, invoice.payment_status || '')
+             .replace(/\{\{subtotal\}\}/g, n2(invoice.subtotal))
+             .replace(/\{\{tax_amount\}\}/g, n2(invoice.tax_amount))
+             .replace(/\{\{discount_amount\}\}/g, n2(invoice.discount_amount))
+             .replace(/\{\{total_amount\}\}/g, n2(invoice.total_amount));
   
   // 替换客户信息
   html = html.replace(/\{\{customer_name\}\}/g, invoice.customer_name || '')
@@ -1035,13 +1040,14 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
              .replace(/\{\{salesperson_name\}\}/g, invoice.salesperson_name || '');
   
   // 替换资源路径
-  html = html.replace(/\{\{logo\}\}/g, logo ? `/uploads/${logo}` : '')
-             .replace(/\{\{seal\}\}/g, seal ? `/uploads/${seal}` : '')
-             .replace(/\{\{signature\}\}/g, signature ? `/uploads/${signature}` : '');
+  const norm = (p) => p || '';
+  html = html.replace(/\{\{logo\}\}/g, norm(logo))
+             .replace(/\{\{seal\}\}/g, norm(seal))
+             .replace(/\{\{signature\}\}/g, norm(signature));
   
   // 生成明细项HTML
   let itemsHtml = '';
-  invoice.items.forEach((item, index) => {
+  (invoice.items || []).forEach((item, index) => {
     itemsHtml += `
       <tr>
         <td>${index + 1}</td>
@@ -1049,10 +1055,10 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
         <td>${item.description}</td>
         <td>${item.quantity}</td>
         <td>${item.unit || ''}</td>
-        <td>${item.unit_price.toFixed(2)}</td>
-        <td>${item.tax_rate ? (item.tax_rate * 100).toFixed(2) + '%' : '0%'}</td>
-        <td>${item.discount_rate ? (item.discount_rate * 100).toFixed(2) + '%' : '0%'}</td>
-        <td>${item.total.toFixed(2)}</td>
+        <td>${n2(item.unit_price)}</td>
+        <td>${Number.isFinite(parseFloat(item.tax_rate)) ? (parseFloat(item.tax_rate).toFixed(2) + '%') : '0%'}</td>
+        <td>${Number.isFinite(parseFloat(item.discount_rate)) ? (parseFloat(item.discount_rate).toFixed(2) + '%') : '0%'}</td>
+        <td>${n2(item.amount || item.total)}</td>
       </tr>
     `;
   });
