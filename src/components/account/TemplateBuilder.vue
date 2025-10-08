@@ -33,7 +33,8 @@
       <div class="right">
         <el-button-group>
           <el-button size="small" @click="toggleEditorMode">{{ editorMode === 'wysiwyg' ? '预览模式' : '编辑模式' }}</el-button>
-          <el-button type="primary" size="small" @click="openHtmlEditor">编辑HTML</el-button>
+          <el-button size="small" @click="openHtmlEditor">编辑HTML</el-button>
+          <el-button type="primary" size="small" @click="saveTemplate">保存模板</el-button>
         </el-button-group>
       </div>
     </div>
@@ -358,13 +359,19 @@
                    :class="['editor-component', {'selected': selectedComponentIndex === index}]"
                    :style="component.style"
                    @click.stop="selectComponent(index)"
+                   @dblclick.stop="editComponentText(index)"
                    draggable="true"
                    @dragstart="handleDragStart($event, index)"
                    @dragend="handleDragEnd">
-                <div class="component-content" v-html="component.content"></div>
+                <div class="component-content" v-if="editingComponentIndex !== index" v-html="component.content"></div>
+                <div class="component-content editing" v-else>
+                  <textarea v-model="editingText" @blur="saveEditedText" @keydown.enter.prevent="saveEditedText"></textarea>
+                </div>
                 <div class="component-controls" v-show="selectedComponentIndex === index">
                   <button class="control-btn delete-btn" @click.stop="deleteComponent(index)" title="删除">×</button>
                   <button class="control-btn move-btn" title="拖动">⋮⋮</button>
+                  <button class="control-btn edit-btn" @click.stop="editComponentText(index)" title="编辑文本">✎</button>
+                  <div class="resize-handle" @mousedown.stop="startResize($event, index)" title="调整大小"></div>
                 </div>
               </div>
             </template>
@@ -412,6 +419,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, defineExpose } from 'vue';
+import { ElMessage } from 'element-plus';
 
 // =====================================
 // 属性和事件
@@ -438,6 +446,12 @@ const selectedComponentIndex = ref(-1);
 const draggedComponentType = ref(null);
 const draggedComponent = ref(null);
 const dragPosition = ref({ x: 0, y: 0 });
+const textEditMode = ref(false);
+const editingText = ref('');
+const editingComponentIndex = ref(-1);
+const isResizing = ref(false);
+const resizeStartPos = ref({ x: 0, y: 0 });
+const resizeStartDimensions = ref({ width: 0, height: 0 });
 
 // 字段过滤
 const fieldCategory = ref('all');
@@ -476,28 +490,43 @@ const editorTab = ref('html');
 // 字段列表
 const invoiceFields = ref([
   // 基础信息
-  { id: 'invoice_number', label: '发票号', value: '{{invoice_number}}', category: '基础' },
-  { id: 'invoice_date', label: '发票日期', value: '{{invoice_date}}', category: '基础' },
-  { id: 'due_date', label: '到期日', value: '{{due_date}}', category: '基础' },
+  { id: 'invoice_number', label: '发票号码', value: '{{invoice_number}}', category: '基础' },
+  { id: 'invoice_code', label: '发票代码', value: '{{invoice_code}}', category: '基础' },
+  { id: 'invoice_date', label: '开票日期', value: '{{invoice_date}}', category: '基础' },
+  { id: 'invoice_month', label: '所属月份', value: '{{invoice_month}}', category: '基础' },
+  { id: 'due_date', label: '到期日期', value: '{{due_date}}', category: '基础' },
+  { id: 'check_code', label: '校验码', value: '{{check_code}}', category: '基础' },
   { id: 'invoice_status', label: '发票状态', value: '{{invoice_status}}', category: '基础' },
   { id: 'invoice_type', label: '发票类型', value: '{{invoice_type}}', category: '基础' },
   { id: 'invoice_currency', label: '币种', value: '{{invoice_currency}}', category: '基础' },
   
   // 金额相关
-  { id: 'subtotal', label: '小计', value: '{{subtotal}}', category: '金额' },
+  { id: 'subtotal', label: '金额小计', value: '{{subtotal}}', category: '金额' },
+  { id: 'tax_rate', label: '税率', value: '{{tax_rate}}', category: '金额' },
   { id: 'tax_amount', label: '税额', value: '{{tax_amount}}', category: '金额' },
-  { id: 'discount_amount', label: '折扣', value: '{{discount_amount}}', category: '金额' },
-  { id: 'total_amount', label: '合计', value: '{{total_amount}}', category: '金额' },
+  { id: 'discount_rate', label: '折扣率', value: '{{discount_rate}}', category: '金额' },
+  { id: 'discount_amount', label: '折扣金额', value: '{{discount_amount}}', category: '金额' },
+  { id: 'total_amount', label: '价税合计', value: '{{total_amount}}', category: '金额' },
   { id: 'amount_in_words', label: '金额大写', value: '{{amount_in_words}}', category: '金额' },
   { id: 'paid_amount', label: '已付金额', value: '{{paid_amount}}', category: '金额' },
   { id: 'remaining_amount', label: '未付金额', value: '{{remaining_amount}}', category: '金额' },
   
+  // 项目信息
+  { id: 'project_id', label: '项目编号', value: '{{project_id}}', category: '项目' },
+  { id: 'project_name', label: '项目名称', value: '{{project_name}}', category: '项目' },
+  { id: 'contract_number', label: '合同编号', value: '{{contract_number}}', category: '项目' },
+  { id: 'order_number', label: '订单编号', value: '{{order_number}}', category: '项目' },
+  
   // 备注信息
   { id: 'invoice_notes', label: '发票备注', value: '{{invoice_notes}}', category: '其他' },
   { id: 'payment_terms', label: '付款条款', value: '{{payment_terms}}', category: '其他' },
+  { id: 'payment_method', label: '付款方式', value: '{{payment_method}}', category: '其他' },
   { id: 'reference_number', label: '参考编号', value: '{{reference_number}}', category: '其他' },
-  { id: 'salespeople', label: '销售人员', value: '{{salespeople}}', category: '其他' },
-  { id: 'project_name', label: '项目名称', value: '{{project_name}}', category: '其他' }
+  { id: 'creator', label: '制单人', value: '{{creator}}', category: '其他' },
+  { id: 'create_time', label: '制单时间', value: '{{create_time}}', category: '其他' },
+  { id: 'reviewer', label: '审核人', value: '{{reviewer}}', category: '其他' },
+  { id: 'review_time', label: '审核时间', value: '{{review_time}}', category: '其他' },
+  { id: 'salespeople', label: '销售人员', value: '{{salespeople}}', category: '其他' }
 ]);
 
 const customerFields = ref([
@@ -699,9 +728,19 @@ const filteredAccountSetFields = computed(() => {
   const categoryMap = {
     'basic': '公司',
     'amount': '税务',
-    'contact': '银行',
+    'bank': '银行',
+    'contact': '公司',  // 包含地址等联系信息
     'other': '其他'
   };
+  
+  // 如果是联系类别，需要特殊处理包含地址等信息
+  if (fieldCategory.value === 'contact') {
+    return accountSetFields.value.filter(field => 
+      field.category === '公司' && ['company_address', 'company_city', 'company_state', 
+      'company_country', 'company_postal_code', 'company_phone', 'company_fax', 
+      'company_email', 'company_website'].includes(field.id)
+    );
+  }
   
   return accountSetFields.value.filter(field => 
     field.category === categoryMap[fieldCategory.value]
@@ -1072,6 +1111,151 @@ function goBackToTemplates() {
   // 如果没有router，可以使用window.history或emit事件
   if (window.history && window.history.back) {
     window.history.back();
+  }
+}
+
+// 文本编辑功能
+function editComponentText(index) {
+  if (index >= 0 && index < components.value.length) {
+    // 获取要编辑的组件
+    const component = components.value[index];
+    
+    // 检查组件类型是否支持编辑
+    if (component.type === 'heading' || component.type === 'paragraph' || component.type === 'field') {
+      // 提取纯文本内容（去除HTML标签）
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = component.content;
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+      
+      // 设置编辑状态
+      editingComponentIndex.value = index;
+      editingText.value = textContent;
+      textEditMode.value = true;
+    }
+  }
+}
+
+// 保存编辑的文本
+function saveEditedText() {
+  if (editingComponentIndex.value !== -1) {
+    const component = components.value[editingComponentIndex.value];
+    
+    // 根据组件类型创建正确的HTML
+    let newContent = '';
+    
+    switch (component.type) {
+      case 'heading':
+        newContent = `<h2>${editingText.value}</h2>`;
+        break;
+      case 'paragraph':
+        newContent = `<p>${editingText.value}</p>`;
+        break;
+      case 'field':
+        newContent = `<span style="padding:2px 4px;background:#f0f7ff;border:1px solid #d0e3ff;border-radius:3px;">${editingText.value}</span>`;
+        break;
+      default:
+        newContent = editingText.value;
+    }
+    
+    // 更新组件内容
+    component.content = newContent;
+    
+    // 重置编辑状态
+    textEditMode.value = false;
+    editingComponentIndex.value = -1;
+    editingText.value = '';
+    
+    // 更新模板数据
+    updateModelFromComponents();
+  }
+}
+
+// 开始调整大小
+function startResize(event, index) {
+  if (index >= 0 && index < components.value.length) {
+    isResizing.value = true;
+    const component = components.value[index];
+    
+    // 记录初始位置和尺寸
+    resizeStartPos.value = {
+      x: event.clientX,
+      y: event.clientY
+    };
+    
+    // 提取当前宽度和高度
+    const style = component.style || {};
+    const width = style.width ? parseInt(style.width) : 100;
+    const height = style.height ? parseInt(style.height) : 100;
+    
+    resizeStartDimensions.value = {
+      width,
+      height,
+      index
+    };
+    
+    // 添加鼠标移动和鼠标释放事件处理
+    document.addEventListener('mousemove', handleResize);
+    document.addEventListener('mouseup', endResize);
+  }
+}
+
+// 处理调整大小
+function handleResize(event) {
+  if (!isResizing.value) return;
+  
+  const deltaX = event.clientX - resizeStartPos.value.x;
+  const deltaY = event.clientY - resizeStartPos.value.y;
+  
+  const index = resizeStartDimensions.value.index;
+  const component = components.value[index];
+  
+  const newWidth = Math.max(50, resizeStartDimensions.value.width + deltaX);
+  const newHeight = Math.max(20, resizeStartDimensions.value.height + deltaY);
+  
+  // 更新组件样式
+  component.style = {
+    ...component.style,
+    width: `${newWidth}px`,
+    height: `${newHeight}px`
+  };
+  
+  // 更新模型
+  updateModelFromComponents();
+}
+
+// 结束调整大小
+function endResize() {
+  isResizing.value = false;
+  document.removeEventListener('mousemove', handleResize);
+  document.removeEventListener('mouseup', endResize);
+}
+
+// 保存模板
+function saveTemplate() {
+  try {
+    // 更新模板数据
+    updateModelFromComponents();
+    
+    // 创建一个表单数据对象来保存模板信息
+    const templateData = {
+      id: props.templateId || Date.now().toString(),
+      name: props.templateName || '新模板',
+      type: props.templateType || 'invoice',
+      content: JSON.stringify({
+        body: templateData.value.body,
+        head: templateData.value.head,
+        css: cssContent.value
+      })
+    };
+    
+    // 触发保存事件，传递数据给父组件
+    emit('save', templateData);
+    
+    // 显示保存成功消息
+    ElMessage.success('模板保存成功!');
+  } catch (error) {
+    console.error('保存模板失败:', error);
+    ElMessage.error('保存模板失败: ' + error.message);
   }
 }
 
@@ -1810,6 +1994,45 @@ defineExpose({
   margin-bottom: 12px;
   display: flex;
   flex-direction: column;
+}
+
+.component-content {
+  pointer-events: none;
+}
+
+.component-content.editing {
+  pointer-events: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.component-content.editing textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+  padding: 5px;
+  border: 1px dashed #4b9fff;
+  background: rgba(255, 255, 255, 0.9);
+  resize: none;
+}
+
+.component-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 5px;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background-color: #4b9fff;
+  border-radius: 50%;
+  cursor: se-resize;
 }
 
 .style-label {
