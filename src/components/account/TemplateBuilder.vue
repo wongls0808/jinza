@@ -432,7 +432,7 @@ const props = defineProps({
   paperSize: { type: String, default: 'A4' }
 });
 
-const emit = defineEmits(['update:modelValue', 'save']);
+const emit = defineEmits(['update:modelValue', 'save', 'update:paper-size']);
 
 // =====================================
 // 状态变量
@@ -647,8 +647,17 @@ const paperSizes = {
 };
 
 // 计算纸张样式
+const paperPreset = ref('A4');
+const customWidthMm = ref(210);
+const customHeightMm = ref(297);
+
 const paperStyle = computed(() => {
-  const size = paperSizes[props.paperSize] || paperSizes['A4'];
+  let size;
+  if (paperPreset.value !== 'custom') {
+    size = paperSizes[paperPreset.value] || paperSizes['A4'];
+  } else {
+    size = { width: `${customWidthMm.value}mm`, height: `${customHeightMm.value}mm` };
+  }
   return {
     width: size.width,
     minHeight: size.height === 'auto' ? '400px' : size.height,
@@ -658,6 +667,31 @@ const paperStyle = computed(() => {
     fontSize: `${fontSize.value}px`
   };
 });
+
+function parsePaperSizeProp() {
+  const val = props.paperSize || 'A4';
+  if (paperSizes[val]) {
+    paperPreset.value = val;
+    return;
+  }
+  if (typeof val === 'string' && val.startsWith('custom:')) {
+    paperPreset.value = 'custom';
+    const m = val.replace('custom:', '').match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)/i);
+    if (m) {
+      customWidthMm.value = parseFloat(m[1]);
+      customHeightMm.value = parseFloat(m[2]);
+    }
+  } else {
+    paperPreset.value = 'A4';
+  }
+}
+
+function emitPaperSize() {
+  const out = paperPreset.value === 'custom'
+    ? `custom:${Math.max(10, Math.round(customWidthMm.value))}x${Math.max(10, Math.round(customHeightMm.value))}`
+    : paperPreset.value;
+  emit('update:paper-size', out);
+}
 
 // 过滤发票字段
 const filteredInvoiceFields = computed(() => {
@@ -734,6 +768,8 @@ const previewContent = ref('');
 // 初始化组件
 onMounted(() => {
   isSyncingFromProps.value = true;
+  // 初始化纸张
+  parsePaperSizeProp();
   // 解析初始HTML
   parseTemplate(props.modelValue);
   // 从模板数据中解析组件
@@ -743,6 +779,14 @@ onMounted(() => {
   isSyncingFromProps.value = false;
   // 监听窗口大小变化
   window.addEventListener('resize', updatePreviewStyle);
+});
+
+watch(() => props.paperSize, () => {
+  parsePaperSizeProp();
+});
+
+watch([paperPreset, customWidthMm, customHeightMm], () => {
+  if (!isSyncingFromProps.value) emitPaperSize();
 });
 
 // 解析模板HTML
@@ -870,7 +914,14 @@ function insertComponent(componentType) {
 function updateModelFromComponents() {
   let content = '';
   components.value.forEach(component => {
-    content += component.content;
+    const style = component.style || {};
+    const hasAbs = style.position === 'absolute' || style.left || style.top || style.zIndex;
+    if (hasAbs) {
+      const styleStr = Object.entries(style).map(([k,v])=>`${k.replace(/[A-Z]/g, m=>'-'+m.toLowerCase())}:${v}`).join(';');
+      content += `<div style="${styleStr}">${component.content}</div>`;
+    } else {
+      content += component.content;
+    }
   });
   
   // 使用page-content容器包装
@@ -901,33 +952,49 @@ function parseComponentsFromTemplate() {
     
     // 将DOM节点转换为组件对象
     Array.from(tempDiv.children).forEach((child) => {
-      // 尝试判断组件类型
+      // 如果是包装容器，提取其行内样式并把内部作为组件内容
+      let extractedStyle = {};
+      let innerHtml = '';
+      if (child.tagName === 'DIV' && child.getAttribute('style')) {
+        const styleText = child.getAttribute('style');
+        styleText.split(';').forEach(rule => {
+          const [k, v] = rule.split(':');
+          if (!k || !v) return;
+          const key = k.trim().replace(/-([a-z])/g, (_,c)=>c.toUpperCase());
+          extractedStyle[key] = v.trim();
+        });
+        innerHtml = child.innerHTML;
+      } else {
+        innerHtml = child.outerHTML;
+      }
+
+      // 尝试判断组件类型（基于内部第一个元素）
+      const probe = document.createElement('div');
+      probe.innerHTML = innerHtml;
+      const first = probe.firstElementChild;
       let type = 'paragraph';
-      if (child.tagName === 'H1' || child.tagName === 'H2' || child.tagName === 'H3') {
+      if (first && (first.tagName === 'H1' || first.tagName === 'H2' || first.tagName === 'H3')) {
         type = 'heading';
-      } else if (child.tagName === 'HR') {
+      } else if (first && first.tagName === 'HR') {
         type = 'divider';
-      } else if (child.tagName === 'TABLE') {
-        if (child.innerHTML.includes('{{invoice_items}}')) {
+      } else if (first && first.tagName === 'TABLE') {
+        if (first.innerHTML.includes('{{invoice_items}}')) {
           type = 'item-table';
         } else {
           type = 'totals';
         }
-      } else if (child.tagName === 'DIV' && child.innerHTML.includes('display:flex')) {
-        if (child.innerHTML.includes('三列')) {
+      } else if (first && first.tagName === 'DIV' && first.innerHTML.includes('display:flex')) {
+        if (first.innerHTML.includes('三列')) {
           type = 'three-columns';
         } else {
           type = 'two-columns';
         }
       }
-      
+
       components.value.push({
-        type: type,
-        content: child.outerHTML,
-        style: {
-          position: 'relative',
-          margin: '8px 0'
-        }
+        type,
+        content: innerHtml,
+        style: Object.keys(extractedStyle).length ? extractedStyle : { position: 'relative', margin: '8px 0' }
       });
     });
   }
@@ -990,8 +1057,12 @@ function handleDropComponent(event) {
   event.preventDefault();
   
   const paperRect = paperContent.value.getBoundingClientRect();
-  const x = event.clientX - paperRect.left;
-  const y = event.clientY - paperRect.top;
+  let x = event.clientX - paperRect.left;
+  let y = event.clientY - paperRect.top;
+  // 网格吸附（采用近似像素网格）
+  const gridSize = 10; // 与控制面板保持一致
+  x = Math.round(x / gridSize) * gridSize;
+  y = Math.round(y / gridSize) * gridSize;
   
   // 获取拖放的数据类型
   const data = event.dataTransfer.getData('text/plain');
