@@ -2,7 +2,7 @@
   <div class="template-builder">
     <div class="builder-toolbar">
       <div class="left">
-        <el-tag size="small" type="info">可视化编辑器</el-tag>
+        <el-tag size="small" type="info">简化版模板编辑器</el-tag>
         <span class="paper">纸张：{{ paperSize }}</span>
       </div>
       <div class="right">
@@ -15,78 +15,127 @@
         <el-button size="small" @click="zoomOut">-</el-button>
         <el-button size="small">{{ Math.round(zoom * 100) }}%</el-button>
         <el-button size="small" @click="zoomIn">+</el-button>
-        <el-button size="small" @click="fitToWidth">适配宽度</el-button>
-        <el-button size="small" @click="fitToPage">整页</el-button>
-        <el-divider direction="vertical" />
-        <span class="toolbar-label">网格：</span>
-        <el-switch v-model="showGrid" active-text="显示" inactive-text="隐藏" @change="applyGrid" />
-        <el-checkbox v-model="snapToGrid" :disabled="!showGrid">吸附</el-checkbox>
-        <el-input-number v-model="gridSize" :min="5" :step="5" size="small" style="width:110px" :disabled="!showGrid" />
+        <el-button size="small" @click="resetZoom">重置</el-button>
         <el-divider direction="vertical" />
         <span class="toolbar-label">字号：</span>
-        <el-input-number v-model="fontSize" :min="8" :max="72" size="small" style="width:110px" @change="applyFontSize" />
+        <el-input-number v-model="fontSize" :min="8" :max="72" size="small" style="width:110px" @change="updatePreviewStyle" />
         <span class="toolbar-label">字体：</span>
-        <el-select v-model="fontFamily" size="small" style="width:160px" @change="applyFontFamily">
+        <el-select v-model="fontFamily" size="small" style="width:160px" @change="updatePreviewStyle">
           <el-option label="Arial" value="Arial, Helvetica, sans-serif" />
           <el-option label="微软雅黑" value="'Microsoft YaHei', '微软雅黑', Arial, sans-serif" />
           <el-option label="黑体" value="'SimHei', '黑体', Arial, sans-serif" />
           <el-option label="宋体" value="'SimSun', '宋体', serif" />
           <el-option label="Times" value="'Times New Roman', Times, serif" />
         </el-select>
-        <span class="toolbar-label">颜色：</span>
-        <input type="color" v-model="fontColor" @change="applyFontColor" class="color-input" />
+        <el-button type="primary" size="small" @click="openHtmlEditor">编辑HTML</el-button>
       </div>
     </div>
     
-    <!-- 主编辑区域 - 全新布局 -->
-    <div class="builder-main-area">
-      <!-- 左侧组件栏 -->
-      <div class="builder-sidebar">
-        <div ref="blocksPanel" class="blocks-panel"></div>
+    <!-- 双栏布局：左侧组件，右侧预览 -->
+    <div class="editor-main">
+      <!-- 左侧组件列表 -->
+      <div class="component-sidebar">
+        <h4 class="sidebar-title">常用组件</h4>
+        <div class="component-list">
+          <!-- 基础组件 -->
+          <div class="component-group">
+            <div class="group-title">基础组件</div>
+            <div class="component-item" @click="insertComponent('heading')">
+              <div class="item-icon">H</div>
+              <div class="item-label">标题</div>
+            </div>
+            <div class="component-item" @click="insertComponent('paragraph')">
+              <div class="item-icon">P</div>
+              <div class="item-label">段落</div>
+            </div>
+            <div class="component-item" @click="insertComponent('divider')">
+              <div class="item-icon">—</div>
+              <div class="item-label">分隔线</div>
+            </div>
+          </div>
+          
+          <!-- 布局组件 -->
+          <div class="component-group">
+            <div class="group-title">布局组件</div>
+            <div class="component-item" @click="insertComponent('two-columns')">
+              <div class="item-icon">||</div>
+              <div class="item-label">两列布局</div>
+            </div>
+            <div class="component-item" @click="insertComponent('three-columns')">
+              <div class="item-icon">|||</div>
+              <div class="item-label">三列布局</div>
+            </div>
+          </div>
+          
+          <!-- 发票组件 -->
+          <div class="component-group">
+            <div class="group-title">发票组件</div>
+            <div class="component-item" @click="insertComponent('invoice-info')">
+              <div class="item-icon">#</div>
+              <div class="item-label">发票信息</div>
+            </div>
+            <div class="component-item" @click="insertComponent('customer-info')">
+              <div class="item-icon">👤</div>
+              <div class="item-label">客户信息</div>
+            </div>
+            <div class="component-item" @click="insertComponent('item-table')">
+              <div class="item-icon">📋</div>
+              <div class="item-label">明细表格</div>
+            </div>
+            <div class="component-item" @click="insertComponent('totals')">
+              <div class="item-icon">💰</div>
+              <div class="item-label">金额汇总</div>
+            </div>
+          </div>
+        </div>
       </div>
       
-      <!-- 中央画布区域 -->
-      <div class="builder-canvas-container">
-        <!-- 加载和错误状态 -->
-        <div v-if="loading" class="editor-status-overlay loading-overlay">
-          <div class="status-content">
-            <div class="spinner"></div>
-            <p>正在加载可视化编辑器...</p>
-          </div>
-        </div>
-        <div v-else-if="loadError" class="editor-status-overlay error-overlay">
-          <div class="status-content">
-            <div class="error-icon">!</div>
-            <h3>加载失败</h3>
-            <p>{{ loadError }}</p>
-            <p>请检查网络连接或使用离线资源：</p>
-            <ul>
-              <li>在项目的 <code>public/libs/grapesjs/</code> 目录放入 <code>grapes.min.js</code> 与 <code>css/grapes.min.css</code></li>
-              <li>刷新页面后将优先从本地加载</li>
-            </ul>
-          </div>
-        </div>
-        
-        <!-- 编辑器容器 - 添加了空div占位以确保面板正确创建 -->
-        <div ref="editorContainer" class="editor-container">
-          <!-- 编辑器面板将由JavaScript动态创建 -->
-          <!-- 这些空div作为占位符，由createPanels函数填充 -->
-          <div class="gjs-editor-region" style="display:none"></div>
-        </div>
-        
-        <!-- 高度控制 -->
-        <div class="canvas-height-control">
-          <span>画布高度：</span>
-          <el-slider v-model="editorHeight" :min="600" :max="1600" :step="50" show-stops style="width:240px" />
-          <span>{{ editorHeight }}px</span>
+      <!-- 右侧预览区域 -->
+      <div class="preview-container" ref="previewContainer">
+        <div class="paper-preview" :style="paperStyle">
+          <div class="paper-content" ref="paperContent" v-html="previewContent"></div>
         </div>
       </div>
     </div>
+    
+    <!-- HTML编辑器对话框 -->
+    <el-dialog
+      v-model="htmlEditorVisible"
+      title="HTML编辑器"
+      width="80%"
+      :before-close="closeHtmlEditor">
+      <el-tabs v-model="editorTab">
+        <el-tab-pane label="HTML编辑" name="html">
+          <el-input
+            v-model="htmlContent"
+            type="textarea"
+            :rows="20"
+            placeholder="编辑HTML内容"
+            class="html-editor"
+          />
+        </el-tab-pane>
+        <el-tab-pane label="CSS样式" name="css">
+          <el-input
+            v-model="cssContent"
+            type="textarea"
+            :rows="20"
+            placeholder="编辑CSS样式"
+            class="css-editor"
+          />
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeHtmlEditor">取消</el-button>
+          <el-button type="primary" @click="applyHtmlChanges">应用更改</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, defineExpose } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, defineExpose } from 'vue';
 
 // =====================================
 // 属性和事件
@@ -101,23 +150,17 @@ const emit = defineEmits(['update:modelValue']);
 // =====================================
 // 状态变量
 // =====================================
-const editorContainer = ref(null);
-const blocksPanel = ref(null);
-const loading = ref(true);
-const loadError = ref('');
-let editor = null;
-
-// 画布设置
-const editorHeight = ref(800);
+const previewContainer = ref(null);
+const paperContent = ref(null);
 const zoom = ref(1);
-const showGrid = ref(false);
-const snapToGrid = ref(false);
-const gridSize = ref(10);
-
-// 文本编辑设置
-const fontFamily = ref("Arial, Helvetica, sans-serif");
 const fontSize = ref(12);
-const fontColor = ref('#333333');
+const fontFamily = ref("Arial, Helvetica, sans-serif");
+
+// HTML编辑器状态
+const htmlEditorVisible = ref(false);
+const htmlContent = ref('');
+const cssContent = ref('');
+const editorTab = ref('html');
 
 // 令牌（占位符）
 const TOKENS = {
@@ -127,428 +170,191 @@ const TOKENS = {
   signature: '<img src="{{signature}}" alt="SIGN" style="max-height:36px;"/>'
 };
 
+// 组件模板
+const COMPONENTS = {
+  'heading': '<h2 style="margin:8px 0">标题文本</h2>',
+  'paragraph': '<p style="margin:6px 0">请输入文本内容...</p>',
+  'divider': '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0" />',
+  'two-columns': `
+    <div style="display:flex;width:100%;gap:16px">
+      <div style="flex:1">左侧内容</div>
+      <div style="flex:1">右侧内容</div>
+    </div>
+  `,
+  'three-columns': `
+    <div style="display:flex;width:100%;gap:12px">
+      <div style="flex:1">第一列</div>
+      <div style="flex:1">第二列</div>
+      <div style="flex:1">第三列</div>
+    </div>
+  `,
+  'invoice-info': `
+    <div style="margin:6px 0">
+      <div>发票号: {{invoice_number}}</div>
+      <div>日期: {{invoice_date}}</div>
+      <div>到期日: {{due_date}}</div>
+    </div>
+  `,
+  'customer-info': `
+    <div style="margin:6px 0">
+      <div><strong>客户信息</strong></div>
+      <div>{{customer_name}}</div>
+      <div>{{customer_address}}</div>
+      <div>电话: {{customer_phone}}</div>
+    </div>
+  `,
+  'item-table': `
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">#</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">产品</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">描述</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">数量</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">单位</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">单价</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">税率</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">折扣</th>
+          <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">金额</th>
+        </tr>
+      </thead>
+      <tbody>{{invoice_items}}</tbody>
+    </table>
+  `,
+  'totals': `
+    <table style="width:220px;border-collapse:collapse;margin-left:auto">
+      <tr>
+        <td style="text-align:left;padding:4px">小计:</td>
+        <td style="text-align:right;padding:4px">{{subtotal}}</td>
+      </tr>
+      <tr>
+        <td style="text-align:left;padding:4px">税额:</td>
+        <td style="text-align:right;padding:4px">{{tax_amount}}</td>
+      </tr>
+      <tr>
+        <td style="text-align:left;padding:4px">折扣:</td>
+        <td style="text-align:right;padding:4px">{{discount_amount}}</td>
+      </tr>
+      <tr style="font-weight:bold">
+        <td style="text-align:left;padding:4px;border-top:1px solid #ddd">合计:</td>
+        <td style="text-align:right;padding:4px;border-top:1px solid #ddd">{{total_amount}}</td>
+      </tr>
+    </table>
+  `
+};
+
+// 纸张尺寸计算
+const paperSizes = {
+  'A4': { width: '210mm', height: '297mm' },
+  'A5': { width: '148mm', height: '210mm' },
+  'B5': { width: '176mm', height: '250mm' },
+  '80mm': { width: '80mm', height: 'auto' },
+  '58mm': { width: '58mm', height: 'auto' }
+};
+
+// 计算纸张样式
+const paperStyle = computed(() => {
+  const size = paperSizes[props.paperSize] || paperSizes['A4'];
+  return {
+    width: size.width,
+    minHeight: size.height === 'auto' ? '400px' : size.height,
+    transform: `scale(${zoom.value})`,
+    transformOrigin: 'top center',
+    fontFamily: fontFamily.value,
+    fontSize: `${fontSize.value}px`
+  };
+});
+
+// 解析和准备初始内容
+const templateData = ref({
+  head: '',
+  body: '<div class="page-content"><p>点击左侧组件或顶部按钮添加内容</p></div>',
+  css: ''
+});
+
+// 预览内容
+const previewContent = ref('');
+
 // =====================================
-// GrapesJS 加载
+// 初始化与解析
 // =====================================
 
-// 加载GrapesJS及其依赖项
-async function loadGrapesJS() {
-  try {
-    // 优先尝试本地资源
-    const localJS = '/libs/grapesjs/grapes.min.js';
-    const localCSS = '/libs/grapesjs/css/grapes.min.css';
-    
-    // 添加CSS
-    await loadCSS(localCSS).catch(() => {
-      console.warn('无法加载本地CSS，尝试CDN');
-      return loadCSS('https://unpkg.com/grapesjs@0.21.5/dist/css/grapes.min.css');
-    });
-    
-    // 添加JS
-    const grapesjs = await loadScript(localJS).catch(() => {
-      console.warn('无法加载本地JS，尝试CDN');
-      return loadScript('https://unpkg.com/grapesjs@0.21.5/dist/grapes.min.js');
-    });
-    
-    return window.grapesjs;
-  } catch (error) {
-    console.error('GrapesJS加载失败:', error);
-    throw new Error('无法加载编辑器资源，请检查网络连接或离线资源');
-  }
-}
-
-// 加载CSS文件
-function loadCSS(href) {
-  return new Promise((resolve, reject) => {
-    // 检查是否已经加载
-    const existingLink = document.querySelector(`link[href="${href}"]`);
-    if (existingLink) {
-      return resolve();
-    }
-    
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    
-    link.onload = () => resolve();
-    link.onerror = () => reject(new Error(`无法加载样式: ${href}`));
-    
-    document.head.appendChild(link);
-  });
-}
-
-// 加载JavaScript文件
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    // 检查是否已经加载
-    if (window.grapesjs) {
-      return resolve(window.grapesjs);
-    }
-    
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    
-    script.onload = () => {
-      if (window.grapesjs) {
-        resolve(window.grapesjs);
-      } else {
-        reject(new Error('GrapesJS未正确加载到全局对象'));
-      }
-    };
-    script.onerror = () => reject(new Error(`无法加载脚本: ${src}`));
-    
-    document.body.appendChild(script);
-  });
-}
-
-// =====================================
-// 编辑器初始化
-// =====================================
-
-// 初始化编辑器 - 全新重构版本
-async function initEditor() {
-  try {
-    loading.value = true;
-    loadError.value = '';
-    
-    // 确保容器已渲染
-    await nextTick();
-    if (!editorContainer.value || !blocksPanel.value) {
-      throw new Error('编辑器容器未找到');
-    }
-    
-    // 加载GrapesJS
-    const grapesjs = await loadGrapesJS();
-    
-    // 解析现有HTML
-    const templateData = parseTemplate(props.modelValue);
-    
-    // 创建临时样式元素以防止样式冲突
-    const styleEl = document.createElement('style');
-    styleEl.innerHTML = `
-      .gjs-one-bg { background-color: #f5f5f5 }
-      .gjs-two-color { color: #383838 }
-      .gjs-three-bg { background-color: #ec5896 }
-      .gjs-four-color { color: #fff }
-    `;
-    document.head.appendChild(styleEl);
-    
-    // 创建编辑器实例 - 全新官方推荐配置
-    editor = grapesjs.init({
-      // 基础设置
-      container: editorContainer.value,
-      height: `${editorHeight.value}px`,
-      width: '100%',
-      protectedCss: `.page{min-height:380px}`,
-      allowScripts: false,
-      noticeOnUnload: false,
-      
-      // 存储管理器 - 禁用自动存储
-      storageManager: false,
-      
-      // 设备管理器 - 专注于单一视图
-      deviceManager: {
-        devices: [
-          {
-            name: 'Desktop',
-            width: '',
-          }
-        ]
-      },
-      
-      // 面板配置 - 使用必要的标准面板
-      panels: {
-        defaults: [
-          // 编辑器默认面板
-          {
-            id: 'commands',
-            el: '.panel__commands',
-            buttons: [
-              { id: 'visibility', command: 'sw-visibility', active: true, className: 'fa fa-square-o' },
-              { id: 'undo', command: 'core:undo', className: 'fa fa-undo' },
-              { id: 'redo', command: 'core:redo', className: 'fa fa-repeat' }
-            ]
-          },
-          {
-            id: 'options',
-            el: '.panel__options',
-            buttons: [
-              { id: 'clear', className: 'fa fa-trash', command: 'core:canvas-clear' }
-            ],
-          }
-        ]
-      },
-      
-      // 样式管理器 - 启用基本样式编辑
-      styleManager: {
-        appendTo: '.styles-container',
-        sectors: [
-          {
-            name: '尺寸',
-            open: false,
-            properties: [
-              { name: 'width', property: 'width' },
-              { name: 'height', property: 'height' },
-              { name: 'padding', property: 'padding' },
-              { name: 'margin', property: 'margin' }
-            ]
-          },
-          {
-            name: '文字',
-            open: false,
-            properties: [
-              { name: 'font-size', property: 'font-size' },
-              { name: 'font-family', property: 'font-family' },
-              { name: 'font-weight', property: 'font-weight' },
-              { name: 'color', property: 'color' },
-              { name: 'text-align', property: 'text-align' }
-            ]
-          }
-        ]
-      },
-      
-      // 区块管理器
-      blockManager: {
-        appendTo: blocksPanel.value,
-        blocks: []  // 将在setupBlocks中添加
-      },
-      // 画布配置 - 完全重构
-      canvas: {
-        styles: [],
-        scripts: [],
-        autoscroll: true,
-        autorender: true,
-        // 设置基本帧样式
-        frameStyle: `
-          html, body {
-            min-height: 100%;
-            margin: 0;
-            padding: 0;
-            background-color: #f8f9fa;
-          }
-          body {
-            padding: 20px;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-          }
-          .page {
-            background-color: white;
-            box-shadow: 0 0 8px rgba(0,0,0,0.1);
-            margin: 0 auto;
-            padding: 15mm;
-            box-sizing: border-box;
-            min-height: 400px;
-            position: relative;
-          }
-          * {
-            box-sizing: border-box;
-          }
-        `
-      },
-      
-      // 布局管理器
-      layerManager: {
-        appendTo: '.layers-container'
-      },
-      
-      // 特性管理器 (属性编辑)
-      traitManager: {
-        appendTo: '.traits-container',
-      },
-      
-      // 选择器管理器 (CSS 类管理)
-      selectorManager: {
-        appendTo: '.selectors-container',
-      },
-      
-      // 组件交互设置
-      components: {
-        // 确保元素可选择
-        selectable: true,
-        // 确保元素可拖动
-        draggable: true,
-        // 确保元素可删除
-        removable: true,
-        // 允许元素嵌套
-        nestable: true,
-        // 允许元素内容编辑
-        editable: true,
-        // 允许元素调整大小
-        resizable: true,
-        // 设置交互提示
-        highlightable: true,
-        // 边框颜色
-        selectedColor: '#4b9fff',
-      },
-    });
-    
-    // 创建必要的面板容器
-    createPanels();
-    
-    // 配置区块
-    setupBlocks();
-    
-    // 设置内容 - 确保总是有页面容器
-    let initialContent = '';
-    if (templateData.body && templateData.body.includes('class="page"')) {
-      // 已有带page容器的内容
-      initialContent = templateData.body;
-    } else {
-      // 添加page容器包装
-      const content = templateData.body || '<p>点击左侧区块或顶部按钮添加内容</p>';
-      initialContent = `<div class="page">${content}</div>`;
-    }
-    
-    // 设置组件并确保它们可以正常渲染
-    editor.setComponents(initialContent);
-    
-    // 添加常用组件命令
-    editor.Commands.add('open-layers', {
-      run(editor) { editor.Panels.getPanel('layers-view').set('visible', true); }
-    });
-    
-    editor.Commands.add('open-style', {
-      run(editor) { editor.Panels.getPanel('styles-view').set('visible', true); }
-    });
-    
-    editor.Commands.add('open-traits', {
-      run(editor) { editor.Panels.getPanel('traits-view').set('visible', true); }
-    });
-    
-    // 绑定事件
-    setupEditorEvents(templateData.head);
-    
-    // 编辑器加载完成后
-    editor.on('load', async () => {
-      console.log('编辑器加载完成');
-      
-      // 应用纸张尺寸
-      await nextTick();
-      applyPaperSize();
-      
-      // 直接访问DOM以确保iframe内部元素可交互
-      setTimeout(() => {
-        const frame = editor.Canvas.getFrameEl();
-        if (frame && frame.contentDocument) {
-          const style = document.createElement('style');
-          style.textContent = `
-            * { pointer-events: auto !important; }
-            body { overflow: auto !important; }
-          `;
-          frame.contentDocument.head.appendChild(style);
-        }
-        
-        // 连续尝试调整视图，确保显示正确
-        fitToWidth();
-        setTimeout(fitToWidth, 200);
-        setTimeout(fitToWidth, 500);
-      }, 100);
-    });
-    
-    // 立即应用纸张尺寸
-    applyPaperSize();
-    
-    loading.value = false;
-  } catch (error) {
-    console.error('初始化编辑器失败:', error);
-    loadError.value = error.message || '初始化失败';
-    loading.value = false;
-  }
-}
-
-// 创建必要的面板容器
-function createPanels() {
-  // 检查是否需要创建面板
-  const panelsContainer = document.createElement('div');
-  panelsContainer.className = 'gjs-panels-container';
+// 初始化组件
+onMounted(() => {
+  // 解析初始HTML
+  parseTemplate(props.modelValue);
+  updatePreviewContent();
   
-  // 命令面板 - 顶部工具栏
-  const cmdPanel = document.createElement('div');
-  cmdPanel.className = 'panel__commands';
-  panelsContainer.appendChild(cmdPanel);
-  
-  // 选项面板
-  const optPanel = document.createElement('div');
-  optPanel.className = 'panel__options';
-  panelsContainer.appendChild(optPanel);
-  
-  // 添加到编辑器容器前
-  if (editorContainer.value) {
-    editorContainer.value.prepend(panelsContainer);
-    
-    // 创建右侧属性面板容器
-    const rightPanel = document.createElement('div');
-    rightPanel.className = 'gjs-right-panel';
-    
-    // 添加样式容器
-    const stylesContainer = document.createElement('div');
-    stylesContainer.className = 'styles-container';
-    stylesContainer.innerHTML = '<div class="gjs-panel-header">样式</div>';
-    rightPanel.appendChild(stylesContainer);
-    
-    // 添加层级容器
-    const layersContainer = document.createElement('div');
-    layersContainer.className = 'layers-container';
-    layersContainer.innerHTML = '<div class="gjs-panel-header">层级</div>';
-    rightPanel.appendChild(layersContainer);
-    
-    // 添加特性容器
-    const traitsContainer = document.createElement('div');
-    traitsContainer.className = 'traits-container';
-    traitsContainer.innerHTML = '<div class="gjs-panel-header">属性</div>';
-    rightPanel.appendChild(traitsContainer);
-    
-    // 添加选择器容器
-    const selectorsContainer = document.createElement('div');
-    selectorsContainer.className = 'selectors-container';
-    selectorsContainer.innerHTML = '<div class="gjs-panel-header">选择器</div>';
-    rightPanel.appendChild(selectorsContainer);
-    
-    // 添加到编辑器容器后
-    editorContainer.value.parentNode.insertBefore(rightPanel, editorContainer.value.nextSibling);
-  }
-}
+  // 监听窗口大小变化
+  window.addEventListener('resize', updatePreviewStyle);
+});
 
 // 解析模板HTML
 function parseTemplate(html) {
-  const result = {
-    head: '',
-    body: ''
-  };
-  
-  if (!html) return result;
+  if (!html) return;
   
   try {
     // 提取head内容
     const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
-    if (headMatch) result.head = headMatch[1];
+    if (headMatch) templateData.value.head = headMatch[1];
+    
+    // 提取style内容
+    const styleMatch = templateData.value.head.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    if (styleMatch) templateData.value.css = styleMatch[1];
     
     // 提取body内容
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     if (bodyMatch) {
-      result.body = bodyMatch[1];
+      templateData.value.body = bodyMatch[1];
     } else {
       // 无完整HTML结构，将整个内容视为body
-      result.body = html.trim();
+      templateData.value.body = html.trim();
+    }
+
+    // 如果body为空，添加默认内容
+    if (!templateData.value.body.trim()) {
+      templateData.value.body = '<div class="page-content"><p>点击左侧组件或顶部按钮添加内容</p></div>';
+    }
+    
+    // 如果没有page-content类的容器，添加一个
+    if (!templateData.value.body.includes('class="page-content"')) {
+      templateData.value.body = `<div class="page-content">${templateData.value.body}</div>`;
     }
   } catch (error) {
-    console.warn('解析模板失败，将作为body内容处理', error);
-    result.body = html || '';
+    console.warn('解析模板失败，使用默认内容', error);
+    templateData.value.body = '<div class="page-content"><p>点击左侧组件或顶部按钮添加内容</p></div>';
   }
-  
-  return result;
+}
+
+// 更新预览内容
+function updatePreviewContent() {
+  previewContent.value = templateData.value.body;
+  updateModelValue();
+}
+
+// 重建HTML并更新model
+function updateModelValue() {
+  const fullHtml = rebuildHtml(
+    templateData.value.head,
+    templateData.value.body,
+    templateData.value.css
+  );
+  emit('update:modelValue', fullHtml);
 }
 
 // 重建完整HTML
 function rebuildHtml(head, body, css = '') {
+  // 从head中移除style标签
+  let cleanHead = head || '';
+  cleanHead = cleanHead.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  
+  // 创建样式标签
   const cssTag = css && css.trim() ? `<style>\n${css}\n</style>` : '';
+  
   return `<!DOCTYPE html>
 <html>
 <head>
-  ${head || ''}
+  ${cleanHead}
   ${cssTag}
 </head>
 <body>
@@ -558,555 +364,140 @@ function rebuildHtml(head, body, css = '') {
 }
 
 // =====================================
-// 编辑器配置
+// 编辑器功能
 // =====================================
 
-// 设置区块
-function setupBlocks() {
-  if (!editor) return;
+// 插入组件
+function insertComponent(componentType) {
+  const componentHtml = COMPONENTS[componentType];
+  if (!componentHtml) return;
   
-  // 注册双击编辑命令
-  editor.Commands.add('tlb-edit', {
-    run(editor) {
-      const selected = editor.getSelected();
-      if (selected) {
-        editor.runCommand('core:open-text-editor', { 
-          target: selected 
-        });
-      }
-    }
-  });
+  // 获取当前body内容
+  let content = templateData.value.body;
   
-  const bm = editor.BlockManager;
+  // 寻找page-content容器
+  const pageContentRegex = /<div\s+class="page-content"[^>]*>([\s\S]*?)<\/div>/i;
+  const contentMatch = content.match(pageContentRegex);
   
-  // 基础元素
-  bm.add('heading', {
-    label: '标题',
-    category: '基础',
-    content: '<h2 style="margin:8px 0">标题文本</h2>',
-    attributes: { class: 'fa fa-header' }
-  });
-  
-  bm.add('paragraph', {
-    label: '段落',
-    category: '基础',
-    content: '<p style="margin:6px 0">请输入文本内容...</p>',
-  });
-  
-  bm.add('divider', {
-    label: '分隔线',
-    category: '基础',
-    content: '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0" />',
-  });
-  
-  // 布局元素
-  bm.add('two-columns', {
-    label: '两列布局',
-    category: '布局',
-    content: `
-      <div style="display:flex;width:100%;gap:16px">
-        <div style="flex:1">左侧内容</div>
-        <div style="flex:1">右侧内容</div>
-      </div>
-    `,
-  });
-  
-  bm.add('three-columns', {
-    label: '三列布局',
-    category: '布局',
-    content: `
-      <div style="display:flex;width:100%;gap:12px">
-        <div style="flex:1">第一列</div>
-        <div style="flex:1">第二列</div>
-        <div style="flex:1">第三列</div>
-      </div>
-    `,
-  });
-  
-  // 发票元素
-  bm.add('item-table', {
-    label: '明细表格',
-    category: '发票',
-    content: `
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">#</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">产品</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">描述</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">数量</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">单位</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">单价</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">税率</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">折扣</th>
-            <th style="border:1px solid #ddd;padding:6px;background:#f8f8f8">金额</th>
-          </tr>
-        </thead>
-        <tbody>{{invoice_items}}</tbody>
-      </table>
-    `,
-  });
-  
-  bm.add('logo', {
-    label: '公司LOGO',
-    category: '发票',
-    content: TOKENS.logo,
-  });
-  
-  bm.add('seal', {
-    label: '公司印章',
-    category: '发票',
-    content: TOKENS.seal,
-  });
-  
-  bm.add('signature', {
-    label: '签名',
-    category: '发票',
-    content: TOKENS.signature,
-  });
-  
-  // 常用字段
-  bm.add('invoice-info', {
-    label: '发票信息',
-    category: '发票',
-    content: `
-      <div style="margin:6px 0">
-        <div>发票号: {{invoice_number}}</div>
-        <div>日期: {{invoice_date}}</div>
-        <div>到期日: {{due_date}}</div>
-      </div>
-    `,
-  });
-  
-  bm.add('customer-info', {
-    label: '客户信息',
-    category: '发票',
-    content: `
-      <div style="margin:6px 0">
-        <div><strong>客户信息</strong></div>
-        <div>{{customer_name}}</div>
-        <div>{{customer_address}}</div>
-        <div>电话: {{customer_phone}}</div>
-      </div>
-    `,
-  });
-  
-  bm.add('totals', {
-    label: '金额汇总',
-    category: '发票',
-    content: `
-      <table style="width:220px;border-collapse:collapse;margin-left:auto">
-        <tr>
-          <td style="text-align:left;padding:4px">小计:</td>
-          <td style="text-align:right;padding:4px">{{subtotal}}</td>
-        </tr>
-        <tr>
-          <td style="text-align:left;padding:4px">税额:</td>
-          <td style="text-align:right;padding:4px">{{tax_amount}}</td>
-        </tr>
-        <tr>
-          <td style="text-align:left;padding:4px">折扣:</td>
-          <td style="text-align:right;padding:4px">{{discount_amount}}</td>
-        </tr>
-        <tr style="font-weight:bold">
-          <td style="text-align:left;padding:4px;border-top:1px solid #ddd">合计:</td>
-          <td style="text-align:right;padding:4px;border-top:1px solid #ddd">{{total_amount}}</td>
-        </tr>
-      </table>
-    `,
-  });
-}
-
-// 设置编辑器事件
-function setupEditorEvents(initialHead) {
-  if (!editor) return;
-  
-  // 内容变更时更新模型值
-  const updateModelValue = () => {
-    try {
-      // 获取编辑内容
-      const body = editor.getHtml();
-      const css = editor.getCss();
-      
-      // 重建完整HTML
-      const html = rebuildHtml(initialHead, body, css);
-      
-      // 发出更新事件
-      emit('update:modelValue', html);
-    } catch (error) {
-      console.error('更新模型值失败', error);
-    }
-  };
-  
-  // 添加右键菜单支持
-  editor.Commands.add('tlb-delete', {
-    run(editor, sender) {
-      const selectedComponent = editor.getSelected();
-      if (selectedComponent) {
-        selectedComponent.remove();
-      }
-    }
-  });
-  
-  // 启用组件选择交互
-  editor.on('component:selected', (component) => {
-    console.log('组件已选中:', component.getId());
-  });
-  
-  // 监听内容变化事件
-  editor.on('component:add', updateModelValue);
-  editor.on('component:remove', updateModelValue);
-  editor.on('component:update', updateModelValue);
-  editor.on('style:property:update', updateModelValue);
-  
-  // 启用组件双击编辑文本内容
-  editor.on('component:dblclick', (component) => {
-    if (component.get('type') === 'text' || component.get('tagName') === 'p' || 
-        component.get('tagName') === 'h1' || component.get('tagName') === 'h2' ||
-        component.get('tagName') === 'h3' || component.get('tagName') === 'span' ||
-        component.get('tagName') === 'div') {
-      editor.runCommand('tlb-edit');
-    }
-  });
-  
-  // 网格吸附
-  editor.on('component:drag:end', (component) => {
-    if (!snapToGrid.value || !component) return;
-    
-    try {
-      const style = component.getStyle();
-      const gs = Math.max(5, gridSize.value);
-      
-      // 四舍五入到网格
-      const roundToGrid = (value) => {
-        if (!value) return value;
-        const numValue = parseFloat(value);
-        if (isNaN(numValue)) return value;
-        return Math.round(numValue / gs) * gs + 'px';
-      };
-      
-      // 计算吸附后的样式
-      const newStyle = {};
-      
-      if (style.left) newStyle.left = roundToGrid(style.left);
-      if (style.top) newStyle.top = roundToGrid(style.top);
-      if (style.marginLeft) newStyle.marginLeft = roundToGrid(style.marginLeft);
-      if (style.marginTop) newStyle.marginTop = roundToGrid(style.marginTop);
-      
-      // 应用新样式
-      if (Object.keys(newStyle).length > 0) {
-        component.addStyle(newStyle);
-      }
-    } catch (error) {
-      console.warn('网格吸附失败', error);
-    }
-  });
-}
-
-// =====================================
-// 页面与样式处理
-// =====================================
-
-// 应用纸张尺寸
-function applyPaperSize() {
-  if (!editor) return;
-  
-  try {
-    // 获取文档
-    const canvas = editor.Canvas;
-    const document = canvas.getDocument();
-    if (!document) return;
-    
-    // 获取尺寸配置
-    const size = props.paperSize || 'A4';
-    const paperSizes = {
-      'A4': { width: '210mm', height: '297mm' },
-      'A5': { width: '148mm', height: '210mm' },
-      'B5': { width: '176mm', height: '250mm' },
-      '80mm': { width: '80mm', height: 'auto' },
-      '58mm': { width: '58mm', height: 'auto' }
-    };
-    
-    const paperSize = paperSizes[size] || paperSizes['A4'];
-    
-    // 获取或创建页面容器
-    let pageEl = document.querySelector('.page');
-    if (!pageEl) {
-      // 创建页面元素
-      pageEl = document.createElement('div');
-      pageEl.className = 'page';
-      
-      // 移动所有内容到页面容器
-      const body = document.body;
-      while (body.firstChild && !body.firstChild.classList?.contains('page')) {
-        pageEl.appendChild(body.firstChild);
-      }
-      
-      // 添加页面容器到文档
-      document.body.appendChild(pageEl);
-    }
-    
-    // 设置页面样式
-    pageEl.style.width = paperSize.width;
-    pageEl.style.minHeight = paperSize.height;
-    pageEl.style.padding = '12mm';
-    pageEl.style.boxSizing = 'border-box';
-    pageEl.style.margin = '0 auto';
-    pageEl.style.background = 'white';
-    pageEl.style.boxShadow = '0 0 8px rgba(0,0,0,0.15)';
-    pageEl.style.position = 'relative';
-    
-    // 添加视觉指示器（顶部蓝色边框）
-    const indicatorId = 'page-indicator';
-    let indicator = document.getElementById(indicatorId);
-    
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = indicatorId;
-      indicator.style.position = 'absolute';
-      indicator.style.top = '0';
-      indicator.style.left = '0';
-      indicator.style.right = '0';
-      indicator.style.height = '3px';
-      indicator.style.backgroundColor = '#409EFF';
-      indicator.style.zIndex = '9999';
-      pageEl.appendChild(indicator);
-    }
-    
-    // 应用网格（如果启用）
-    applyGrid();
-    
-    // 适应宽度
-    fitToWidth();
-  } catch (error) {
-    console.error('应用纸张尺寸失败', error);
+  if (contentMatch) {
+    // 在容器内追加组件
+    const pageContent = contentMatch[1];
+    const updatedContent = pageContent + componentHtml;
+    content = content.replace(pageContentRegex, `<div class="page-content">${updatedContent}</div>`);
+  } else {
+    // 没有找到容器，创建一个
+    content = `<div class="page-content">${componentHtml}</div>`;
   }
-}
-
-// 应用网格
-function applyGrid() {
-  if (!editor) return;
   
-  try {
-    const document = editor.Canvas.getDocument();
-    if (!document) return;
-    
-    const body = document.body;
-    
-    if (showGrid.value) {
-      // 设置网格大小
-      const size = Math.max(5, gridSize.value);
-      
-      // 创建网格背景
-      const gridBg = `
-        linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
-      `;
-      
-      // 应用网格样式
-      body.style.backgroundImage = gridBg;
-      body.style.backgroundSize = `${size}px ${size}px`;
-    } else {
-      // 移除网格样式
-      body.style.backgroundImage = '';
-      body.style.backgroundSize = '';
-    }
-  } catch (error) {
-    console.warn('应用网格失败', error);
-  }
+  // 更新内容
+  templateData.value.body = content;
+  updatePreviewContent();
 }
-
-// 适应宽度
-function fitToWidth() {
-  if (!editor) return;
-  
-  try {
-    // 获取页面元素
-    const document = editor.Canvas.getDocument();
-    if (!document) return;
-    
-    const pageEl = document.querySelector('.page');
-    if (!pageEl) {
-      console.warn('页面元素不存在，无法适应宽度');
-      return;
-    }
-    
-    // 获取容器和页面宽度
-    const containerWidth = editorContainer.value.clientWidth;
-    const pageWidth = pageEl.offsetWidth;
-    
-    if (containerWidth <= 0 || pageWidth <= 0) {
-      console.warn('容器或页面宽度无效', { containerWidth, pageWidth });
-      return;
-    }
-    
-    // 计算适合的缩放比例
-    let scaleRatio = (containerWidth - 40) / pageWidth; // 减去边距
-    scaleRatio = Math.min(Math.max(0.1, scaleRatio), 2.0); // 限制缩放范围
-    
-    // 应用缩放
-    zoom.value = scaleRatio;
-    editor.Canvas.setZoom(scaleRatio);
-    
-    console.log(`适应宽度: 容器=${containerWidth}px, 页面=${pageWidth}px, 缩放=${scaleRatio.toFixed(2)}`);
-  } catch (error) {
-    console.error('适应宽度失败', error);
-  }
-}
-
-// 适应页面
-function fitToPage() {
-  if (!editor) return;
-  
-  try {
-    // 获取页面元素
-    const document = editor.Canvas.getDocument();
-    if (!document) return;
-    
-    const pageEl = document.querySelector('.page');
-    if (!pageEl) return;
-    
-    // 获取容器和页面尺寸
-    const containerWidth = editorContainer.value.clientWidth;
-    const containerHeight = editorContainer.value.clientHeight;
-    const pageWidth = pageEl.offsetWidth;
-    const pageHeight = pageEl.offsetHeight;
-    
-    if (containerWidth <= 0 || containerHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) {
-      return;
-    }
-    
-    // 计算适合的缩放比例
-    const widthRatio = (containerWidth - 40) / pageWidth;
-    const heightRatio = (containerHeight - 40) / pageHeight;
-    let scaleRatio = Math.min(widthRatio, heightRatio);
-    scaleRatio = Math.min(Math.max(0.1, scaleRatio), 2.0);
-    
-    // 应用缩放
-    zoom.value = scaleRatio;
-    editor.Canvas.setZoom(scaleRatio);
-  } catch (error) {
-    console.error('适应页面失败', error);
-  }
-}
-
-// =====================================
-// 工具栏操作
-// =====================================
 
 // 插入令牌
 function insertToken(token) {
-  if (!editor || !token) return;
+  if (!token) return;
   
-  try {
-    // 获取当前选中的组件
-    const selected = editor.getSelected();
-    
-    if (selected) {
-      // 将令牌添加到选中组件中
-      selected.append(token);
-    } else {
-      // 没有选中组件，添加到页面中
-      editor.addComponents(token);
-    }
-  } catch (error) {
-    console.error('插入令牌失败', error);
+  // 获取当前body内容
+  let content = templateData.value.body;
+  
+  // 寻找page-content容器
+  const pageContentRegex = /<div\s+class="page-content"[^>]*>([\s\S]*?)<\/div>/i;
+  const contentMatch = content.match(pageContentRegex);
+  
+  if (contentMatch) {
+    // 在容器内追加令牌
+    const pageContent = contentMatch[1];
+    const updatedContent = pageContent + token;
+    content = content.replace(pageContentRegex, `<div class="page-content">${updatedContent}</div>`);
+  } else {
+    // 没有找到容器，创建一个
+    content = `<div class="page-content">${token}</div>`;
   }
+  
+  // 更新内容
+  templateData.value.body = content;
+  updatePreviewContent();
 }
 
 // 缩放控制
 function zoomIn() {
-  if (!editor) return;
-  zoom.value = Math.min(3, zoom.value + 0.1);
-  editor.Canvas.setZoom(zoom.value);
+  zoom.value = Math.min(2, zoom.value + 0.1);
+  updatePreviewStyle();
 }
 
 function zoomOut() {
-  if (!editor) return;
-  zoom.value = Math.max(0.1, zoom.value - 0.1);
-  editor.Canvas.setZoom(zoom.value);
+  zoom.value = Math.max(0.2, zoom.value - 0.1);
+  updatePreviewStyle();
 }
 
-// 样式应用
-function applyFontSize() {
-  const selected = editor?.getSelected();
-  if (selected) {
-    selected.addStyle({ 'font-size': `${fontSize.value}px` });
-  }
+function resetZoom() {
+  zoom.value = 1;
+  updatePreviewStyle();
 }
 
-function applyFontFamily() {
-  const selected = editor?.getSelected();
-  if (selected) {
-    selected.addStyle({ 'font-family': fontFamily.value });
-  }
-}
-
-function applyFontColor() {
-  const selected = editor?.getSelected();
-  if (selected) {
-    selected.addStyle({ 'color': fontColor.value });
-  }
+// 更新预览样式
+function updatePreviewStyle() {
+  nextTick(() => {
+    if (paperContent.value) {
+      paperContent.value.style.fontFamily = fontFamily.value;
+      paperContent.value.style.fontSize = `${fontSize.value}px`;
+    }
+  });
 }
 
 // =====================================
-// 生命周期钩子
+// HTML编辑器功能
 // =====================================
 
+// 打开HTML编辑器
+function openHtmlEditor() {
+  htmlContent.value = templateData.value.body;
+  cssContent.value = templateData.value.css || '';
+  htmlEditorVisible.value = true;
+}
+
+// 关闭HTML编辑器
+function closeHtmlEditor() {
+  htmlEditorVisible.value = false;
+}
+
+// 应用HTML更改
+function applyHtmlChanges() {
+  // 更新模板数据
+  templateData.value.body = htmlContent.value;
+  templateData.value.css = cssContent.value;
+  
+  // 更新预览
+  updatePreviewContent();
+  
+  // 关闭对话框
+  htmlEditorVisible.value = false;
+}
+
+// =====================================
 // 监听属性变化
-watch(() => props.paperSize, (newSize) => {
-  if (editor) {
-    applyPaperSize();
-    setTimeout(fitToWidth, 100);
+// =====================================
+watch(() => props.modelValue, (newValue) => {
+  if (newValue) {
+    parseTemplate(newValue);
+    updatePreviewContent();
   }
 });
 
-watch(() => editorHeight.value, (newHeight) => {
-  if (editor) {
-    editor.setHeight(`${newHeight}px`);
-  }
-});
-
-// 窗口调整大小处理
-const handleResize = () => {
-  if (editor) {
-    setTimeout(() => {
-      fitToWidth();
-    }, 100);
-  }
-};
-
-// 组件挂载
-onMounted(async () => {
-  // 监听窗口大小变化
-  window.addEventListener('resize', handleResize);
-  
-  // 初始化编辑器
-  await initEditor();
-});
-
-// 组件卸载
-onBeforeUnmount(() => {
-  // 移除窗口大小变化监听
-  window.removeEventListener('resize', handleResize);
-  
-  // 销毁编辑器
-  if (editor) {
-    editor.destroy();
-    editor = null;
-  }
+watch(() => props.paperSize, () => {
+  nextTick(updatePreviewStyle);
 });
 
 // 暴露方法给父组件
 defineExpose({
   insertToken,
-  fitToWidth,
-  fitToPage
+  openHtmlEditor
 });
 </script>
 
 <style scoped>
-/* 全新设计的模板构建器布局 */
+/* 模板构建器样式 */
 .template-builder {
   display: flex;
   flex-direction: column;
@@ -1151,344 +542,129 @@ defineExpose({
   margin: 0 4px;
 }
 
-.color-input {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.builder-main-area {
+/* 编辑器主区域 */
+.editor-main {
   display: flex;
   flex-grow: 1;
   overflow: hidden;
-  position: relative;
-  height: calc(100% - 46px); /* 减去工具栏高度 */
 }
 
-.builder-sidebar {
-  width: 240px;
+/* 左侧组件栏 */
+.component-sidebar {
+  width: 200px;
   flex-shrink: 0;
   border-right: 1px solid #e4e7ed;
-  overflow-y: auto;
   background-color: #ffffff;
-  z-index: 10;
-}
-
-.blocks-panel {
-  height: 100%;
   overflow-y: auto;
   padding: 8px;
 }
 
-.builder-canvas-container {
-  flex: 1;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-container {
-  flex-grow: 1;
-  overflow: hidden;
-  position: relative;
-  min-width: 0;
-}
-
-/* GrapesJS面板容器样式 */
-.gjs-panels-container {
-  display: flex;
-  padding: 5px;
-  background-color: #444;
-  border-bottom: 1px solid #333;
-}
-
-.panel__commands, 
-.panel__options {
-  display: flex;
-  align-items: center;
-}
-
-.panel__commands {
-  margin-right: auto;
-}
-
-/* 右侧属性面板容器 */
-.gjs-right-panel {
-  width: 240px;
-  border-left: 1px solid #ddd;
-  background: white;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.gjs-right-panel > div {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.gjs-panel-header {
-  font-weight: bold;
-  margin-bottom: 5px;
+.sidebar-title {
+  margin: 0 0 12px 0;
+  padding: 0 0 8px 0;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 14px;
+  font-weight: 500;
   color: #333;
 }
 
-.canvas-height-control {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  background-color: #f5f7fa;
-  border-top: 1px solid #e4e7ed;
-  font-size: 12px;
-  color: #606266;
-  gap: 8px;
-}
-
-/* 状态覆盖层 */
-.editor-status-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, 0.9);
-  z-index: 100;
-}
-
-.status-content {
-  max-width: 500px;
-  padding: 24px;
-  text-align: center;
-}
-
-/* 加载动画 */
-.loading-overlay .spinner {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 16px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-left-color: #409eff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 错误样式 */
-.error-overlay {
-  color: #cf1322;
-}
-
-.error-overlay .error-icon {
-  font-size: 32px;
-  font-weight: bold;
+.component-group {
   margin-bottom: 16px;
+}
+
+.group-title {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #ebeef5;
+}
+
+.component-item {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #fff;
+}
+
+.component-item:hover {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.item-icon {
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background-color: #fff2f0;
-  border: 2px solid #ffccc7;
-  margin: 0 auto 16px;
-}
-
-.error-overlay h3 {
-  margin-bottom: 12px;
-  font-size: 18px;
-}
-
-.error-overlay ul {
-  text-align: left;
-  margin: 16px 0;
-  padding-left: 20px;
-}
-
-.error-overlay code {
-  background-color: #f5f5f5;
-  padding: 2px 4px;
+  background-color: #f0f0f0;
   border-radius: 3px;
+  margin-right: 8px;
+  font-size: 12px;
+}
+
+.item-label {
+  font-size: 12px;
+}
+
+/* 预览区域 */
+.preview-container {
+  flex: 1;
+  padding: 24px;
+  overflow: auto;
+  background-color: #f0f2f5;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.paper-preview {
+  background-color: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 15mm;
+  box-sizing: border-box;
+  transform-origin: top center;
+  transition: transform 0.2s ease;
+}
+
+/* HTML编辑器样式 */
+.html-editor,
+.css-editor {
   font-family: monospace;
 }
 </style>
 
 <style>
-/* 全新设计的GrapesJS全局样式 */
-
-/* 编辑器核心样式 */
-.gjs-editor {
-  position: relative;
+/* 页面内容样式 */
+.page-content {
+  min-height: 400px;
 }
 
-.gjs-cv-canvas {
-  width: 100% !important;
-  height: 100% !important;
-  top: 0 !important;
+.page-content * {
+  box-sizing: border-box;
 }
 
-.gjs-frame-wrapper {
-  padding: 15px !important;
-  overflow: auto !important;
+.page-content table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.gjs-frame {
-  width: 100% !important;
-  transform-origin: top left;
-}
-
-/* 面板和UI元素样式 */
-.gjs-pn-panel {
-  position: relative;
-}
-
-/* 按钮和交互元素样式 */
-.gjs-pn-btn {
-  margin: 0 5px;
-  background: transparent;
-  border: none;
-  color: #ddd;
-  font-size: 16px;
-  width: 30px;
-  height: 30px;
-  line-height: 30px;
-  text-align: center;
-  cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.2s ease;
-}
-
-.gjs-pn-btn:hover {
-  background-color: #555;
-  color: white;
-}
-
-/* 画布中组件样式 */
-.gjs-comp-selected {
-  outline: 2px solid #4b9fff !important;
-}
-
-.gjs-toolbar {
-  background-color: #4b9fff !important;
-  color: white !important;
-  border-radius: 3px;
-}
-
-.gjs-badge {
-  background-color: #4b9fff !important;
-  color: white !important;
-  border-radius: 12px;
-  pointer-events: all !important;
-}
-
-.gjs-resizer-h {
-  border-color: #4b9fff !important;
-  background-color: white !important;
-}
-
-/* 区块样式 */
-.gjs-block-category {
-  margin-bottom: 10px;
-}
-
-.gjs-block-category.gjs-open {
-  border-bottom: 1px solid #eee;
-}
-
-.gjs-block-category .gjs-title {
-  background-color: #f5f5f5;
-  font-weight: bold;
-  padding: 10px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.gjs-block {
-  width: calc(100% - 10px);
+.page-content td, 
+.page-content th {
   border: 1px solid #ddd;
-  border-radius: 3px;
-  margin: 5px;
-  padding: 10px;
-  cursor: grab;
-  position: relative;
-  background-color: white;
-  transition: all 0.2s ease;
+  padding: 8px;
 }
 
-.gjs-block:hover {
-  border-color: #4b9fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.gjs-block-label {
-  text-align: center;
-  font-size: 12px;
-}
-
-/* 层级管理器 */
-.gjs-layer {
-  padding: 3px 10px;
-  font-size: 12px;
-  border-bottom: 1px solid #eee;
-  cursor: pointer;
-}
-
-.gjs-layer.gjs-selected {
-  background-color: #e6f7ff;
-  border-left: 2px solid #4b9fff;
-}
-
-/* 样式管理器 */
-.gjs-sm-sector {
-  margin-bottom: 10px;
-}
-
-.gjs-sm-title {
-  padding: 5px 0;
-  font-weight: bold;
-  font-size: 13px;
-  border-bottom: 1px solid #eee;
-}
-
-/* 强制使iframe内的元素可交互 */
-.gjs-frame * {
-  pointer-events: auto !important;
-}
-
-/* 确保拖拽功能正常工作 */
-.gjs-block.gjs-dragging {
-  cursor: grabbing !important;
-  z-index: 10000 !important;
-  opacity: 0.8 !important;
-}
-
-/* 确保菜单可交互 */
-.gjs-rte-toolbar, 
-.gjs-toolbar {
-  pointer-events: auto !important;
-  z-index: 99 !important;
-}
-</style>
-
-<style>
-/* 为避免样式冲突，添加全局样式重置 */
-.gjs-one-bg { background-color: #f5f5f5 !important; }
-.gjs-two-color { color: #383838 !important; }
-.gjs-three-bg { background-color: #3b97e3 !important; }
-.gjs-four-color { color: #fff !important; }
-
-/* 确保iframe内内容可见 */
-.gjs-frame-wrapper, .gjs-frame { 
-  z-index: auto !important; 
-  pointer-events: auto !important; 
+.page-content hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 10px 0;
 }
 </style>
