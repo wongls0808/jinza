@@ -1276,6 +1276,8 @@ function printInvoice() {
   } catch (error) {
     console.error('打印失败:', error);
     ElMessage.error('打印失败: ' + error.message);
+    // 如果常规打印失败，尝试使用iframe方法
+    setTimeout(executePrintUsingIframe, 300);
   }
 }
 
@@ -1297,10 +1299,23 @@ function executePrint() {
       printHtml = templateData.value.body || '<p>无内容</p>';
     }
 
-    // 创建打印窗口
-    const printWindow = window.open('', '_blank');
+    // 创建打印窗口前先通知用户
+    ElMessage({
+      message: '正在准备打印发票...',
+      type: 'info',
+      duration: 3000
+    });
+
+    // 创建打印窗口 - 添加特定窗口选项以减少被拦截的可能性
+    const printWindow = window.open('', '_blank', 'toolbar=0,location=0,menubar=0,width=800,height=600');
     if (!printWindow) {
-      ElMessage.error('无法打开打印窗口，请检查浏览器是否阻止了弹出窗口');
+      ElMessage({
+        message: '无法打开打印窗口，请检查浏览器是否阻止了弹出窗口。请在浏览器中允许弹出窗口后重试。',
+        type: 'error',
+        duration: 5000,
+        showClose: true
+      });
+      console.error('打印窗口被浏览器拦截');
       return;
     }
 
@@ -1481,23 +1496,142 @@ function executePrint() {
       </html>
     `;
     
+    // 显示通知
+    ElMessage({
+      message: '正在准备打印窗口...',
+      type: 'info',
+      duration: 2000
+    });
+
+    // 写入内容
     printWindow.document.write(printTemplate);
     printWindow.document.close();
     
-    // 添加打印功能
-    printWindow.onload = function() {
-      setTimeout(function() {
-        try {
+    // 直接使用setTimeout而不依赖onload事件
+    setTimeout(function() {
+      try {
+        if (printWindow.document.readyState === 'complete' || 
+            printWindow.document.readyState === 'interactive') {
           printWindow.print();
-        } catch(e) {
-          console.error("打印过程中出现错误:", e);
+          // 确保焦点回到打印窗口
+          printWindow.focus();
+        } else {
+          // 如果文档未加载完成，添加一个监听器
+          printWindow.addEventListener('DOMContentLoaded', function() {
+            printWindow.print();
+            printWindow.focus();
+          });
         }
-      }, 500);
-    };
+      } catch(e) {
+        console.error("打印过程中出现错误:", e);
+        ElMessage.error('打印过程中出现错误: ' + e.message);
+      }
+    }, 800); // 增加延时确保内容加载
     
   } catch (e) {
     console.error('准备打印内容时出错:', e);
     ElMessage.error('准备打印内容时出错: ' + e.message);
+    
+    // 如果打开新窗口失败，尝试使用iframe方法
+    setTimeout(executePrintUsingIframe, 300);
+  }
+}
+
+// 使用iframe的备选打印方法（不需要打开新窗口）
+function executePrintUsingIframe() {
+  try {
+    // 获取要打印的内容
+    let printHtml = '';
+    
+    // 检查是否是预览模式还是编辑模式
+    if (editorMode.value === 'preview') {
+      // 在预览模式下，直接获取预览的内容
+      const previewElement = document.querySelector('.paper-content');
+      if (previewElement) {
+        printHtml = previewElement.innerHTML;
+      }
+    } else {
+      // 从模板数据获取内容
+      printHtml = templateData.value.body || '<p>无内容</p>';
+    }
+    
+    // 创建iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.name = 'print_frame_' + Date.now();
+    document.body.appendChild(iframe);
+    
+    // 创建打印文档
+    const printTemplate = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>发票打印</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            /* 基本样式 */
+            body {
+              font-family: ${fontFamily.value || 'Arial, sans-serif'};
+              font-size: ${fontSize.value || '12'}px;
+              line-height: 1.4;
+              color: #000;
+              margin: 0;
+              padding: 0;
+            }
+            
+            /* 用户自定义样式 */
+            ${cssContent.value || ''}
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            ${printHtml}
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // 显示通知
+    ElMessage({
+      message: '正在准备打印...',
+      type: 'info',
+      duration: 2000
+    });
+    
+    // 写入内容到iframe
+    const frameDoc = iframe.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(printTemplate);
+    frameDoc.close();
+    
+    // 等待iframe加载完成后打印
+    iframe.onload = function() {
+      setTimeout(function() {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+          
+          // 打印完成后移除iframe
+          setTimeout(function() {
+            document.body.removeChild(iframe);
+          }, 1000);
+          
+        } catch(e) {
+          console.error("使用iframe打印时出错:", e);
+          ElMessage.error('打印过程中出现错误: ' + e.message);
+        }
+      }, 600);
+    };
+    
+  } catch (e) {
+    console.error('准备iframe打印内容时出错:', e);
+    ElMessage.error('准备iframe打印内容时出错: ' + e.message);
   }
 }
 
