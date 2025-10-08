@@ -1237,7 +1237,7 @@ function saveTemplate() {
     updateModelFromComponents();
     
     // 创建一个表单数据对象来保存模板信息
-    const templateData = {
+    const templateDataToSave = {
       id: props.templateId || Date.now().toString(),
       name: props.templateName || '新模板',
       type: props.templateType || 'invoice',
@@ -1249,7 +1249,7 @@ function saveTemplate() {
     };
     
     // 触发保存事件，传递数据给父组件
-    emit('save', templateData);
+    emit('save', templateDataToSave);
     
     // 显示保存成功消息
     ElMessage.success('模板保存成功!');
