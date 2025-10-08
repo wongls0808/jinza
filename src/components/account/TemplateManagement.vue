@@ -221,11 +221,13 @@ const loadPrintTemplates = async () => {
       console.error('账套ID为空');
       return;
     }
-    
-    const response = await fetch(`/api/print-templates?accountSetId=${props.accountSet.id}`);
+
+    // 修正查询参数名称，与后端保持一致 account_set_id；
+    // 后端返回为数组，直接赋值即可
+    const response = await fetch(`/api/print-templates?account_set_id=${props.accountSet.id}`);
     if (response.ok) {
       const data = await response.json();
-      printTemplates.value = data.templates || [];
+      printTemplates.value = Array.isArray(data) ? data : [];
     } else {
       console.error('获取打印模板失败', response.statusText);
     }
@@ -333,10 +335,18 @@ const deleteTemplate = async (templateId) => {
 
 const setDefaultTemplate = async (template) => {
   try {
+    // 由于后端 PUT 接口会一并更新 name/type/paper_size/content
+    // 为避免仅传 is_default 导致其它字段被置空，这里携带完整字段
     const response = await fetch(`/api/print-templates/${template.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_default: true })
+      body: JSON.stringify({
+        name: template.name,
+        type: template.type,
+        paper_size: template.paper_size,
+        content: template.content,
+        is_default: true
+      })
     });
 
     if (response.ok) {
