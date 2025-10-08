@@ -871,7 +871,22 @@ router.post('/:id/preview', requireAuth, async (req, res) => {
     
     // 获取账套资源（LOGO、公章、签名等）—从 account_sets 表读取 *_path 字段
     const resources = await dbGet(db, `
-      SELECT logo_path, seal_path, signature_path FROM account_sets WHERE id = ?
+      SELECT 
+        name AS company_name,
+        code,
+        address,
+        phone,
+        email,
+        registration_number,
+        tax_number,
+        bank_name,
+        bank_account,
+        bank_name2,
+        bank_account2,
+        logo_path,
+        seal_path,
+        signature_path
+      FROM account_sets WHERE id = ?
     `, [invoice.account_set_id]);
     
     // 生成HTML预览内容
@@ -915,7 +930,22 @@ router.post('/:id/pdf', requireAuth, async (req, res) => {
     
     // 获取账套资源（LOGO、公章、签名等）—从 account_sets 表读取 *_path 字段
     const resources = await dbGet(db, `
-      SELECT logo_path, seal_path, signature_path FROM account_sets WHERE id = ?
+      SELECT 
+        name AS company_name,
+        code,
+        address,
+        phone,
+        email,
+        registration_number,
+        tax_number,
+        bank_name,
+        bank_account,
+        bank_name2,
+        bank_account2,
+        logo_path,
+        seal_path,
+        signature_path
+      FROM account_sets WHERE id = ?
     `, [invoice.account_set_id]);
     
     // 生成HTML预览内容
@@ -1019,6 +1049,9 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
   
   // 替换发票基本信息
   const n2 = (v) => Number.isFinite(parseFloat(v)) ? parseFloat(v).toFixed(2) : '0.00';
+  // 计算已付与未付金额（基于付款记录）
+  const paid = (invoice.payments || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  const remaining = Math.max(0, (parseFloat(invoice.total_amount) || 0) - paid);
   html = html.replace(/\{\{invoice_number\}\}/g, invoice.invoice_number || '')
              .replace(/\{\{invoice_date\}\}/g, invoice.invoice_date || '')
              .replace(/\{\{due_date\}\}/g, invoice.due_date || '')
@@ -1027,23 +1060,50 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
              .replace(/\{\{subtotal\}\}/g, n2(invoice.subtotal))
              .replace(/\{\{tax_amount\}\}/g, n2(invoice.tax_amount))
              .replace(/\{\{discount_amount\}\}/g, n2(invoice.discount_amount))
-             .replace(/\{\{total_amount\}\}/g, n2(invoice.total_amount));
+             .replace(/\{\{total_amount\}\}/g, n2(invoice.total_amount))
+             .replace(/\{\{paid_amount\}\}/g, n2(paid))
+             .replace(/\{\{remaining_amount\}\}/g, n2(remaining));
   
   // 替换客户信息
   html = html.replace(/\{\{customer_name\}\}/g, invoice.customer_name || '')
              .replace(/\{\{customer_address\}\}/g, invoice.customer_address || '')
              .replace(/\{\{customer_contact\}\}/g, invoice.customer_contact || '')
-             .replace(/\{\{customer_phone\}\}/g, invoice.customer_phone || '');
+             .replace(/\{\{customer_phone\}\}/g, invoice.customer_phone || '')
+             .replace(/\{\{customer_email\}\}/g, invoice.customer_email || '');
   
   // 替换账套和业务员信息
   html = html.replace(/\{\{account_set_name\}\}/g, invoice.account_set_name || '')
              .replace(/\{\{salesperson_name\}\}/g, invoice.salesperson_name || '');
+  // 账套公司信息（尽量从 account_sets 读取，需要额外查询时已在外部传入 resources，可扩展为附带文本字段）
+  // 兼容多个占位符别名：company_* 与 account_set_*
+  const acct = resources || {};
+  const replaceMap = {
+    company_name: acct.company_name || invoice.account_set_name || '',
+    company_code: acct.code || '',
+    company_address: acct.address || '',
+    company_phone: acct.phone || '',
+    company_email: acct.email || '',
+    registration_number: acct.registration_number || '',
+    tax_number: acct.tax_number || '',
+    bank_name: acct.bank_name || '',
+    bank_account: acct.bank_account || '',
+    bank_name2: acct.bank_name2 || '',
+    bank_account2: acct.bank_account2 || ''
+  };
+  Object.entries(replaceMap).forEach(([k,v]) => {
+    html = html.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || '');
+  });
+  // 兼容 account_set_* 前缀
+  html = html.replace(/\{\{account_set_name\}\}/g, replaceMap.company_name || invoice.account_set_name || '');
   
   // 替换资源路径
   const norm = (p) => p || '';
   html = html.replace(/\{\{logo\}\}/g, norm(logo))
              .replace(/\{\{seal\}\}/g, norm(seal))
-             .replace(/\{\{signature\}\}/g, norm(signature));
+             .replace(/\{\{signature\}\}/g, norm(signature))
+             // 兼容旧别名
+             .replace(/\{\{company_logo\}\}/g, norm(logo))
+             .replace(/\{\{company_seal\}\}/g, norm(seal));
   
   // 生成明细项HTML
   let itemsHtml = '';

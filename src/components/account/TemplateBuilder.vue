@@ -495,97 +495,61 @@ const editorTab = ref('html');
 
 // 字段列表
 const invoiceFields = ref([
-  // 基础信息
+  // 基础信息（与后端字段一致）
   { id: 'invoice_number', label: '发票号码', value: '{{invoice_number}}', category: '基础' },
-  { id: 'invoice_code', label: '发票代码', value: '{{invoice_code}}', category: '基础' },
   { id: 'invoice_date', label: '开票日期', value: '{{invoice_date}}', category: '基础' },
-  { id: 'invoice_month', label: '所属月份', value: '{{invoice_month}}', category: '基础' },
   { id: 'due_date', label: '到期日期', value: '{{due_date}}', category: '基础' },
-  { id: 'check_code', label: '校验码', value: '{{check_code}}', category: '基础' },
-  { id: 'invoice_status', label: '发票状态', value: '{{invoice_status}}', category: '基础' },
-  { id: 'invoice_type', label: '发票类型', value: '{{invoice_type}}', category: '基础' },
-  { id: 'invoice_currency', label: '币种', value: '{{invoice_currency}}', category: '基础' },
-  
-  // 金额相关
+  { id: 'status', label: '发票状态', value: '{{status}}', category: '基础' },
+  { id: 'payment_status', label: '付款状态', value: '{{payment_status}}', category: '基础' },
+
+  // 金额相关（后端可计算/提供）
   { id: 'subtotal', label: '金额小计', value: '{{subtotal}}', category: '金额' },
-  { id: 'tax_rate', label: '税率', value: '{{tax_rate}}', category: '金额' },
   { id: 'tax_amount', label: '税额', value: '{{tax_amount}}', category: '金额' },
-  { id: 'discount_rate', label: '折扣率', value: '{{discount_rate}}', category: '金额' },
   { id: 'discount_amount', label: '折扣金额', value: '{{discount_amount}}', category: '金额' },
   { id: 'total_amount', label: '价税合计', value: '{{total_amount}}', category: '金额' },
-  { id: 'amount_in_words', label: '金额大写', value: '{{amount_in_words}}', category: '金额' },
   { id: 'paid_amount', label: '已付金额', value: '{{paid_amount}}', category: '金额' },
   { id: 'remaining_amount', label: '未付金额', value: '{{remaining_amount}}', category: '金额' },
-  
-  // 项目信息
-  { id: 'project_id', label: '项目编号', value: '{{project_id}}', category: '项目' },
-  { id: 'project_name', label: '项目名称', value: '{{project_name}}', category: '项目' },
-  { id: 'contract_number', label: '合同编号', value: '{{contract_number}}', category: '项目' },
-  { id: 'order_number', label: '订单编号', value: '{{order_number}}', category: '项目' },
-  
-  // 备注信息
-  { id: 'invoice_notes', label: '发票备注', value: '{{invoice_notes}}', category: '其他' },
-  { id: 'payment_terms', label: '付款条款', value: '{{payment_terms}}', category: '其他' },
-  { id: 'payment_method', label: '付款方式', value: '{{payment_method}}', category: '其他' },
-  { id: 'reference_number', label: '参考编号', value: '{{reference_number}}', category: '其他' },
-  { id: 'creator', label: '制单人', value: '{{creator}}', category: '其他' },
-  { id: 'create_time', label: '制单时间', value: '{{create_time}}', category: '其他' },
-  { id: 'reviewer', label: '审核人', value: '{{reviewer}}', category: '其他' },
-  { id: 'review_time', label: '审核时间', value: '{{review_time}}', category: '其他' },
-  { id: 'salespeople', label: '销售人员', value: '{{salespeople}}', category: '其他' }
+
+  // 其他
+  { id: 'salesperson_name', label: '销售人员', value: '{{salesperson_name}}', category: '其他' }
 ]);
 
 const customerFields = ref([
-  // 基本信息
+  // 基本信息（与后端一致）
   { id: 'customer_name', label: '客户名称', value: '{{customer_name}}', category: '基础' },
-  { id: 'customer_code', label: '客户编号', value: '{{customer_code}}', category: '基础' },
-  { id: 'customer_type', label: '客户类型', value: '{{customer_type}}', category: '基础' },
-  
-  // 联系信息
+  // 联系信息（后端有的）
   { id: 'customer_address', label: '客户地址', value: '{{customer_address}}', category: '联系' },
-  { id: 'customer_city', label: '城市', value: '{{customer_city}}', category: '联系' },
-  { id: 'customer_state', label: '省/州', value: '{{customer_state}}', category: '联系' },
-  { id: 'customer_country', label: '国家', value: '{{customer_country}}', category: '联系' },
-  { id: 'customer_postal_code', label: '邮编', value: '{{customer_postal_code}}', category: '联系' },
   { id: 'customer_phone', label: '客户电话', value: '{{customer_phone}}', category: '联系' },
-  { id: 'customer_mobile', label: '手机', value: '{{customer_mobile}}', category: '联系' },
-  { id: 'customer_fax', label: '传真', value: '{{customer_fax}}', category: '联系' },
   { id: 'customer_email', label: '客户邮箱', value: '{{customer_email}}', category: '联系' },
-  { id: 'customer_website', label: '网站', value: '{{customer_website}}', category: '联系' },
-  
-  // 联系人信息
-  { id: 'customer_contact', label: '联系人', value: '{{customer_contact}}', category: '联系人' },
-  { id: 'contact_position', label: '职位', value: '{{contact_position}}', category: '联系人' },
-  { id: 'contact_phone', label: '联系人电话', value: '{{contact_phone}}', category: '联系人' },
-  { id: 'contact_email', label: '联系人邮箱', value: '{{contact_email}}', category: '联系人' }
+  // 联系人信息（后端有的）
+  { id: 'customer_contact', label: '联系人', value: '{{customer_contact}}', category: '联系人' }
 ]);
 
 const accountSetFields = ref([
-  // 公司信息
+  // 公司信息（来自账套）
   { id: 'company_name', label: '公司名称', value: '{{company_name}}', category: '公司' },
   { id: 'company_code', label: '公司代码', value: '{{company_code}}', category: '公司' },
   { id: 'company_address', label: '公司地址', value: '{{company_address}}', category: '公司' },
-  { id: 'company_city', label: '城市', value: '{{company_city}}', category: '公司' },
-  { id: 'company_state', label: '省/州', value: '{{company_state}}', category: '公司' },
-  { id: 'company_country', label: '国家', value: '{{company_country}}', category: '公司' },
-  { id: 'company_postal_code', label: '邮编', value: '{{company_postal_code}}', category: '公司' },
   { id: 'company_phone', label: '公司电话', value: '{{company_phone}}', category: '公司' },
-  { id: 'company_fax', label: '公司传真', value: '{{company_fax}}', category: '公司' },
   { id: 'company_email', label: '公司邮箱', value: '{{company_email}}', category: '公司' },
-  { id: 'company_website', label: '公司网站', value: '{{company_website}}', category: '公司' },
-  
-  // 税务和银行信息
-  { id: 'tax_id', label: '税号', value: '{{tax_id}}', category: '税务' },
-  { id: 'bank_name', label: '开户银行', value: '{{bank_name}}', category: '银行' },
-  { id: 'bank_account', label: '银行账号', value: '{{bank_account}}', category: '银行' },
-  { id: 'bank_branch', label: '开户支行', value: '{{bank_branch}}', category: '银行' }
+  { id: 'registration_number', label: '注册号', value: '{{registration_number}}', category: '公司' },
+
+  // 税务
+  { id: 'tax_number', label: '税号', value: '{{tax_number}}', category: '税务' },
+
+  // 银行信息
+  { id: 'bank_name', label: '开户银行1', value: '{{bank_name}}', category: '银行' },
+  { id: 'bank_account', label: '银行账号1', value: '{{bank_account}}', category: '银行' },
+  { id: 'bank_name2', label: '开户银行2', value: '{{bank_name2}}', category: '银行' },
+  { id: 'bank_account2', label: '银行账号2', value: '{{bank_account2}}', category: '银行' }
 ]);
 
 // 令牌（占位符）
 const TOKENS = {
   invoiceItems: '{{invoice_items}}',
-  logo: '<img src="{{company_logo}}" alt="LOGO" style="max-height:48px;"/>',
-  seal: '<img src="{{company_seal}}" alt="SEAL" style="max-height:72px;"/>',
+  // 与后端占位符对齐（兼容别名由后端处理）
+  logo: '<img src="{{logo}}" alt="LOGO" style="max-height:48px;"/>',
+  seal: '<img src="{{seal}}" alt="SEAL" style="max-height:72px;"/>',
   signature: '<img src="{{signature}}" alt="SIGN" style="max-height:36px;"/>'
 };
 
