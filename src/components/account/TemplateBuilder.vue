@@ -2,14 +2,16 @@
   <div class="template-builder">
     <div class="builder-toolbar">
       <div class="left">
-        <el-tag size="small" type="info">简化版模板编辑器</el-tag>
+        <span class="back-link" @click="goBackToTemplates">&lt; 返回模板管理</span>
         <span class="paper">纸张：{{ paperSize }}</span>
       </div>
-      <div class="right">
-        <el-button size="small" @click="insertToken(TOKENS.invoiceItems)">插入明细表格</el-button>
-        <el-button size="small" @click="insertToken(TOKENS.logo)">插入LOGO</el-button>
-        <el-button size="small" @click="insertToken(TOKENS.seal)">插入印章</el-button>
-        <el-button size="small" @click="insertToken(TOKENS.signature)">插入签名</el-button>
+      <div class="middle">
+        <el-button-group>
+          <el-button size="small" @click="insertToken(TOKENS.invoiceItems)">插入明细表格</el-button>
+          <el-button size="small" @click="insertToken(TOKENS.logo)">插入LOGO</el-button>
+          <el-button size="small" @click="insertToken(TOKENS.seal)">插入印章</el-button>
+          <el-button size="small" @click="insertToken(TOKENS.signature)">插入签名</el-button>
+        </el-button-group>
         <el-divider direction="vertical" />
         <span class="toolbar-label">缩放：</span>
         <el-button size="small" @click="zoomOut">-</el-button>
@@ -18,16 +20,21 @@
         <el-button size="small" @click="resetZoom">重置</el-button>
         <el-divider direction="vertical" />
         <span class="toolbar-label">字号：</span>
-        <el-input-number v-model="fontSize" :min="8" :max="72" size="small" style="width:110px" @change="updatePreviewStyle" />
+        <el-input-number v-model="fontSize" :min="8" :max="72" size="small" style="width:80px" @change="updateFontStyle" />
         <span class="toolbar-label">字体：</span>
-        <el-select v-model="fontFamily" size="small" style="width:160px" @change="updatePreviewStyle">
+        <el-select v-model="fontFamily" size="small" style="width:120px" @change="updateFontStyle">
           <el-option label="Arial" value="Arial, Helvetica, sans-serif" />
           <el-option label="微软雅黑" value="'Microsoft YaHei', '微软雅黑', Arial, sans-serif" />
           <el-option label="黑体" value="'SimHei', '黑体', Arial, sans-serif" />
           <el-option label="宋体" value="'SimSun', '宋体', serif" />
           <el-option label="Times" value="'Times New Roman', Times, serif" />
         </el-select>
-        <el-button type="primary" size="small" @click="openHtmlEditor">编辑HTML</el-button>
+      </div>
+      <div class="right">
+        <el-button-group>
+          <el-button size="small" @click="toggleEditorMode">{{ editorMode === 'wysiwyg' ? '预览模式' : '编辑模式' }}</el-button>
+          <el-button type="primary" size="small" @click="openHtmlEditor">编辑HTML</el-button>
+        </el-button-group>
       </div>
     </div>
     
@@ -35,56 +42,120 @@
     <div class="editor-main">
       <!-- 左侧组件列表 -->
       <div class="component-sidebar">
-        <h4 class="sidebar-title">常用组件</h4>
-        <div class="component-list">
+        <div class="sidebar-tabs">
+          <div :class="['tab', {'active': activeTab === 'components'}]" @click="activeTab = 'components'">组件</div>
+          <div :class="['tab', {'active': activeTab === 'fields'}]" @click="activeTab = 'fields'">字段</div>
+        </div>
+        
+        <div v-if="activeTab === 'components'" class="component-list">
           <!-- 基础组件 -->
           <div class="component-group">
             <div class="group-title">基础组件</div>
-            <div class="component-item" @click="insertComponent('heading')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'heading')" @click="insertComponent('heading')">
               <div class="item-icon">H</div>
               <div class="item-label">标题</div>
             </div>
-            <div class="component-item" @click="insertComponent('paragraph')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'paragraph')" @click="insertComponent('paragraph')">
               <div class="item-icon">P</div>
               <div class="item-label">段落</div>
             </div>
-            <div class="component-item" @click="insertComponent('divider')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'divider')" @click="insertComponent('divider')">
               <div class="item-icon">—</div>
               <div class="item-label">分隔线</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'image')" @click="insertComponent('image')">
+              <div class="item-icon">🖼️</div>
+              <div class="item-label">图片</div>
             </div>
           </div>
           
           <!-- 布局组件 -->
           <div class="component-group">
             <div class="group-title">布局组件</div>
-            <div class="component-item" @click="insertComponent('two-columns')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'two-columns')" @click="insertComponent('two-columns')">
               <div class="item-icon">||</div>
               <div class="item-label">两列布局</div>
             </div>
-            <div class="component-item" @click="insertComponent('three-columns')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'three-columns')" @click="insertComponent('three-columns')">
               <div class="item-icon">|||</div>
               <div class="item-label">三列布局</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'header-footer')" @click="insertComponent('header-footer')">
+              <div class="item-icon">⊥</div>
+              <div class="item-label">页眉页脚</div>
             </div>
           </div>
           
           <!-- 发票组件 -->
           <div class="component-group">
             <div class="group-title">发票组件</div>
-            <div class="component-item" @click="insertComponent('invoice-info')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'invoice-info')" @click="insertComponent('invoice-info')">
               <div class="item-icon">#</div>
               <div class="item-label">发票信息</div>
             </div>
-            <div class="component-item" @click="insertComponent('customer-info')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'customer-info')" @click="insertComponent('customer-info')">
               <div class="item-icon">👤</div>
               <div class="item-label">客户信息</div>
             </div>
-            <div class="component-item" @click="insertComponent('item-table')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'supplier-info')" @click="insertComponent('supplier-info')">
+              <div class="item-icon">🏢</div>
+              <div class="item-label">供应商信息</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'item-table')" @click="insertComponent('item-table')">
               <div class="item-icon">📋</div>
               <div class="item-label">明细表格</div>
             </div>
-            <div class="component-item" @click="insertComponent('totals')">
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'totals')" @click="insertComponent('totals')">
               <div class="item-icon">💰</div>
               <div class="item-label">金额汇总</div>
+            </div>
+          </div>
+          
+          <!-- 账套组件 -->
+          <div class="component-group">
+            <div class="group-title">账套组件</div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'code-rule')" @click="insertComponent('code-rule')">
+              <div class="item-icon">🔢</div>
+              <div class="item-label">编号规则</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'account-set-info')" @click="insertComponent('account-set-info')">
+              <div class="item-icon">📒</div>
+              <div class="item-label">账套信息</div>
+            </div>
+          </div>
+        </div>
+        
+        <div v-if="activeTab === 'fields'" class="component-list">
+          <!-- 发票字段 -->
+          <div class="component-group">
+            <div class="group-title">发票字段</div>
+            <div class="field-list">
+              <div class="field-item" draggable="true" v-for="field in invoiceFields" :key="field.id" 
+                   @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
+                {{ field.label }}
+              </div>
+            </div>
+          </div>
+          
+          <!-- 客户字段 -->
+          <div class="component-group">
+            <div class="group-title">客户字段</div>
+            <div class="field-list">
+              <div class="field-item" draggable="true" v-for="field in customerFields" :key="field.id" 
+                   @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
+                {{ field.label }}
+              </div>
+            </div>
+          </div>
+          
+          <!-- 账套字段 -->
+          <div class="component-group">
+            <div class="group-title">账套字段</div>
+            <div class="field-list">
+              <div class="field-item" draggable="true" v-for="field in accountSetFields" :key="field.id" 
+                   @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
+                {{ field.label }}
+              </div>
             </div>
           </div>
         </div>
@@ -93,7 +164,29 @@
       <!-- 右侧预览区域 -->
       <div class="preview-container" ref="previewContainer">
         <div class="paper-preview" :style="paperStyle">
-          <div class="paper-content" ref="paperContent" v-html="previewContent"></div>
+          <div class="paper-content" 
+               ref="paperContent" 
+               @click="handleContentClick"
+               @dragover.prevent 
+               @drop="handleDropComponent">
+            <template v-if="editorMode === 'wysiwyg'">
+              <div v-for="(component, index) in components" 
+                   :key="index"
+                   :class="['editor-component', {'selected': selectedComponentIndex === index}]"
+                   :style="component.style"
+                   @click.stop="selectComponent(index)"
+                   draggable="true"
+                   @dragstart="handleDragStart($event, index)"
+                   @dragend="handleDragEnd">
+                <div class="component-content" v-html="component.content"></div>
+                <div class="component-controls" v-show="selectedComponentIndex === index">
+                  <button class="control-btn delete-btn" @click.stop="deleteComponent(index)" title="删除">×</button>
+                  <button class="control-btn move-btn" title="拖动">⋮⋮</button>
+                </div>
+              </div>
+            </template>
+            <div v-else v-html="previewContent"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -155,12 +248,46 @@ const paperContent = ref(null);
 const zoom = ref(1);
 const fontSize = ref(12);
 const fontFamily = ref("Arial, Helvetica, sans-serif");
+const editorMode = ref('wysiwyg'); // 'wysiwyg' 或 'preview'
+const activeTab = ref('components'); // 'components' 或 'fields'
+const components = ref([]);
+const selectedComponentIndex = ref(-1);
+const draggedComponentType = ref(null);
+const draggedComponent = ref(null);
+const dragPosition = ref({ x: 0, y: 0 });
 
 // HTML编辑器状态
 const htmlEditorVisible = ref(false);
 const htmlContent = ref('');
 const cssContent = ref('');
 const editorTab = ref('html');
+
+// 字段列表
+const invoiceFields = ref([
+  { id: 'invoice_number', label: '发票号', value: '{{invoice_number}}' },
+  { id: 'invoice_date', label: '发票日期', value: '{{invoice_date}}' },
+  { id: 'due_date', label: '到期日', value: '{{due_date}}' },
+  { id: 'subtotal', label: '小计', value: '{{subtotal}}' },
+  { id: 'tax_amount', label: '税额', value: '{{tax_amount}}' },
+  { id: 'discount_amount', label: '折扣', value: '{{discount_amount}}' },
+  { id: 'total_amount', label: '合计', value: '{{total_amount}}' }
+]);
+
+const customerFields = ref([
+  { id: 'customer_name', label: '客户名称', value: '{{customer_name}}' },
+  { id: 'customer_address', label: '客户地址', value: '{{customer_address}}' },
+  { id: 'customer_phone', label: '客户电话', value: '{{customer_phone}}' },
+  { id: 'customer_email', label: '客户邮箱', value: '{{customer_email}}' },
+  { id: 'customer_contact', label: '联系人', value: '{{customer_contact}}' }
+]);
+
+const accountSetFields = ref([
+  { id: 'company_name', label: '公司名称', value: '{{company_name}}' },
+  { id: 'company_address', label: '公司地址', value: '{{company_address}}' },
+  { id: 'company_phone', label: '公司电话', value: '{{company_phone}}' },
+  { id: 'company_email', label: '公司邮箱', value: '{{company_email}}' },
+  { id: 'tax_id', label: '税号', value: '{{tax_id}}' }
+]);
 
 // 令牌（占位符）
 const TOKENS = {
@@ -283,6 +410,11 @@ const previewContent = ref('');
 onMounted(() => {
   // 解析初始HTML
   parseTemplate(props.modelValue);
+  
+  // 从模板数据中解析组件
+  parseComponentsFromTemplate();
+  
+  // 更新预览内容
   updatePreviewContent();
   
   // 监听窗口大小变化
@@ -372,52 +504,281 @@ function insertComponent(componentType) {
   const componentHtml = COMPONENTS[componentType];
   if (!componentHtml) return;
   
-  // 获取当前body内容
-  let content = templateData.value.body;
+  // 在组件数组中添加新组件
+  components.value.push({
+    type: componentType,
+    content: componentHtml,
+    style: {
+      position: 'relative',
+      margin: '8px 0'
+    }
+  });
   
-  // 寻找page-content容器
-  const pageContentRegex = /<div\s+class="page-content"[^>]*>([\s\S]*?)<\/div>/i;
-  const contentMatch = content.match(pageContentRegex);
+  // 同时更新模板数据
+  updateModelFromComponents();
+}
+
+// 更新组件到模板数据
+function updateModelFromComponents() {
+  let content = '';
+  components.value.forEach(component => {
+    content += component.content;
+  });
   
-  if (contentMatch) {
-    // 在容器内追加组件
-    const pageContent = contentMatch[1];
-    const updatedContent = pageContent + componentHtml;
-    content = content.replace(pageContentRegex, `<div class="page-content">${updatedContent}</div>`);
-  } else {
-    // 没有找到容器，创建一个
-    content = `<div class="page-content">${componentHtml}</div>`;
-  }
+  // 使用page-content容器包装
+  const wrappedContent = `<div class="page-content">${content}</div>`;
   
-  // 更新内容
-  templateData.value.body = content;
+  // 更新模板数据
+  templateData.value.body = wrappedContent;
   updatePreviewContent();
+}
+
+// 从模板数据解析组件
+function parseComponentsFromTemplate() {
+  // 提取page-content内的内容
+  const pageContentRegex = /<div\s+class="page-content"[^>]*>([\s\S]*?)<\/div>/i;
+  const contentMatch = templateData.value.body.match(pageContentRegex);
+  
+  if (contentMatch && contentMatch[1]) {
+    const content = contentMatch[1];
+    
+    // 解析组件
+    // 这里简化处理，将内容按组件类型分割
+    // 实际应用中可能需要更复杂的解析逻辑
+    components.value = [];
+    
+    // 简单解析，将内容按常见HTML标签分割
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    
+    // 将DOM节点转换为组件对象
+    Array.from(tempDiv.children).forEach((child) => {
+      // 尝试判断组件类型
+      let type = 'paragraph';
+      if (child.tagName === 'H1' || child.tagName === 'H2' || child.tagName === 'H3') {
+        type = 'heading';
+      } else if (child.tagName === 'HR') {
+        type = 'divider';
+      } else if (child.tagName === 'TABLE') {
+        if (child.innerHTML.includes('{{invoice_items}}')) {
+          type = 'item-table';
+        } else {
+          type = 'totals';
+        }
+      } else if (child.tagName === 'DIV' && child.innerHTML.includes('display:flex')) {
+        if (child.innerHTML.includes('三列')) {
+          type = 'three-columns';
+        } else {
+          type = 'two-columns';
+        }
+      }
+      
+      components.value.push({
+        type: type,
+        content: child.outerHTML,
+        style: {
+          position: 'relative',
+          margin: '8px 0'
+        }
+      });
+    });
+  }
+}
+
+// 选择组件
+function selectComponent(index) {
+  selectedComponentIndex.value = index;
+}
+
+// 删除组件
+function deleteComponent(index) {
+  components.value.splice(index, 1);
+  selectedComponentIndex.value = -1;
+  updateModelFromComponents();
+}
+
+// 处理组件拖拽开始
+function handleComponentDragStart(event, componentType) {
+  draggedComponentType.value = componentType;
+  event.dataTransfer.setData('text/plain', componentType);
+  event.dataTransfer.effectAllowed = 'copy';
+}
+
+// 处理字段拖拽开始
+function handleFieldDragStart(event, field) {
+  event.dataTransfer.setData('text/plain', JSON.stringify(field));
+  event.dataTransfer.effectAllowed = 'copy';
+}
+
+// 处理组件拖动开始
+function handleDragStart(event, index) {
+  draggedComponent.value = components.value[index];
+  selectedComponentIndex.value = index;
+  event.dataTransfer.setData('text/plain', 'move-component');
+  event.dataTransfer.effectAllowed = 'move';
+  
+  // 记录鼠标在组件内的位置，用于精确定位
+  const rect = event.target.getBoundingClientRect();
+  dragPosition.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+// 处理组件拖动结束
+function handleDragEnd() {
+  draggedComponentType.value = null;
+  draggedComponent.value = null;
+}
+
+// 处理组件放置
+function handleDropComponent(event) {
+  event.preventDefault();
+  
+  const paperRect = paperContent.value.getBoundingClientRect();
+  const x = event.clientX - paperRect.left;
+  const y = event.clientY - paperRect.top;
+  
+  // 获取拖放的数据类型
+  const data = event.dataTransfer.getData('text/plain');
+  
+  if (data === 'move-component' && draggedComponent.value) {
+    // 移动现有组件
+    const index = components.value.indexOf(draggedComponent.value);
+    if (index !== -1) {
+      const component = { ...components.value[index] };
+      
+      // 更新位置样式
+      component.style = {
+        ...component.style,
+        position: 'absolute',
+        left: `${x - dragPosition.value.x}px`,
+        top: `${y - dragPosition.value.y}px`
+      };
+      
+      // 更新组件
+      components.value.splice(index, 1);
+      components.value.push(component);
+      selectedComponentIndex.value = components.value.length - 1;
+      
+      updateModelFromComponents();
+    }
+  } else if (draggedComponentType.value) {
+    // 添加新组件
+    const componentHtml = COMPONENTS[draggedComponentType.value];
+    if (componentHtml) {
+      const newComponent = {
+        type: draggedComponentType.value,
+        content: componentHtml,
+        style: {
+          position: 'absolute',
+          left: `${x}px`,
+          top: `${y}px`
+        }
+      };
+      
+      components.value.push(newComponent);
+      selectedComponentIndex.value = components.value.length - 1;
+      updateModelFromComponents();
+    }
+  } else {
+    // 可能是字段拖放
+    try {
+      const fieldData = JSON.parse(data);
+      if (fieldData && fieldData.value) {
+        // 在拖放位置添加字段
+        insertFieldAt(fieldData, x, y);
+      }
+    } catch (error) {
+      console.error('无法解析拖放数据', error);
+    }
+  }
+}
+
+// 在指定位置插入字段
+function insertFieldAt(field, x, y) {
+  const fieldHtml = `<span style="padding:2px 4px;background:#f0f7ff;border:1px solid #d0e3ff;border-radius:3px;white-space:nowrap;">${field.value}</span>`;
+  
+  const newComponent = {
+    type: 'field',
+    content: fieldHtml,
+    style: {
+      position: 'absolute',
+      left: `${x}px`,
+      top: `${y}px`,
+      zIndex: 10
+    }
+  };
+  
+  components.value.push(newComponent);
+  selectedComponentIndex.value = components.value.length - 1;
+  updateModelFromComponents();
+}
+
+// 插入字段（点击方式）
+function insertField(field) {
+  const fieldHtml = `<span style="padding:2px 4px;background:#f0f7ff;border:1px solid #d0e3ff;border-radius:3px;white-space:nowrap;">${field.value}</span>`;
+  
+  const newComponent = {
+    type: 'field',
+    content: fieldHtml,
+    style: {
+      position: 'relative',
+      margin: '8px 0'
+    }
+  };
+  
+  components.value.push(newComponent);
+  selectedComponentIndex.value = components.value.length - 1;
+  updateModelFromComponents();
+}
+
+// 处理内容区域点击
+function handleContentClick() {
+  // 点击空白区域取消组件选择
+  selectedComponentIndex.value = -1;
+}
+
+// 切换编辑模式
+function toggleEditorMode() {
+  editorMode.value = editorMode.value === 'wysiwyg' ? 'preview' : 'wysiwyg';
+}
+
+// 返回模板管理页面
+function goBackToTemplates() {
+  // 这里应该使用Vue Router导航
+  // 如果没有router，可以使用window.history或emit事件
+  if (window.history && window.history.back) {
+    window.history.back();
+  }
 }
 
 // 插入令牌
 function insertToken(token) {
   if (!token) return;
   
-  // 获取当前body内容
-  let content = templateData.value.body;
-  
-  // 寻找page-content容器
-  const pageContentRegex = /<div\s+class="page-content"[^>]*>([\s\S]*?)<\/div>/i;
-  const contentMatch = content.match(pageContentRegex);
-  
-  if (contentMatch) {
-    // 在容器内追加令牌
-    const pageContent = contentMatch[1];
-    const updatedContent = pageContent + token;
-    content = content.replace(pageContentRegex, `<div class="page-content">${updatedContent}</div>`);
-  } else {
-    // 没有找到容器，创建一个
-    content = `<div class="page-content">${token}</div>`;
+  // 创建令牌组件
+  let componentType = 'item-table';
+  if (token === TOKENS.logo) {
+    componentType = 'logo';
+  } else if (token === TOKENS.seal) {
+    componentType = 'seal';
+  } else if (token === TOKENS.signature) {
+    componentType = 'signature';
   }
   
-  // 更新内容
-  templateData.value.body = content;
-  updatePreviewContent();
+  const newComponent = {
+    type: componentType,
+    content: token,
+    style: {
+      position: 'relative',
+      margin: '8px 0'
+    }
+  };
+  
+  components.value.push(newComponent);
+  selectedComponentIndex.value = components.value.length - 1;
+  updateModelFromComponents();
 }
 
 // 缩放控制
@@ -468,6 +829,9 @@ function applyHtmlChanges() {
   templateData.value.body = htmlContent.value;
   templateData.value.css = cssContent.value;
   
+  // 从更新后的HTML中解析组件
+  parseComponentsFromTemplate();
+  
   // 更新预览
   updatePreviewContent();
   
@@ -481,6 +845,7 @@ function applyHtmlChanges() {
 watch(() => props.modelValue, (newValue) => {
   if (newValue) {
     parseTemplate(newValue);
+    parseComponentsFromTemplate();
     updatePreviewContent();
   }
 });
@@ -623,6 +988,7 @@ defineExpose({
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  position: relative;
 }
 
 .paper-preview {
@@ -632,6 +998,72 @@ defineExpose({
   box-sizing: border-box;
   transform-origin: top center;
   transition: transform 0.2s ease;
+}
+
+.paper-content {
+  position: relative;
+  min-height: 200px;
+}
+
+/* 组件拖拽相关样式 */
+.editor-component {
+  position: relative;
+  cursor: move;
+  padding: 2px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  min-height: 20px;
+}
+
+.editor-component:hover {
+  border: 1px dashed #ddd;
+}
+
+.editor-component.selected {
+  border: 1px solid #409eff;
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.2);
+}
+
+.component-content {
+  pointer-events: none;  /* 确保点击穿透到组件本身 */
+}
+
+.component-controls {
+  position: absolute;
+  right: -30px;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.control-btn {
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.delete-btn {
+  color: #f56c6c;
+}
+
+.delete-btn:hover {
+  background: #fef0f0;
+}
+
+.move-btn {
+  cursor: move;
+}
+
+.move-btn:hover {
+  background: #ecf5ff;
 }
 
 /* HTML编辑器样式 */
