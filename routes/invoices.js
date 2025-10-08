@@ -1056,13 +1056,17 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
              .replace(/\{\{invoice_date\}\}/g, invoice.invoice_date || '')
              .replace(/\{\{due_date\}\}/g, invoice.due_date || '')
              .replace(/\{\{status\}\}/g, invoice.status || '')
+             .replace(/\{\{invoice_status\}\}/g, invoice.status || '')
              .replace(/\{\{payment_status\}\}/g, invoice.payment_status || '')
              .replace(/\{\{subtotal\}\}/g, n2(invoice.subtotal))
              .replace(/\{\{tax_amount\}\}/g, n2(invoice.tax_amount))
              .replace(/\{\{discount_amount\}\}/g, n2(invoice.discount_amount))
              .replace(/\{\{total_amount\}\}/g, n2(invoice.total_amount))
              .replace(/\{\{paid_amount\}\}/g, n2(paid))
-             .replace(/\{\{remaining_amount\}\}/g, n2(remaining));
+             .replace(/\{\{remaining_amount\}\}/g, n2(remaining))
+             .replace(/\{\{notes\}\}/g, invoice.notes || '')
+             .replace(/\{\{invoice_notes\}\}/g, invoice.notes || '')
+             .replace(/\{\{payment_method\}\}/g, invoice.payment_method || '');
   
   // 替换客户信息
   html = html.replace(/\{\{customer_name\}\}/g, invoice.customer_name || '')
@@ -1094,7 +1098,13 @@ async function generateInvoiceHtml(invoice, template, resources, paperSize) {
     html = html.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || '');
   });
   // 兼容 account_set_* 前缀
-  html = html.replace(/\{\{account_set_name\}\}/g, replaceMap.company_name || invoice.account_set_name || '');
+  html = html.replace(/\{\{account_set_name\}\}/g, replaceMap.company_name || invoice.account_set_name || '')
+             .replace(/\{\{account_set_code\}\}/g, replaceMap.company_code || '')
+             .replace(/\{\{account_set_address\}\}/g, replaceMap.company_address || '')
+             .replace(/\{\{account_set_phone\}\}/g, replaceMap.company_phone || '')
+             .replace(/\{\{account_set_email\}\}/g, replaceMap.company_email || '')
+             .replace(/\{\{registration_no\}\}/g, replaceMap.registration_number || '')
+             .replace(/\{\{tax_id\}\}/g, replaceMap.tax_number || '');
   
   // 替换资源路径
   const norm = (p) => p || '';
