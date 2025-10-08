@@ -45,6 +45,8 @@
         <div class="sidebar-tabs">
           <div :class="['tab', {'active': activeTab === 'components'}]" @click="activeTab = 'components'">组件</div>
           <div :class="['tab', {'active': activeTab === 'fields'}]" @click="activeTab = 'fields'">字段</div>
+          <div :class="['tab', {'active': activeTab === 'style'}]" @click="activeTab = 'style'">样式</div>
+          <div :class="['tab', {'active': activeTab === 'layout'}]" @click="activeTab = 'layout'">排版</div>
         </div>
         
         <div v-if="activeTab === 'components'" class="component-list">
@@ -69,6 +71,31 @@
             </div>
           </div>
           
+          <!-- 图形组件 -->
+          <div class="component-group">
+            <div class="group-title">图形组件</div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'horizontal-line')" @click="insertComponent('horizontal-line')">
+              <div class="item-icon">—</div>
+              <div class="item-label">水平线</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'vertical-line')" @click="insertComponent('vertical-line')">
+              <div class="item-icon">|</div>
+              <div class="item-label">垂直线</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'rectangle')" @click="insertComponent('rectangle')">
+              <div class="item-icon">□</div>
+              <div class="item-label">矩形</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'circle')" @click="insertComponent('circle')">
+              <div class="item-icon">○</div>
+              <div class="item-label">圆形</div>
+            </div>
+            <div class="component-item" draggable="true" @dragstart="handleComponentDragStart($event, 'rounded-rectangle')" @click="insertComponent('rounded-rectangle')">
+              <div class="item-icon">⬭</div>
+              <div class="item-label">圆角矩形</div>
+            </div>
+          </div>
+
           <!-- 布局组件 -->
           <div class="component-group">
             <div class="group-title">布局组件</div>
@@ -126,11 +153,22 @@
         </div>
         
         <div v-if="activeTab === 'fields'" class="component-list">
+          <!-- 字段分类选择器 -->
+          <div class="field-filter">
+            <el-radio-group v-model="fieldCategory" size="small">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button label="basic">基础</el-radio-button>
+              <el-radio-button label="amount">金额</el-radio-button>
+              <el-radio-button label="contact">联系</el-radio-button>
+              <el-radio-button label="other">其他</el-radio-button>
+            </el-radio-group>
+          </div>
+
           <!-- 发票字段 -->
           <div class="component-group">
             <div class="group-title">发票字段</div>
             <div class="field-list">
-              <div class="field-item" draggable="true" v-for="field in invoiceFields" :key="field.id" 
+              <div class="field-item" draggable="true" v-for="field in filteredInvoiceFields" :key="field.id" 
                    @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
                 {{ field.label }}
               </div>
@@ -141,7 +179,7 @@
           <div class="component-group">
             <div class="group-title">客户字段</div>
             <div class="field-list">
-              <div class="field-item" draggable="true" v-for="field in customerFields" :key="field.id" 
+              <div class="field-item" draggable="true" v-for="field in filteredCustomerFields" :key="field.id" 
                    @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
                 {{ field.label }}
               </div>
@@ -152,10 +190,155 @@
           <div class="component-group">
             <div class="group-title">账套字段</div>
             <div class="field-list">
-              <div class="field-item" draggable="true" v-for="field in accountSetFields" :key="field.id" 
+              <div class="field-item" draggable="true" v-for="field in filteredAccountSetFields" :key="field.id" 
                    @dragstart="handleFieldDragStart($event, field)" @click="insertField(field)">
                 {{ field.label }}
               </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 样式选项卡 -->
+        <div v-if="activeTab === 'style'" class="component-list">
+          <!-- 字体样式 -->
+          <div class="component-group">
+            <div class="group-title">字体样式</div>
+            
+            <div class="style-control">
+              <div class="style-label">字体</div>
+              <el-select v-model="selectedFontFamily" size="small" style="width:100%" @change="applyFontStyle">
+                <el-option label="默认" value="inherit" />
+                <el-option label="Arial" value="Arial, Helvetica, sans-serif" />
+                <el-option label="微软雅黑" value="'Microsoft YaHei', '微软雅黑', Arial, sans-serif" />
+                <el-option label="黑体" value="'SimHei', '黑体', Arial, sans-serif" />
+                <el-option label="宋体" value="'SimSun', '宋体', serif" />
+                <el-option label="Times" value="'Times New Roman', Times, serif" />
+              </el-select>
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">字号</div>
+              <el-input-number v-model="selectedFontSize" :min="8" :max="72" size="small" @change="applyFontStyle" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">颜色</div>
+              <el-color-picker v-model="selectedTextColor" size="small" @change="applyFontStyle" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">样式</div>
+              <div class="text-style-buttons">
+                <el-button size="small" :class="{'is-active': selectedBold}" @click="toggleBold">B</el-button>
+                <el-button size="small" :class="{'is-active': selectedItalic}" @click="toggleItalic">I</el-button>
+                <el-button size="small" :class="{'is-active': selectedUnderline}" @click="toggleUnderline">U</el-button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 边框样式 -->
+          <div class="component-group">
+            <div class="group-title">边框样式</div>
+            <div class="style-control">
+              <div class="style-label">边框宽度</div>
+              <el-input-number v-model="selectedBorderWidth" :min="0" :max="10" size="small" @change="applyBorderStyle" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">边框颜色</div>
+              <el-color-picker v-model="selectedBorderColor" size="small" @change="applyBorderStyle" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">边框样式</div>
+              <el-select v-model="selectedBorderStyle" size="small" style="width:100%" @change="applyBorderStyle">
+                <el-option label="实线" value="solid" />
+                <el-option label="虚线" value="dashed" />
+                <el-option label="点线" value="dotted" />
+                <el-option label="双线" value="double" />
+              </el-select>
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">圆角</div>
+              <el-input-number v-model="selectedBorderRadius" :min="0" :max="50" size="small" @change="applyBorderStyle" />
+            </div>
+          </div>
+        </div>
+        
+        <!-- 排版选项卡 -->
+        <div v-if="activeTab === 'layout'" class="component-list">
+          <!-- 对齐方式 -->
+          <div class="component-group">
+            <div class="group-title">对齐方式</div>
+            <div class="style-control">
+              <div class="align-buttons">
+                <el-button-group>
+                  <el-button size="small" @click="applyAlignment('left')"><i class="el-icon-align-left"></i></el-button>
+                  <el-button size="small" @click="applyAlignment('center')"><i class="el-icon-align-center"></i></el-button>
+                  <el-button size="small" @click="applyAlignment('right')"><i class="el-icon-align-right"></i></el-button>
+                  <el-button size="small" @click="applyAlignment('justify')"><i class="el-icon-menu"></i></el-button>
+                </el-button-group>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 间距和边距 -->
+          <div class="component-group">
+            <div class="group-title">间距和边距</div>
+            <div class="style-control">
+              <div class="style-label">上边距</div>
+              <el-input-number v-model="selectedMarginTop" :min="0" :max="100" size="small" @change="applyMargin" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">右边距</div>
+              <el-input-number v-model="selectedMarginRight" :min="0" :max="100" size="small" @change="applyMargin" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">下边距</div>
+              <el-input-number v-model="selectedMarginBottom" :min="0" :max="100" size="small" @change="applyMargin" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">左边距</div>
+              <el-input-number v-model="selectedMarginLeft" :min="0" :max="100" size="small" @change="applyMargin" />
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">内边距</div>
+              <el-input-number v-model="selectedPadding" :min="0" :max="100" size="small" @change="applyPadding" />
+            </div>
+          </div>
+          
+          <!-- 尺寸 -->
+          <div class="component-group">
+            <div class="group-title">尺寸</div>
+            <div class="style-control">
+              <div class="style-label">宽度</div>
+              <el-input v-model="selectedWidth" size="small" @change="applySize">
+                <template #append>
+                  <el-select v-model="selectedWidthUnit" style="width:60px">
+                    <el-option label="px" value="px" />
+                    <el-option label="%" value="%" />
+                    <el-option label="auto" value="auto" />
+                  </el-select>
+                </template>
+              </el-input>
+            </div>
+            
+            <div class="style-control">
+              <div class="style-label">高度</div>
+              <el-input v-model="selectedHeight" size="small" @change="applySize">
+                <template #append>
+                  <el-select v-model="selectedHeightUnit" style="width:60px">
+                    <el-option label="px" value="px" />
+                    <el-option label="%" value="%" />
+                    <el-option label="auto" value="auto" />
+                  </el-select>
+                </template>
+              </el-input>
             </div>
           </div>
         </div>
@@ -249,12 +432,40 @@ const zoom = ref(1);
 const fontSize = ref(12);
 const fontFamily = ref("Arial, Helvetica, sans-serif");
 const editorMode = ref('wysiwyg'); // 'wysiwyg' 或 'preview'
-const activeTab = ref('components'); // 'components' 或 'fields'
+const activeTab = ref('components'); // 'components', 'fields', 'style', 或 'layout'
 const components = ref([]);
 const selectedComponentIndex = ref(-1);
 const draggedComponentType = ref(null);
 const draggedComponent = ref(null);
 const dragPosition = ref({ x: 0, y: 0 });
+
+// 字段过滤
+const fieldCategory = ref('all');
+
+// 样式选项
+const selectedFontFamily = ref("Arial, Helvetica, sans-serif");
+const selectedFontSize = ref(12);
+const selectedTextColor = ref("#000000");
+const selectedBold = ref(false);
+const selectedItalic = ref(false);
+const selectedUnderline = ref(false);
+
+// 边框选项
+const selectedBorderWidth = ref(1);
+const selectedBorderColor = ref("#000000");
+const selectedBorderStyle = ref('solid');
+const selectedBorderRadius = ref(0);
+
+// 排版选项
+const selectedMarginTop = ref(8);
+const selectedMarginRight = ref(0);
+const selectedMarginBottom = ref(8);
+const selectedMarginLeft = ref(0);
+const selectedPadding = ref(0);
+const selectedWidth = ref('auto');
+const selectedWidthUnit = ref('auto');
+const selectedHeight = ref('auto');
+const selectedHeightUnit = ref('auto');
 
 // HTML编辑器状态
 const htmlEditorVisible = ref(false);
@@ -264,29 +475,75 @@ const editorTab = ref('html');
 
 // 字段列表
 const invoiceFields = ref([
-  { id: 'invoice_number', label: '发票号', value: '{{invoice_number}}' },
-  { id: 'invoice_date', label: '发票日期', value: '{{invoice_date}}' },
-  { id: 'due_date', label: '到期日', value: '{{due_date}}' },
-  { id: 'subtotal', label: '小计', value: '{{subtotal}}' },
-  { id: 'tax_amount', label: '税额', value: '{{tax_amount}}' },
-  { id: 'discount_amount', label: '折扣', value: '{{discount_amount}}' },
-  { id: 'total_amount', label: '合计', value: '{{total_amount}}' }
+  // 基础信息
+  { id: 'invoice_number', label: '发票号', value: '{{invoice_number}}', category: '基础' },
+  { id: 'invoice_date', label: '发票日期', value: '{{invoice_date}}', category: '基础' },
+  { id: 'due_date', label: '到期日', value: '{{due_date}}', category: '基础' },
+  { id: 'invoice_status', label: '发票状态', value: '{{invoice_status}}', category: '基础' },
+  { id: 'invoice_type', label: '发票类型', value: '{{invoice_type}}', category: '基础' },
+  { id: 'invoice_currency', label: '币种', value: '{{invoice_currency}}', category: '基础' },
+  
+  // 金额相关
+  { id: 'subtotal', label: '小计', value: '{{subtotal}}', category: '金额' },
+  { id: 'tax_amount', label: '税额', value: '{{tax_amount}}', category: '金额' },
+  { id: 'discount_amount', label: '折扣', value: '{{discount_amount}}', category: '金额' },
+  { id: 'total_amount', label: '合计', value: '{{total_amount}}', category: '金额' },
+  { id: 'amount_in_words', label: '金额大写', value: '{{amount_in_words}}', category: '金额' },
+  { id: 'paid_amount', label: '已付金额', value: '{{paid_amount}}', category: '金额' },
+  { id: 'remaining_amount', label: '未付金额', value: '{{remaining_amount}}', category: '金额' },
+  
+  // 备注信息
+  { id: 'invoice_notes', label: '发票备注', value: '{{invoice_notes}}', category: '其他' },
+  { id: 'payment_terms', label: '付款条款', value: '{{payment_terms}}', category: '其他' },
+  { id: 'reference_number', label: '参考编号', value: '{{reference_number}}', category: '其他' },
+  { id: 'salespeople', label: '销售人员', value: '{{salespeople}}', category: '其他' },
+  { id: 'project_name', label: '项目名称', value: '{{project_name}}', category: '其他' }
 ]);
 
 const customerFields = ref([
-  { id: 'customer_name', label: '客户名称', value: '{{customer_name}}' },
-  { id: 'customer_address', label: '客户地址', value: '{{customer_address}}' },
-  { id: 'customer_phone', label: '客户电话', value: '{{customer_phone}}' },
-  { id: 'customer_email', label: '客户邮箱', value: '{{customer_email}}' },
-  { id: 'customer_contact', label: '联系人', value: '{{customer_contact}}' }
+  // 基本信息
+  { id: 'customer_name', label: '客户名称', value: '{{customer_name}}', category: '基础' },
+  { id: 'customer_code', label: '客户编号', value: '{{customer_code}}', category: '基础' },
+  { id: 'customer_type', label: '客户类型', value: '{{customer_type}}', category: '基础' },
+  
+  // 联系信息
+  { id: 'customer_address', label: '客户地址', value: '{{customer_address}}', category: '联系' },
+  { id: 'customer_city', label: '城市', value: '{{customer_city}}', category: '联系' },
+  { id: 'customer_state', label: '省/州', value: '{{customer_state}}', category: '联系' },
+  { id: 'customer_country', label: '国家', value: '{{customer_country}}', category: '联系' },
+  { id: 'customer_postal_code', label: '邮编', value: '{{customer_postal_code}}', category: '联系' },
+  { id: 'customer_phone', label: '客户电话', value: '{{customer_phone}}', category: '联系' },
+  { id: 'customer_mobile', label: '手机', value: '{{customer_mobile}}', category: '联系' },
+  { id: 'customer_fax', label: '传真', value: '{{customer_fax}}', category: '联系' },
+  { id: 'customer_email', label: '客户邮箱', value: '{{customer_email}}', category: '联系' },
+  { id: 'customer_website', label: '网站', value: '{{customer_website}}', category: '联系' },
+  
+  // 联系人信息
+  { id: 'customer_contact', label: '联系人', value: '{{customer_contact}}', category: '联系人' },
+  { id: 'contact_position', label: '职位', value: '{{contact_position}}', category: '联系人' },
+  { id: 'contact_phone', label: '联系人电话', value: '{{contact_phone}}', category: '联系人' },
+  { id: 'contact_email', label: '联系人邮箱', value: '{{contact_email}}', category: '联系人' }
 ]);
 
 const accountSetFields = ref([
-  { id: 'company_name', label: '公司名称', value: '{{company_name}}' },
-  { id: 'company_address', label: '公司地址', value: '{{company_address}}' },
-  { id: 'company_phone', label: '公司电话', value: '{{company_phone}}' },
-  { id: 'company_email', label: '公司邮箱', value: '{{company_email}}' },
-  { id: 'tax_id', label: '税号', value: '{{tax_id}}' }
+  // 公司信息
+  { id: 'company_name', label: '公司名称', value: '{{company_name}}', category: '公司' },
+  { id: 'company_code', label: '公司代码', value: '{{company_code}}', category: '公司' },
+  { id: 'company_address', label: '公司地址', value: '{{company_address}}', category: '公司' },
+  { id: 'company_city', label: '城市', value: '{{company_city}}', category: '公司' },
+  { id: 'company_state', label: '省/州', value: '{{company_state}}', category: '公司' },
+  { id: 'company_country', label: '国家', value: '{{company_country}}', category: '公司' },
+  { id: 'company_postal_code', label: '邮编', value: '{{company_postal_code}}', category: '公司' },
+  { id: 'company_phone', label: '公司电话', value: '{{company_phone}}', category: '公司' },
+  { id: 'company_fax', label: '公司传真', value: '{{company_fax}}', category: '公司' },
+  { id: 'company_email', label: '公司邮箱', value: '{{company_email}}', category: '公司' },
+  { id: 'company_website', label: '公司网站', value: '{{company_website}}', category: '公司' },
+  
+  // 税务和银行信息
+  { id: 'tax_id', label: '税号', value: '{{tax_id}}', category: '税务' },
+  { id: 'bank_name', label: '开户银行', value: '{{bank_name}}', category: '银行' },
+  { id: 'bank_account', label: '银行账号', value: '{{bank_account}}', category: '银行' },
+  { id: 'bank_branch', label: '开户支行', value: '{{bank_branch}}', category: '银行' }
 ]);
 
 // 令牌（占位符）
@@ -299,9 +556,12 @@ const TOKENS = {
 
 // 组件模板
 const COMPONENTS = {
+  // 文本组件
   'heading': '<h2 style="margin:8px 0">标题文本</h2>',
   'paragraph': '<p style="margin:6px 0">请输入文本内容...</p>',
   'divider': '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0" />',
+  
+  // 布局组件
   'two-columns': `
     <div style="display:flex;width:100%;gap:16px">
       <div style="flex:1">左侧内容</div>
@@ -315,6 +575,14 @@ const COMPONENTS = {
       <div style="flex:1">第三列</div>
     </div>
   `,
+  
+  // 线条和图形组件
+  'horizontal-line': `<div style="width:100%;height:1px;background-color:#000;margin:10px 0;"></div>`,
+  'vertical-line': `<div style="width:1px;height:100px;background-color:#000;margin:0 10px;display:inline-block;"></div>`,
+  'rectangle': `<div style="width:100px;height:60px;border:1px solid #000;"></div>`,
+  'circle': `<div style="width:60px;height:60px;border-radius:50%;border:1px solid #000;"></div>`,
+  'rounded-rectangle': `<div style="width:100px;height:60px;border:1px solid #000;border-radius:8px;"></div>`,
+  
   'invoice-info': `
     <div style="margin:6px 0">
       <div>发票号: {{invoice_number}}</div>
@@ -390,6 +658,54 @@ const paperStyle = computed(() => {
     fontFamily: fontFamily.value,
     fontSize: `${fontSize.value}px`
   };
+});
+
+// 过滤发票字段
+const filteredInvoiceFields = computed(() => {
+  if (fieldCategory.value === 'all') return invoiceFields.value;
+  
+  const categoryMap = {
+    'basic': '基础',
+    'amount': '金额',
+    'contact': '联系',
+    'other': '其他'
+  };
+  
+  return invoiceFields.value.filter(field => 
+    field.category === categoryMap[fieldCategory.value]
+  );
+});
+
+// 过滤客户字段
+const filteredCustomerFields = computed(() => {
+  if (fieldCategory.value === 'all') return customerFields.value;
+  
+  const categoryMap = {
+    'basic': '基础',
+    'amount': '金额',
+    'contact': '联系',
+    'other': '其他'
+  };
+  
+  return customerFields.value.filter(field => 
+    field.category === categoryMap[fieldCategory.value]
+  );
+});
+
+// 过滤账套字段
+const filteredAccountSetFields = computed(() => {
+  if (fieldCategory.value === 'all') return accountSetFields.value;
+  
+  const categoryMap = {
+    'basic': '公司',
+    'amount': '税务',
+    'contact': '银行',
+    'other': '其他'
+  };
+  
+  return accountSetFields.value.filter(field => 
+    field.category === categoryMap[fieldCategory.value]
+  );
 });
 
 // 解析和准备初始内容
@@ -588,6 +904,12 @@ function parseComponentsFromTemplate() {
 // 选择组件
 function selectComponent(index) {
   selectedComponentIndex.value = index;
+  
+  // 切换到样式选项卡并更新样式控制面板
+  if (index !== -1) {
+    activeTab.value = 'style';
+    updateStyleControls();
+  }
 }
 
 // 删除组件
@@ -751,6 +1073,383 @@ function goBackToTemplates() {
   if (window.history && window.history.back) {
     window.history.back();
   }
+}
+
+// =====================================
+// 样式编辑功能
+// =====================================
+
+// 更新当前选中组件的样式状态
+function updateStyleControls() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  const content = component.content;
+  const style = component.style || {};
+  
+  // 提取字体样式
+  const fontRegex = /font-family:\s*([^;]+)/;
+  const fontMatch = content.match(fontRegex);
+  if (fontMatch) {
+    selectedFontFamily.value = fontMatch[1].trim();
+  } else {
+    selectedFontFamily.value = "Arial, Helvetica, sans-serif";
+  }
+  
+  // 提取字体大小
+  const sizeRegex = /font-size:\s*(\d+)px/;
+  const sizeMatch = content.match(sizeRegex);
+  if (sizeMatch) {
+    selectedFontSize.value = parseInt(sizeMatch[1]);
+  } else {
+    selectedFontSize.value = 12;
+  }
+  
+  // 提取文本颜色
+  const colorRegex = /color:\s*([^;]+)/;
+  const colorMatch = content.match(colorRegex);
+  if (colorMatch) {
+    selectedTextColor.value = colorMatch[1].trim();
+  } else {
+    selectedTextColor.value = "#000000";
+  }
+  
+  // 提取字体样式
+  selectedBold.value = content.includes('font-weight: bold') || content.includes('font-weight:bold');
+  selectedItalic.value = content.includes('font-style: italic') || content.includes('font-style:italic');
+  selectedUnderline.value = content.includes('text-decoration: underline') || content.includes('text-decoration:underline');
+  
+  // 提取边框样式
+  const borderWidthRegex = /border-width:\s*(\d+)px/;
+  const borderWidthMatch = content.match(borderWidthRegex);
+  if (borderWidthMatch) {
+    selectedBorderWidth.value = parseInt(borderWidthMatch[1]);
+  } else {
+    selectedBorderWidth.value = 1;
+  }
+  
+  // 提取边距
+  if (style.margin) {
+    const marginValues = style.margin.split(' ');
+    if (marginValues.length === 1) {
+      const value = parseInt(marginValues[0]);
+      selectedMarginTop.value = value;
+      selectedMarginRight.value = value;
+      selectedMarginBottom.value = value;
+      selectedMarginLeft.value = value;
+    } else if (marginValues.length === 4) {
+      selectedMarginTop.value = parseInt(marginValues[0]);
+      selectedMarginRight.value = parseInt(marginValues[1]);
+      selectedMarginBottom.value = parseInt(marginValues[2]);
+      selectedMarginLeft.value = parseInt(marginValues[3]);
+    }
+  }
+  
+  // 提取内边距
+  if (style.padding) {
+    selectedPadding.value = parseInt(style.padding);
+  }
+  
+  // 提取尺寸
+  if (style.width) {
+    if (style.width === 'auto') {
+      selectedWidth.value = 'auto';
+      selectedWidthUnit.value = 'auto';
+    } else if (style.width.includes('%')) {
+      selectedWidth.value = style.width.replace('%', '');
+      selectedWidthUnit.value = '%';
+    } else {
+      selectedWidth.value = style.width.replace('px', '');
+      selectedWidthUnit.value = 'px';
+    }
+  }
+  
+  if (style.height) {
+    if (style.height === 'auto') {
+      selectedHeight.value = 'auto';
+      selectedHeightUnit.value = 'auto';
+    } else if (style.height.includes('%')) {
+      selectedHeight.value = style.height.replace('%', '');
+      selectedHeightUnit.value = '%';
+    } else {
+      selectedHeight.value = style.height.replace('px', '');
+      selectedHeightUnit.value = 'px';
+    }
+  }
+}
+
+// 应用字体样式
+function applyFontStyle() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的字体样式
+  content = content.replace(/font-family:[^;]+;/g, '');
+  content = content.replace(/font-size:[^;]+;/g, '');
+  content = content.replace(/color:[^;]+;/g, '');
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const newStyles = `${styles};font-family:${selectedFontFamily.value};font-size:${selectedFontSize.value}px;color:${selectedTextColor.value}`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="font-family:${selectedFontFamily.value};font-size:${selectedFontSize.value}px;color:${selectedTextColor.value}"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 切换粗体
+function toggleBold() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  selectedBold.value = !selectedBold.value;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的粗体样式
+  content = content.replace(/font-weight:[^;]+;/g, '');
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const boldStyle = selectedBold.value ? 'font-weight:bold;' : '';
+      const newStyles = `${styles};${boldStyle}`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else if (selectedBold.value) {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="font-weight:bold"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 切换斜体
+function toggleItalic() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  selectedItalic.value = !selectedItalic.value;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的斜体样式
+  content = content.replace(/font-style:[^;]+;/g, '');
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const italicStyle = selectedItalic.value ? 'font-style:italic;' : '';
+      const newStyles = `${styles};${italicStyle}`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else if (selectedItalic.value) {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="font-style:italic"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 切换下划线
+function toggleUnderline() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  selectedUnderline.value = !selectedUnderline.value;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的下划线样式
+  content = content.replace(/text-decoration:[^;]+;/g, '');
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const underlineStyle = selectedUnderline.value ? 'text-decoration:underline;' : '';
+      const newStyles = `${styles};${underlineStyle}`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else if (selectedUnderline.value) {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="text-decoration:underline"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 应用边框样式
+function applyBorderStyle() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的边框样式
+  content = content.replace(/border:[^;]+;/g, '');
+  content = content.replace(/border-radius:[^;]+;/g, '');
+  
+  // 构建新的边框样式
+  const borderStyle = `border:${selectedBorderWidth.value}px ${selectedBorderStyle.value} ${selectedBorderColor.value};`;
+  const borderRadiusStyle = selectedBorderRadius.value > 0 ? `border-radius:${selectedBorderRadius.value}px;` : '';
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const newStyles = `${styles};${borderStyle}${borderRadiusStyle}`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="${borderStyle}${borderRadiusStyle}"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 应用对齐方式
+function applyAlignment(alignment) {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  let content = component.content;
+  
+  // 移除旧的对齐方式
+  content = content.replace(/text-align:[^;]+;/g, '');
+  
+  // 查找样式标签
+  const styleIndex = content.indexOf('style="');
+  if (styleIndex !== -1) {
+    const styleEnd = content.indexOf('"', styleIndex + 7);
+    if (styleEnd !== -1) {
+      // 在现有样式中添加新样式
+      const styles = content.substring(styleIndex + 7, styleEnd);
+      const newStyles = `${styles};text-align:${alignment};`;
+      content = content.substring(0, styleIndex + 7) + newStyles + content.substring(styleEnd);
+    }
+  } else {
+    // 添加新的样式标签
+    const tagEnd = content.indexOf('>');
+    if (tagEnd !== -1) {
+      content = content.substring(0, tagEnd) + ` style="text-align:${alignment};"` + content.substring(tagEnd);
+    }
+  }
+  
+  component.content = content;
+  updateModelFromComponents();
+}
+
+// 应用边距
+function applyMargin() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  
+  // 更新组件样式
+  component.style = {
+    ...component.style,
+    margin: `${selectedMarginTop.value}px ${selectedMarginRight.value}px ${selectedMarginBottom.value}px ${selectedMarginLeft.value}px`
+  };
+  
+  updateModelFromComponents();
+}
+
+// 应用内边距
+function applyPadding() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  
+  // 更新组件样式
+  component.style = {
+    ...component.style,
+    padding: `${selectedPadding.value}px`
+  };
+  
+  updateModelFromComponents();
+}
+
+// 应用尺寸
+function applySize() {
+  if (selectedComponentIndex.value === -1 || !components.value[selectedComponentIndex.value]) return;
+  
+  const component = components.value[selectedComponentIndex.value];
+  
+  // 处理宽度
+  let width = selectedWidth.value;
+  if (selectedWidthUnit.value === '%') {
+    width = `${width}%`;
+  } else if (selectedWidthUnit.value === 'px') {
+    width = `${width}px`;
+  } else {
+    width = 'auto';
+  }
+  
+  // 处理高度
+  let height = selectedHeight.value;
+  if (selectedHeightUnit.value === '%') {
+    height = `${height}%`;
+  } else if (selectedHeightUnit.value === 'px') {
+    height = `${height}px`;
+  } else {
+    height = 'auto';
+  }
+  
+  // 更新组件样式
+  component.style = {
+    ...component.style,
+    width,
+    height
+  };
+  
+  updateModelFromComponents();
 }
 
 // 插入令牌
@@ -1098,5 +1797,51 @@ defineExpose({
   border: none;
   border-top: 1px solid #eee;
   margin: 10px 0;
+}
+
+/* 字段过滤器 */
+.field-filter {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* 样式控制 */
+.style-control {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.style-label {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 4px;
+}
+
+.text-style-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.text-style-buttons .el-button {
+  flex: 1;
+}
+
+.text-style-buttons .is-active {
+  background-color: #ecf5ff;
+  color: #409eff;
+  border-color: #c6e2ff;
+}
+
+.align-buttons {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* 样式选项卡内容 */
+.component-list .el-button--small {
+  height: 28px;
+  padding: 0 8px;
 }
 </style>
