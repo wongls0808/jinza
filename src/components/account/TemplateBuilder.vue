@@ -34,6 +34,9 @@
         <el-button-group>
           <el-button size="small" @click="toggleEditorMode">{{ editorMode === 'wysiwyg' ? '预览模式' : '编辑模式' }}</el-button>
           <el-button size="small" @click="openHtmlEditor">编辑HTML</el-button>
+          <el-button size="small" @click="printInvoice" type="success">
+            <i class="el-icon-printer"></i> 打印
+          </el-button>
           <el-button type="primary" size="small" @click="saveTemplate">保存模板</el-button>
         </el-button-group>
       </div>
@@ -1259,6 +1262,166 @@ function saveTemplate() {
   }
 }
 
+// 打印发票功能
+function printInvoice() {
+  try {
+    // 切换到预览模式（如果当前不是）
+    if (editorMode.value !== 'preview') {
+      editorMode.value = 'preview';
+      // 给一点时间让预览模式渲染
+      setTimeout(executePrint, 300);
+    } else {
+      executePrint();
+    }
+  } catch (error) {
+    console.error('打印失败:', error);
+    ElMessage.error('打印失败: ' + error.message);
+  }
+}
+
+// 执行实际的打印操作
+function executePrint() {
+  // 创建一个临时的打印窗口内容
+  const printContent = document.createElement('div');
+  printContent.innerHTML = `
+    <html>
+      <head>
+        <title>发票打印</title>
+        <style>
+          @media print {
+            body {
+              font-family: ${fontFamily.value};
+              font-size: ${fontSize.value}px;
+              margin: 0;
+              padding: 0;
+              color: #000;
+            }
+            .page {
+              width: 210mm;
+              min-height: 297mm;
+              padding: 10mm;
+              margin: 0 auto;
+              background-color: white;
+              box-shadow: none;
+              position: relative;
+            }
+            .page-content {
+              position: relative;
+            }
+            /* 隐藏控制元素 */
+            .component-controls,
+            .resize-handle {
+              display: none !important;
+            }
+            /* 自定义CSS样式 */
+            ${cssContent.value || ''}
+          }
+          /* 预览样式 */
+          body {
+            font-family: ${fontFamily.value};
+            font-size: ${fontSize.value}px;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+          }
+          .page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 10mm;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+          }
+          .page-content {
+            position: relative;
+          }
+          .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+          }
+          .print-header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .print-footer {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+          }
+          .no-print {
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #e1f5fe;
+            border-left: 4px solid #039be5;
+            color: #01579b;
+          }
+          @media print {
+            .no-print {
+              display: none !important;
+            }
+          }
+          /* 自定义CSS样式 */
+          ${cssContent.value || ''}
+        </style>
+      </head>
+      <body>
+        <div class="no-print">
+          <p>提示: 打印对话框出现后，请设置为无边距打印以获得最佳效果。打印预览会自动删除此提示。</p>
+        </div>
+        <div class="print-header no-print">
+          <h1>${props.templateName || '发票打印'}</h1>
+        </div>
+        <div class="page">
+          <div class="page-content">
+            ${templateData.value.body || '<p>无内容</p>'}
+          </div>
+        </div>
+        <div class="print-footer no-print">
+          <p>打印时间: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  // 创建打印窗口
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    ElMessage.error('无法打开打印窗口，请检查浏览器是否阻止了弹出窗口');
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(printContent.innerHTML);
+  printWindow.document.close();
+
+  // 加载完成后打印
+  printWindow.onload = function() {
+    try {
+      // 给打印机一点时间准备
+      setTimeout(() => {
+        printWindow.print();
+        // 打印完成后关闭窗口（某些浏览器可能会自动关闭）
+        // 不是所有浏览器都支持 afterprint 事件
+        if ('onafterprint' in window) {
+          printWindow.onafterprint = function() {
+            printWindow.close();
+          };
+        } else {
+          // 部分浏览器不支持 afterprint，则依赖用户关闭窗口
+        }
+      }, 500);
+    } catch (e) {
+      console.error('打印过程中出错:', e);
+      ElMessage.error('打印过程中出错: ' + e.message);
+    }
+  };
+}
+
 // =====================================
 // 样式编辑功能
 // =====================================
@@ -2066,5 +2229,34 @@ defineExpose({
 .component-list .el-button--small {
   height: 28px;
   padding: 0 8px;
+}
+
+/* 打印样式 */
+@media print {
+  .template-editor-container {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .toolbar, .component-sidebar, .property-panel, .component-controls, .resize-handle {
+    display: none !important;
+  }
+  
+  .paper {
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .editor-main {
+    display: block;
+    padding: 0;
+  }
+  
+  .paper-container {
+    width: 100%;
+    overflow: visible;
+  }
 }
 </style>
