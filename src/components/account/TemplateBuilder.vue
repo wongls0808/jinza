@@ -456,6 +456,9 @@ const isResizing = ref(false);
 const resizeStartPos = ref({ x: 0, y: 0 });
 const resizeStartDimensions = ref({ width: 0, height: 0 });
 
+// 防止 props -> 内部解析 -> 再次 emit -> props 的反馈循环
+const isSyncingFromProps = ref(false);
+
 // 字段过滤
 const fieldCategory = ref('all');
 
@@ -766,15 +769,14 @@ const previewContent = ref('');
 
 // 初始化组件
 onMounted(() => {
+  isSyncingFromProps.value = true;
   // 解析初始HTML
   parseTemplate(props.modelValue);
-  
   // 从模板数据中解析组件
   parseComponentsFromTemplate();
-  
-  // 更新预览内容
+  // 更新预览内容（静默，不再向父 emit）
   updatePreviewContent();
-  
+  isSyncingFromProps.value = false;
   // 监听窗口大小变化
   window.addEventListener('resize', updatePreviewStyle);
 });
@@ -850,7 +852,10 @@ function updateModelValue() {
     templateData.value.body,
     templateData.value.css
   );
-  emit('update:modelValue', fullHtml);
+  // 仅在非同步阶段且内容发生变化时才向父组件回写
+  if (!isSyncingFromProps.value && fullHtml !== props.modelValue) {
+    emit('update:modelValue', fullHtml);
+  }
 }
 
 // 重建完整HTML
@@ -2120,9 +2125,11 @@ function applyHtmlChanges() {
 // =====================================
 watch(() => props.modelValue, (newValue) => {
   if (newValue) {
+    isSyncingFromProps.value = true;
     parseTemplate(newValue);
     parseComponentsFromTemplate();
     updatePreviewContent();
+    isSyncingFromProps.value = false;
   }
 });
 

@@ -183,11 +183,13 @@ const dialogVisible = ref(false);
 const showAddTemplate = ref(false);
 const printTemplates = ref([]);
 const editingTemplate = ref(null);
+const defaultContent = `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; }\n    .page-content{ padding:10mm; }\n    table{ width:100%; border-collapse:collapse; }\n    th,td{ border:1px solid #ddd; padding:6px; }\n  </style>\n</head>\n<body>\n  <div class=\"page-content\">\n    <h2 style=\"text-align:center\">{{account_set_name}} 发票</h2>\n    <p>发票号：{{invoice_number}} 开票日期：{{invoice_date}}</p>\n    <table>\n      <thead><tr><th>#</th><th>商品</th><th>描述</th><th>数量</th><th>单位</th><th>单价</th><th>金额</th></tr></thead>\n      <tbody>{{invoice_items}}</tbody>\n    </table>\n    <p style=\"text-align:right\">合计：{{total_amount}}</p>\n  </div>\n</body>\n</html>`;
+
 const templateForm = ref({
   name: '',
-  type: '',
+  type: 'invoice',
   paper_size: 'A4',
-  content: '',
+  content: defaultContent,
   is_default: false
 });
 
@@ -365,6 +367,10 @@ const setDefaultTemplate = async (template) => {
 
 // 打开可视化编辑器
 const openVisualEditor = () => {
+  // 确保进入编辑器时有可解析的基础HTML
+  if (!templateForm.value.content || typeof templateForm.value.content !== 'string') {
+    templateForm.value.content = defaultContent;
+  }
   isBuilderMode.value = true;
 };
 
