@@ -38,7 +38,7 @@
       </div>
     </div>
     
-    <!-- 主编辑区域 -->
+    <!-- 主编辑区域 - 全新布局 -->
     <div class="builder-main-area">
       <!-- 左侧组件栏 -->
       <div class="builder-sidebar">
@@ -67,8 +67,12 @@
           </div>
         </div>
         
-        <!-- 编辑器容器 -->
-        <div ref="editorContainer" class="editor-container"></div>
+        <!-- 编辑器容器 - 添加了空div占位以确保面板正确创建 -->
+        <div ref="editorContainer" class="editor-container">
+          <!-- 编辑器面板将由JavaScript动态创建 -->
+          <!-- 这些空div作为占位符，由createPanels函数填充 -->
+          <div class="gjs-editor-region" style="display:none"></div>
+        </div>
         
         <!-- 高度控制 -->
         <div class="canvas-height-control">
@@ -202,7 +206,7 @@ function loadScript(src) {
 // 编辑器初始化
 // =====================================
 
-// 初始化编辑器
+// 初始化编辑器 - 全新重构版本
 async function initEditor() {
   try {
     loading.value = true;
@@ -220,109 +224,174 @@ async function initEditor() {
     // 解析现有HTML
     const templateData = parseTemplate(props.modelValue);
     
-    // 创建编辑器实例
+    // 创建临时样式元素以防止样式冲突
+    const styleEl = document.createElement('style');
+    styleEl.innerHTML = `
+      .gjs-one-bg { background-color: #f5f5f5 }
+      .gjs-two-color { color: #383838 }
+      .gjs-three-bg { background-color: #ec5896 }
+      .gjs-four-color { color: #fff }
+    `;
+    document.head.appendChild(styleEl);
+    
+    // 创建编辑器实例 - 全新官方推荐配置
     editor = grapesjs.init({
+      // 基础设置
       container: editorContainer.value,
       height: `${editorHeight.value}px`,
       width: '100%',
-      // 不从元素加载内容，我们将手动设置
-      fromElement: false,
-      // 禁用存储
+      protectedCss: `.page{min-height:380px}`,
+      allowScripts: false,
+      noticeOnUnload: false,
+      
+      // 存储管理器 - 禁用自动存储
       storageManager: false,
-      // 启用编辑功能和交互控件
-      deviceManager: false,
-      // 面板配置 - 添加基本面板以增强交互
-      panels: { 
-        defaults: [
+      
+      // 设备管理器 - 专注于单一视图
+      deviceManager: {
+        devices: [
           {
-            id: 'basic-actions',
+            name: 'Desktop',
+            width: '',
+          }
+        ]
+      },
+      
+      // 面板配置 - 使用必要的标准面板
+      panels: {
+        defaults: [
+          // 编辑器默认面板
+          {
+            id: 'commands',
+            el: '.panel__commands',
             buttons: [
-              {
-                id: 'undo',
-                className: 'fa fa-undo',
-                command: 'core:undo',
-                attributes: { title: '撤销' }
-              },
-              {
-                id: 'redo',
-                className: 'fa fa-repeat',
-                command: 'core:redo',
-                attributes: { title: '重做' }
-              }
+              { id: 'visibility', command: 'sw-visibility', active: true, className: 'fa fa-square-o' },
+              { id: 'undo', command: 'core:undo', className: 'fa fa-undo' },
+              { id: 'redo', command: 'core:redo', className: 'fa fa-repeat' }
+            ]
+          },
+          {
+            id: 'options',
+            el: '.panel__options',
+            buttons: [
+              { id: 'clear', className: 'fa fa-trash', command: 'core:canvas-clear' }
             ],
           }
-        ] 
+        ]
       },
+      
+      // 样式管理器 - 启用基本样式编辑
+      styleManager: {
+        appendTo: '.styles-container',
+        sectors: [
+          {
+            name: '尺寸',
+            open: false,
+            properties: [
+              { name: 'width', property: 'width' },
+              { name: 'height', property: 'height' },
+              { name: 'padding', property: 'padding' },
+              { name: 'margin', property: 'margin' }
+            ]
+          },
+          {
+            name: '文字',
+            open: false,
+            properties: [
+              { name: 'font-size', property: 'font-size' },
+              { name: 'font-family', property: 'font-family' },
+              { name: 'font-weight', property: 'font-weight' },
+              { name: 'color', property: 'color' },
+              { name: 'text-align', property: 'text-align' }
+            ]
+          }
+        ]
+      },
+      
       // 区块管理器
       blockManager: {
-        appendTo: blocksPanel.value
+        appendTo: blocksPanel.value,
+        blocks: []  // 将在setupBlocks中添加
       },
-      // 画布配置
+      // 画布配置 - 完全重构
       canvas: {
         styles: [],
         scripts: [],
-        // 强制启用自动渲染
         autoscroll: true,
         autorender: true,
-        // 启用交互选项
-        customBadgeLabel: (component) => {
-          return component.getName() || component.get('tagName');
-        },
-        // 确保可拖拽和调整大小
-        dragMode: 'absolute',
+        // 设置基本帧样式
         frameStyle: `
-          body {
-            background-color: #e9ecef;
-            margin: 0;
-            padding: 16px;
+          html, body {
             min-height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+          }
+          body {
+            padding: 20px;
             box-sizing: border-box;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            position: relative;
           }
           .page {
-            background: white;
-            box-shadow: 0 0 8px rgba(0,0,0,0.15);
+            background-color: white;
+            box-shadow: 0 0 8px rgba(0,0,0,0.1);
             margin: 0 auto;
+            padding: 15mm;
+            box-sizing: border-box;
+            min-height: 400px;
             position: relative;
-            min-height: 200px; /* 确保有足够高度可交互 */
+          }
+          * {
+            box-sizing: border-box;
           }
         `
       },
-      // 选择器管理器
+      
+      // 布局管理器
+      layerManager: {
+        appendTo: '.layers-container'
+      },
+      
+      // 特性管理器 (属性编辑)
+      traitManager: {
+        appendTo: '.traits-container',
+      },
+      
+      // 选择器管理器 (CSS 类管理)
       selectorManager: {
-        componentFirst: true
+        appendTo: '.selectors-container',
       },
-      // 启用拖拽功能
-      dragMode: 'absolute',
-      // 启用调整大小
-      resizer: {
-        ratioDefault: true,
-        // 优化调整大小的交互体验
-        step: 1,
-        // 显示调整大小控制点
-        controlsVisible: true,
+      
+      // 组件交互设置
+      components: {
+        // 确保元素可选择
+        selectable: true,
+        // 确保元素可拖动
+        draggable: true,
+        // 确保元素可删除
+        removable: true,
+        // 允许元素嵌套
+        nestable: true,
+        // 允许元素内容编辑
+        editable: true,
+        // 允许元素调整大小
+        resizable: true,
+        // 设置交互提示
+        highlightable: true,
+        // 边框颜色
+        selectedColor: '#4b9fff',
       },
-      // 启用组件选择和移动功能
-      allowScripts: false,
-      avoidInlineStyle: false,
-      // 添加文本编辑模式
-      textEditMode: 'absolute',
-      // 其他编辑器设置
-      devices: [
-        {
-          name: '桌面',
-          width: ''
-        }
-      ],
     });
+    
+    // 创建必要的面板容器
+    createPanels();
     
     // 配置区块
     setupBlocks();
     
-    // 设置内容
+    // 设置内容 - 确保总是有页面容器
     let initialContent = '';
     if (templateData.body && templateData.body.includes('class="page"')) {
       // 已有带page容器的内容
@@ -333,22 +402,50 @@ async function initEditor() {
       initialContent = `<div class="page">${content}</div>`;
     }
     
+    // 设置组件并确保它们可以正常渲染
     editor.setComponents(initialContent);
+    
+    // 添加常用组件命令
+    editor.Commands.add('open-layers', {
+      run(editor) { editor.Panels.getPanel('layers-view').set('visible', true); }
+    });
+    
+    editor.Commands.add('open-style', {
+      run(editor) { editor.Panels.getPanel('styles-view').set('visible', true); }
+    });
+    
+    editor.Commands.add('open-traits', {
+      run(editor) { editor.Panels.getPanel('traits-view').set('visible', true); }
+    });
     
     // 绑定事件
     setupEditorEvents(templateData.head);
     
     // 编辑器加载完成后
-    editor.on('load', () => {
+    editor.on('load', async () => {
       console.log('编辑器加载完成');
       
       // 应用纸张尺寸
+      await nextTick();
       applyPaperSize();
       
-      // 连续尝试调整视图，确保显示正确
-      setTimeout(fitToWidth, 100);
-      setTimeout(fitToWidth, 300);
-      setTimeout(fitToWidth, 500);
+      // 直接访问DOM以确保iframe内部元素可交互
+      setTimeout(() => {
+        const frame = editor.Canvas.getFrameEl();
+        if (frame && frame.contentDocument) {
+          const style = document.createElement('style');
+          style.textContent = `
+            * { pointer-events: auto !important; }
+            body { overflow: auto !important; }
+          `;
+          frame.contentDocument.head.appendChild(style);
+        }
+        
+        // 连续尝试调整视图，确保显示正确
+        fitToWidth();
+        setTimeout(fitToWidth, 200);
+        setTimeout(fitToWidth, 500);
+      }, 100);
     });
     
     // 立即应用纸张尺寸
@@ -359,6 +456,59 @@ async function initEditor() {
     console.error('初始化编辑器失败:', error);
     loadError.value = error.message || '初始化失败';
     loading.value = false;
+  }
+}
+
+// 创建必要的面板容器
+function createPanels() {
+  // 检查是否需要创建面板
+  const panelsContainer = document.createElement('div');
+  panelsContainer.className = 'gjs-panels-container';
+  
+  // 命令面板 - 顶部工具栏
+  const cmdPanel = document.createElement('div');
+  cmdPanel.className = 'panel__commands';
+  panelsContainer.appendChild(cmdPanel);
+  
+  // 选项面板
+  const optPanel = document.createElement('div');
+  optPanel.className = 'panel__options';
+  panelsContainer.appendChild(optPanel);
+  
+  // 添加到编辑器容器前
+  if (editorContainer.value) {
+    editorContainer.value.prepend(panelsContainer);
+    
+    // 创建右侧属性面板容器
+    const rightPanel = document.createElement('div');
+    rightPanel.className = 'gjs-right-panel';
+    
+    // 添加样式容器
+    const stylesContainer = document.createElement('div');
+    stylesContainer.className = 'styles-container';
+    stylesContainer.innerHTML = '<div class="gjs-panel-header">样式</div>';
+    rightPanel.appendChild(stylesContainer);
+    
+    // 添加层级容器
+    const layersContainer = document.createElement('div');
+    layersContainer.className = 'layers-container';
+    layersContainer.innerHTML = '<div class="gjs-panel-header">层级</div>';
+    rightPanel.appendChild(layersContainer);
+    
+    // 添加特性容器
+    const traitsContainer = document.createElement('div');
+    traitsContainer.className = 'traits-container';
+    traitsContainer.innerHTML = '<div class="gjs-panel-header">属性</div>';
+    rightPanel.appendChild(traitsContainer);
+    
+    // 添加选择器容器
+    const selectorsContainer = document.createElement('div');
+    selectorsContainer.className = 'selectors-container';
+    selectorsContainer.innerHTML = '<div class="gjs-panel-header">选择器</div>';
+    rightPanel.appendChild(selectorsContainer);
+    
+    // 添加到编辑器容器后
+    editorContainer.value.parentNode.insertBefore(rightPanel, editorContainer.value.nextSibling);
   }
 }
 
@@ -956,6 +1106,7 @@ defineExpose({
 </script>
 
 <style scoped>
+/* 全新设计的模板构建器布局 */
 .template-builder {
   display: flex;
   flex-direction: column;
@@ -964,6 +1115,7 @@ defineExpose({
   border-radius: 4px;
   overflow: hidden;
   background-color: #f5f7fa;
+  position: relative;
 }
 
 .builder-toolbar {
@@ -1022,6 +1174,7 @@ defineExpose({
   border-right: 1px solid #e4e7ed;
   overflow-y: auto;
   background-color: #ffffff;
+  z-index: 10;
 }
 
 .blocks-panel {
@@ -1031,7 +1184,7 @@ defineExpose({
 }
 
 .builder-canvas-container {
-  flex-grow: 1;
+  flex: 1;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1042,6 +1195,46 @@ defineExpose({
   flex-grow: 1;
   overflow: hidden;
   position: relative;
+  min-width: 0;
+}
+
+/* GrapesJS面板容器样式 */
+.gjs-panels-container {
+  display: flex;
+  padding: 5px;
+  background-color: #444;
+  border-bottom: 1px solid #333;
+}
+
+.panel__commands, 
+.panel__options {
+  display: flex;
+  align-items: center;
+}
+
+.panel__commands {
+  margin-right: auto;
+}
+
+/* 右侧属性面板容器 */
+.gjs-right-panel {
+  width: 240px;
+  border-left: 1px solid #ddd;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gjs-right-panel > div {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.gjs-panel-header {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #333;
 }
 
 .canvas-height-control {
@@ -1130,68 +1323,172 @@ defineExpose({
 </style>
 
 <style>
-/* 全局样式，确保GrapesJS编辑器元素可见且可交互 */
+/* 全新设计的GrapesJS全局样式 */
+
+/* 编辑器核心样式 */
+.gjs-editor {
+  position: relative;
+}
+
 .gjs-cv-canvas {
   width: 100% !important;
   height: 100% !important;
   top: 0 !important;
-  pointer-events: auto !important;
-  z-index: 1 !important;
 }
 
 .gjs-frame-wrapper {
-  padding: 16px !important;
+  padding: 15px !important;
+  overflow: auto !important;
 }
 
 .gjs-frame {
+  width: 100% !important;
   transform-origin: top left;
-  pointer-events: auto !important; /* 确保框架元素可交互 */
-  z-index: 1 !important;
 }
 
-/* 确保编辑器中的所有画布元素可交互 */
-.gjs-cv-canvas, .gjs-pn-panels, .gjs-editor, .gjs-pn-views, .gjs-pn-views-container {
-  pointer-events: auto !important;
+/* 面板和UI元素样式 */
+.gjs-pn-panel {
+  position: relative;
 }
 
-/* 强制启用组件选择和交互 */
-.gjs-comp-selected,
-.gjs-comp-selected-parent,
-.gjs-frame-wrapper * {
-  pointer-events: auto !important;
+/* 按钮和交互元素样式 */
+.gjs-pn-btn {
+  margin: 0 5px;
+  background: transparent;
+  border: none;
+  color: #ddd;
+  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s ease;
 }
 
-/* 编辑器内的目标区域样式 */
+.gjs-pn-btn:hover {
+  background-color: #555;
+  color: white;
+}
+
+/* 画布中组件样式 */
+.gjs-comp-selected {
+  outline: 2px solid #4b9fff !important;
+}
+
 .gjs-toolbar {
-  background-color: #444 !important;
-  z-index: 11 !important;
-  pointer-events: auto !important;
+  background-color: #4b9fff !important;
+  color: white !important;
+  border-radius: 3px;
 }
 
 .gjs-badge {
-  background-color: #409eff !important;
-  z-index: 10 !important;
+  background-color: #4b9fff !important;
+  color: white !important;
+  border-radius: 12px;
+  pointer-events: all !important;
+}
+
+.gjs-resizer-h {
+  border-color: #4b9fff !important;
+  background-color: white !important;
+}
+
+/* 区块样式 */
+.gjs-block-category {
+  margin-bottom: 10px;
+}
+
+.gjs-block-category.gjs-open {
+  border-bottom: 1px solid #eee;
+}
+
+.gjs-block-category .gjs-title {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.gjs-block {
+  width: calc(100% - 10px);
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  margin: 5px;
+  padding: 10px;
+  cursor: grab;
+  position: relative;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+.gjs-block:hover {
+  border-color: #4b9fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.gjs-block-label {
+  text-align: center;
+  font-size: 12px;
+}
+
+/* 层级管理器 */
+.gjs-layer {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.gjs-layer.gjs-selected {
+  background-color: #e6f7ff;
+  border-left: 2px solid #4b9fff;
+}
+
+/* 样式管理器 */
+.gjs-sm-sector {
+  margin-bottom: 10px;
+}
+
+.gjs-sm-title {
+  padding: 5px 0;
+  font-weight: bold;
+  font-size: 13px;
+  border-bottom: 1px solid #eee;
+}
+
+/* 强制使iframe内的元素可交互 */
+.gjs-frame * {
   pointer-events: auto !important;
 }
 
-.gjs-highlighter, .gjs-highlighter-sel {
-  outline: 2px solid #409eff !important;
-  outline-offset: 1px;
-  z-index: 9 !important;
-  pointer-events: none !important;
-}
-
-/* 修复区块拖拽预览 */
-.gjs-block__media {
-  margin-bottom: 5px;
-}
-
-/* 修复拖放功能 */
-.gjs-block {
-  cursor: grab !important;
-}
-
-.gjs-block:active {
+/* 确保拖拽功能正常工作 */
+.gjs-block.gjs-dragging {
   cursor: grabbing !important;
+  z-index: 10000 !important;
+  opacity: 0.8 !important;
+}
+
+/* 确保菜单可交互 */
+.gjs-rte-toolbar, 
+.gjs-toolbar {
+  pointer-events: auto !important;
+  z-index: 99 !important;
+}
+</style>
+
+<style>
+/* 为避免样式冲突，添加全局样式重置 */
+.gjs-one-bg { background-color: #f5f5f5 !important; }
+.gjs-two-color { color: #383838 !important; }
+.gjs-three-bg { background-color: #3b97e3 !important; }
+.gjs-four-color { color: #fff !important; }
+
+/* 确保iframe内内容可见 */
+.gjs-frame-wrapper, .gjs-frame { 
+  z-index: auto !important; 
+  pointer-events: auto !important; 
 }
 </style>
