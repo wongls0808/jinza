@@ -134,6 +134,7 @@
         stripe
         style="width: 100%"
         @row-click="handleRowClick"
+        @row-dblclick="handleRowDblClick"
         @header-dragend="onHeaderDragEnd"
       >
         <el-table-column prop="invoice_date" label="开票时间" :width="colWidths.invoice_date || 140" />
@@ -173,8 +174,7 @@
                 <el-button size="small" @click.stop>操作</el-button>
               </template>
               <div class="ops-menu">
-                <el-button text size="small" @click.stop="previewInvoice(scope.row)">预览</el-button>
-                <el-button text size="small" type="primary" @click.stop="editInvoice(scope.row)">编辑</el-button>
+                <!-- 移除预览与编辑，使用双击进入详情，在详情右上角编辑 -->
                 <el-button
                   v-if="scope.row.status !== 'cancelled'"
                   text size="small" type="warning"
@@ -209,24 +209,20 @@
 
     
 
-    <!-- 发票详情对话框 -->
+    <!-- 发票详情对话框（双击进入），右上角含编辑与打印按钮 -->
     <el-dialog
       v-model="showViewDialog"
-      title="预览发票"
+      title="发票详情"
       width="90%"
       custom-class="invoice-detail-dialog"
       :close-on-click-modal="true"
     >
-      <invoice-form
+      <invoice-detail
         v-if="showViewDialog"
         :invoice-id="currentInvoiceId"
-        :read-only="true"
-      >
-        <template #header-actions>
-          <el-button @click="showViewDialog = false">关闭</el-button>
-          <el-button type="primary" @click="handlePrintFromView(currentInvoiceId)">打印</el-button>
-        </template>
-      </invoice-form>
+        @close="showViewDialog = false"
+        @edit="handleEditFromView"
+      />
     </el-dialog>
 
     <!-- 新增/编辑发票对话框 -->
@@ -584,27 +580,17 @@ function getPaymentStatusText(status) {
 
 // 行点击处理
 function handleRowClick(row) {
-  viewInvoice(row);
+  // 单击不直接打开，保持当前逻辑可用于选中/扩展
+}
+
+function handleRowDblClick(row) {
+  if (!row || !row.id) return;
+  currentInvoiceId.value = row.id;
+  showViewDialog.value = true;
 }
 
 // 预览
-function previewInvoice(invoice) {
-  currentInvoiceId.value = invoice.id;
-  showViewDialog.value = true;
-}
-
-// 查看发票
-function viewInvoice(invoice) {
-  currentInvoiceId.value = invoice.id;
-  showViewDialog.value = true;
-}
-
-// 编辑发票
-function editInvoice(invoice) {
-  currentInvoiceId.value = invoice.id;
-  isEditing.value = true;
-  showAddDialog.value = true;
-}
+// 预览/编辑功能由双击 + 详情页右上角按钮承担
 
 // 新建对话框入口，确保清空编辑状态与ID，避免沿用上次编辑的数据
 function openCreateDialog() {
@@ -620,9 +606,71 @@ function onFormDialogClosed() {
 }
 
 // 打印发票
-function printInvoice(invoice) {
-  // 将在后续实现
-  ElMessage.info(`正在准备打印发票: ${invoice.invoice_number}`);
+async function printInvoice(invoice) {
+  try {
+    if (!invoice || !invoice.id) return;
+    ElMessage.info(`正在准备打印发票: ${invoice.invoice_number}`);
+
+    // 1) 获取该账套的打印模板，优先默认模板(type=invoice)
+    let templatesResp = await fetch(`/api/print-templates${invoice.account_set_id ? `?account_set_id=${invoice.account_set_id}` : ''}`);
+    if (!templatesResp.ok) throw new Error('获取打印模板失败');
+    let templates = await templatesResp.json();
+    templates = Array.isArray(templates) ? templates.filter(t => !t.type || t.type === 'invoice') : [];
+    if (!templates.length) {
+      ElMessage.warning('当前账套没有可用的打印模板');
+      return;
+    }
+    const defaultTpl = templates.find(t => t.is_default) || templates[0];
+
+    // 2) 调用预览接口生成 HTML
+    const previewResp = await fetch(`/api/invoices/${invoice.id}/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: defaultTpl.id, paper_size: defaultTpl.paper_size || 'A4' })
+    });
+    if (!previewResp.ok) throw new Error('生成打印预览失败');
+    const { html } = await previewResp.json();
+    if (!html) throw new Error('打印内容为空');
+
+    // 3) 打开打印窗口并打印
+    const printWindow = window.open('', '_blank', 'toolbar=0,location=0,menubar=0,width=900,height=700');
+    if (!printWindow) {
+      ElMessage.error('打印窗口被浏览器拦截，请允许弹出窗口');
+      return;
+    }
+    const safeTitle = `${invoice.invoice_number} - 打印`;
+    const paper = (defaultTpl.paper_size || 'A4');
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${safeTitle}</title>
+          <style>
+            @media print {
+              @page { size: ${paper}; margin: 0; }
+              body { margin: 0; padding: 0; }
+            }
+            body { font-family: Arial, sans-serif; }
+            .print-content { padding: 10mm; box-sizing: border-box; }
+          </style>
+        </head>
+        <body>
+          <div class="print-content">${html}</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 500); }, 400);
+            };
+          <\/script>
+        <\/body>
+      <\/html>
+    `);
+    printWindow.document.close();
+  } catch (e) {
+    console.error(e);
+    ElMessage.error(e.message || '打印失败');
+  }
 }
 
 // 复制发票
@@ -701,9 +749,14 @@ function handleEditFromView(invoiceId) {
 }
 
 // 从查看对话框打印
-function handlePrintFromView(invoiceId) {
-  // 将在后续实现
-  ElMessage.info(`正在准备打印发票ID: ${invoiceId}`);
+async function handlePrintFromView(invoiceId) {
+  const row = invoices.value.find(i => i.id === invoiceId);
+  if (row) {
+    await printInvoice(row);
+  } else {
+    // 回退：最少也尝试用最基本数据
+    await printInvoice({ id: invoiceId, invoice_number: `#${invoiceId}`, account_set_id: currentAccountSet.value?.id });
+  }
 }
 
 // 保存发票后的处理

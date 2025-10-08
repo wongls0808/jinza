@@ -266,9 +266,68 @@ function getPaymentStatusText(status) {
   return texts[status] || status;
 }
 
-function printInvoice() {
-  // 将在后续实现
-  ElMessage.info(`准备打印发票 ${invoice.value.invoice_number}`);
+async function printInvoice() {
+  try {
+    if (!invoice.value || !invoice.value.id) return;
+    ElMessage.info(`正在准备打印发票: ${invoice.value.invoice_number}`);
+
+    // 获取打印模板
+    let templatesResp = await fetch(`/api/print-templates${invoice.value.account_set_id ? `?account_set_id=${invoice.value.account_set_id}` : ''}`);
+    if (!templatesResp.ok) throw new Error('获取打印模板失败');
+    let templates = await templatesResp.json();
+    templates = Array.isArray(templates) ? templates.filter(t => !t.type || t.type === 'invoice') : [];
+    if (!templates.length) {
+      ElMessage.warning('当前账套没有可用的打印模板');
+      return;
+    }
+    const defaultTpl = templates.find(t => t.is_default) || templates[0];
+
+    // 调用预览接口生成 HTML
+    const previewResp = await fetch(`/api/invoices/${invoice.value.id}/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: defaultTpl.id, paper_size: defaultTpl.paper_size || 'A4' })
+    });
+    if (!previewResp.ok) throw new Error('生成打印预览失败');
+    const { html } = await previewResp.json();
+    if (!html) throw new Error('打印内容为空');
+
+    // 打开打印窗口
+    const printWindow = window.open('', '_blank', 'toolbar=0,location=0,menubar=0,width=900,height=700');
+    if (!printWindow) {
+      ElMessage.error('打印窗口被浏览器拦截，请允许弹出窗口');
+      return;
+    }
+    const safeTitle = `${invoice.value.invoice_number} - 打印`;
+    const paper = (defaultTpl.paper_size || 'A4');
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${safeTitle}</title>
+          <style>
+            @media print { @page { size: ${paper}; margin: 0; } body { margin: 0; padding: 0; } }
+            body { font-family: Arial, sans-serif; }
+            .print-content { padding: 10mm; box-sizing: border-box; }
+          </style>
+        </head>
+        <body>
+          <div class="print-content">${html}</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 500); }, 400);
+            };
+          <\/script>
+        <\/body>
+      <\/html>
+    `);
+    printWindow.document.close();
+  } catch (e) {
+    console.error(e);
+    ElMessage.error(e.message || '打印失败');
+  }
 }
 </script>
 
