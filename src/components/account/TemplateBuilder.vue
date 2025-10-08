@@ -229,8 +229,30 @@ async function initEditor() {
       fromElement: false,
       // 禁用存储
       storageManager: false,
-      // 面板配置
-      panels: { defaults: [] },
+      // 启用编辑功能和交互控件
+      deviceManager: false,
+      // 面板配置 - 添加基本面板以增强交互
+      panels: { 
+        defaults: [
+          {
+            id: 'basic-actions',
+            buttons: [
+              {
+                id: 'undo',
+                className: 'fa fa-undo',
+                command: 'core:undo',
+                attributes: { title: '撤销' }
+              },
+              {
+                id: 'redo',
+                className: 'fa fa-repeat',
+                command: 'core:redo',
+                attributes: { title: '重做' }
+              }
+            ],
+          }
+        ] 
+      },
       // 区块管理器
       blockManager: {
         appendTo: blocksPanel.value
@@ -242,6 +264,12 @@ async function initEditor() {
         // 强制启用自动渲染
         autoscroll: true,
         autorender: true,
+        // 启用交互选项
+        customBadgeLabel: (component) => {
+          return component.getName() || component.get('tagName');
+        },
+        // 确保可拖拽和调整大小
+        dragMode: 'absolute',
         frameStyle: `
           body {
             background-color: #e9ecef;
@@ -252,12 +280,14 @@ async function initEditor() {
             display: flex;
             justify-content: center;
             align-items: flex-start;
+            position: relative;
           }
           .page {
             background: white;
             box-shadow: 0 0 8px rgba(0,0,0,0.15);
             margin: 0 auto;
             position: relative;
+            min-height: 200px; /* 确保有足够高度可交互 */
           }
         `
       },
@@ -265,6 +295,21 @@ async function initEditor() {
       selectorManager: {
         componentFirst: true
       },
+      // 启用拖拽功能
+      dragMode: 'absolute',
+      // 启用调整大小
+      resizer: {
+        ratioDefault: true,
+        // 优化调整大小的交互体验
+        step: 1,
+        // 显示调整大小控制点
+        controlsVisible: true,
+      },
+      // 启用组件选择和移动功能
+      allowScripts: false,
+      avoidInlineStyle: false,
+      // 添加文本编辑模式
+      textEditMode: 'absolute',
       // 其他编辑器设置
       devices: [
         {
@@ -369,6 +414,18 @@ function rebuildHtml(head, body, css = '') {
 // 设置区块
 function setupBlocks() {
   if (!editor) return;
+  
+  // 注册双击编辑命令
+  editor.Commands.add('tlb-edit', {
+    run(editor) {
+      const selected = editor.getSelected();
+      if (selected) {
+        editor.runCommand('core:open-text-editor', { 
+          target: selected 
+        });
+      }
+    }
+  });
   
   const bm = editor.BlockManager;
   
@@ -531,11 +588,36 @@ function setupEditorEvents(initialHead) {
     }
   };
   
+  // 添加右键菜单支持
+  editor.Commands.add('tlb-delete', {
+    run(editor, sender) {
+      const selectedComponent = editor.getSelected();
+      if (selectedComponent) {
+        selectedComponent.remove();
+      }
+    }
+  });
+  
+  // 启用组件选择交互
+  editor.on('component:selected', (component) => {
+    console.log('组件已选中:', component.getId());
+  });
+  
   // 监听内容变化事件
   editor.on('component:add', updateModelValue);
   editor.on('component:remove', updateModelValue);
   editor.on('component:update', updateModelValue);
   editor.on('style:property:update', updateModelValue);
+  
+  // 启用组件双击编辑文本内容
+  editor.on('component:dblclick', (component) => {
+    if (component.get('type') === 'text' || component.get('tagName') === 'p' || 
+        component.get('tagName') === 'h1' || component.get('tagName') === 'h2' ||
+        component.get('tagName') === 'h3' || component.get('tagName') === 'span' ||
+        component.get('tagName') === 'div') {
+      editor.runCommand('tlb-edit');
+    }
+  });
   
   // 网格吸附
   editor.on('component:drag:end', (component) => {
@@ -1053,6 +1135,8 @@ defineExpose({
   width: 100% !important;
   height: 100% !important;
   top: 0 !important;
+  pointer-events: auto !important;
+  z-index: 1 !important;
 }
 
 .gjs-frame-wrapper {
@@ -1061,29 +1145,53 @@ defineExpose({
 
 .gjs-frame {
   transform-origin: top left;
+  pointer-events: auto !important; /* 确保框架元素可交互 */
+  z-index: 1 !important;
 }
 
 /* 确保编辑器中的所有画布元素可交互 */
-.gjs-cv-canvas, .gjs-pn-panels, .gjs-editor {
+.gjs-cv-canvas, .gjs-pn-panels, .gjs-editor, .gjs-pn-views, .gjs-pn-views-container {
+  pointer-events: auto !important;
+}
+
+/* 强制启用组件选择和交互 */
+.gjs-comp-selected,
+.gjs-comp-selected-parent,
+.gjs-frame-wrapper * {
   pointer-events: auto !important;
 }
 
 /* 编辑器内的目标区域样式 */
 .gjs-toolbar {
   background-color: #444 !important;
+  z-index: 11 !important;
+  pointer-events: auto !important;
 }
 
 .gjs-badge {
   background-color: #409eff !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
 }
 
 .gjs-highlighter, .gjs-highlighter-sel {
   outline: 2px solid #409eff !important;
   outline-offset: 1px;
+  z-index: 9 !important;
+  pointer-events: none !important;
 }
 
 /* 修复区块拖拽预览 */
 .gjs-block__media {
   margin-bottom: 5px;
+}
+
+/* 修复拖放功能 */
+.gjs-block {
+  cursor: grab !important;
+}
+
+.gjs-block:active {
+  cursor: grabbing !important;
 }
 </style>
