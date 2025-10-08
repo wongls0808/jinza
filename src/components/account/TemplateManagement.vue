@@ -149,7 +149,7 @@
     <!-- 可视化编辑器模式 -->
     <template-builder
       v-if="isBuilderMode"
-      :initial-content="templateForm.content"
+      v-model="templateForm.content"
       :paper-size="templateForm.paper_size"
       @save="handleBuilderSave"
       @cancel="isBuilderMode = false"
@@ -269,8 +269,12 @@ const saveTemplate = async () => {
     const method = isUpdate ? 'PUT' : 'POST';
     
     const payload = {
-      ...templateForm.value,
-      account_set_id: props.accountSet.id
+      account_set_id: props.accountSet.id,
+      name: templateForm.value.name,
+      type: templateForm.value.type,
+      paper_size: templateForm.value.paper_size,
+      content: templateForm.value.content, // 直接存完整HTML
+      is_default: !!templateForm.value.is_default
     };
     
     const response = await fetch(url, {
@@ -366,6 +370,7 @@ const openVisualEditor = () => {
 
 // 处理可视化编辑器保存
 const handleBuilderSave = (content) => {
+  // content 为 TemplateBuilder 输出的完整 HTML
   templateForm.value.content = content;
   isBuilderMode.value = false;
   ElMessage.success('模板内容已更新');

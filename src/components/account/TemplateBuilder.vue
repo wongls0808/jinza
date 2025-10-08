@@ -432,7 +432,7 @@ const props = defineProps({
   paperSize: { type: String, default: 'A4' }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'save']);
 
 // =====================================
 // 状态变量
@@ -784,6 +784,27 @@ function parseTemplate(html) {
   if (!html) return;
   
   try {
+    // 兼容旧数据：如 content 存的是 { body, head, css } 的 JSON
+    if (typeof html === 'string') {
+      const maybeJson = html.trim();
+      if ((maybeJson.startsWith('{') && maybeJson.endsWith('}')) || maybeJson.includes('"body"')) {
+        try {
+          const obj = JSON.parse(maybeJson);
+          if (obj && (obj.body || obj.head || obj.css)) {
+            templateData.value.body = obj.body || templateData.value.body;
+            templateData.value.head = obj.head || '';
+            templateData.value.css = obj.css || '';
+            // 确保 page-content 容器存在
+            if (!templateData.value.body.includes('class="page-content"')) {
+              templateData.value.body = `<div class="page-content">${templateData.value.body}</div>`;
+            }
+            return;
+          }
+        } catch(e) {
+          // 不是合法JSON，继续按HTML解析
+        }
+      }
+    }
     // 提取head内容
     const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
     if (headMatch) templateData.value.head = headMatch[1];
@@ -1239,20 +1260,16 @@ function saveTemplate() {
     // 更新模板数据
     updateModelFromComponents();
     
-    // 创建一个表单数据对象来保存模板信息
-    const templateDataToSave = {
-      id: props.templateId || Date.now().toString(),
-      name: props.templateName || '新模板',
-      type: props.templateType || 'invoice',
-      content: JSON.stringify({
-        body: templateData.value.body,
-        head: templateData.value.head,
-        css: cssContent.value
-      })
-    };
-    
-    // 触发保存事件，传递数据给父组件
-    emit('save', templateDataToSave);
+    // 输出完整HTML，供父组件直接保存到后端
+    const fullHtml = rebuildHtml(
+      templateData.value.head,
+      templateData.value.body,
+      cssContent.value
+    );
+    // 同步 v-model
+    emit('update:modelValue', fullHtml);
+    // 触发保存事件，传递最终HTML给父组件
+    emit('save', fullHtml);
     
     // 显示保存成功消息
     ElMessage.success('模板保存成功!');
