@@ -39,7 +39,7 @@ router.post('/auth/change-password', authMiddleware(true), async (req, res) => {
   const user = rs.rows[0]
   const ok = await verifyPassword(old_password, user.password_hash)
   if (!ok) return res.status(400).json({ error: '旧密码不正确' })
-  const strength = validatePasswordStrength(new_password, user.username)
+  const strength = validatePasswordStrength(new_password)
   if (!strength.ok) return res.status(400).json({ error: '密码强度不足', reasons: strength.reasons })
   const hash = await hashPassword(new_password)
   await query('update users set password_hash=$1, must_change_password=false, password_updated_at=now() where id=$2', [hash, meId])
@@ -55,8 +55,6 @@ router.get('/users', authMiddleware(true), requirePerm('manage_users'), async (r
 router.post('/users', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
   const { username, password, display_name, is_active = true } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'Missing fields' })
-  const strength = validatePasswordStrength(password, username)
-  if (!strength.ok) return res.status(400).json({ error: '密码强度不足', reasons: strength.reasons })
   const hash = await hashPassword(password)
   try {
     const rs = await query(
@@ -85,6 +83,17 @@ router.delete('/users/:id', authMiddleware(true), requirePerm('manage_users'), a
   const id = Number(req.params.id)
   await query('delete from user_permissions where user_id=$1', [id])
   const rs = await query('delete from users where id=$1', [id])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  res.json({ ok: true })
+})
+
+// Admin reset user password (no complexity check), force change on next login
+router.post('/users/:id/reset-password', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+  const id = Number(req.params.id)
+  const { password } = req.body || {}
+  if (!password) return res.status(400).json({ error: 'Missing password' })
+  const hash = await hashPassword(password)
+  const rs = await query('update users set password_hash=$1, must_change_password=true, password_updated_at=null where id=$2 returning id', [hash, id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
 })

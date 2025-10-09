@@ -109,16 +109,44 @@ export async function seedInitialAdmin() {
   }
 }
 
-export function validatePasswordStrength(password, username) {
+export function validatePasswordStrength(password) {
   const reasons = []
-  if (!password || password.length < 8) reasons.push('密码长度至少 8 位')
-  if (!/[a-z]/.test(password)) reasons.push('需包含小写字母')
-  if (!/[A-Z]/.test(password)) reasons.push('需包含大写字母')
-  if (!/[0-9]/.test(password)) reasons.push('需包含数字')
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) reasons.push('建议包含特殊字符')
-  const weakList = new Set(['password','123456','12345678','qwerty','111111','abc123','admin','iloveyou','000000'])
-  if (weakList.has(password.toLowerCase())) reasons.push('密码过于常见')
-  if (username && password.toLowerCase().includes(String(username).toLowerCase())) reasons.push('密码不能包含用户名')
+  if (!password || password.length === 0) {
+    reasons.push('密码不能为空')
+    return { ok: false, reasons }
+  }
+  const s = String(password)
+  // 1) 全部字符相同，例如 AAAAA
+  const allSame = [...s].every(ch => ch === s[0])
+  if (allSame) reasons.push('密码过于简单（重复单一字符）')
+
+  // 2) 重复模式，例如 AAABBB、ababab（一个子串重复）
+  const repeatedBySubstring = (s + s).slice(1, -1).includes(s)
+  if (repeatedBySubstring) reasons.push('密码过于简单（重复模式）')
+
+  // 3) 递增或递减序列，例如 ABCDE 或 12345；检查是否存在长度≥5的单调步进子串
+  const lc = s.toLowerCase()
+  const isAlphaNum = c => /[a-z0-9]/.test(c)
+  const hasMonotonicRun = (runLen = 5) => {
+    if (lc.length < runLen) return false
+    for (let i = 0; i <= lc.length - runLen; i++) {
+      let step = null
+      let ok = true
+      for (let k = 0; k < runLen - 1; k++) {
+        const a = lc[i + k], b = lc[i + k + 1]
+        if (!(isAlphaNum(a) && isAlphaNum(b))) { ok = false; break }
+        const diff = b.charCodeAt(0) - a.charCodeAt(0)
+        if (step === null) {
+          if (diff !== 1 && diff !== -1) { ok = false; break }
+          step = diff
+        } else if (diff !== step) { ok = false; break }
+      }
+      if (ok) return true
+    }
+    return false
+  }
+  if (hasMonotonicRun(5)) reasons.push('密码过于简单（连续序列）')
+
   return { ok: reasons.length === 0, reasons }
 }
 
