@@ -34,24 +34,24 @@ if (shouldServeStatic) {
   })
 }
 
-async function start() {
+// Start HTTP server ASAP to avoid platform 502 waiting
+app.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`)
+})
+
+// Init DB in background
+;(async () => {
   try {
     if (!process.env.DATABASE_URL) {
       console.warn('DATABASE_URL not set. API requiring DB will fail until configured.')
-    } else {
-      await ensureSchema()
-      await seedInitialAdmin()
-      console.log('Database schema ensured and admin seeded')
+      return
     }
-    app.listen(PORT, () => {
-      console.log(`Server listening on http://localhost:${PORT}`)
-    })
+    await ensureSchema()
+    await seedInitialAdmin()
+    console.log('Database schema ensured and admin seeded')
   } catch (e) {
-    console.error('Failed to start server', e)
-    process.exit(1)
+    console.error('Background DB initialization failed', e)
   }
-}
-
-start()
+})()
 
 export default app
