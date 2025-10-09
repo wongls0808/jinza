@@ -46,6 +46,8 @@ export async function ensureSchema() {
       password_hash text not null,
       display_name text,
       is_active boolean default true,
+      must_change_password boolean default false,
+      password_updated_at timestamptz,
       created_at timestamptz default now()
     );
 
@@ -61,6 +63,9 @@ export async function ensureSchema() {
       primary key(user_id, permission_id)
     );
   `)
+  // Add columns if the table pre-existed
+  await query(`alter table users add column if not exists must_change_password boolean default false`)
+  await query(`alter table users add column if not exists password_updated_at timestamptz`)
 }
 
 export async function seedInitialAdmin() {
@@ -87,8 +92,8 @@ export async function seedInitialAdmin() {
   if (res.rowCount === 0) {
     const hash = await hashPassword(adminPassword)
     const ins = await query(
-      'insert into users(username, password_hash, display_name) values($1,$2,$3) returning id',
-      [adminUsername, hash, adminDisplay]
+      'insert into users(username, password_hash, display_name, must_change_password) values($1,$2,$3,$4) returning id',
+      [adminUsername, hash, adminDisplay, true]
     )
     adminId = ins.rows[0].id
   } else {
@@ -101,5 +106,26 @@ export async function seedInitialAdmin() {
       'insert into user_permissions(user_id, permission_id) values($1,$2) on conflict do nothing',
       [adminId, row.id]
     )
+  }
+}
+
+export function validatePasswordStrength(password, username) {
+  const reasons = []
+  if (!password || password.length < 8) reasons.push('密码长度至少 8 位')
+  if (!/[a-z]/.test(password)) reasons.push('需包含小写字母')
+  if (!/[A-Z]/.test(password)) reasons.push('需包含大写字母')
+  if (!/[0-9]/.test(password)) reasons.push('需包含数字')
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) reasons.push('建议包含特殊字符')
+  const weakList = new Set(['password','123456','12345678','qwerty','111111','abc123','admin','iloveyou','000000'])
+  if (weakList.has(password.toLowerCase())) reasons.push('密码过于常见')
+  if (username && password.toLowerCase().includes(String(username).toLowerCase())) reasons.push('密码不能包含用户名')
+  return { ok: reasons.length === 0, reasons }
+}
+
+export function requirePerm(code) {
+  return (req, res, next) => {
+    const perms = (req.user && req.user.perms) || []
+    if (!perms.includes(code)) return res.status(403).json({ error: 'Forbidden' })
+    next()
   }
 }

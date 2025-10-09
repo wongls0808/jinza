@@ -39,11 +39,11 @@ const onSubmit = async () => {
   }
   submitting.value = true
   try {
-    const res = await api.login(form.value.username, form.value.password)
+  const res = await api.login(form.value.username, form.value.password)
     // Persist token, user, perms
-    save({ token: res.token, user: res.user, perms: res.perms })
-    const redirect = route.query.redirect || '/'
-    router.replace(String(redirect))
+  save({ token: res.token, user: res.user, perms: res.perms, must_change_password: !!res.must_change_password })
+  const redirect = res.must_change_password ? '/change-password' : (route.query.redirect || '/')
+  router.replace(String(redirect))
   } catch (e) {
     alert('登录失败：' + (e.message || 'unknown error'))
   } finally {

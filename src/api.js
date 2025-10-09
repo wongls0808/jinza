@@ -6,7 +6,7 @@ function getToken() {
   try { return JSON.parse(raw).token || null } catch { return null }
 }
 
-async function request(path, opts = {}) {
+export async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -30,5 +30,6 @@ export const api = {
   },
   perms: {
     list: () => request('/permissions')
-  }
+  },
+  changePassword: (old_password, new_password) => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) })
 }
