@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 // Views
 import Home from '@/views/Home.vue'
+const UserManagement = () => import('@/views/UserManagement.vue')
 
 const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
@@ -11,11 +12,12 @@ const Settings = () => import('@/views/Settings.vue')
 
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
-  { path: '/', name: 'home', component: Home },
-  { path: '/customers', name: 'customers', component: Customers },
-  { path: '/products', name: 'products', component: Products },
-  { path: '/invoices', name: 'invoices', component: Invoices },
-  { path: '/settings', name: 'settings', component: Settings },
+  { path: '/', name: 'home', component: Home, meta: { perm: 'view_dashboard' } },
+  { path: '/users', name: 'users', component: UserManagement, meta: { perm: 'manage_users' } },
+  { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
+  { path: '/products', name: 'products', component: Products, meta: { perm: 'view_products' } },
+  { path: '/invoices', name: 'invoices', component: Invoices, meta: { perm: 'view_invoices' } },
+  { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
 ]
 
 const router = createRouter({
@@ -23,14 +25,21 @@ const router = createRouter({
   routes,
 })
 
-// 简单登录状态与守卫（演示用）
-const isAuthed = () => {
-  try { return !!JSON.parse(localStorage.getItem('auth_user')) } catch { return false }
+// 登录与权限检查
+const readAuth = () => {
+  try {
+    const data = JSON.parse(localStorage.getItem('auth_user') || 'null')
+    if (!data) return { token: null, perms: [] }
+    return { token: data.token, perms: data.perms || [] }
+  } catch { return { token: null, perms: [] } }
 }
 
 router.beforeEach((to, from, next) => {
   if (to.meta.public) return next()
-  if (!isAuthed()) return next({ name: 'login', query: { redirect: to.fullPath } })
+  const { token, perms } = readAuth()
+  if (!token) return next({ name: 'login', query: { redirect: to.fullPath } })
+  const need = to.meta.perm
+  if (need && !perms.includes(need)) return next({ name: 'home' })
   next()
 })
 

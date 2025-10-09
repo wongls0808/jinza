@@ -15,15 +15,12 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
-const authed = computed(() => {
-  try { return !!JSON.parse(localStorage.getItem('auth_user')) } catch { return false }
-})
-const logout = () => {
-  localStorage.removeItem('auth_user')
-  router.replace('/login')
-}
+const { state, logout: doLogout } = useAuth()
+const authed = computed(() => !!state.token)
+const logout = () => { doLogout(); router.replace('/login') }
 </script>
 
 <style scoped>

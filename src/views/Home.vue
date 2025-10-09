@@ -2,22 +2,27 @@
   <div class="home">
     <h2 class="title">欢迎回来</h2>
     <div class="grid">
-      <div class="card" @click="go('/customers')">
+      <div v-if="has('manage_users')" class="card" @click="go('/users')">
+        <div class="icon">👤</div>
+        <div class="name">用户管理</div>
+        <div class="desc">系统用户与权限分配</div>
+      </div>
+      <div v-if="has('view_customers')" class="card" @click="go('/customers')">
         <div class="icon">👥</div>
         <div class="name">客户管理</div>
         <div class="desc">管理客户档案与往来</div>
       </div>
-      <div class="card" @click="go('/products')">
+      <div v-if="has('view_products')" class="card" @click="go('/products')">
         <div class="icon">📦</div>
         <div class="name">商品库</div>
         <div class="desc">维护商品与库存</div>
       </div>
-      <div class="card" @click="go('/invoices')">
+      <div v-if="has('view_invoices')" class="card" @click="go('/invoices')">
         <div class="icon">🧾</div>
         <div class="name">发票管理</div>
         <div class="desc">开票、预览与打印</div>
       </div>
-      <div class="card" @click="go('/settings')">
+      <div v-if="has('view_settings')" class="card" @click="go('/settings')">
         <div class="icon">⚙️</div>
         <div class="name">系统设置</div>
         <div class="desc">基础资料与偏好</div>
@@ -29,8 +34,10 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 const router = useRouter()
 const go = (path) => router.push(path)
+const { has } = useAuth()
 </script>
 
 <style scoped>
