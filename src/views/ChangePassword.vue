@@ -51,7 +51,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await api.request('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password: oldPassword.value, new_password: newPassword.value }) })
+  await api.changePassword(oldPassword.value, newPassword.value)
     alert('密码已更新，请重新登录')
     localStorage.removeItem('auth_user')
     router.replace('/login')
