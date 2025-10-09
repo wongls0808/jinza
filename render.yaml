@@ -1,0 +1,32 @@
+services:services:
+
+  - type: web  - type: web
+
+    name: jinza-web    name: enterprise-management
+
+    env: node    env: node
+
+    plan: free    plan: starter
+
+    buildCommand: npm run build    buildCommand: npm install && npm run build
+
+    startCommand: npm start    startCommand: npm start
+
+    healthCheckPath: /api/health    envVars:
+
+    autoDeploy: true      - key: NODE_ENV
+
+    envVars:        value: production
+
+      - key: NODE_VERSION      - key: SESSION_SECRET
+
+        value: 20        generateValue: true
+
+      - key: NODE_ENV      - key: DATA_DIR
+
+        value: production        value: /data
+
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

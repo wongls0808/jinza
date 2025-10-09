@@ -1,5 +1,6 @@
 import express from 'express'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -15,11 +16,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-// In production, serve built front-end
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'dist')))
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'))
+// Serve built front-end when dist exists or in production (for PaaS like Render)
+const distPath = path.join(__dirname, 'dist')
+const shouldServeStatic = fs.existsSync(distPath) || process.env.NODE_ENV === 'production'
+if (shouldServeStatic) {
+  app.use(express.static(distPath))
+  // SPA fallback for non-API routes
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
   })
 }
 
