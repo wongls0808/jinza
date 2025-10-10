@@ -1,6 +1,9 @@
 <template>
   <div class="home container">
-    <h2 class="title">{{ t('home.welcome') }}</h2>
+    <div class="hero">
+      <div class="welcome">{{ t('home.welcome') }}</div>
+      <div class="meta">{{ username }} · {{ today }}</div>
+    </div>
     <div class="grid">
       <el-card v-if="has('manage_users')" class="home-card" @click="go('/users')">
         <div class="icon">👤</div>
@@ -35,22 +38,27 @@
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
 const router = useRouter()
 const go = (path) => router.push(path)
-const { has } = useAuth()
+const { has, state } = useAuth()
 const { t } = useI18n()
+const username = computed(() => state.user?.display_name || state.user?.username || '')
+const today = new Date().toLocaleDateString()
 </script>
 
 <style scoped>
 .home { padding: 8px; }
-.title { margin: 8px 8px 16px; font-size: 20px; color: var(--el-text-color-primary); }
+.hero { margin: 8px 8px 16px; }
+.welcome { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
+.meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
 }
-.home-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
-.home-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.home-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; border-radius: 14px; }
+.home-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
 .icon { font-size: 28px; }
 .name { margin-top: 8px; font-weight: 600; color: var(--el-text-color-primary); }
 .desc { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 13px; }
