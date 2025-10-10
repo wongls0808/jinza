@@ -46,10 +46,11 @@ watch(locale, (v) => lang.value = v)
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  background: var(--el-color-primary);
+  background: linear-gradient(90deg, var(--el-color-primary) 0%, color-mix(in oklab, var(--el-color-primary) 88%, #fff) 100%);
   color: var(--el-color-white);
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
 }
-.brand { font-weight: 600; cursor: pointer; }
-.right { display: flex; gap: 10px; align-items: center; }
-.view { padding: 16px; }
+.brand { font-weight: 700; letter-spacing: .2px; cursor: pointer; }
+.right { display: flex; gap: 12px; align-items: center; }
+.view { padding: 20px; }
 </style>

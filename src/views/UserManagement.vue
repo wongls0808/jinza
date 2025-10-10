@@ -1,15 +1,18 @@
 <template>
   <div class="users container">
-    <h2 style="margin:8px 0 16px;">用户管理</h2>
-    <div class="actions">
-      <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:200px" />
-      <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:200px" />
-      <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:200px" />
-      <el-button type="primary" :loading="creating" @click="createUser">新增用户</el-button>
+    <div class="page-head">
+      <div class="title">用户管理</div>
+      <div class="spacer"></div>
+      <div class="actions">
+        <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:180px" size="small" />
+        <el-button type="primary" :loading="creating" size="small" @click="createUser">新增用户</el-button>
+      </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
-      <el-card v-for="u in users" :key="u.id" class="user-card">
+    <div class="grid cards">
+      <el-card v-for="u in users" :key="u.id" class="user-card card">
         <template #header>
           <div class="row">
             <div>
@@ -24,7 +27,15 @@
           </div>
         </template>
         <div class="perms" v-if="perms.length">
-          <el-tag v-for="p in perms" :key="p.code" :type="userHas(u, p.code) ? 'success' : 'info'" class="perm-tag" @click="togglePerm(u, p.code)">
+          <el-tag
+            v-for="p in perms"
+            :key="p.code"
+            :type="userHas(u, p.code) ? 'success' : 'info'"
+            class="perm-tag"
+            effect="light"
+            size="small"
+            @click="togglePerm(u, p.code)"
+          >
             {{ p.name }}
           </el-tag>
         </div>
@@ -157,16 +168,17 @@ onMounted(load)
 </script>
 
 <style scoped>
-.users { padding: 8px; }
-.actions { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
-.actions input { height: 34px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.user-card { padding: 12px; }
-.row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-.name { font-weight: 600; }
-.username { color: #6b7280; }
-.perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.perm-tag { cursor: pointer; }
+.users { padding: 0; }
+.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.title { font-size: 18px; font-weight: 600; }
+.spacer { flex: 1; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.user-card { padding: 0; }
+.row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.name { font-weight: 600; font-size: 15px; }
+.username { color: var(--el-text-color-secondary); font-size: 12px; }
+.perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.perm-tag { cursor: pointer; user-select: none; }
 .ops { display: flex; gap: 8px; align-items: center; }
-.toggle { display: inline-flex; align-items: center; gap: 6px; }
 </style>
