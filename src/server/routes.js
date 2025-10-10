@@ -210,8 +210,16 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       await query(sql, flat)
       inserted += chunk.length
     } catch (e) {
-      // 捕获批次插入错误，尽量返回已插入数量
-      errors.push({ index: i, reason: '批次插入失败', detail: e.message })
+      // 批次失败则降级逐行插入，尽最大可能导入
+      for (let k = 0; k < chunk.length; k++) {
+        const r = chunk[k]
+        try {
+          await query('insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values($1,$2,$3,$4,$5,$6)', [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, r.submitter])
+          inserted += 1
+        } catch (e1) {
+          errors.push({ index: i + k, reason: '行插入失败', detail: e1?.message })
+        }
+      }
     }
   }
 
