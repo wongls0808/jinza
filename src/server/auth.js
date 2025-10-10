@@ -126,6 +126,21 @@ export async function seedInitialAdmin() {
       [adminId, row.id]
     )
   }
+
+  // Seed initial bank (ICBC) if missing
+  try {
+    const has = await query('select id from banks where code=$1', ['ICBC'])
+    if (has.rowCount === 0) {
+      await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4)', [
+        'ICBC',
+        '中国工商银行',
+        'Industrial and Commercial Bank of China',
+        '/banks/icbc.svg'
+      ])
+    }
+  } catch (e) {
+    // ignore if banks table doesn't exist yet; ensureSchema should have created it
+  }
 }
 
 export function validatePasswordStrength(password) {
