@@ -140,6 +140,31 @@ async function removeSelected() {
   ElMessage.success('已删除所选')
 }
 
+// 自动检测编码并解码 CSV 文本：优先 utf-8，回退 gb18030/gbk/big5
+async function decodeCsvFile(file) {
+  const buf = await (file.arrayBuffer ? file.arrayBuffer() : new Response(file).arrayBuffer())
+  const encodings = ['utf-8', 'gb18030', 'gbk', 'big5']
+  let best = null
+  for (const enc of encodings) {
+    try {
+      const dec = new TextDecoder(enc, { fatal: false })
+      const text = dec.decode(buf)
+      const repl = (text.match(/\uFFFD/g) || []).length
+      const han = (text.match(/[\u4E00-\u9FFF]/g) || []).length
+      const score = -repl * 10 + han
+      if (!best || score > best.score) best = { encoding: enc, text, score }
+      // 若为 UTF-8 且没有替换字符且包含逗号，直接认为可用
+      if (enc === 'utf-8' && repl === 0 && text.includes(',')) {
+        // 但仍会被上面的评分体系涵盖，这里不提前返回，保持择优
+      }
+    } catch (err) {
+      // 某些浏览器可能不支持 big5/gb18030，忽略
+    }
+  }
+  if (!best) throw new Error('无法读取文件，请确认文件未损坏')
+  return best
+}
+
 function parseCSV(text) {
   // 简单 CSV 解析（逗号分隔，不处理转义与换行）
   const noBom = text.replace(/^\ufeff/, '')
@@ -176,11 +201,12 @@ function toNumber(v) {
 
 async function onImport(file) {
   try {
-    const text = file.raw ? await file.raw.text() : await file.text()
+    const f = file.raw || file
+    const { text, encoding } = await decodeCsvFile(f)
     const data = parseCSV(text)
     const inserted = await batchImport(data)
     await reload()
-    ElMessage.success(`导入成功：${inserted} 条`)
+    ElMessage.success(`导入成功：${inserted} 条（编码：${encoding}）`)
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
@@ -190,7 +216,8 @@ async function onImport(file) {
 
 async function onImportCsv(file) {
   try {
-    const text = file.raw ? await file.raw.text() : await file.text()
+    const f = file.raw || file
+    const { text, encoding } = await decodeCsvFile(f)
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
     if (parsed.errors && parsed.errors.length) {
       console.warn('CSV parse errors:', parsed.errors)
@@ -205,7 +232,7 @@ async function onImportCsv(file) {
     })).filter(r => r.name)
     const inserted = await batchImport(rows)
     await reload()
-    ElMessage.success(`导入成功：${inserted} 条`)
+    ElMessage.success(`导入成功：${inserted} 条（编码：${encoding}）`)
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
