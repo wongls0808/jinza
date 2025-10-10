@@ -112,10 +112,10 @@ async function submit() {
       if (!f.code || !f.zh || !f.en) { ElMessage.warning('请填写代码/中文名/英文名'); return }
       await api.createBank({ code: f.code.trim(), zh: f.zh.trim(), en: f.en.trim(), logo_url: f.logo_url?.trim() || undefined, logo_data_url: f.logo_data_url || undefined })
     } else {
-      const body = {}
-      if (f.logo_data_url) body.logo_data_url = f.logo_data_url
-      if (f.logo_url && !f.logo_data_url) body.logo_url = f.logo_url
-      await api.request(`/banks/${f.id}`, { method: 'PUT', body: JSON.stringify(body) })
+  const body = {}
+  if (f.logo_data_url) body.logo_data_url = f.logo_data_url
+  if (f.logo_url && !f.logo_data_url) body.logo_url = f.logo_url
+  await api.updateBank(f.id, body)
     }
     dlg.value.visible = false
     await load()

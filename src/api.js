@@ -47,5 +47,6 @@ export const api = {
   requestBanks: () => request('/banks'),
   createBank: (data) => request('/banks', { method: 'POST', body: JSON.stringify(data) }),
   deleteBank: (id) => request(`/banks/${id}`, { method: 'DELETE' }),
-  resetBanks: () => request('/banks/reset-defaults', { method: 'POST' })
+  resetBanks: () => request('/banks/reset-defaults', { method: 'POST' }),
+  updateBank: (id, data) => request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
