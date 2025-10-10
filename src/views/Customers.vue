@@ -84,9 +84,7 @@
             <el-input-number v-model="addDlg.form.opening_cny" :precision="2" :min="0" :step="100" controls-position="right" placeholder="0.00" style="width:100%" />
           </el-form-item>
         </div>
-        <el-form-item label="提交人">
-          <el-input v-model.trim="addDlg.form.submitter" placeholder="如：张三" />
-        </el-form-item>
+        <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
       </el-form>
       <template #footer>
         <el-button @click="addDlg.visible=false">取消</el-button>
@@ -111,7 +109,7 @@ const pageSize = ref(10)
 const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
-const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null, submitter: '' } })
+const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null } })
 const addFormRef = ref()
 const addRules = {
   name: [{ required: true, message: '请填写客户名', trigger: 'blur' }],
@@ -142,7 +140,7 @@ async function reload() {
 }
 
 function openAdd() {
-  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null, submitter: '' } }
+  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null } }
 }
 async function doAdd() {
   addDlg.value.loading = true
@@ -156,7 +154,7 @@ async function doAdd() {
     f.tax_rate = f.tax_rate == null || f.tax_rate === '' ? 0 : f.tax_rate
     f.opening_myr = f.opening_myr == null || f.opening_myr === '' ? 0 : f.opening_myr
     f.opening_cny = f.opening_cny == null || f.opening_cny === '' ? 0 : f.opening_cny
-    await api.customers.create(f)
+  await api.customers.create({ abbr: f.abbr, name: f.name, tax_rate: f.tax_rate, opening_myr: f.opening_myr, opening_cny: f.opening_cny })
     addDlg.value.visible = false
     await reload()
     ElMessage.success('已添加')
@@ -205,7 +203,7 @@ function parseCSV(text) {
   const out = []
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx]
-    const [abbr, name, tax_rate, opening_myr, opening_cny, submitter] = line.split(',')
+  const [abbr, name, tax_rate, opening_myr, opening_cny] = line.split(',')
     // 跳过表头：abbr,name, ...
     if (idx === 0 && String(abbr).toLowerCase() === 'abbr') continue
     if (!abbr && !name) continue
@@ -214,8 +212,7 @@ function parseCSV(text) {
       name: name || '',
       tax_rate: toNumber(tax_rate),
       opening_myr: toNumber(opening_myr),
-      opening_cny: toNumber(opening_cny),
-      submitter: submitter || ''
+      opening_cny: toNumber(opening_cny)
     })
   }
   return out
@@ -260,8 +257,7 @@ async function onImportCsv(file) {
       name: (r.name ?? r.NAME ?? r.Name ?? '').toString().trim(),
       tax_rate: toNumber(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
       opening_myr: toNumber(r.opening_myr ?? r.opening_m ?? r.MYR ?? r.opening_MYR ?? 0),
-      opening_cny: toNumber(r.opening_cny ?? r.opening_c ?? r.CNY ?? r.RMB ?? r.opening_CNY ?? 0),
-      submitter: (r.submitter ?? r.SUBMITTER ?? r.Submitter ?? '').toString().trim()
+      opening_cny: toNumber(r.opening_cny ?? r.opening_c ?? r.CNY ?? r.RMB ?? r.opening_CNY ?? 0)
     })).filter(r => r.name)
     const inserted = await batchImport(rows)
     await reload()

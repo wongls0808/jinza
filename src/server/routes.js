@@ -143,8 +143,14 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
 })
 
 router.post('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
-  const { abbr, name, tax_rate = 0, opening_myr = 0, opening_cny = 0, submitter } = req.body || {}
+  const { abbr, name, tax_rate = 0, opening_myr = 0, opening_cny = 0 } = req.body || {}
   if (!name) return res.status(400).json({ error: '客户名必填' })
+  // Detect submitter from token (display_name preferred)
+  let submitter = null
+  try {
+    const me = await query('select display_name, username from users where id=$1', [req.user.id])
+    if (me.rowCount) submitter = me.rows[0].display_name || me.rows[0].username
+  } catch {}
   const nr = await query('insert into customers(abbr, name, tax_rate, opening_myr, opening_cny, submitter) values($1,$2,$3,$4,$5,$6) returning *', [abbr || null, name, Number(tax_rate)||0, Number(opening_myr)||0, Number(opening_cny)||0, submitter || null])
   res.json(nr.rows[0])
 })
@@ -163,6 +169,12 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
   const { rows } = req.body || {}
   if (!Array.isArray(rows)) return res.status(400).json({ error: 'invalid rows' })
   if (!rows.length) return res.json({ inserted: 0, errors: [] })
+  // submitter from token
+  let submitter = null
+  try {
+    const me = await query('select display_name, username from users where id=$1', [req.user.id])
+    if (me.rowCount) submitter = me.rows[0].display_name || me.rows[0].username
+  } catch {}
 
   // Validate & normalize
   const valids = []
@@ -181,7 +193,7 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       tax_rate: parseNum(r.tax_rate ?? 0),
       opening_myr: parseNum(r.opening_myr ?? 0),
       opening_cny: parseNum(r.opening_cny ?? 0),
-      submitter: (r.submitter ?? '').toString().trim() || null
+      submitter // 强制使用当前用户
     }
     if (!obj.name) {
       errors.push({ index: i, reason: '缺少客户名' })
@@ -202,7 +214,7 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
   for (let i = 0; i < valids.length; i += chunkSize) {
     const chunk = valids.slice(i, i + chunkSize)
     if (!chunk.length) continue
-    const values = chunk.map(r => [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, r.submitter])
+  const values = chunk.map(r => [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, submitter])
     const params = values.map((_, idx) => `($${idx*6+1},$${idx*6+2},$${idx*6+3},$${idx*6+4},$${idx*6+5},$${idx*6+6})`).join(',')
     const flat = values.flat()
     const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
@@ -225,7 +237,7 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       for (let k = 0; k < chunk.length; k++) {
         const r = chunk[k]
         try {
-          await query('insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values($1,$2,$3,$4,$5,$6)', [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, r.submitter])
+          await query('insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values($1,$2,$3,$4,$5,$6)', [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, submitter])
           inserted += 1
         } catch (e1) {
           errors.push({ index: i + k, reason: '行插入失败', detail: e1?.message })
@@ -245,6 +257,12 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
   try {
     if (!req.body || typeof req.body !== 'string') return res.status(400).json({ error: 'empty body' })
     const text = req.body.replace(/^\ufeff/, '') // strip BOM if any
+    // submitter from token
+    let submitter = null
+    try {
+      const me = await query('select display_name, username from users where id=$1', [req.user.id])
+      if (me.rowCount) submitter = me.rows[0].display_name || me.rows[0].username
+    } catch {}
     let records = []
     let usedColumns = false
     try {
@@ -279,7 +297,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
           tax_rate: Number(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
           opening_myr: Number(r.opening_myr ?? r.MYR ?? r.opening_MYR ?? 0),
           opening_cny: Number(r.opening_cny ?? r.CNY ?? r.opening_CNY ?? 0),
-          submitter: (r.submitter ?? r.SUBMITTER ?? r.Submitter ?? '').toString().trim()
+          submitter
         }
         if (!obj.name) {
           errors.push({ line: lineNo, reason: '缺少客户名' })
@@ -296,8 +314,8 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
       // No header: expect 6 columns
       let lineNo = 1
       for (const r of records) {
-        const [abbr = '', name = '', tax_rate = 0, opening_myr = 0, opening_cny = 0, submitter = ''] = r
-        const obj = { abbr, name, tax_rate: Number(tax_rate), opening_myr: Number(opening_myr), opening_cny: Number(opening_cny), submitter }
+  const [abbr = '', name = '', tax_rate = 0, opening_myr = 0, opening_cny = 0] = r
+  const obj = { abbr, name, tax_rate: Number(tax_rate), opening_myr: Number(opening_myr), opening_cny: Number(opening_cny), submitter }
         if (!obj.name) {
           errors.push({ line: lineNo, reason: '缺少客户名' })
         } else if (isNaN(obj.tax_rate) || obj.tax_rate < 0 || obj.tax_rate > 100) {
@@ -312,7 +330,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
     if (!normalized.length) return res.json({ inserted: 0, errors })
 
     // Insert
-    const values = normalized.map(r => [r.abbr || null, r.name, Number(r.tax_rate) || 0, Number(r.opening_myr) || 0, Number(r.opening_cny) || 0, r.submitter || null])
+  const values = normalized.map(r => [r.abbr || null, r.name, Number(r.tax_rate) || 0, Number(r.opening_myr) || 0, Number(r.opening_cny) || 0, submitter || null])
     const params = values.map((_, i) => `($${i*6+1},$${i*6+2},$${i*6+3},$${i*6+4},$${i*6+5},$${i*6+6})`).join(',')
     const flat = values.flat()
     const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
