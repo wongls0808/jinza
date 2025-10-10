@@ -2,7 +2,12 @@
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
 body {
-	font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Noto Sans', 'Microsoft YaHei', sans-serif;
+	/* 更优的中英文字体栈，优先系统优雅字体，兼容 Windows/Android/macOS */
+	font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial,
+	  "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+	font-size: 15px; /* 全局字体放大 1 级（默认 14 → 15） */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	color: var(--el-text-color-primary);
 	background: var(--el-bg-color-page);
 }
