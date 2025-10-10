@@ -212,7 +212,27 @@ async function downloadTemplate() {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    ElMessage.error('下载模板失败：' + (e.message || ''))
+    // 后端不可用时，使用前端本地兜底模板
+    try {
+      const header = 'abbr,name,tax_rate,opening_myr,opening_cny,submitter'
+      const sample = [
+        'ABC,深圳市某某公司,6,1000,2000,王五',
+        'DEF,广州某某集团,0,0,3500,李四'
+      ].join('\n')
+      const content = '\ufeff' + [header, sample].join('\n')
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'customers_template.csv'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      ElMessage.info('后端暂不可用，已使用本地模板文件')
+    } catch (err) {
+      ElMessage.error('下载模板失败：' + (e.message || ''))
+    }
   }
 }
 
