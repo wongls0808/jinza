@@ -93,6 +93,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import Papa from 'papaparse'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 
@@ -162,9 +163,9 @@ async function onImport(file) {
   try {
     const text = await file.raw.text()
     const data = parseCSV(text)
-    await api.customers.importRows(data)
+    const inserted = await batchImport(data)
     await reload()
-    ElMessage.success(`导入成功：${data.length} 条`)
+    ElMessage.success(`导入成功：${inserted} 条`)
   } catch (e) {
     ElMessage.error('导入失败')
   }
@@ -173,13 +174,35 @@ async function onImport(file) {
 async function onImportCsv(file) {
   try {
     const text = await file.raw.text()
-    const data = await api.customers.importCsv(text)
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
+    if (parsed.errors && parsed.errors.length) {
+      console.warn('CSV parse errors:', parsed.errors)
+    }
+    const rows = (parsed.data || []).map(r => ({
+      abbr: (r.abbr ?? r.ABBR ?? r.Abbr ?? '').toString().trim(),
+      name: (r.name ?? r.NAME ?? r.Name ?? '').toString().trim(),
+      tax_rate: Number(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
+      opening_myr: Number(r.opening_myr ?? r.MYR ?? r.opening_MYR ?? 0),
+      opening_cny: Number(r.opening_cny ?? r.CNY ?? r.opening_CNY ?? 0),
+      submitter: (r.submitter ?? r.SUBMITTER ?? r.Submitter ?? '').toString().trim()
+    })).filter(r => r.name)
+    const inserted = await batchImport(rows)
     await reload()
-    const errMsg = (data.errors && data.errors.length) ? `，有 ${data.errors.length} 行失败` : ''
-    ElMessage.success(`导入成功：${data.inserted} 条${errMsg}`)
+    ElMessage.success(`导入成功：${inserted} 条`)
   } catch (e) {
     ElMessage.error('导入失败：' + (e.message || ''))
   }
+}
+
+async function batchImport(allRows, chunkSize = 300) {
+  let inserted = 0
+  for (let i = 0; i < allRows.length; i += chunkSize) {
+    const chunk = allRows.slice(i, i + chunkSize)
+    if (!chunk.length) continue
+    await api.customers.importRows(chunk)
+    inserted += chunk.length
+  }
+  return inserted
 }
 
 async function onExport() {
