@@ -56,7 +56,19 @@
             <el-option v-for="c in currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>
-        <el-form-item label="期初余额"><el-input v-model.number="dlg.form.opening_balance" /></el-form-item>
+        <el-form-item label="期初余额">
+          <el-input-number
+            v-model="dlg.form.opening_balance"
+            :precision="2"
+            :min="0"
+            :step="100"
+            controls-position="right"
+            placeholder="0.00"
+            :formatter="moneyFormatter"
+            :parser="moneyParser"
+            style="width:100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dlg.visible=false">取消</el-button>
@@ -77,6 +89,19 @@ const currencies = ref([])
 const dlg = ref({ visible: false, loading: false, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
 
 function formatMoney(v) { return Number(v||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+// InputNumber 千分位展示与两位小数解析
+function moneyFormatter(value) {
+  if (value === undefined || value === null || value === '') return ''
+  const n = Number(value)
+  if (isNaN(n)) return ''
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function moneyParser(value) {
+  if (value === undefined || value === null) return 0
+  const s = String(value).replace(/,/g, '')
+  const n = Number(s)
+  return isNaN(n) ? 0 : n
+}
 
 async function load() {
   rows.value = await api.accounts.list()

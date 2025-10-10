@@ -78,10 +78,30 @@
         </el-form-item>
         <div class="grid2">
           <el-form-item label="马币期初">
-            <el-input-number v-model="addDlg.form.opening_myr" :precision="2" :min="0" :step="100" controls-position="right" placeholder="0.00" style="width:100%" />
+            <el-input-number
+              v-model="addDlg.form.opening_myr"
+              :precision="2"
+              :min="0"
+              :step="100"
+              controls-position="right"
+              placeholder="0.00"
+              :formatter="moneyFormatter"
+              :parser="moneyParser"
+              style="width:100%"
+            />
           </el-form-item>
           <el-form-item label="人民币期初">
-            <el-input-number v-model="addDlg.form.opening_cny" :precision="2" :min="0" :step="100" controls-position="right" placeholder="0.00" style="width:100%" />
+            <el-input-number
+              v-model="addDlg.form.opening_cny"
+              :precision="2"
+              :min="0"
+              :step="100"
+              controls-position="right"
+              placeholder="0.00"
+              :formatter="moneyFormatter"
+              :parser="moneyParser"
+              style="width:100%"
+            />
           </el-form-item>
         </div>
         <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
@@ -370,6 +390,20 @@ function onSort({ prop, order: ord }) {
 
 function formatMoney(v) { return Number(v||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function formatPercent(v) { return Number(v||0).toFixed(2) }
+
+// InputNumber 千分位展示与两位小数解析
+function moneyFormatter(value) {
+  if (value === undefined || value === null || value === '') return ''
+  const n = Number(value)
+  if (isNaN(n)) return ''
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function moneyParser(value) {
+  if (value === undefined || value === null) return 0
+  const s = String(value).replace(/,/g, '')
+  const n = Number(s)
+  return isNaN(n) ? 0 : n
+}
 
 onMounted(reload)
 
