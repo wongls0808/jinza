@@ -15,8 +15,8 @@
           <div class="idx">{{ i + 1 }}</div>
           <img class="logo" :src="b.logo_url || b.logo" :alt="b.en" @error="onImgErr" />
           <div class="names">
-            <div class="zh">{{ b.zh }}</div>
-            <div class="en">{{ b.en }}</div>
+            <div class="zh text-clip" title="{{ b.zh }}">{{ b.zh }}</div>
+            <div class="en text-clip" title="{{ b.en }}">{{ b.en }}</div>
           </div>
           <div class="ops">
             <el-button link @click="openEdit(b)">替换Logo</el-button>
@@ -147,17 +147,18 @@ function onImgErr(e) {
 .toolbar { display: flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(620px, 1fr)); gap: 14px; }
 .bank-card {
-  display: grid; grid-template-columns: 40px 56px 1fr auto; align-items: center; gap: 12px;
+  display: grid; grid-template-columns: 40px auto 1fr auto; align-items: center; gap: 12px;
   padding: 10px 12px; border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color);
 }
 .idx { color: var(--el-text-color-secondary); font-weight: 600; }
-.logo { width: 56px; height: 56px; object-fit: contain; }
-.names { display: grid; gap: 2px; }
+.logo { height: 36px; width: auto; max-width: 200px; object-fit: contain; }
+.names { display: flex; gap: 12px; align-items: center; white-space: nowrap; overflow: hidden; }
 .zh { font-weight: 600; }
-.en { color: var(--el-text-color-secondary); font-size: 12px; }
+.en { color: var(--el-text-color-secondary); font-size: 13px; }
 .ops { display: flex; gap: 6px; }
 .form { display: grid; gap: 12px; }
 .hint { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 8px; }
+.text-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
