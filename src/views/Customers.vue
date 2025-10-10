@@ -150,13 +150,24 @@ function parseCSV(text) {
     out.push({
       abbr: abbr || '',
       name: name || '',
-      tax_rate: Number(tax_rate || 0),
-      opening_myr: Number(opening_myr || 0),
-      opening_cny: Number(opening_cny || 0),
+      tax_rate: toNumber(tax_rate),
+      opening_myr: toNumber(opening_myr),
+      opening_cny: toNumber(opening_cny),
       submitter: submitter || ''
     })
   }
   return out
+}
+
+function toNumber(v) {
+  if (v === null || v === undefined) return 0
+  const s = String(v)
+    .replace(/[,%]/g, '')
+    .replace(/[￥¥RMBrmb$]/gi, '')
+    .replace(/MYR|CNY|RMB|USD/gi, '')
+    .trim()
+  const n = Number(s)
+  return isNaN(n) ? 0 : n
 }
 
 async function onImport(file) {
@@ -167,7 +178,9 @@ async function onImport(file) {
     await reload()
     ElMessage.success(`导入成功：${inserted} 条`)
   } catch (e) {
-    ElMessage.error('导入失败')
+    let msg = e?.message || ''
+    try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
+    ElMessage.error('导入失败：' + (msg || ''))
   }
 }
 
@@ -181,16 +194,18 @@ async function onImportCsv(file) {
     const rows = (parsed.data || []).map(r => ({
       abbr: (r.abbr ?? r.ABBR ?? r.Abbr ?? '').toString().trim(),
       name: (r.name ?? r.NAME ?? r.Name ?? '').toString().trim(),
-      tax_rate: Number(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
-      opening_myr: Number(r.opening_myr ?? r.MYR ?? r.opening_MYR ?? 0),
-      opening_cny: Number(r.opening_cny ?? r.CNY ?? r.opening_CNY ?? 0),
+      tax_rate: toNumber(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
+      opening_myr: toNumber(r.opening_myr ?? r.MYR ?? r.opening_MYR ?? 0),
+      opening_cny: toNumber(r.opening_cny ?? r.CNY ?? r.opening_CNY ?? 0),
       submitter: (r.submitter ?? r.SUBMITTER ?? r.Submitter ?? '').toString().trim()
     })).filter(r => r.name)
     const inserted = await batchImport(rows)
     await reload()
     ElMessage.success(`导入成功：${inserted} 条`)
   } catch (e) {
-    ElMessage.error('导入失败：' + (e.message || ''))
+    let msg = e?.message || ''
+    try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
+    ElMessage.error('导入失败：' + (msg || ''))
   }
 }
 
