@@ -1,4 +1,5 @@
 import express from 'express'
+import 'express-async-errors'
 import path from 'path'
 import fs from 'fs'
 import cors from 'cors'
@@ -53,5 +54,11 @@ app.listen(PORT, () => {
     console.error('Background DB initialization failed', e)
   }
 })()
+
+// Global error handler to prevent hanging requests
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err)
+  res.status(500).json({ error: 'Internal Server Error' })
+})
 
 export default app
