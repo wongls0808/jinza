@@ -13,7 +13,7 @@
       <div class="cards">
         <div v-for="(b,i) in banks" :key="b.code" class="bank-card">
           <div class="idx">{{ i + 1 }}</div>
-          <img class="logo" :src="b.logo" :alt="b.en" />
+          <img class="logo" :src="b.logo_url || b.logo" :alt="b.en" @error="onImgErr" />
           <div class="names">
             <div class="zh">{{ b.zh }}</div>
             <div class="en">{{ b.en }}</div>
@@ -130,6 +130,14 @@ async function submit() {
 }
 
 onMounted(load)
+
+function onImgErr(e) {
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    // 回退到一个本地占位图，避免破图
+    el.src = '/banks/public.svg'
+  }
+}
 </script>
 
 <style scoped>
