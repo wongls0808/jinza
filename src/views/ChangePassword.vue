@@ -29,6 +29,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const oldPassword = ref('')
@@ -43,10 +44,12 @@ async function submit() {
   reasons.value = []
   if (!oldPassword.value || !newPassword.value) {
     error.value = '请填写完整'
+    ElMessage.warning(error.value)
     return
   }
   if (newPassword.value !== confirm.value) {
     error.value = '两次输入密码不一致'
+    ElMessage.warning(error.value)
     return
   }
   submitting.value = true
@@ -61,7 +64,7 @@ async function submit() {
         localStorage.setItem('auth_user', JSON.stringify(d))
       }
     } catch {}
-    alert('密码已更新，请重新登录')
+  ElMessage.success('密码已更新，请重新登录')
     localStorage.removeItem('auth_user')
     router.replace('/login')
   } catch (e) {
@@ -69,8 +72,10 @@ async function submit() {
       const data = JSON.parse(e.message)
       error.value = data.error || '更新失败'
       reasons.value = data.reasons || []
+      ElMessage.error(error.value)
     } catch {
       error.value = e.message || '更新失败'
+      ElMessage.error(error.value)
     }
   } finally {
     submitting.value = false

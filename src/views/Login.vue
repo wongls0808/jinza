@@ -24,6 +24,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
@@ -36,8 +37,7 @@ const { save } = useAuth()
 
 const onSubmit = async () => {
   if (!form.value.username || !form.value.password) {
-  // 用 Element Plus 的消息也可，这里保持最简
-  alert(t('login.username') + '/' + t('login.password') + ' 不能为空')
+    ElMessage.warning(t('login.username') + '/' + t('login.password') + ' 不能为空')
     return
   }
   submitting.value = true
@@ -47,8 +47,14 @@ const onSubmit = async () => {
   save({ token: res.token, user: res.user, perms: res.perms, must_change_password: !!res.must_change_password })
   const redirect = res.must_change_password ? '/change-password' : (route.query.redirect || '/')
   router.replace(String(redirect))
+  ElMessage.success(t('login.title') + '成功')
   } catch (e) {
-  alert('登录失败：' + (e.message || 'unknown error'))
+  try {
+    const data = JSON.parse(e.message)
+    ElMessage.error('登录失败：' + (data.error || ''))
+  } catch {
+    ElMessage.error('登录失败：' + (e.message || 'unknown error'))
+  }
   } finally {
     submitting.value = false
   }
