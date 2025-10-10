@@ -358,6 +358,47 @@ router.get('/customers/export', authMiddleware(true), requirePerm('view_customer
   res.send(BOM + csv)
 })
 
+// Currencies CRUD (simple)
+router.get('/currencies', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+  const rs = await query('select code, name from currencies order by code')
+  res.json(rs.rows)
+})
+router.post('/currencies', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+  const { code, name } = req.body || {}
+  if (!code || !name) return res.status(400).json({ error: 'Missing fields' })
+  await query('insert into currencies(code, name) values($1,$2) on conflict do nothing', [code.toUpperCase(), name])
+  res.json({ ok: true })
+})
+router.delete('/currencies/:code', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+  const code = (req.params.code || '').toUpperCase()
+  await query('delete from currencies where code=$1', [code])
+  res.json({ ok: true })
+})
+
+// Receiving accounts
+router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+  const rs = await query(`
+    select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+           b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
+    from receiving_accounts a
+    left join banks b on b.id = a.bank_id
+    order by a.id desc
+  `)
+  res.json(rs.rows)
+})
+router.post('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+  const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
+  if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
+  const rs = await query('insert into receiving_accounts(account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5) returning *', [account_name, Number(bank_id), bank_account, currency_code.toUpperCase(), Number(opening_balance)||0])
+  res.json(rs.rows[0])
+})
+router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+  const id = Number(req.params.id)
+  const rs = await query('delete from receiving_accounts where id=$1', [id])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  res.json({ ok: true })
+})
+
 // Banks CRUD (server-managed)
 router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')
@@ -368,6 +409,10 @@ router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req
 router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}
   if (!code || !zh || !en) return res.status(400).json({ error: 'Missing fields' })
+  // Normalize to uppercase for consistency (as requested)
+  code = String(code).toUpperCase()
+  zh = String(zh).toUpperCase()
+  en = String(en).toUpperCase()
   // Handle data URL upload
   if (logo_data_url && /^data:/i.test(logo_data_url)) {
     try {
@@ -425,9 +470,10 @@ router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), expres
   const fields = []
   const values = []
   let idx = 1
-  if (code) { fields.push(`code=$${idx++}`); values.push(code) }
-  if (zh) { fields.push(`zh=$${idx++}`); values.push(zh) }
-  if (en) { fields.push(`en=$${idx++}`); values.push(en) }
+  // Normalize to uppercase for provided string fields
+  if (code) { code = String(code).toUpperCase(); fields.push(`code=$${idx++}`); values.push(code) }
+  if (zh) { zh = String(zh).toUpperCase(); fields.push(`zh=$${idx++}`); values.push(zh) }
+  if (en) { en = String(en).toUpperCase(); fields.push(`en=$${idx++}`); values.push(en) }
   if (logo_url) { fields.push(`logo_url=$${idx++}`); values.push(logo_url) }
   if (!fields.length) return res.status(400).json({ error: 'no changes' })
   values.push(id)

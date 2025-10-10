@@ -48,5 +48,20 @@ export const api = {
   createBank: (data) => request('/banks', { method: 'POST', body: JSON.stringify(data) }),
   deleteBank: (id) => request(`/banks/${id}`, { method: 'DELETE' }),
   resetBanks: () => request('/banks/reset-defaults', { method: 'POST' }),
-  updateBank: (id, data) => request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  updateBank: (id, data) => request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  banks: { all: () => request('/banks') },
+
+  // Currencies
+  currencies: {
+    list: () => request('/currencies'),
+    create: (code, name) => request('/currencies', { method: 'POST', body: JSON.stringify({ code, name }) }),
+    remove: (code) => request(`/currencies/${code}`, { method: 'DELETE' })
+  },
+
+  // Accounts
+  accounts: {
+    list: () => request('/accounts'),
+    create: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    remove: (id) => request(`/accounts/${id}`, { method: 'DELETE' })
+  }
 }

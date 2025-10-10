@@ -15,8 +15,8 @@
           <div class="idx">{{ i + 1 }}</div>
           <img class="logo" :src="b.logo_url || b.logo" :alt="b.en" @error="onImgErr" />
           <div class="names">
-            <div class="zh text-clip" title="{{ b.zh }}">{{ b.zh }}</div>
-            <div class="en text-clip" title="{{ b.en }}">{{ b.en }}</div>
+            <div class="zh text-clip" :title="b.zh">{{ b.zh }}</div>
+            <div class="en text-clip" :title="b.en">{{ b.en }}</div>
           </div>
           <div class="ops">
             <el-button link @click="openEdit(b)">替换Logo</el-button>
@@ -30,13 +30,13 @@
     <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? '新增银行' : '替换 Logo'" width="520px">
       <el-form :model="dlg.form" label-width="90px" class="form">
         <el-form-item label="代码" v-if="dlg.mode==='add'">
-          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" />
+          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" />
         </el-form-item>
         <el-form-item label="中文名" v-if="dlg.mode==='add'">
-          <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" />
+          <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" @input="dlg.form.zh = (dlg.form.zh || '').toUpperCase()" />
         </el-form-item>
         <el-form-item label="英文名" v-if="dlg.mode==='add'">
-          <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" />
+          <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
         <el-form-item label="Logo URL">
           <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" />
@@ -110,7 +110,13 @@ async function submit() {
     const f = dlg.value.form
     if (dlg.value.mode === 'add') {
       if (!f.code || !f.zh || !f.en) { ElMessage.warning('请填写代码/中文名/英文名'); return }
-      await api.createBank({ code: f.code.trim(), zh: f.zh.trim(), en: f.en.trim(), logo_url: f.logo_url?.trim() || undefined, logo_data_url: f.logo_data_url || undefined })
+      await api.createBank({
+        code: (f.code || '').trim().toUpperCase(),
+        zh: (f.zh || '').trim().toUpperCase(),
+        en: (f.en || '').trim().toUpperCase(),
+        logo_url: f.logo_url?.trim() || undefined,
+        logo_data_url: f.logo_data_url || undefined
+      })
     } else {
   const body = {}
   if (f.logo_data_url) body.logo_data_url = f.logo_data_url

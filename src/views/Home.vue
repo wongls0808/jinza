@@ -20,6 +20,11 @@
         <div class="name">银行列表</div>
         <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
       </el-card>
+  <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
+  <div class="icon"><OfficeBuilding /></div>
+        <div class="name">收款账户</div>
+        <div class="desc">银行账户、币种与期初余额</div>
+      </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>

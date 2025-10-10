@@ -82,6 +82,21 @@ export async function ensureSchema() {
       logo_url text,
       created_at timestamptz default now()
     );
+
+    create table if not exists currencies (
+      code text primary key,
+      name text not null
+    );
+
+    create table if not exists receiving_accounts (
+      id serial primary key,
+      account_name text not null,
+      bank_id int references banks(id) on delete restrict,
+      bank_account text not null,
+      currency_code text references currencies(code) on delete restrict,
+      opening_balance numeric default 0,
+      created_at timestamptz default now()
+    );
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
@@ -95,6 +110,7 @@ export async function seedInitialAdmin() {
     { code: 'manage_users', name: '用户管理' },
     { code: 'view_customers', name: '客户模块' },
     { code: 'view_banks', name: '银行列表' },
+    { code: 'view_accounts', name: '收款账户' },
     { code: 'view_settings', name: '系统设置' }
   ]
   for (const p of corePerms) {
@@ -141,6 +157,13 @@ export async function seedInitialAdmin() {
   } catch (e) {
     // ignore if banks table doesn't exist yet; ensureSchema should have created it
   }
+
+  // Seed default currencies
+  try {
+    await query('insert into currencies(code, name) values ($1,$2) on conflict do nothing', ['CNY', '人民币'])
+    await query('insert into currencies(code, name) values ($1,$2) on conflict do nothing', ['MYR', '马来西亚林吉特'])
+    await query('insert into currencies(code, name) values ($1,$2) on conflict do nothing', ['USD', '美元'])
+  } catch {}
 }
 
 export function validatePasswordStrength(password) {
