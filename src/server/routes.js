@@ -157,6 +157,9 @@ router.delete('/customers', authMiddleware(true), requirePerm('view_customers'),
 })
 
 router.post('/customers/import', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  if (!process.env.DATABASE_URL) {
+    return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' })
+  }
   const { rows } = req.body || {}
   if (!Array.isArray(rows)) return res.status(400).json({ error: 'invalid rows' })
   if (!rows.length) return res.json({ inserted: 0, errors: [] })
@@ -164,14 +167,20 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
   // Validate & normalize
   const valids = []
   const errors = []
+  const parseNum = (v) => {
+    if (v === null || v === undefined || v === '') return 0
+    const s = String(v).replace(/,/g, '').trim()
+    const n = Number(s)
+    return isNaN(n) ? 0 : n
+  }
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i] || {}
     const obj = {
       abbr: (r.abbr ?? '').toString().trim() || null,
       name: ((r.name ?? '') + '').trim(),
-      tax_rate: Number(r.tax_rate ?? 0),
-      opening_myr: Number(r.opening_myr ?? 0),
-      opening_cny: Number(r.opening_cny ?? 0),
+      tax_rate: parseNum(r.tax_rate ?? 0),
+      opening_myr: parseNum(r.opening_myr ?? 0),
+      opening_cny: parseNum(r.opening_cny ?? 0),
       submitter: (r.submitter ?? '').toString().trim() || null
     }
     if (!obj.name) {
@@ -182,14 +191,14 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       errors.push({ index: i, reason: '税率应在 0-100 之间' })
       continue
     }
-    // Number() 可能为 NaN
+    // 保护性处理
     obj.opening_myr = isNaN(obj.opening_myr) ? 0 : obj.opening_myr
     obj.opening_cny = isNaN(obj.opening_cny) ? 0 : obj.opening_cny
     valids.push(obj)
   }
 
   let inserted = 0
-  const chunkSize = 500
+  const chunkSize = 200
   for (let i = 0; i < valids.length; i += chunkSize) {
     const chunk = valids.slice(i, i + chunkSize)
     if (!chunk.length) continue
@@ -211,6 +220,9 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
 
 // Import customers via raw CSV content
 router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  if (!process.env.DATABASE_URL) {
+    return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' })
+  }
   try {
     if (!req.body || typeof req.body !== 'string') return res.status(400).json({ error: 'empty body' })
     const text = req.body.replace(/^\ufeff/, '') // strip BOM if any

@@ -58,7 +58,7 @@ app.listen(PORT, () => {
 // Global error handler to prevent hanging requests
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
-  res.status(500).json({ error: 'Internal Server Error' })
+  res.status(500).json({ error: 'Internal Server Error', detail: err?.message })
 })
 
 export default app
