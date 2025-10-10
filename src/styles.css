@@ -1,0 +1,30 @@
+/* Global minimal reset and theme */
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Noto Sans', 'Microsoft YaHei', sans-serif; color: #111827; background: #f6f7fb; }
+
+/* Containers */
+.container { max-width: 1080px; margin: 0 auto; padding: 16px; }
+
+/* Forms */
+input, select, textarea { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; outline: none; background: #fff; transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #111827; cursor: pointer; transition: background .15s, box-shadow .15s, transform .05s; }
+.btn:hover { box-shadow: 0 6px 14px rgba(0,0,0,.08); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.btn.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+.btn.warn { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+
+/* Cards */
+.card { background: #fff; border: 1px solid #eef0f4; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.badge.green { background: #dcfce7; color: #166534; }
+.badge.gray { background: #f3f4f6; color: #374151; }
+
+/* Grid helpers */
+.grid { display: grid; gap: 12px; }

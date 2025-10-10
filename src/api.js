@@ -25,6 +25,7 @@ export const api = {
     create: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+    resetPassword: (id, password) => request(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
     getPerms: (id) => request(`/users/${id}/permissions`),
     setPerms: (id, perms) => request(`/users/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ perms }) }),
   },

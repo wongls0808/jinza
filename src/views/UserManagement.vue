@@ -5,17 +5,21 @@
       <input v-model.trim="newUser.username" placeholder="用户名" />
       <input v-model.trim="newUser.password" placeholder="初始密码" type="password" />
       <input v-model.trim="newUser.display_name" placeholder="显示名" />
-      <button @click="createUser" :disabled="creating">新增用户</button>
+      <button class="btn primary" @click="createUser" :disabled="creating">新增用户</button>
     </div>
 
     <div class="grid">
-      <div class="card" v-for="u in users" :key="u.id">
+      <div class="card user-card" v-for="u in users" :key="u.id">
         <div class="row">
           <div class="name">{{ u.display_name || u.username }}</div>
           <div class="username">@{{ u.username }}</div>
-          <label>
-            <input type="checkbox" v-model="u.is_active" @change="toggleActive(u)" /> 启用
-          </label>
+          <div class="ops">
+            <label class="toggle">
+              <input type="checkbox" v-model="u.is_active" @change="toggleActive(u)" /> 启用
+            </label>
+            <button class="btn warn" @click="promptReset(u)">重置密码</button>
+            <button class="btn danger" @click="removeUser(u)">删除</button>
+          </div>
         </div>
         <div class="perms" v-if="perms.length">
           <div class="perm" v-for="p in perms" :key="p.code">
@@ -86,19 +90,41 @@ async function setUserPerm(u, code, on) {
   }
 }
 
+async function promptReset(u) {
+  const pwd = prompt(`为用户 ${u.username} 设置新的初始密码：`)
+  if (!pwd) return
+  try {
+    await api.users.resetPassword(u.id, pwd)
+    alert('已重置。用户下次登录需强制修改新密码。')
+  } catch (e) {
+    alert('重置失败：' + (e.message || ''))
+  }
+}
+
+async function removeUser(u) {
+  if (!confirm(`确认删除用户 ${u.username} ？该操作不可恢复！`)) return
+  try {
+    await api.users.remove(u.id)
+    users.value = users.value.filter(x => x.id !== u.id)
+  } catch (e) {
+    alert('删除失败：' + (e.message || ''))
+  }
+}
+
 onMounted(load)
 </script>
 
 <style scoped>
 .users { padding: 8px; }
 .actions { display: flex; gap: 8px; margin-bottom: 12px; }
-.actions input { height: 32px; padding: 0 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
-.actions button { height: 34px; padding: 0 12px; background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+.actions input { height: 34px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.card { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.05); }
+.user-card { padding: 12px; }
 .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
 .name { font-weight: 600; }
 .username { color: #6b7280; }
 .perms { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 10px; }
 .perm { font-size: 13px; color: #374151; }
+.ops { display: flex; gap: 8px; align-items: center; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; }
 </style>
