@@ -16,6 +16,13 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
+// Serve runtime uploads (e.g., bank logos)
+const uploadsPath = path.join(__dirname, 'uploads')
+if (!fs.existsSync(uploadsPath)) {
+  try { fs.mkdirSync(uploadsPath, { recursive: true }) } catch {}
+}
+app.use('/uploads', express.static(uploadsPath))
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })

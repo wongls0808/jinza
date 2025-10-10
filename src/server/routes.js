@@ -2,8 +2,14 @@ import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
 import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema } from './auth.js'
 import { query } from './db.js'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 export const router = express.Router()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Auth
 router.post('/auth/login', async (req, res) => {
@@ -350,6 +356,69 @@ router.get('/customers/export', authMiddleware(true), requirePerm('view_customer
   res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"')
   const BOM = '\ufeff'
   res.send(BOM + csv)
+})
+
+// Banks CRUD (server-managed)
+router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+  const rs = await query('select id, code, zh, en, logo_url from banks order by id')
+  res.json(rs.rows)
+})
+
+// Accept either {code, zh, en, logo_url} or {logo_data_url} (data:image/svg+xml;base64,...)
+router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
+  let { code, zh, en, logo_url, logo_data_url } = req.body || {}
+  if (!code || !zh || !en) return res.status(400).json({ error: 'Missing fields' })
+  // Handle data URL upload
+  if (logo_data_url && /^data:/i.test(logo_data_url)) {
+    try {
+      const m = /^data:(.+);base64,(.*)$/i.exec(logo_data_url)
+      if (!m) return res.status(400).json({ error: 'invalid data url' })
+      const mime = m[1]
+      const buf = Buffer.from(m[2], 'base64')
+      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
+      const uploads = path.join(__dirname, '../../uploads')
+      if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
+      const file = path.join(uploads, `bank_${code}.${ext}`)
+      fs.writeFileSync(file, buf)
+      logo_url = `/uploads/${path.basename(file)}`
+    } catch (e) {
+      return res.status(400).json({ error: 'upload failed' })
+    }
+  }
+  try {
+    const rs = await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4) returning id, code, zh, en, logo_url', [code, zh, en, logo_url || null])
+    res.json(rs.rows[0])
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+    throw e
+  }
+})
+
+router.delete('/banks/:id', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+  const id = Number(req.params.id)
+  const rs = await query('delete from banks where id=$1 returning id', [id])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  res.json({ ok: true })
+})
+
+// Reset to a default set
+router.post('/banks/reset-defaults', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+  const defaults = [
+    ['ICBC','中国工商银行','Industrial and Commercial Bank of China','/banks/icbc.svg'],
+    ['ABC','中国农业银行','Agricultural Bank of China','/banks/abc.svg'],
+    ['BOC','中国银行','Bank of China','/banks/boc.svg'],
+    ['CCB','中国建设银行','China Construction Bank','/banks/ccb.svg'],
+    ['BCM','交通银行','Bank of Communications','/banks/bcm.svg'],
+    ['MAYBANK','马银行','Maybank','/banks/maybank.svg'],
+    ['CIMB','联昌银行','CIMB Bank','/banks/cimb.svg'],
+    ['PUBLIC','大众银行','Public Bank','/banks/public.svg'],
+    ['RHB','兴业银行（马）','RHB Bank','/banks/rhb.svg'],
+    ['HONGLEONG','丰隆银行','Hong Leong Bank','/banks/hlb.svg']
+  ]
+  await query('truncate table banks restart identity')
+  const params = defaults.map((_, i) => `($${i*4+1},$${i*4+2},$${i*4+3},$${i*4+4})`).join(',')
+  await query(`insert into banks(code, zh, en, logo_url) values ${params}`, defaults.flat())
+  res.json({ ok: true, count: defaults.length })
 })
 
 router.get('/customers/template', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {

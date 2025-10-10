@@ -42,4 +42,10 @@ export const api = {
     exportCsv: () => request('/customers/export'),
     template: () => request('/customers/template')
   }
+  ,
+  // Banks
+  requestBanks: () => request('/banks'),
+  createBank: (data) => request('/banks', { method: 'POST', body: JSON.stringify(data) }),
+  deleteBank: (id) => request(`/banks/${id}`, { method: 'DELETE' }),
+  resetBanks: () => request('/banks/reset-defaults', { method: 'POST' })
 }

@@ -73,6 +73,15 @@ export async function ensureSchema() {
       submitter text,
       created_at timestamptz default now()
     );
+
+    create table if not exists banks (
+      id serial primary key,
+      code text unique not null,
+      zh text not null,
+      en text not null,
+      logo_url text,
+      created_at timestamptz default now()
+    );
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)

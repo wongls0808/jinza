@@ -25,31 +25,34 @@
   </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/api'
 
-const defaults = [
-  // 中国 Mainland China
-  { code: 'ICBC', zh: '中国工商银行', en: 'Industrial and Commercial Bank of China', logo: '/banks/icbc.svg' },
-  { code: 'ABC', zh: '中国农业银行', en: 'Agricultural Bank of China', logo: '/banks/abc.svg' },
-  { code: 'BOC', zh: '中国银行', en: 'Bank of China', logo: '/banks/boc.svg' },
-  { code: 'CCB', zh: '中国建设银行', en: 'China Construction Bank', logo: '/banks/ccb.svg' },
-  { code: 'BCM', zh: '交通银行', en: 'Bank of Communications', logo: '/banks/bcm.svg' },
-  // 马来西亚 Malaysia
-  { code: 'MAYBANK', zh: '马银行', en: 'Maybank', logo: '/banks/maybank.svg' },
-  { code: 'CIMB', zh: '联昌银行', en: 'CIMB Bank', logo: '/banks/cimb.svg' },
-  { code: 'PUBLIC', zh: '大众银行', en: 'Public Bank', logo: '/banks/public.svg' },
-  { code: 'RHB', zh: '兴业银行（马）', en: 'RHB Bank', logo: '/banks/rhb.svg' },
-  { code: 'HONGLEONG', zh: '丰隆银行', en: 'Hong Leong Bank', logo: '/banks/hlb.svg' }
-]
+const banks = ref([])
 
-const banks = ref(load() || defaults)
-
-function load() {
-  try { return JSON.parse(localStorage.getItem('banks_list') || 'null') } catch { return null }
+async function load() {
+  banks.value = await api.requestBanks()
 }
-function save() { localStorage.setItem('banks_list', JSON.stringify(banks.value)) }
-function remove(code) { banks.value = banks.value.filter(b => b.code !== code); save() }
-function reset() { banks.value = [...defaults]; save() }
+
+async function remove(code) {
+  try {
+    const b = banks.value.find(x => x.code === code)
+    if (!b) return
+    await ElMessageBox.confirm(`确认删除【${b.zh}】?`, '提示', { type: 'warning' })
+    await api.deleteBank(b.id)
+    await load()
+    ElMessage.success('已删除')
+  } catch {}
+}
+
+async function reset() {
+  await api.resetBanks()
+  await load()
+  ElMessage.success('已重置到默认列表')
+}
+
+onMounted(load)
 </script>
 
 <style scoped>
