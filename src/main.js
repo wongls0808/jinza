@@ -6,15 +6,18 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { i18n } from './i18n'
 import Tilt from './directives/tilt'
-import * as Icons from '@element-plus/icons-vue'
+import { User, UserFilled, Box, Document, Setting, Lock } from '@element-plus/icons-vue'
 
 const app = createApp(App)
 app.use(router)
 app.use(i18n)
 app.use(ElementPlus)
 app.directive('tilt', Tilt)
-// 全局注册 EL 图标
-Object.entries(Icons).forEach(([name, comp]) => {
-	app.component(name, comp)
-})
+// 按需注册用到的图标组件
+app.component('User', User)
+app.component('UserFilled', UserFilled)
+app.component('Box', Box)
+app.component('Document', Document)
+app.component('Setting', Setting)
+app.component('Lock', Lock)
 app.mount('#app')

@@ -1,6 +1,6 @@
 <template>
   <div class="app">
-    <el-header v-if="!isLogin" height="56px" class="topbar">
+    <el-header v-if="false" height="56px" class="topbar">
       <div class="brand" @click="$router.push('/')">{{ t('app.title') }}</div>
       <div class="right">
         <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">

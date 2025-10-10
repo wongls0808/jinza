@@ -1,24 +1,38 @@
 <template>
   <div class="page container">
     <div class="head">
-      <div>
-        <div class="title">客户管理</div>
-        <div class="sub">支持添加/删除/导入/导出；字段：勾选、序号、简称、客户名、税率、马币金额(期初)、人民币金额(期初)、提交人</div>
-      </div>
-      <div class="ops">
-        <el-input v-model.trim="q" placeholder="搜索 简称/客户名" size="small" style="width:220px" @keyup.enter.native="reload" />
-        <el-button size="small" @click="reload">搜索</el-button>
-        <el-button size="small" @click="downloadTemplate">模板下载</el-button>
-        <el-button type="primary" size="small" @click="openAdd">添加</el-button>
-        <el-button type="danger" :disabled="!selection.length" @click="removeSelected">删除</el-button>
-        <el-upload :show-file-list="false" accept=".csv" :on-change="onImport">
-          <el-button>导入</el-button>
-        </el-upload>
-        <el-button @click="onExport">导出</el-button>
-      </div>
+      <div class="title">客户管理</div>
     </div>
 
-    <el-card class="jelly">
+  <el-card class="jelly">
+      <template #header>
+        <div class="toolbar">
+          <el-input v-model.trim="q" placeholder="搜索 简称/客户名" size="small" style="width:220px" @keyup.enter.native="reload" />
+          <el-button size="small" @click="reload">搜索</el-button>
+          <div class="spacer"></div>
+          <el-dropdown>
+            <el-button size="small">导入</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item>
+                  <el-upload :show-file-list="false" accept=".csv" :on-change="onImportCsv" class="upload-inline">
+                    <span>CSV 导入（自动解析）</span>
+                  </el-upload>
+                </el-dropdown-item>
+                <el-dropdown-item>
+                  <el-upload :show-file-list="false" accept=".csv" :on-change="onImport">
+                    <span>CSV 导入（简单分割）</span>
+                  </el-upload>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button size="small" @click="onExport">导出</el-button>
+          <el-button size="small" @click="downloadTemplate">模板</el-button>
+          <el-button type="primary" size="small" @click="openAdd">添加</el-button>
+          <el-button type="danger" size="small" :disabled="!selection.length" @click="removeSelected">删除</el-button>
+        </div>
+      </template>
       <el-table
         ref="tableRef"
         :data="rows"
@@ -43,6 +57,18 @@
         </el-table-column>
         <el-table-column prop="submitter" label="提交人" width="140" />
       </el-table>
+      <div class="pager">
+        <el-pagination
+          background
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10,20,50,100]"
+          @size-change="onPageSizeChange"
+          @current-change="onPageChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -144,6 +170,24 @@ async function onImport(file) {
   }
 }
 
+async function onImportCsv(file) {
+  try {
+    const text = await file.raw.text()
+    const res = await fetch('/api/customers/import-csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: text
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.error || '导入失败')
+    await reload()
+    const errMsg = (data.errors && data.errors.length) ? `，有 ${data.errors.length} 行失败` : ''
+    ElMessage.success(`导入成功：${data.inserted} 条${errMsg}`)
+  } catch (e) {
+    ElMessage.error('导入失败：' + (e.message || ''))
+  }
+}
+
 async function onExport() {
   const csv = await api.customers.exportCsv()
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -177,14 +221,25 @@ function formatMoney(v) { return Number(v||0).toLocaleString(undefined, { minimu
 function formatPercent(v) { return Number(v||0).toFixed(2) }
 
 onMounted(reload)
+
+function onPageSizeChange(ps) {
+  pageSize.value = ps
+  page.value = 1
+  reload()
+}
+function onPageChange(p) {
+  page.value = p
+  reload()
+}
 </script>
 
 <style scoped>
 .page { padding: 8px; }
-.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 12px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 8px; }
 .title { font-size: 18px; font-weight: 700; }
-.sub { color: var(--el-text-color-secondary); font-size: 12px; }
-.ops { display: flex; gap: 10px; }
+.toolbar { display: flex; align-items: center; gap: 8px; }
+.spacer { flex: 1; }
 .form { display: grid; gap: 12px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pager { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
 </style>
