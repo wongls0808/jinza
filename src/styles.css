@@ -13,6 +13,9 @@ body {
 	--app-radius: 12px;
 	--app-gap: 16px;
 	--app-shadow-sm: 0 4px 12px rgba(0,0,0,.06);
+	--app-shadow-lg: 0 20px 50px rgba(0,0,0,.12);
+	--app-glass-bg: color-mix(in oklab, var(--el-color-primary) 6%, transparent);
+	--app-glass-border: color-mix(in oklab, var(--el-color-primary) 12%, var(--el-border-color));
 }
 
 /* Containers */
@@ -21,6 +24,23 @@ body {
 /* Utility */
 .card { background: var(--el-bg-color-overlay); border: 1px solid var(--el-border-color); border-radius: var(--app-radius); box-shadow: var(--app-shadow-sm); }
 .grid { display: grid; gap: var(--app-gap); }
+
+/* Jelly glass card */
+.jelly {
+	background: linear-gradient(180deg, var(--app-glass-bg), transparent), var(--el-bg-color-overlay);
+	backdrop-filter: saturate(140%) blur(16px);
+	-webkit-backdrop-filter: saturate(140%) blur(16px);
+	border: 1px solid var(--app-glass-border);
+	border-radius: calc(var(--app-radius) + 2px);
+	box-shadow: var(--app-shadow-lg);
+	transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.jelly:hover { box-shadow: 0 30px 70px rgba(0,0,0,.18); }
+.jelly-pop { animation: jellyPop .6s ease both; }
+@keyframes jellyPop { 0% { transform: scale(.98); } 60% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+/* Motion helpers */
+.will-anim { will-change: transform, box-shadow, background; }
 
 /* Legacy form/button helpers (rarely used now that we use Element Plus) */
 input, select, textarea {

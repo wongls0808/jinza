@@ -4,7 +4,7 @@
       <div class="brand">{{ t('app.title') }}</div>
       <div class="sub">{{ t('login.title') }}</div>
     </div>
-    <el-card class="login-card card">
+  <el-card class="login-card card jelly" v-tilt>
       <el-form @submit.prevent class="login-form" label-position="top">
         <el-form-item :label="t('login.username')">
           <el-input v-model.trim="form.username" :placeholder="t('login.username')">

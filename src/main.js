@@ -5,9 +5,11 @@ import './styles.css'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { i18n } from './i18n'
+import Tilt from './directives/tilt'
 
-createApp(App)
-	.use(router)
-	.use(i18n)
-	.use(ElementPlus)
-	.mount('#app')
+const app = createApp(App)
+app.use(router)
+app.use(i18n)
+app.use(ElementPlus)
+app.directive('tilt', Tilt)
+app.mount('#app')
