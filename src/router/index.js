@@ -36,13 +36,31 @@ const readAuth = () => {
   } catch { return { token: null, perms: [] } }
 }
 
+// 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
+function firstAllowed(perms) {
+  const order = ['home','users','customers','products','invoices','settings']
+  for (const name of order) {
+    const r = routes.find(r => r.name === name)
+    if (!r) continue
+    const need = r.meta?.perm
+    if (!need || perms.includes(need)) return { name }
+  }
+  // 若没有任何匹配，回到登录页
+  return { name: 'login' }
+}
+
 router.beforeEach((to, from, next) => {
   if (to.meta.public) return next()
   const { token, perms, must_change_password } = readAuth()
   if (!token) return next({ name: 'login', query: { redirect: to.fullPath } })
   if (must_change_password && to.name !== 'change-password') return next({ name: 'change-password' })
   const need = to.meta.perm
-  if (need && !perms.includes(need)) return next({ name: 'home' })
+  if (need && !perms.includes(need)) {
+    const target = firstAllowed(perms)
+    // 避免跳转到同名路由导致循环
+    if (target.name === to.name) return next()
+    return next(target)
+  }
   next()
 })
 
