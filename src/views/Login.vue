@@ -1,11 +1,15 @@
 <template>
   <div class="login-page">
-    <div class="hero">
-      <div class="brand">{{ t('app.title') }}</div>
-      <div class="sub">{{ t('login.title') }}</div>
-    </div>
-  <el-card class="login-card card jelly" v-tilt>
-      <el-form @submit.prevent class="login-form" label-position="top">
+    <div class="layout">
+      <div class="left">
+        <img class="illus" src="/illustrations/login-hero.svg" alt="login-illustration" />
+        <div class="hero">
+          <div class="brand">{{ t('app.title') }}</div>
+          <div class="sub">{{ t('login.title') }}</div>
+        </div>
+      </div>
+      <el-card class="login-card card jelly" v-tilt="tiltOpts">
+        <el-form @submit.prevent class="login-form" label-position="top">
         <el-form-item :label="t('login.username')">
           <el-input v-model.trim="form.username" :placeholder="t('login.username')">
             <template #prefix>👤</template>
@@ -22,8 +26,9 @@
           <el-button type="primary" :loading="submitting" @click="onSubmit">{{ t('login.submit') }}</el-button>
         </div>
         <div class="hint">使用在 Railway/本地数据库中的用户进行登录</div>
-      </el-form>
-    </el-card>
+        </el-form>
+      </el-card>
+    </div>
   </div>
 </template>
 
@@ -40,6 +45,13 @@ const route = useRoute()
 
 const form = ref({ username: '', password: '' })
 const remember = ref(true)
+const tiltOpts = ref(matchMedia('(max-width: 640px)').matches ? { max: 0, scale: 1 } : { max: 12, scale: 1.02 })
+// 监听窗口尺寸变化，移动端禁用 3D 倾斜
+if (typeof window !== 'undefined') {
+  const m = matchMedia('(max-width: 640px)')
+  const update = () => (tiltOpts.value = m.matches ? { max: 0, scale: 1 } : { max: 12, scale: 1.02 })
+  m.addEventListener?.('change', update)
+}
 const submitting = ref(false)
 const { t } = useI18n()
 
@@ -78,19 +90,21 @@ const onSubmit = async () => {
 </script>
 
 <style scoped>
-.login-page {
-  min-height: calc(100vh - 56px);
-  display: grid;
-  place-items: center;
-  background: radial-gradient(1200px 600px at 70% -200px, color-mix(in oklab, var(--el-color-primary) 16%, transparent), transparent), var(--el-bg-color-page);
-  padding: 32px 16px;
-}
-.hero { text-align: center; margin-bottom: 14px; }
+.login-page { min-height: calc(100vh - 56px); background: radial-gradient(1200px 600px at 70% -200px, color-mix(in oklab, var(--el-color-primary) 16%, transparent), transparent), var(--el-bg-color-page); padding: 24px 16px; }
+.layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: center; max-width: 1100px; margin: 0 auto; }
+.left { display: grid; justify-items: center; gap: 10px; }
+.illus { width: 100%; max-width: 560px; height: auto; }
+.hero { text-align: center; }
 .brand { font-size: 22px; font-weight: 700; letter-spacing: .2px; }
 .sub { color: var(--el-text-color-secondary); font-size: 13px; margin-top: 2px; }
-.login-card { width: 420px; }
+.login-card { width: 100%; max-width: 420px; }
 .login-form { display: grid; gap: 14px; }
 .hint { color: var(--el-text-color-secondary); font-size: 12px; text-align: center; margin-top: 8px; }
 .actions { display: flex; align-items: center; gap: 10px; }
 .spacer { flex: 1; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .illus { max-width: 420px; }
+}
 </style>
