@@ -65,17 +65,29 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="addDlg.visible" title="添加客户" width="520px">
-      <div class="form">
-        <el-input v-model.trim="addDlg.form.abbr" placeholder="简称" />
-        <el-input v-model.trim="addDlg.form.name" placeholder="客户名" />
-        <el-input v-model.number="addDlg.form.tax_rate" placeholder="税率 %" />
+    <el-dialog v-model="addDlg.visible" title="添加客户" width="560px">
+      <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="90px" class="form">
+        <el-form-item label="简称">
+          <el-input v-model.trim="addDlg.form.abbr" placeholder="例如：HZ" />
+        </el-form-item>
+        <el-form-item label="客户名" prop="name">
+          <el-input v-model.trim="addDlg.form.name" placeholder="请输入客户全称" />
+        </el-form-item>
+        <el-form-item label="税率(%)" prop="tax_rate">
+          <el-input-number v-model="addDlg.form.tax_rate" :precision="2" :min="0" :max="100" :step="1" controls-position="right" placeholder="0-100" style="width:100%" />
+        </el-form-item>
         <div class="grid2">
-          <el-input v-model.number="addDlg.form.opening_myr" placeholder="马币金额(期初)" />
-          <el-input v-model.number="addDlg.form.opening_cny" placeholder="人民币金额(期初)" />
+          <el-form-item label="马币期初">
+            <el-input-number v-model="addDlg.form.opening_myr" :precision="2" :min="0" :step="100" controls-position="right" placeholder="0.00" style="width:100%" />
+          </el-form-item>
+          <el-form-item label="人民币期初">
+            <el-input-number v-model="addDlg.form.opening_cny" :precision="2" :min="0" :step="100" controls-position="right" placeholder="0.00" style="width:100%" />
+          </el-form-item>
         </div>
-        <el-input v-model.trim="addDlg.form.submitter" placeholder="提交人" />
-      </div>
+        <el-form-item label="提交人">
+          <el-input v-model.trim="addDlg.form.submitter" placeholder="如：张三" />
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="addDlg.visible=false">取消</el-button>
         <el-button type="primary" :loading="addDlg.loading" @click="doAdd">确定</el-button>
@@ -99,7 +111,22 @@ const pageSize = ref(10)
 const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
-const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: 0, opening_myr: 0, opening_cny: 0, submitter: '' } })
+const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null, submitter: '' } })
+const addFormRef = ref()
+const addRules = {
+  name: [{ required: true, message: '请填写客户名', trigger: 'blur' }],
+  tax_rate: [
+    {
+      validator: (_, v, cb) => {
+        if (v === null || v === undefined || v === '') return cb()
+        const n = Number(v)
+        if (isNaN(n) || n < 0 || n > 100) return cb(new Error('税率应在 0-100 之间'))
+        cb()
+      },
+      trigger: 'change'
+    }
+  ]
+}
 const filePicker = ref(null)
 const importMode = ref('auto')
 
@@ -115,14 +142,20 @@ async function reload() {
 }
 
 function openAdd() {
-  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: 0, opening_myr: 0, opening_cny: 0, submitter: '' } }
+  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null, submitter: '' } }
 }
 async function doAdd() {
   addDlg.value.loading = true
   try {
-    const f = addDlg.value.form
-    if (!f.name) return ElMessage.warning('请填写客户名')
-    if (f.tax_rate < 0 || f.tax_rate > 100) return ElMessage.warning('税率应在 0-100 之间')
+    const f = { ...addDlg.value.form }
+    // 先进行表单校验
+    if (addFormRef.value) {
+      await addFormRef.value.validate()
+    }
+    // 将空值规范化为数字 0 再提交
+    f.tax_rate = f.tax_rate == null || f.tax_rate === '' ? 0 : f.tax_rate
+    f.opening_myr = f.opening_myr == null || f.opening_myr === '' ? 0 : f.opening_myr
+    f.opening_cny = f.opening_cny == null || f.opening_cny === '' ? 0 : f.opening_cny
     await api.customers.create(f)
     addDlg.value.visible = false
     await reload()
