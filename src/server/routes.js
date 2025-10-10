@@ -159,13 +159,54 @@ router.delete('/customers', authMiddleware(true), requirePerm('view_customers'),
 router.post('/customers/import', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const { rows } = req.body || {}
   if (!Array.isArray(rows)) return res.status(400).json({ error: 'invalid rows' })
-  if (!rows.length) return res.json({ inserted: 0 })
-  const values = rows.map(r => [r.abbr||null, r.name, Number(r.tax_rate)||0, Number(r.opening_myr)||0, Number(r.opening_cny)||0, r.submitter||null])
-  const params = values.map((_, i) => `($${i*6+1},$${i*6+2},$${i*6+3},$${i*6+4},$${i*6+5},$${i*6+6})`).join(',')
-  const flat = values.flat()
-  const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
-  await query(sql, flat)
-  res.json({ inserted: rows.length })
+  if (!rows.length) return res.json({ inserted: 0, errors: [] })
+
+  // Validate & normalize
+  const valids = []
+  const errors = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || {}
+    const obj = {
+      abbr: (r.abbr ?? '').toString().trim() || null,
+      name: ((r.name ?? '') + '').trim(),
+      tax_rate: Number(r.tax_rate ?? 0),
+      opening_myr: Number(r.opening_myr ?? 0),
+      opening_cny: Number(r.opening_cny ?? 0),
+      submitter: (r.submitter ?? '').toString().trim() || null
+    }
+    if (!obj.name) {
+      errors.push({ index: i, reason: '缺少客户名' })
+      continue
+    }
+    if (isNaN(obj.tax_rate) || obj.tax_rate < 0 || obj.tax_rate > 100) {
+      errors.push({ index: i, reason: '税率应在 0-100 之间' })
+      continue
+    }
+    // Number() 可能为 NaN
+    obj.opening_myr = isNaN(obj.opening_myr) ? 0 : obj.opening_myr
+    obj.opening_cny = isNaN(obj.opening_cny) ? 0 : obj.opening_cny
+    valids.push(obj)
+  }
+
+  let inserted = 0
+  const chunkSize = 500
+  for (let i = 0; i < valids.length; i += chunkSize) {
+    const chunk = valids.slice(i, i + chunkSize)
+    if (!chunk.length) continue
+    const values = chunk.map(r => [r.abbr, r.name, r.tax_rate, r.opening_myr, r.opening_cny, r.submitter])
+    const params = values.map((_, idx) => `($${idx*6+1},$${idx*6+2},$${idx*6+3},$${idx*6+4},$${idx*6+5},$${idx*6+6})`).join(',')
+    const flat = values.flat()
+    const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
+    try {
+      await query(sql, flat)
+      inserted += chunk.length
+    } catch (e) {
+      // 捕获批次插入错误，尽量返回已插入数量
+      errors.push({ index: i, reason: '批次插入失败', detail: e.message })
+    }
+  }
+
+  res.json({ inserted, errors })
 })
 
 // Import customers via raw CSV content

@@ -196,11 +196,26 @@ async function onImportCsv(file) {
 
 async function batchImport(allRows, chunkSize = 300) {
   let inserted = 0
+  async function importChunk(chunk) {
+    if (!chunk.length) return 0
+    try {
+      await api.customers.importRows(chunk)
+      return chunk.length
+    } catch (e) {
+      // 当后端或网络超时时，自动降批量重试；最小批量 50 条
+      if (chunk.length <= 50) throw e
+      const mid = Math.floor(chunk.length / 2)
+      const left = chunk.slice(0, mid)
+      const right = chunk.slice(mid)
+      let ok = 0
+      ok += await importChunk(left)
+      ok += await importChunk(right)
+      return ok
+    }
+  }
   for (let i = 0; i < allRows.length; i += chunkSize) {
     const chunk = allRows.slice(i, i + chunkSize)
-    if (!chunk.length) continue
-    await api.customers.importRows(chunk)
-    inserted += chunk.length
+    inserted += await importChunk(chunk)
   }
   return inserted
 }
