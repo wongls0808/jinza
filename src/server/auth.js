@@ -62,6 +62,17 @@ export async function ensureSchema() {
       permission_id int references permissions(id) on delete cascade,
       primary key(user_id, permission_id)
     );
+
+    create table if not exists customers (
+      id serial primary key,
+      abbr text,
+      name text not null,
+      tax_rate numeric default 0,
+      opening_myr numeric default 0,
+      opening_cny numeric default 0,
+      submitter text,
+      created_at timestamptz default now()
+    );
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)

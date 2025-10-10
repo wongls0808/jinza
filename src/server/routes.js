@@ -130,3 +130,56 @@ router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
   }
   res.json({ ok: true })
 })
+
+// Customers
+router.get('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
+  const offset = (Number(page) - 1) * Number(pageSize)
+  const term = `%${q}%`
+  const total = await query('select count(*) from customers where name ilike $1 or coalesce(abbr,"") ilike $1', [term])
+  const rows = await query(`select * from customers where name ilike $1 or coalesce(abbr,"") ilike $1 order by ${sort} ${order === 'asc' ? 'asc' : 'desc'} offset $2 limit $3`, [term, offset, Number(pageSize)])
+  res.json({ total: Number(total.rows[0].count), items: rows.rows })
+})
+
+router.post('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const { abbr, name, tax_rate = 0, opening_myr = 0, opening_cny = 0, submitter } = req.body || {}
+  if (!name) return res.status(400).json({ error: '客户名必填' })
+  const nr = await query('insert into customers(abbr, name, tax_rate, opening_myr, opening_cny, submitter) values($1,$2,$3,$4,$5,$6) returning *', [abbr || null, name, Number(tax_rate)||0, Number(opening_myr)||0, Number(opening_cny)||0, submitter || null])
+  res.json(nr.rows[0])
+})
+
+router.delete('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const { ids } = req.body || {}
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
+  await query('delete from customers where id = any($1::int[])', [ids])
+  res.json({ ok: true })
+})
+
+router.post('/customers/import', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const { rows } = req.body || {}
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'invalid rows' })
+  if (!rows.length) return res.json({ inserted: 0 })
+  const values = rows.map(r => [r.abbr||null, r.name, Number(r.tax_rate)||0, Number(r.opening_myr)||0, Number(r.opening_cny)||0, r.submitter||null])
+  const params = values.map((_, i) => `($${i*6+1},$${i*6+2},$${i*6+3},$${i*6+4},$${i*6+5},$${i*6+6})`).join(',')
+  const flat = values.flat()
+  const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
+  await query(sql, flat)
+  res.json({ inserted: rows.length })
+})
+
+router.get('/customers/export', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const rs = await query('select abbr,name,tax_rate,opening_myr,opening_cny,submitter from customers order by id desc')
+  const lines = rs.rows.map(r => [r.abbr||'', r.name||'', r.tax_rate||0, r.opening_myr||0, r.opening_cny||0, r.submitter||''].join(','))
+  const csv = lines.join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"')
+  res.send(csv)
+})
+
+router.get('/customers/template', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const header = 'abbr,name,tax_rate,opening_myr,opening_cny,submitter' // 简称,客户名,税率,马币期初,人民币期初,提交人
+  const sample = ['ABC,深圳市某某公司,6,1000,2000,王五', 'DEF,广州某某集团,0,0,3500,李四'].join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="customers_template.csv"')
+  res.send([header, sample].join('\n'))
+})

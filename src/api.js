@@ -32,5 +32,13 @@ export const api = {
   perms: {
     list: () => request('/permissions')
   },
-  changePassword: (old_password, new_password) => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) })
+  changePassword: (old_password, new_password) => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) }),
+  customers: {
+    list: (params={}) => request(`/customers?${new URLSearchParams(params).toString()}`),
+    create: (data) => request('/customers', { method: 'POST', body: JSON.stringify(data) }),
+    removeBatch: (ids) => request('/customers', { method: 'DELETE', body: JSON.stringify({ ids }) }),
+    importRows: (rows) => request('/customers/import', { method: 'POST', body: JSON.stringify({ rows }) }),
+    exportCsv: () => request('/customers/export'),
+    template: () => request('/customers/template')
+  }
 }
