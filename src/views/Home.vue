@@ -6,27 +6,27 @@
     </div>
     <div class="grid">
   <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
-        <div class="icon">👤</div>
+  <div class="icon"><User /></div>
         <div class="name">{{ t('home.users') }}</div>
         <div class="desc">{{ t('home.usersDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
-        <div class="icon">👥</div>
+  <div class="icon"><UserFilled /></div>
         <div class="name">{{ t('home.customers') }}</div>
         <div class="desc">{{ t('home.customersDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_products')" class="home-card jelly" v-tilt @click="go('/products')">
-        <div class="icon">📦</div>
+  <div class="icon"><Box /></div>
         <div class="name">{{ t('home.products') }}</div>
         <div class="desc">{{ t('home.productsDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_invoices')" class="home-card jelly" v-tilt @click="go('/invoices')">
-        <div class="icon">🧾</div>
+  <div class="icon"><Document /></div>
         <div class="name">{{ t('home.invoices') }}</div>
         <div class="desc">{{ t('home.invoicesDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
-        <div class="icon">⚙️</div>
+  <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>
         <div class="desc">{{ t('home.settingsDesc') }}</div>
       </el-card>

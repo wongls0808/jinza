@@ -12,12 +12,12 @@
         <el-form @submit.prevent class="login-form" label-position="top">
         <el-form-item :label="t('login.username')">
           <el-input v-model.trim="form.username" :placeholder="t('login.username')">
-            <template #prefix>👤</template>
+            <template #prefix><User /></template>
           </el-input>
         </el-form-item>
         <el-form-item :label="t('login.password')">
           <el-input v-model.trim="form.password" type="password" show-password :placeholder="t('login.password')">
-            <template #prefix>🔒</template>
+            <template #prefix><Lock /></template>
           </el-input>
         </el-form-item>
         <div class="actions">

@@ -1,6 +1,6 @@
 <template>
   <div class="app">
-    <el-header height="56px" class="topbar">
+    <el-header v-if="!isLogin" height="56px" class="topbar">
       <div class="brand" @click="$router.push('/')">{{ t('app.title') }}</div>
       <div class="right">
         <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
@@ -11,7 +11,7 @@
         <el-button v-if="authed" size="small" type="danger" @click="logout">{{ t('app.logout') }}</el-button>
       </div>
     </el-header>
-    <el-main class="view">
+    <el-main :class="['view', { 'view--full': isLogin }]">
       <router-view />
     </el-main>
   </div>
@@ -20,12 +20,13 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
+const route = useRoute()
 const { state, logout: doLogout } = useAuth()
 const authed = computed(() => !!state.token)
 const logout = () => { doLogout(); router.replace('/login') }
@@ -37,6 +38,7 @@ function onLangChange(v) { localStorage.setItem('lang', v); locale.value = v }
 function onThemeChange(v) { set(!!v) }
 watch(isDark, (v) => dark.value = v)
 watch(locale, (v) => lang.value = v)
+const isLogin = computed(() => route.name === 'login')
 </script>
 
 <style scoped>
@@ -53,4 +55,5 @@ watch(locale, (v) => lang.value = v)
 .brand { font-weight: 700; letter-spacing: .2px; cursor: pointer; }
 .right { display: flex; gap: 12px; align-items: center; }
 .view { padding: 20px; }
+.view.view--full { padding: 0; }
 </style>
