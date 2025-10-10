@@ -38,6 +38,7 @@ export const api = {
     create: (data) => request('/customers', { method: 'POST', body: JSON.stringify(data) }),
     removeBatch: (ids) => request('/customers', { method: 'DELETE', body: JSON.stringify({ ids }) }),
     importRows: (rows) => request('/customers/import', { method: 'POST', body: JSON.stringify({ rows }) }),
+    importCsv: (text) => request('/customers/import-csv', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
     exportCsv: () => request('/customers/export'),
     template: () => request('/customers/template')
   }

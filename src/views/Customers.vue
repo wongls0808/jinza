@@ -173,13 +173,7 @@ async function onImport(file) {
 async function onImportCsv(file) {
   try {
     const text = await file.raw.text()
-    const res = await fetch('/api/customers/import-csv', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: text
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.error || '导入失败')
+    const data = await api.customers.importCsv(text)
     await reload()
     const errMsg = (data.errors && data.errors.length) ? `，有 ${data.errors.length} 行失败` : ''
     ElMessage.success(`导入成功：${data.inserted} 条${errMsg}`)
@@ -189,25 +183,37 @@ async function onImportCsv(file) {
 }
 
 async function onExport() {
-  const csv = await api.customers.exportCsv()
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'customers.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const csv = await api.customers.exportCsv()
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'customers.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败：' + (e.message || ''))
+  }
 }
 
 async function downloadTemplate() {
-  const csv = await api.customers.template()
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'customers_template.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const csv = await api.customers.template()
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'customers_template.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('下载模板失败：' + (e.message || ''))
+  }
 }
 
 function onSort({ prop, order: ord }) {
