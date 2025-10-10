@@ -10,6 +10,7 @@ const Customers = () => import('@/views/Customers.vue')
 const Products = () => import('@/views/Products.vue')
 const Invoices = () => import('@/views/Invoices.vue')
 const Settings = () => import('@/views/Settings.vue')
+const NoAccess = () => import('@/views/NoAccess.vue')
 
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -20,6 +21,7 @@ export const routes = [
   { path: '/products', name: 'products', component: Products, meta: { perm: 'view_products' } },
   { path: '/invoices', name: 'invoices', component: Invoices, meta: { perm: 'view_invoices' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
+  { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
 
 const router = createRouter({
@@ -46,7 +48,7 @@ function firstAllowed(perms) {
     if (!need || perms.includes(need)) return { name }
   }
   // 若没有任何匹配，回到登录页
-  return { name: 'login' }
+  return { name: 'no-access' }
 }
 
 router.beforeEach((to, from, next) => {

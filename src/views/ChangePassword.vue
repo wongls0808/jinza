@@ -52,6 +52,15 @@ async function submit() {
   submitting.value = true
   try {
   await api.changePassword(oldPassword.value, newPassword.value)
+    // 将本地 must_change_password 状态清除，避免后续守卫误判
+    try {
+      const raw = localStorage.getItem('auth_user')
+      if (raw) {
+        const d = JSON.parse(raw)
+        d.must_change_password = false
+        localStorage.setItem('auth_user', JSON.stringify(d))
+      }
+    } catch {}
     alert('密码已更新，请重新登录')
     localStorage.removeItem('auth_user')
     router.replace('/login')
