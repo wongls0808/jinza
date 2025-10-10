@@ -15,15 +15,10 @@
         <div class="name">{{ t('home.customers') }}</div>
         <div class="desc">{{ t('home.customersDesc') }}</div>
       </el-card>
-  <el-card v-if="has('view_products')" class="home-card jelly" v-tilt @click="go('/products')">
-  <div class="icon"><Box /></div>
-        <div class="name">{{ t('home.products') }}</div>
-        <div class="desc">{{ t('home.productsDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_invoices')" class="home-card jelly" v-tilt @click="go('/invoices')">
-  <div class="icon"><Document /></div>
-        <div class="name">{{ t('home.invoices') }}</div>
-        <div class="desc">{{ t('home.invoicesDesc') }}</div>
+  <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
+  <div class="icon"><OfficeBuilding /></div>
+        <div class="name">银行列表</div>
+        <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
       </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>

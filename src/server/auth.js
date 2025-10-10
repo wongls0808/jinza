@@ -85,8 +85,7 @@ export async function seedInitialAdmin() {
     { code: 'view_dashboard', name: '查看首页' },
     { code: 'manage_users', name: '用户管理' },
     { code: 'view_customers', name: '客户模块' },
-    { code: 'view_products', name: '产品模块' },
-    { code: 'view_invoices', name: '发票模块' },
+    { code: 'view_banks', name: '银行列表' },
     { code: 'view_settings', name: '系统设置' }
   ]
   for (const p of corePerms) {

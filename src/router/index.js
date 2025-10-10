@@ -7,8 +7,7 @@ const ChangePassword = () => import('@/views/ChangePassword.vue')
 
 const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
-const Products = () => import('@/views/Products.vue')
-const Invoices = () => import('@/views/Invoices.vue')
+const Banks = () => import('@/views/Banks.vue')
 const Settings = () => import('@/views/Settings.vue')
 const NoAccess = () => import('@/views/NoAccess.vue')
 
@@ -18,8 +17,7 @@ export const routes = [
   { path: '/', name: 'home', component: Home, meta: { perm: 'view_dashboard' } },
   { path: '/users', name: 'users', component: UserManagement, meta: { perm: 'manage_users' } },
   { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
-  { path: '/products', name: 'products', component: Products, meta: { perm: 'view_products' } },
-  { path: '/invoices', name: 'invoices', component: Invoices, meta: { perm: 'view_invoices' } },
+  { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
@@ -40,7 +38,7 @@ const readAuth = () => {
 
 // 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
 function firstAllowed(perms) {
-  const order = ['home','users','customers','products','invoices','settings']
+  const order = ['home','users','customers','banks','settings']
   for (const name of order) {
     const r = routes.find(r => r.name === name)
     if (!r) continue

@@ -6,7 +6,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { i18n } from './i18n'
 import Tilt from './directives/tilt'
-import { User, UserFilled, Box, Document, Setting, Lock } from '@element-plus/icons-vue'
+import { User, UserFilled, Box, Document, Setting, Lock, OfficeBuilding } from '@element-plus/icons-vue'
 
 const app = createApp(App)
 app.use(router)
@@ -20,4 +20,5 @@ app.component('Box', Box)
 app.component('Document', Document)
 app.component('Setting', Setting)
 app.component('Lock', Lock)
+app.component('OfficeBuilding', OfficeBuilding)
 app.mount('#app')
