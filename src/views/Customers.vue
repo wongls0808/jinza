@@ -14,19 +14,12 @@
             <el-button size="small">导入</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>
-                  <el-upload :show-file-list="false" accept=".csv" :on-change="onImportCsv" class="upload-inline">
-                    <span>CSV 导入（自动解析）</span>
-                  </el-upload>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-upload :show-file-list="false" accept=".csv" :on-change="onImport">
-                    <span>CSV 导入（简单分割）</span>
-                  </el-upload>
-                </el-dropdown-item>
+                <el-dropdown-item @click="pickImport('auto')">CSV 导入（自动解析）</el-dropdown-item>
+                <el-dropdown-item @click="pickImport('simple')">CSV 导入（简单分割）</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+          <input ref="filePicker" type="file" accept=".csv" style="display:none" @change="onFilePicked" />
           <el-button size="small" @click="onExport">导出</el-button>
           <el-button size="small" @click="downloadTemplate">模板</el-button>
           <el-button type="primary" size="small" @click="openAdd">添加</el-button>
@@ -107,6 +100,13 @@ const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
 const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: 0, opening_myr: 0, opening_cny: 0, submitter: '' } })
+const filePicker = ref(null)
+const importMode = ref('auto')
+
+function pickImport(mode) {
+  importMode.value = mode
+  filePicker.value && filePicker.value.click()
+}
 
 async function reload() {
   const data = await api.customers.list({ q: q.value, page: page.value, pageSize: pageSize.value, sort: sort.value, order: order.value })
@@ -142,10 +142,14 @@ async function removeSelected() {
 
 function parseCSV(text) {
   // 简单 CSV 解析（逗号分隔，不处理转义与换行）
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const noBom = text.replace(/^\ufeff/, '')
+  const lines = noBom.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
   const out = []
-  for (const line of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx]
     const [abbr, name, tax_rate, opening_myr, opening_cny, submitter] = line.split(',')
+    // 跳过表头：abbr,name, ...
+    if (idx === 0 && String(abbr).toLowerCase() === 'abbr') continue
     if (!abbr && !name) continue
     out.push({
       abbr: abbr || '',
@@ -172,7 +176,7 @@ function toNumber(v) {
 
 async function onImport(file) {
   try {
-    const text = await file.raw.text()
+    const text = file.raw ? await file.raw.text() : await file.text()
     const data = parseCSV(text)
     const inserted = await batchImport(data)
     await reload()
@@ -186,7 +190,7 @@ async function onImport(file) {
 
 async function onImportCsv(file) {
   try {
-    const text = await file.raw.text()
+    const text = file.raw ? await file.raw.text() : await file.text()
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
     if (parsed.errors && parsed.errors.length) {
       console.warn('CSV parse errors:', parsed.errors)
@@ -195,8 +199,8 @@ async function onImportCsv(file) {
       abbr: (r.abbr ?? r.ABBR ?? r.Abbr ?? '').toString().trim(),
       name: (r.name ?? r.NAME ?? r.Name ?? '').toString().trim(),
       tax_rate: toNumber(r.tax_rate ?? r.TAX_RATE ?? r.Tax_rate ?? 0),
-      opening_myr: toNumber(r.opening_myr ?? r.MYR ?? r.opening_MYR ?? 0),
-      opening_cny: toNumber(r.opening_cny ?? r.CNY ?? r.opening_CNY ?? 0),
+      opening_myr: toNumber(r.opening_myr ?? r.opening_m ?? r.MYR ?? r.opening_MYR ?? 0),
+      opening_cny: toNumber(r.opening_cny ?? r.opening_c ?? r.CNY ?? r.RMB ?? r.opening_CNY ?? 0),
       submitter: (r.submitter ?? r.SUBMITTER ?? r.Submitter ?? '').toString().trim()
     })).filter(r => r.name)
     const inserted = await batchImport(rows)
@@ -206,6 +210,18 @@ async function onImportCsv(file) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
     ElMessage.error('导入失败：' + (msg || ''))
+  }
+}
+
+async function onFilePicked(e) {
+  const file = e.target.files && e.target.files[0]
+  if (!file) return
+  try {
+    if (importMode.value === 'auto') await onImportCsv(file)
+    else await onImport(file)
+  } finally {
+    // 允许选择同一个文件时也能再次触发 change
+    e.target.value = ''
   }
 }
 
