@@ -401,6 +401,46 @@ router.delete('/banks/:id', authMiddleware(true), requirePerm('view_banks'), asy
   res.json({ ok: true })
 })
 
+router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
+  const id = Number(req.params.id)
+  let { code, zh, en, logo_url, logo_data_url } = req.body || {}
+  // Optional upload
+  if (logo_data_url && /^data:/i.test(logo_data_url)) {
+    try {
+      const m = /^data:(.+);base64,(.*)$/i.exec(logo_data_url)
+      if (!m) return res.status(400).json({ error: 'invalid data url' })
+      const mime = m[1]
+      const buf = Buffer.from(m[2], 'base64')
+      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
+      const uploads = path.join(__dirname, '../../uploads')
+      if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
+      const file = path.join(uploads, `bank_${code || 'id'+id}.${ext}`)
+      fs.writeFileSync(file, buf)
+      logo_url = `/uploads/${path.basename(file)}`
+    } catch (e) {
+      return res.status(400).json({ error: 'upload failed' })
+    }
+  }
+  // Build dynamic update
+  const fields = []
+  const values = []
+  let idx = 1
+  if (code) { fields.push(`code=$${idx++}`); values.push(code) }
+  if (zh) { fields.push(`zh=$${idx++}`); values.push(zh) }
+  if (en) { fields.push(`en=$${idx++}`); values.push(en) }
+  if (logo_url) { fields.push(`logo_url=$${idx++}`); values.push(logo_url) }
+  if (!fields.length) return res.status(400).json({ error: 'no changes' })
+  values.push(id)
+  try {
+    const rs = await query(`update banks set ${fields.join(', ')} where id=$${idx} returning id, code, zh, en, logo_url`, values)
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+    res.json(rs.rows[0])
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+    throw e
+  }
+})
+
 // Reset to a default set
 router.post('/banks/reset-defaults', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
   const defaults = [

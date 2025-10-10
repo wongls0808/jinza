@@ -4,6 +4,7 @@
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
+          <el-button size="small" @click="openAdd">新增</el-button>
           <div class="spacer"></div>
           <el-button type="primary" size="small" @click="reset">重置为默认</el-button>
         </div>
@@ -17,10 +18,39 @@
             <div class="zh">{{ b.zh }}</div>
             <div class="en">{{ b.en }}</div>
           </div>
-          <el-button type="danger" link @click="remove(b.code)">删除</el-button>
+          <div class="ops">
+            <el-button link @click="openEdit(b)">替换Logo</el-button>
+            <el-button type="danger" link @click="remove(b.code)">删除</el-button>
+          </div>
         </div>
       </div>
     </el-card>
+
+    <!-- 新增/编辑银行 -->
+    <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? '新增银行' : '替换 Logo'" width="520px">
+      <el-form :model="dlg.form" label-width="90px" class="form">
+        <el-form-item label="代码" v-if="dlg.mode==='add'">
+          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" />
+        </el-form-item>
+        <el-form-item label="中文名" v-if="dlg.mode==='add'">
+          <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" />
+        </el-form-item>
+        <el-form-item label="英文名" v-if="dlg.mode==='add'">
+          <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" />
+        </el-form-item>
+        <el-form-item label="Logo URL">
+          <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" />
+        </el-form-item>
+        <el-form-item label="或 上传文件">
+          <input type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
+          <div class="hint">若选择文件，将优先生成为 data URL 上传并覆盖 Logo URL</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dlg.visible=false">取消</el-button>
+        <el-button type="primary" :loading="dlg.loading" @click="submit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
   </template>
 
@@ -30,6 +60,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
 
 const banks = ref([])
+const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_url: '', logo_data_url: '' } })
 
 async function load() {
   banks.value = await api.requestBanks()
@@ -52,6 +83,52 @@ async function reset() {
   ElMessage.success('已重置到默认列表')
 }
 
+function openAdd() {
+  dlg.value = { visible: true, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_url: '', logo_data_url: '' } }
+}
+function openEdit(b) {
+  dlg.value = { visible: true, mode: 'edit', loading: false, form: { id: b.id, code: b.code, zh: b.zh, en: b.en, logo_url: b.logo_url || '', logo_data_url: '' } }
+}
+
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(fr.result)
+    fr.onerror = reject
+    fr.readAsDataURL(file)
+  })
+}
+async function pickFile(e) {
+  const f = e.target.files && e.target.files[0]
+  if (!f) return
+  dlg.value.form.logo_data_url = await fileToDataUrl(f)
+}
+
+async function submit() {
+  dlg.value.loading = true
+  try {
+    const f = dlg.value.form
+    if (dlg.value.mode === 'add') {
+      if (!f.code || !f.zh || !f.en) { ElMessage.warning('请填写代码/中文名/英文名'); return }
+      await api.createBank({ code: f.code.trim(), zh: f.zh.trim(), en: f.en.trim(), logo_url: f.logo_url?.trim() || undefined, logo_data_url: f.logo_data_url || undefined })
+    } else {
+      const body = {}
+      if (f.logo_data_url) body.logo_data_url = f.logo_data_url
+      if (f.logo_url && !f.logo_data_url) body.logo_url = f.logo_url
+      await api.request(`/banks/${f.id}`, { method: 'PUT', body: JSON.stringify(body) })
+    }
+    dlg.value.visible = false
+    await load()
+    ElMessage.success('已保存')
+  } catch (e) {
+    let msg = e?.message || ''
+    try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
+    ElMessage.error('保存失败：' + msg)
+  } finally {
+    dlg.value.loading = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -72,4 +149,7 @@ onMounted(load)
 .names { display: grid; gap: 2px; }
 .zh { font-weight: 600; }
 .en { color: var(--el-text-color-secondary); font-size: 12px; }
+.ops { display: flex; gap: 6px; }
+.form { display: grid; gap: 12px; }
+.hint { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 8px; }
 </style>
