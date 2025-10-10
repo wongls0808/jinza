@@ -1,6 +1,6 @@
 import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
-import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm } from './auth.js'
+import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema } from './auth.js'
 import { query } from './db.js'
 
 export const router = express.Router()
@@ -137,8 +137,8 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
   const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const term = `%${q}%`
-  const total = await query('select count(*) from customers where name ilike $1 or coalesce(abbr,"") ilike $1', [term])
-  const rows = await query(`select * from customers where name ilike $1 or coalesce(abbr,"") ilike $1 order by ${sort} ${order === 'asc' ? 'asc' : 'desc'} offset $2 limit $3`, [term, offset, Number(pageSize)])
+  const total = await query("select count(*) from customers where name ilike $1 or coalesce(abbr,'') ilike $1", [term])
+  const rows = await query(`select * from customers where name ilike $1 or coalesce(abbr,'') ilike $1 order by ${sort} ${order === 'asc' ? 'asc' : 'desc'} offset $2 limit $3`, [term, offset, Number(pageSize)])
   res.json({ total: Number(total.rows[0].count), items: rows.rows })
 })
 
@@ -210,6 +210,17 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       await query(sql, flat)
       inserted += chunk.length
     } catch (e) {
+      // 如果表不存在（42P01），尝试自动初始化 schema 后重试一次当前批次
+      if (e && (e.code === '42P01' || /relation\s+"?customers"?\s+does not exist/i.test(e.message))) {
+        try {
+          await ensureSchema()
+          await query(sql, flat)
+          inserted += chunk.length
+          continue
+        } catch (e2) {
+          // 继续走降级逐行插入
+        }
+      }
       // 批次失败则降级逐行插入，尽最大可能导入
       for (let k = 0; k < chunk.length; k++) {
         const r = chunk[k]
