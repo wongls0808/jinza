@@ -685,25 +685,40 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
   const combineRefsNorm = (r) => normStr([r.ref1, r.ref2, r.ref3].filter(x => x != null && String(x).trim() !== '').join(' '))
   const buildHeaderMap = (headerRow) => {
     const map = {}
-    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, ' ').trim()
     headerRow.forEach((h, i) => { map[norm(h)] = i })
     const idx = (keys) => {
       for (const k of keys) { const v = map[k]; if (typeof v === 'number') return v }
       return -1
     }
     return {
-      date: idx(['trn date', 'trn date', 'transaction date']),
+      date: idx(['trn date', 'transaction date', 'date', 'posting date', 'value date', '交易日期', '日期']),
       cheque: (() => {
-        const c = idx(['cheque no ref no', 'cheque no', 'ref no']);
+        const c = idx(['cheque no ref no', 'cheque no', 'ref no', 'reference no', 'reference', 'reference #', 'cheque ref', 'cheque ref no', '支票号', '票据号', '参考号', '凭证号'])
         return c
       })(),
-      desc: idx(['transaction description', 'description']),
-      debit: idx(['debit amount']),
-      credit: idx(['credit amount']),
-      ref1: idx(['reference 1', 'reference1']),
-      ref2: idx(['reference 2', 'reference2']),
-      ref3: idx(['reference 3', 'reference3'])
+      desc: idx(['transaction description', 'description', 'narration', 'details', 'remarks', 'remark', '摘要', '用途', '说明', '备注']),
+      debit: idx(['debit amount', 'debit', 'withdrawal', 'dr', '借方', '支出']),
+      credit: idx(['credit amount', 'credit', 'deposit', 'cr', '贷方', '收入']),
+      amount: idx(['amount', 'transaction amount', '金额']),
+      drcr: idx(['dr cr', 'dr/cr', 'dc', 'drcr', '借贷', '借贷方向', '借贷标志']),
+      ref: idx(['reference', '附言', '备注']),
+      ref1: idx(['reference 1', 'reference1', 'ref1', '参考 1', '参考1', '附言 1', '附言1']),
+      ref2: idx(['reference 2', 'reference2', 'ref2', '参考 2', '参考2', '附言 2', '附言2']),
+      ref3: idx(['reference 3', 'reference3', 'ref3', '参考 3', '参考3', '附言 3', '附言3'])
     }
+  }
+  const headerScore = (headerRow) => {
+    const names = headerRow.map(c => String(c || '').toLowerCase())
+    const has = (re) => names.some(n => re.test(n))
+    let score = 0
+    if (has(/\btrn\.?\s*date\b|transaction\s*date|\bdate\b|交易日期|日期/)) score++
+    if (has(/cheque|ref\.?\s*no|reference|支票|票据|参考|凭证/)) score++
+    if (has(/description|narration|remark|摘要|备注|说明/)) score++
+    if (has(/debit|withdrawal|dr|借方|支出/)) score++
+    if (has(/credit|deposit|cr|贷方|收入/)) score++
+    if (has(/amount|金额/)) score++
+    return score
   }
   const extractRowByHeader = (row, hmap) => {
     const get = (idx) => (idx >= 0 && idx < row.length ? String(row[idx]).trim() : '')
@@ -715,6 +730,15 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     let credit = null
     if (hmap.debit >= 0) debit = parseAmount(get(hmap.debit))
     if (hmap.credit >= 0) credit = parseAmount(get(hmap.credit))
+    if (debit == null && credit == null && hmap.amount >= 0) {
+      let amt = parseAmount(get(hmap.amount))
+      if (amt != null) {
+        const ind = hmap.drcr >= 0 ? get(hmap.drcr) : ''
+        if (/\bDR\b|借/i.test(ind)) amt = -Math.abs(amt)
+        if (/\bCR\b|贷/i.test(ind)) amt = Math.abs(amt)
+        if (amt < 0) { debit = Math.abs(amt); credit = null } else { credit = amt; debit = null }
+      }
+    }
     // fallback if both null: use numeric heuristic like extractRow
     if (debit == null && credit == null) {
       const numsIdx = []
@@ -729,9 +753,13 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       }
     }
     const description = hmap.desc >= 0 ? (get(hmap.desc) || null) : null
-    const ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
-    const ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
-    const ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
+    let ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
+    let ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
+    let ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
+    if (hmap.ref >= 0 && !ref1 && !ref2 && !ref3) {
+      const r = get(hmap.ref)
+      if (r) ref1 = r
+    }
     return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1, ref2, ref3, ref4: null, ref5: null, ref6: null }
   }
   const extractRow = (rawRow) => {
@@ -739,7 +767,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     // Find a date cell within the first 6 columns
     let dateIdx = -1
     let dateObj = null
-    const scanLimit = Math.min(row.length, 6)
+  const scanLimit = Math.min(row.length, 10)
     for (let i = 0; i < scanLimit; i++) {
       const d = row[i]
       const parsed = parseDate(d)
@@ -864,13 +892,16 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       const mostlySingle = csvRows.length > 3 && csvRows.filter(r => r.length <= 1).length / csvRows.length > 0.6
       if (mostlySingle && /;/.test(text)) {
         csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true, delimiter: ';' })
+      } else if (mostlySingle && /\|/.test(text)) {
+        csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true, delimiter: '|' })
       }
       // collect kv before header
       let headerIdx = -1
-      for (let i = 0; i < csvRows.length; i++) {
+      for (let i = 0; i < Math.min(csvRows.length, 10); i++) {
         const row = csvRows[i].map(c => String(c).trim())
         const first = row[0] || ''
-        if (/^Trn\.?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
+        if (/^Trn\.\?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
+        if (headerScore(row) >= 2) { headerIdx = i; break }
         if (row.length >= 2 && first) {
           const key = first.replace(/:$/, '')
           kv[key] = row[1]
