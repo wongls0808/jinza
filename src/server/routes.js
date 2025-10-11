@@ -2,10 +2,14 @@
   const cleanCell = (v) => {
     let s = String(v ?? '').trim()
     if (/^=".*"$/.test(s)) s = s.replace(/^="/, '').replace(/"$/, '')
-  if (/^".*"$/.test(s)) s = s.replace(/^"/, '').replace(/"$/, '')
-  // 移除无效的 Excel 单引号分支（WPS/Excel 导出不会出现该格式）
+    if (/^".*"$/.test(s)) s = s.replace(/^"/, '').replace(/"$/, '')
     if (/^=.*$/.test(s)) s = s.replace(/^=/, '')
-    return s.trim()
+    s = s.trim()
+    // 金额字段标准化
+    if (/^-?\d{1,3}(,\d{3})*(\.\d+)?$/.test(s)) s = s.replace(/,/g, '')
+    // 统一大小写
+    s = s.toLowerCase()
+    return s
   }
 import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
@@ -857,11 +861,11 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (accNo && rows.length) {
       const tuples = rows.map(r => [
         r.trn_date?.toISOString().slice(0,10),
-        normStr(r.cheque_ref),
-        normStr(r.description),
-        combineRefsNorm(r),
-        r.debit || 0,
-        r.credit || 0
+        cleanCell(r.cheque_ref),
+        cleanCell(r.description),
+        cleanCell(combineRefsNorm(r)),
+        Number(cleanCell(r.debit)) || 0,
+        Number(cleanCell(r.credit)) || 0
       ])
       const params = tuples.map((_, i) => `($${i*6+1}::date,$${i*6+2}::text,$${i*6+3}::text,$${i*6+4}::text,$${i*6+5}::numeric,$${i*6+6}::numeric)`).join(',')
       const flat = tuples.flat()
@@ -883,7 +887,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         [...flat, accNo]
       )
       const set = new Set(existed.rows.map(r => `${r.d || ''}|${r.c || ''}|${r.desc || ''}|${r.refs || ''}|${r.db || 0}|${r.cr || 0}`))
-      toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${normStr(r.cheque_ref)}|${normStr(r.description)}|${combineRefsNorm(r)}|${r.debit || 0}|${r.credit || 0}`))
+  toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${cleanCell(r.cheque_ref)}|${cleanCell(r.description)}|${cleanCell(combineRefsNorm(r))}|${Number(cleanCell(r.debit)) || 0}|${Number(cleanCell(r.credit)) || 0}`))
     }
     if (toInsert.length) {
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
