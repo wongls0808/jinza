@@ -943,15 +943,23 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         const m = /^(.*?)[\t,:]\s*(.*)$/.exec(line) // support key: value and key, value
         if (m) kv[m[1].trim()] = m[2].trim()
       }
-      for (; i < lines.length; i++) { if (/^Trn\.?\s*Date/i.test(lines[i])) { i++; break } }
-      for (; i < lines.length; i++) {
-        const l = lines[i]
-        if (!l) continue
-        let cols = l.split('\t')
-        if (cols.length === 1) cols = l.split(/\s{2,}/)
-        const obj = extractRow(cols)
-        if (obj) txnRows.push(obj)
+      // seek to header line if present
+      let start = 0
+      for (let j = i; j < lines.length; j++) { if (/^Trn\.?\s*Date/i.test(lines[j])) { start = j + 1; break } }
+      const tryParseFrom = (startIdx) => {
+        for (let k = startIdx; k < lines.length; k++) {
+          const l = lines[k]
+          if (!l) continue
+          let cols = l.split('\t')
+          if (cols.length === 1) cols = l.split(/\s{2,}/)
+          const obj = extractRow(cols)
+          if (obj) txnRows.push(obj)
+        }
       }
+      // first try from after header (if found)
+      if (start > 0) tryParseFrom(start)
+      // if still nothing, try parse the whole file (headerless)
+      if (!txnRows.length) tryParseFrom(0)
     }
 
     // Insert with one-time ensureSchema retry on relation-missing
