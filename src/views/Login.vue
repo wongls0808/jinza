@@ -93,7 +93,7 @@ const onSubmit = async () => {
 }
 </script>
 
-</style>
+<style scoped>
 <style scoped>
 .login-modern-bg {
   min-height: 100vh;
