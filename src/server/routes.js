@@ -848,7 +848,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         r.debit || 0,
         r.credit || 0
       ])
-      const params = tuples.map((_, i) => `($${i*6+1},$${i*6+2},$${i*6+3},$${i*6+4},$${i*6+5},$${i*6+6})`).join(',')
+  const params = tuples.map((_, i) => `($${i*6+1}::date,$${i*6+2}::text,$${i*6+3}::text,$${i*6+4}::text,$${i*6+5}::numeric,$${i*6+6}::numeric)`).join(',')
       const flat = tuples.flat()
       const existed = await query(
         `select t.trn_date::date as d,
@@ -860,11 +860,11 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
            from bank_transactions t
            join bank_statements s on s.id = t.statement_id
           where s.account_number = $${flat.length+1}
-            and (t.trn_date::date,
-                 lower(trim(coalesce(t.cheque_ref,''))),
-                 lower(trim(coalesce(t.description,''))),
-                 lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))),
-                 coalesce(t.debit,0), coalesce(t.credit,0)) in (values ${params})`,
+      and (t.trn_date::date,
+        lower(trim(coalesce(t.cheque_ref,''))),
+        lower(trim(coalesce(t.description,''))),
+        lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))),
+        coalesce(t.debit,0)::numeric, coalesce(t.credit,0)::numeric) in (values ${params})`,
         [...flat, accNo]
       )
       const set = new Set(existed.rows.map(r => `${r.d}|${r.c}|${r.desc}|${r.refs}|${r.db}|${r.cr}`))
