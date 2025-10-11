@@ -377,19 +377,52 @@ router.delete('/currencies/:code', authMiddleware(true), requirePerm('view_setti
 
 // Receiving accounts
 router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
-  const rs = await query(`
-    select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
-           b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
-    from receiving_accounts a
-    left join banks b on b.id = a.bank_id
-    order by a.id desc
-  `)
-  res.json(rs.rows)
+  const { page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
+  const offset = (Number(page) - 1) * Number(pageSize)
+  const sortMap = {
+    id: 'a.id',
+    account_name: 'a.account_name',
+    bank_account: 'a.bank_account',
+    currency_code: 'a.currency_code',
+    opening_balance: 'a.opening_balance',
+    bank_zh: 'b.zh',
+    bank_code: 'b.code'
+  }
+  const sortCol = sortMap[String(sort)] || sortMap.id
+  const ord = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc'
+  const totalRs = await query('select count(*) from receiving_accounts')
+  const rs = await query(
+    `select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+            b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
+       from receiving_accounts a
+       left join banks b on b.id = a.bank_id
+      order by ${sortCol} ${ord}
+      offset $1 limit $2`,
+    [offset, Number(pageSize)]
+  )
+  res.json({ total: Number(totalRs.rows[0].count), items: rs.rows })
 })
 router.post('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
   const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
   const rs = await query('insert into receiving_accounts(account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5) returning *', [account_name, Number(bank_id), bank_account, currency_code.toUpperCase(), Number(opening_balance)||0])
+  res.json(rs.rows[0])
+})
+router.put('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+  const id = Number(req.params.id)
+  const { account_name, bank_id, bank_account, currency_code, opening_balance } = req.body || {}
+  const fields = []
+  const values = []
+  let idx = 1
+  if (account_name !== undefined) { fields.push(`account_name=$${idx++}`); values.push(account_name) }
+  if (bank_id !== undefined) { fields.push(`bank_id=$${idx++}`); values.push(Number(bank_id)) }
+  if (bank_account !== undefined) { fields.push(`bank_account=$${idx++}`); values.push(bank_account) }
+  if (currency_code !== undefined) { fields.push(`currency_code=$${idx++}`); values.push(String(currency_code).toUpperCase()) }
+  if (opening_balance !== undefined) { fields.push(`opening_balance=$${idx++}`); values.push(Number(opening_balance)||0) }
+  if (!fields.length) return res.status(400).json({ error: 'no changes' })
+  values.push(id)
+  const rs = await query(`update receiving_accounts set ${fields.join(', ')} where id=$${idx} returning *`, values)
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json(rs.rows[0])
 })
 router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {

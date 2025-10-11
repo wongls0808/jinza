@@ -13,10 +13,18 @@
         </div>
       </template>
 
-      <el-table :data="rows" size="small" border style="width:100%" @header-dragend="onColResize">
+      <el-table
+        :data="rows"
+        size="small"
+        border
+        style="width:100%"
+        @header-dragend="onColResize"
+        @sort-change="onSort"
+        @row-dblclick="onRowDblClick"
+      >
         <el-table-column type="index" column-key="__idx" :label="$t('accounts.fields.index')" :width="colW('__idx', 60)" />
-        <el-table-column prop="account_name" :label="$t('accounts.fields.accountName')" :width="colW('account_name', 160)" />
-  <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
+        <el-table-column prop="account_name" :label="$t('accounts.fields.accountName')" sortable="custom" :width="colW('account_name', 160)" />
+        <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
               <img class="logo" :src="row.bank_logo" alt="logo" />
@@ -25,9 +33,9 @@
             </div>
           </template>
         </el-table-column>
-  <el-table-column prop="bank_account" :label="$t('accounts.fields.bankAccount')" :width="colW('bank_account', 200)" />
-  <el-table-column prop="currency_code" :label="$t('accounts.fields.currency')" :width="colW('currency', 100)" />
-  <el-table-column prop="opening_balance" :label="$t('accounts.fields.openingBalance')" :width="colW('opening_balance', 140)">
+        <el-table-column prop="bank_account" :label="$t('accounts.fields.bankAccount')" sortable="custom" :width="colW('bank_account', 200)" />
+        <el-table-column prop="currency_code" :label="$t('accounts.fields.currency')" sortable="custom" :width="colW('currency_code', 100)" />
+        <el-table-column prop="opening_balance" :label="$t('accounts.fields.openingBalance')" sortable="custom" :width="colW('opening_balance', 140)">
           <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
         </el-table-column>
         <el-table-column :label="$t('accounts.fields.ops')" :width="colW('ops', 100)">
@@ -38,6 +46,19 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pager">
+        <el-pagination
+          background
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10,20,50,100]"
+          @size-change="onPageSizeChange"
+          @current-change="onPageChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="600px">
@@ -95,6 +116,11 @@ import { useTableMemory } from '@/composables/useTableMemory'
 const { colW, onColResize } = useTableMemory('accounts')
 
 const rows = ref([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
+const sort = ref('id')
+const order = ref('desc')
 const banks = ref([])
 const currencies = ref([])
 const dlg = ref({ visible: false, loading: false, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
@@ -115,7 +141,9 @@ function moneyParser(value) {
 }
 
 async function load() {
-  rows.value = await api.accounts.list()
+  const data = await api.accounts.list({ page: page.value, pageSize: pageSize.value, sort: sort.value, order: order.value })
+  rows.value = data.items || []
+  total.value = data.total || 0
   banks.value = await api.banks.all()
   currencies.value = await api.currencies.list()
 }
@@ -127,10 +155,15 @@ async function submit() {
   try {
     const f = dlg.value.form
     if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请填写完整'); return }
-    await api.accounts.create(f)
+    if (dlg.value.mode === 'edit' && dlg.value.id) {
+      await api.accounts.update(dlg.value.id, f)
+      ElMessage.success('已保存')
+    } else {
+      await api.accounts.create(f)
+      ElMessage.success('已添加')
+    }
     dlg.value.visible = false
     await load()
-    ElMessage.success('已添加')
   } finally {
     dlg.value.loading = false
   }
@@ -143,6 +176,33 @@ async function remove(row) {
 }
 
 onMounted(load)
+
+function onSort({ prop, order: ord }) {
+  if (!prop) return
+  sort.value = prop
+  order.value = ord === 'ascending' ? 'asc' : 'desc'
+  load()
+}
+
+function onPageSizeChange(ps) {
+  pageSize.value = ps
+  page.value = 1
+  load()
+}
+function onPageChange(p) {
+  page.value = p
+  load()
+}
+
+function onRowDblClick(row) {
+  dlg.value = { visible: true, loading: false, mode: 'edit', id: row.id, form: {
+    account_name: row.account_name,
+    bank_id: row.bank_id,
+    bank_account: row.bank_account,
+    currency_code: row.currency_code,
+    opening_balance: row.opening_balance
+  } }
+}
 </script>
 
 <style scoped>

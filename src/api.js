@@ -102,8 +102,9 @@ export const api = {
 
   // Accounts
   accounts: {
-    list: () => request('/accounts'),
+    list: (params={}) => request(`/accounts?${new URLSearchParams(params).toString()}`),
     create: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => request(`/accounts/${id}`, { method: 'DELETE' })
   },
 
