@@ -609,3 +609,109 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   const BOM = '\ufeff'
   res.send(BOM + [header, sample].join('\n'))
 })
+
+// ===== Receipts (Bank Statements) =====
+// Import CSV (raw text) and persist statement + transactions
+router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  try {
+    const text = (req.body || '').replace(/\r\n/g, '\n')
+    if (!text) return res.status(400).json({ error: 'empty body' })
+    const lines = text.split(/\n/).map(s => s.trim())
+    // Parse header key-values like "Account Number:\t3236912309"
+    const kv = {}
+    let i = 0
+    for (; i < lines.length; i++) {
+      const line = lines[i]
+      if (!line) continue
+      if (/^Trn\.?\s*Date/i.test(line) || /^Transaction Type/i.test(line)) break
+      const m = /^(.*?):\s*(.*)$/.exec(line)
+      if (m) kv[m[1].trim()] = m[2].trim()
+    }
+    // Skip until header row begins with Trn. Date
+    for (; i < lines.length; i++) { if (/^Trn\.?\s*Date/i.test(lines[i])) { i++; break } }
+    // Insert statement
+    const stmtIns = await query(
+      `insert into bank_statements(
+        account_number, account_name, account_type,
+        period_from, period_to,
+        available_balance, current_balance,
+        generation_date, generation_time,
+        interest_paid_ytd, interest_accrual,
+        hold_amount, one_day_float, online_float, od_limit,
+        raw_filename, uploaded_by
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      returning id`, [
+        kv['Account Number'], kv['Account Name'], kv['Account Type'],
+        kv['From Date'] ? new Date(kv['From Date']) : null,
+        kv['To Date'] ? new Date(kv['To Date']) : null,
+        kv['Available Balance'] ? Number(String(kv['Available Balance']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['Current Balance'] ? Number(String(kv['Current Balance']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['Generation Date'] ? new Date(kv['Generation Date']) : null,
+        kv['Generation Time'] || null,
+        kv['Interest Paid YTD'] ? Number(String(kv['Interest Paid YTD']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['Interest Accrual'] ? Number(String(kv['Interest Accrual']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['Hold Amount'] ? Number(String(kv['Hold Amount']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['One Day Float'] ? Number(String(kv['One Day Float']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['Online Float'] ? Number(String(kv['Online Float']).replace(/[^0-9.\-]/g, '')) : null,
+        kv['OD Limit'] ? Number(String(kv['OD Limit']).replace(/[^0-9.\-]/g, '')) : null,
+        (req.query.filename || ''), req.user.id
+      ])
+    const stmtId = stmtIns.rows[0].id
+
+    const txns = []
+    for (; i < lines.length; i++) {
+      const l = lines[i]
+      if (!l) continue
+      // Expect TSV-like or multi-space delimited; split conservatively by tab, else by 2+ spaces
+      let cols = l.split('\t')
+      if (cols.length === 1) cols = l.split(/\s{2,}/)
+      // Expected columns: date, cheque/ref, description, debit, credit, ref1..ref6
+      if (cols.length < 3) continue
+      const [d, cheque, desc, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6] = cols
+      // Skip header or non-date lines
+      if (!/\d{2}\/\d{2}\/\d{4}/.test(d)) continue
+      txns.push([
+        stmtId,
+        new Date(d.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')),
+        cheque || null,
+        desc || null,
+        debit ? Number(String(debit).replace(/[^0-9.\-]/g, '')) : null,
+        credit ? Number(String(credit).replace(/[^0-9.\-]/g, '')) : null,
+        ref1 || null, ref2 || null, ref3 || null, ref4 || null, ref5 || null, ref6 || null
+      ])
+    }
+    if (txns.length) {
+      const params = txns.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
+      const flat = txns.flat()
+      await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params}`, flat)
+    }
+    res.json({ ok: true, statement_id: stmtId, inserted: txns.length })
+  } catch (e) {
+    console.error('receipts import failed', e)
+    res.status(400).json({ error: 'import failed' })
+  }
+})
+
+router.get('/receipts/statements', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const { page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
+  const offset = (Number(page) - 1) * Number(pageSize)
+  const sortMap = { id: 'id', generation_date: 'generation_date', account_number: 'account_number', period_from: 'period_from', period_to: 'period_to' }
+  const sortCol = sortMap[String(sort)] || 'id'
+  const ord = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc'
+  const total = await query('select count(*) from bank_statements')
+  const rs = await query(`select * from bank_statements order by ${sortCol} ${ord} offset $1 limit $2`, [offset, Number(pageSize)])
+  res.json({ total: Number(total.rows[0].count), items: rs.rows })
+})
+
+router.get('/receipts/:id/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const id = Number(req.params.id)
+  const { page = 1, pageSize = 20, sort = 'trn_date', order = 'asc', q = '' } = req.query
+  const offset = (Number(page) - 1) * Number(pageSize)
+  const sortMap = { trn_date: 'trn_date', debit: 'debit', credit: 'credit' }
+  const sortCol = sortMap[String(sort)] || 'trn_date'
+  const ord = String(order).toLowerCase() === 'desc' ? 'desc' : 'asc'
+  const term = `%${q}%`
+  const total = await query('select count(*) from bank_transactions where statement_id=$1 and (coalesce(description,\'\') ilike $2 or coalesce(cheque_ref,\'\') ilike $2)', [id, term])
+  const rs = await query(`select * from bank_transactions where statement_id=$1 and (coalesce(description,'') ilike $4 or coalesce(cheque_ref,'') ilike $4) order by ${sortCol} ${ord} offset $2 limit $3`, [id, offset, Number(pageSize), term])
+  res.json({ total: Number(total.rows[0].count), items: rs.rows })
+})

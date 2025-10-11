@@ -25,6 +25,11 @@
         <div class="name">收款账户</div>
         <div class="desc">银行账户、币种与期初余额</div>
       </el-card>
+  <el-card v-if="has('view_receipts')" class="home-card jelly" v-tilt @click="go('/receipts')">
+  <div class="icon"><DocumentIcon /></div>
+        <div class="name">入帐管理</div>
+        <div class="desc">银行对账单导入与交易浏览</div>
+      </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>

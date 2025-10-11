@@ -9,6 +9,7 @@ const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
 const Banks = () => import('@/views/Banks.vue')
 const Accounts = () => import('@/views/Accounts.vue')
+const Receipts = () => import('@/views/Receipts.vue')
 const Settings = () => import('@/views/Settings.vue')
 const NoAccess = () => import('@/views/NoAccess.vue')
 
@@ -20,6 +21,7 @@ export const routes = [
   { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
   { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
   { path: '/accounts', name: 'accounts', component: Accounts, meta: { perm: 'view_accounts' } },
+  { path: '/receipts', name: 'receipts', component: Receipts, meta: { perm: 'view_receipts' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]

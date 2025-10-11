@@ -115,6 +115,43 @@ export async function ensureSchema() {
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
   await query(`alter table users add column if not exists password_updated_at timestamptz`)
+
+  // Receipts: statements + transactions
+  await query(`
+    create table if not exists bank_statements (
+      id serial primary key,
+      account_number text,
+      account_name text,
+      account_type text,
+      period_from date,
+      period_to date,
+      available_balance numeric,
+      current_balance numeric,
+      generation_date date,
+      generation_time text,
+      interest_paid_ytd numeric,
+      interest_accrual numeric,
+      hold_amount numeric,
+      one_day_float numeric,
+      online_float numeric,
+      od_limit numeric,
+      raw_filename text,
+      uploaded_by int references users(id) on delete set null,
+      created_at timestamptz default now()
+    );
+
+    create table if not exists bank_transactions (
+      id serial primary key,
+      statement_id int references bank_statements(id) on delete cascade,
+      trn_date date,
+      cheque_ref text,
+      description text,
+      debit numeric,
+      credit numeric,
+      ref1 text, ref2 text, ref3 text, ref4 text, ref5 text, ref6 text,
+      created_at timestamptz default now()
+    );
+  `)
 }
 
 export async function seedInitialAdmin() {
@@ -126,6 +163,7 @@ export async function seedInitialAdmin() {
     { code: 'view_banks', name: '银行列表' },
     { code: 'view_accounts', name: '收款账户' },
     { code: 'view_settings', name: '系统设置' }
+    ,{ code: 'view_receipts', name: '入帐管理' }
   ]
   for (const p of corePerms) {
     await query(

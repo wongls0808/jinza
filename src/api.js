@@ -51,8 +51,13 @@ export const api = {
     importCsv: (text) => request('/customers/import-csv', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
     exportCsv: () => request('/customers/export'),
     template: () => request('/customers/template')
-  }
-  ,
+  },
+    // Receipts (Bank Statements)
+    receipts: {
+      importCsv: (text, filename='') => request(`/receipts/import?${new URLSearchParams({ filename }).toString() }`, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
+      listStatements: (params={}) => request(`/receipts/statements?${new URLSearchParams(params).toString()}`),
+      listTxns: (id, params={}) => request(`/receipts/${id}/transactions?${new URLSearchParams(params).toString()}`)
+    },
   // Banks
   requestBanks: () => request('/banks'),
   createBank: async (data) => {

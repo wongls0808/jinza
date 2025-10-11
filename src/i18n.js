@@ -83,6 +83,19 @@ const messages = {
       labels: { code: '代码', zh: '中文名', en: '英文名', logoUrl: 'Logo URL', uploadFile: '或 上传文件' },
       hintFile: '若选择文件，将优先生成为 data URL 上传并覆盖 Logo URL'
     },
+    receipts: {
+      title: '入帐管理',
+      import: '导入对账单 CSV',
+      searchTxn: '搜索 摘要/票据号',
+      accountNumber: '账号',
+      accountName: '户名',
+      period: '期间',
+      trnDate: '交易日期',
+      cheque: '票据/参考',
+      desc: '摘要',
+      debit: '支出',
+      credit: '收入',
+    },
     login: {
       title: '登录',
       username: '用户名',
@@ -201,6 +214,19 @@ const messages = {
       replaceTitle: 'Replace Logo',
       labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', logoUrl: 'Logo URL', uploadFile: 'Or Upload File' },
       hintFile: 'If file is picked, a data URL will be used to upload and override the Logo URL'
+    },
+    receipts: {
+      title: 'Receipts',
+      import: 'Import Statement CSV',
+      searchTxn: 'Search Desc/Ref',
+      accountNumber: 'Account No.',
+      accountName: 'Account Name',
+      period: 'Period',
+      trnDate: 'Date',
+      cheque: 'Cheque/Ref',
+      desc: 'Description',
+      debit: 'Debit',
+      credit: 'Credit',
     },
     login: {
       title: 'Sign In',
