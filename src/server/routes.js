@@ -857,33 +857,22 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (accNo && rows.length) {
       const tuples = rows.map(r => [
         r.trn_date?.toISOString().slice(0,10),
-        normStr(r.cheque_ref),
-        normStr(r.description),
-        combineRefsNorm(r),
-        r.debit || 0,
-        r.credit || 0
+        normStr(r.cheque_ref)
       ])
-  const params = tuples.map((_, i) => `($${i*6+1}::date,$${i*6+2}::text,$${i*6+3}::text,$${i*6+4}::text,$${i*6+5}::numeric,$${i*6+6}::numeric)`).join(',')
+      const params = tuples.map((_, i) => `($${i*2+1}::date,$${i*2+2}::text)`).join(',')
       const flat = tuples.flat()
       const existed = await query(
         `select t.trn_date::date as d,
-                lower(trim(coalesce(t.cheque_ref,''))) as c,
-                lower(trim(coalesce(t.description,''))) as desc,
-                lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))) as refs,
-                coalesce(t.debit,0) as db,
-                coalesce(t.credit,0) as cr
+                lower(trim(coalesce(t.cheque_ref,''))) as c
            from bank_transactions t
            join bank_statements s on s.id = t.statement_id
           where s.account_number = $${flat.length+1}
       and (t.trn_date::date,
-        lower(trim(coalesce(t.cheque_ref,''))),
-        lower(trim(coalesce(t.description,''))),
-        lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))),
-        coalesce(t.debit,0)::numeric, coalesce(t.credit,0)::numeric) in (values ${params})`,
+        lower(trim(coalesce(t.cheque_ref,'')))) in (values ${params})`,
         [...flat, accNo]
       )
-  const set = new Set(existed.rows.map(r => `${r.d || ''}|${r.c || ''}|${r.desc || ''}|${r.refs || ''}|${r.db || 0}|${r.cr || 0}`))
-  toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${normStr(r.cheque_ref)}|${normStr(r.description)}|${combineRefsNorm(r)}|${r.debit || 0}|${r.credit || 0}`))
+      const set = new Set(existed.rows.map(r => `${r.d || ''}|${r.c || ''}`))
+      toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${normStr(r.cheque_ref)}`))
     }
     if (toInsert.length) {
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
