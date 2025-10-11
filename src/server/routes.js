@@ -644,6 +644,30 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (!s) return null
     const str = String(s).trim()
     const [datePart] = str.split(/\s+/)
+    // Excel serial date (roughly between year 1950-2099): allow 20000..60000
+    if (/^\d{4,6}$/.test(datePart)) {
+      const n = Number(datePart)
+      if (!Number.isNaN(n) && n >= 20000 && n <= 60000) {
+        const base = new Date(Date.UTC(1899, 11, 30))
+        const d = new Date(base.getTime() + n * 86400000)
+        // construct using mm/dd/yyyy to avoid locale issues
+        return new Date(`${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`)
+      }
+    }
+    // Month-name dates: dd-MMM-yyyy / dd MMM yyyy / MMM dd, yyyy (3+ letters)
+    const monthMap = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 }
+    const normMon = (m) => monthMap[(m || '').slice(0,3).toLowerCase()] || null
+    let m
+    m = str.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s,](\d{2,4})$/)
+    if (m) {
+      const d = Number(m[1]); const mon = normMon(m[2]); const y = m[3].length===2 ? Number('20'+m[3]) : Number(m[3])
+      if (mon && d && y) return new Date(`${mon}/${d}/${y}`)
+    }
+    m = str.match(/^([A-Za-z]{3,})[-\s](\d{1,2})[,\s](\d{2,4})$/)
+    if (m) {
+      const mon = normMon(m[1]); const d = Number(m[2]); const y = m[3].length===2 ? Number('20'+m[3]) : Number(m[3])
+      if (mon && d && y) return new Date(`${mon}/${d}/${y}`)
+    }
     const zh = /^\d{4}年\d{1,2}月\d{1,2}日$/.test(str)
     if (zh) {
       const m = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日$/)
@@ -656,6 +680,59 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(datePart)) return new Date(datePart)
     if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(datePart)) return new Date(datePart)
     return null
+  }
+  const normStr = (v) => (v == null ? '' : String(v).trim().toLowerCase())
+  const combineRefsNorm = (r) => normStr([r.ref1, r.ref2, r.ref3].filter(x => x != null && String(x).trim() !== '').join(' '))
+  const buildHeaderMap = (headerRow) => {
+    const map = {}
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    headerRow.forEach((h, i) => { map[norm(h)] = i })
+    const idx = (keys) => {
+      for (const k of keys) { const v = map[k]; if (typeof v === 'number') return v }
+      return -1
+    }
+    return {
+      date: idx(['trn date', 'trn date', 'transaction date']),
+      cheque: (() => {
+        const c = idx(['cheque no ref no', 'cheque no', 'ref no']);
+        return c
+      })(),
+      desc: idx(['transaction description', 'description']),
+      debit: idx(['debit amount']),
+      credit: idx(['credit amount']),
+      ref1: idx(['reference 1', 'reference1']),
+      ref2: idx(['reference 2', 'reference2']),
+      ref3: idx(['reference 3', 'reference3'])
+    }
+  }
+  const extractRowByHeader = (row, hmap) => {
+    const get = (idx) => (idx >= 0 && idx < row.length ? String(row[idx]).trim() : '')
+    const dateStr = get(hmap.date)
+    const dateObj = parseDate(dateStr)
+    if (!dateObj) return null
+    const cheque = cleanCheque(get(hmap.cheque))
+    let debit = null
+    let credit = null
+    if (hmap.debit >= 0) debit = parseAmount(get(hmap.debit))
+    if (hmap.credit >= 0) credit = parseAmount(get(hmap.credit))
+    // fallback if both null: use numeric heuristic like extractRow
+    if (debit == null && credit == null) {
+      const numsIdx = []
+      for (let i = row.length - 1; i > (hmap.date >= 0 ? hmap.date + 1 : 1); i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
+      if (numsIdx.length === 1) {
+        const n = parseAmount(row[numsIdx[0]])
+        if (n != null && !isNaN(n)) { if (n < 0) debit = Math.abs(n); else credit = n }
+      } else if (numsIdx.length >= 2) {
+        const a = Math.min(numsIdx[0], numsIdx[1])
+        const b = Math.max(numsIdx[0], numsIdx[1])
+        debit = parseAmount(row[a]); credit = parseAmount(row[b])
+      }
+    }
+    const description = hmap.desc >= 0 ? (get(hmap.desc) || null) : null
+    const ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
+    const ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
+    const ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
+    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1, ref2, ref3, ref4: null, ref5: null, ref6: null }
   }
   const extractRow = (rawRow) => {
     const row = (rawRow || []).map(c => (c == null ? '' : String(c).trim()))
@@ -731,22 +808,39 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       ])
     const stmtId = stmtIns.rows[0].id
     let toInsert = rows
-    // Suppress duplicates for same account across existing statements: (account_number, date, cheque_ref, debit, credit)
+    // Suppress duplicates for same account across existing statements:
+    // (account_number filter) and fields: date, cheque/ref, description, combined(reference1-3), debit, credit
     const accNo = kv['Account Number'] || kv['Account No.'] || kv['ACCOUNT NUMBER'] || null
     if (accNo && rows.length) {
-      const tuples = rows.map(r => [r.trn_date?.toISOString().slice(0,10), r.cheque_ref || '', r.debit || 0, r.credit || 0])
-      const params = tuples.map((_, i) => `($${i*4+1},$${i*4+2},$${i*4+3},$${i*4+4})`).join(',')
+      const tuples = rows.map(r => [
+        r.trn_date?.toISOString().slice(0,10),
+        normStr(r.cheque_ref),
+        normStr(r.description),
+        combineRefsNorm(r),
+        r.debit || 0,
+        r.credit || 0
+      ])
+      const params = tuples.map((_, i) => `($${i*6+1},$${i*6+2},$${i*6+3},$${i*6+4},$${i*6+5},$${i*6+6})`).join(',')
       const flat = tuples.flat()
       const existed = await query(
-        `select t.trn_date::date as d, coalesce(t.cheque_ref,'') as c, coalesce(t.debit,0) as db, coalesce(t.credit,0) as cr
+        `select t.trn_date::date as d,
+                lower(trim(coalesce(t.cheque_ref,''))) as c,
+                lower(trim(coalesce(t.description,''))) as desc,
+                lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))) as refs,
+                coalesce(t.debit,0) as db,
+                coalesce(t.credit,0) as cr
            from bank_transactions t
            join bank_statements s on s.id = t.statement_id
           where s.account_number = $${flat.length+1}
-            and (t.trn_date::date, coalesce(t.cheque_ref,''), coalesce(t.debit,0), coalesce(t.credit,0)) in (values ${params})`,
+            and (t.trn_date::date,
+                 lower(trim(coalesce(t.cheque_ref,''))),
+                 lower(trim(coalesce(t.description,''))),
+                 lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))),
+                 coalesce(t.debit,0), coalesce(t.credit,0)) in (values ${params})`,
         [...flat, accNo]
       )
-      const set = new Set(existed.rows.map(r => `${r.d}|${r.c}|${r.db}|${r.cr}`))
-      toInsert = rows.filter(r => !set.has(`${r.trn_date?.toISOString().slice(0,10)}|${r.cheque_ref || ''}|${r.debit || 0}|${r.credit || 0}`))
+      const set = new Set(existed.rows.map(r => `${r.d}|${r.c}|${r.desc}|${r.refs}|${r.db}|${r.cr}`))
+      toInsert = rows.filter(r => !set.has(`${r.trn_date?.toISOString().slice(0,10)}|${normStr(r.cheque_ref)}|${normStr(r.description)}|${combineRefsNorm(r)}|${r.debit || 0}|${r.credit || 0}`))
     }
     if (toInsert.length) {
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
@@ -783,9 +877,12 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         }
       }
       if (headerIdx >= 0) {
+        const headerRow = csvRows[headerIdx].map(c => String(c).trim())
+        const hmap = buildHeaderMap(headerRow)
         for (let i = headerIdx + 1; i < csvRows.length; i++) {
           const row = csvRows[i]
-          const obj = extractRow(row)
+          let obj = extractRowByHeader(row, hmap)
+          if (!obj) obj = extractRow(row)
           if (obj) txnRows.push(obj)
         }
       } else {
@@ -823,13 +920,13 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     // Insert with one-time ensureSchema retry on relation-missing
     try {
       const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
-      return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped })
+      return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped, parsed: txnRows.length })
     } catch (e) {
       if (e && (e.code === '42P01' || /relation\s+\"?bank_statements\"?\s+does not exist/i.test(e.message))) {
         try {
           await ensureSchema()
           const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
-          return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped })
+          return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped, parsed: txnRows.length })
         } catch (e2) {
           console.error('receipts import retry failed', e2)
           return res.status(400).json({ error: 'import failed' })
