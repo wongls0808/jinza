@@ -16,7 +16,7 @@
         </div>
       </template>
 
-      <el-table :data="txns" size="small" border height="600" @sort-change="onSort" style="width:100%" @selection-change="onSelectionChange">
+  <el-table :data="txns" size="small" border height="600" @sort-change="onSort" style="width:100vw;max-width:100vw;" @selection-change="onSelectionChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="trn_date" :label="$t('receipts.trnDate')" sortable="custom" width="120">
           <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>

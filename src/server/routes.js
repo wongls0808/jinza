@@ -882,8 +882,8 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         coalesce(t.debit,0)::numeric, coalesce(t.credit,0)::numeric) in (values ${params})`,
         [...flat, accNo]
       )
-      const set = new Set(existed.rows.map(r => `${r.d}|${r.c}|${r.desc}|${r.refs}|${r.db}|${r.cr}`))
-      toInsert = rows.filter(r => !set.has(`${r.trn_date?.toISOString().slice(0,10)}|${normStr(r.cheque_ref)}|${normStr(r.description)}|${combineRefsNorm(r)}|${r.debit || 0}|${r.credit || 0}`))
+  const set = new Set(existed.rows.map(r => `${r.d || ''}|${r.c || ''}|${r.desc || ''}|${r.refs || ''}|${r.db || 0}|${r.cr || 0}`))
+  toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${normStr(r.cheque_ref)}|${normStr(r.description)}|${combineRefsNorm(r)}|${r.debit || 0}|${r.credit || 0}`))
     }
     if (toInsert.length) {
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
