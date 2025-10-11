@@ -1,3 +1,12 @@
+  // 清理 Excel 导出 '="内容"' 包裹
+  const cleanCell = (v) => {
+    let s = String(v ?? '').trim()
+    if (/^=".*"$/.test(s)) s = s.replace(/^="/, '').replace(/"$/, '')
+  if (/^".*"$/.test(s)) s = s.replace(/^"/, '').replace(/"$/, '')
+  // 移除无效的 Excel 单引号分支（WPS/Excel 导出不会出现该格式）
+    if (/^=.*$/.test(s)) s = s.replace(/^=/, '')
+    return s.trim()
+  }
 import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
 import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema } from './auth.js'
@@ -904,7 +913,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       // collect kv before header
       let headerIdx = -1
       for (let i = 0; i < Math.min(csvRows.length, 50); i++) {
-        const row = csvRows[i].map(c => String(c).trim())
+        const row = csvRows[i].map(c => cleanCell(c))
         const first = row[0] || ''
         if (/^Trn\.\?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
         if (headerScore(row) >= 2) { headerIdx = i; break }
@@ -914,18 +923,18 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         }
       }
       if (headerIdx >= 0) {
-        const headerRow = csvRows[headerIdx].map(c => String(c).trim())
+        const headerRow = csvRows[headerIdx].map(c => cleanCell(c))
         const hmap = buildHeaderMap(headerRow)
         for (let i = headerIdx + 1; i < csvRows.length; i++) {
-          const row = csvRows[i]
+          const row = csvRows[i].map(c => cleanCell(c))
           let obj = extractRowByHeader(row, hmap)
-          if (!obj) obj = extractRow(row)
+          if (!obj) obj = extractRow(row.map(c => cleanCell(c)))
           if (obj) txnRows.push(obj)
         }
       } else {
         // No explicit header like "Trn Date"; attempt to parse every row
         for (let i = 0; i < csvRows.length; i++) {
-          const row = csvRows[i]
+          const row = csvRows[i].map(c => cleanCell(c))
           const obj = extractRow(row)
           if (obj) txnRows.push(obj)
         }
@@ -950,8 +959,8 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         for (let k = startIdx; k < lines.length; k++) {
           const l = lines[k]
           if (!l) continue
-          let cols = l.split('\t')
-          if (cols.length === 1) cols = l.split(/\s{2,}/)
+          let cols = l.split('\t').map(cleanCell)
+          if (cols.length === 1) cols = l.split(/\s{2,}/).map(cleanCell)
           const obj = extractRow(cols)
           if (obj) txnRows.push(obj)
         }
