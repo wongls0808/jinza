@@ -97,6 +97,17 @@ export async function ensureSchema() {
       opening_balance numeric default 0,
       created_at timestamptz default now()
     );
+
+    create table if not exists customer_receiving_accounts (
+      id serial primary key,
+      customer_id int references customers(id) on delete cascade,
+      account_name text not null,
+      bank_id int references banks(id) on delete restrict,
+      bank_account text not null,
+      currency_code text references currencies(code) on delete restrict,
+      opening_balance numeric default 0,
+      created_at timestamptz default now()
+    );
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)

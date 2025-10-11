@@ -49,6 +49,11 @@
           <template #default="{ row }">{{ formatMoney(row.opening_cny) }}</template>
         </el-table-column>
         <el-table-column prop="submitter" label="提交人" width="140" />
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openAccounts(row)">收款账户</el-button>
+          </template>
+        </el-table-column>
       </el-table>
       <div class="pager">
         <el-pagination
@@ -111,6 +116,65 @@
         <el-button type="primary" :loading="addDlg.loading" @click="doAdd">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 客户收款账户抽屉 -->
+    <el-drawer v-model="accDrawer.visible" size="60%" :title="(accDrawer.customer?.name || '') + ' · 收款账户'">
+      <div v-loading="accDrawer.loading">
+        <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+          <el-input v-model.trim="accDrawer.form.account_name" placeholder="账户名称" style="width:200px" />
+          <el-select v-model="accDrawer.form.bank_id" filterable placeholder="银行" style="width:220px">
+            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id">
+              <div style="display:inline-flex; align-items:center; gap:8px;">
+                <img :src="b.logo_url" style="height:16px" />
+                <span style="font-weight:600;">{{ b.zh }}</span>
+                <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ b.en }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <el-input v-model.trim="accDrawer.form.bank_account" placeholder="银行账户" style="width:220px" />
+          <el-select v-model="accDrawer.form.currency_code" placeholder="币种" style="width:140px">
+            <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
+          </el-select>
+          <el-input-number
+            v-model="accDrawer.form.opening_balance"
+            :precision="2"
+            :min="0"
+            :step="100"
+            controls-position="right"
+            placeholder="0.00"
+            :formatter="moneyFormatter"
+            :parser="moneyParser"
+            style="width:180px"
+          />
+          <el-button type="primary" @click="addCusAccount">添加</el-button>
+        </div>
+        <el-table :data="accDrawer.items" size="small" border style="width:100%">
+          <el-table-column type="index" width="60" />
+          <el-table-column prop="account_name" label="账户名称" min-width="160" />
+          <el-table-column label="银行" min-width="260">
+            <template #default="{ row }">
+              <div style="display:inline-flex; align-items:center; gap:8px;">
+                <img :src="row.bank_logo" style="height:16px" />
+                <span style="font-weight:600;">{{ row.bank_zh }}</span>
+                <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ row.bank_en }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="bank_account" label="银行账户" min-width="200" />
+          <el-table-column prop="currency_code" label="币种" width="100" />
+          <el-table-column prop="opening_balance" label="期初余额" width="140">
+            <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="100">
+            <template #default="{ row }">
+              <el-popconfirm title="确定删除？" @confirm="removeCusAccount(row)">
+                <template #reference><el-button link type="danger">删除</el-button></template>
+              </el-popconfirm>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -365,7 +429,7 @@ async function downloadTemplate() {
         'DEF,广州某某集团,0,0,3500,李四'
       ].join('\n')
       const content = '\ufeff' + [header, sample].join('\n')
-      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -415,6 +479,43 @@ function onPageSizeChange(ps) {
 function onPageChange(p) {
   page.value = p
   reload()
+}
+
+// 客户绑定的收款账户 Drawer
+const accDrawer = ref({ visible: false, loading: false, customer: null, items: [], banks: [], currencies: [], form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
+async function openAccounts(cus) {
+  accDrawer.value.visible = true
+  accDrawer.value.customer = cus
+  accDrawer.value.loading = true
+  try {
+    const [items, banks, currencies] = await Promise.all([
+      api.customerAccounts.list(cus.id),
+      api.banks.all(),
+      api.currencies.list()
+    ])
+    accDrawer.value.items = items
+    accDrawer.value.banks = banks
+    accDrawer.value.currencies = currencies
+    accDrawer.value.form = { account_name: '', bank_id: banks[0]?.id || null, bank_account: '', currency_code: currencies[0]?.code || 'CNY', opening_balance: 0 }
+  } finally {
+    accDrawer.value.loading = false
+  }
+}
+async function addCusAccount() {
+  const c = accDrawer.value.customer
+  const f = accDrawer.value.form
+  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请完整填写'); return }
+  await api.customerAccounts.create(c.id, f)
+  const items = await api.customerAccounts.list(c.id)
+  accDrawer.value.items = items
+  accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY', opening_balance: 0 }
+  ElMessage.success('已添加')
+}
+async function removeCusAccount(row) {
+  const c = accDrawer.value.customer
+  await api.customerAccounts.remove(c.id, row.id)
+  accDrawer.value.items = await api.customerAccounts.list(c.id)
+  ElMessage.success('已删除')
 }
 </script>
 

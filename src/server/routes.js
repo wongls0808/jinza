@@ -399,6 +399,39 @@ router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'
   res.json({ ok: true })
 })
 
+// Customer specific receiving accounts
+router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const cid = Number(req.params.id)
+  const rs = await query(`
+    select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+           b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
+    from customer_receiving_accounts a
+    left join banks b on b.id = a.bank_id
+    where a.customer_id = $1
+    order by a.id desc
+  `, [cid])
+  res.json(rs.rows)
+})
+
+router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const cid = Number(req.params.id)
+  const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
+  if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
+  const rs = await query(
+    'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5,$6) returning *',
+    [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase(), Number(opening_balance)||0]
+  )
+  res.json(rs.rows[0])
+})
+
+router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const cid = Number(req.params.id)
+  const aid = Number(req.params.aid)
+  const rs = await query('delete from customer_receiving_accounts where id=$1 and customer_id=$2', [aid, cid])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  res.json({ ok: true })
+})
+
 // Banks CRUD (server-managed)
 router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')

@@ -63,5 +63,12 @@ export const api = {
     list: () => request('/accounts'),
     create: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
     remove: (id) => request(`/accounts/${id}`, { method: 'DELETE' })
+  },
+
+  // Customer Accounts
+  customerAccounts: {
+    list: (customerId) => request(`/customers/${customerId}/accounts`),
+    create: (customerId, data) => request(`/customers/${customerId}/accounts`, { method: 'POST', body: JSON.stringify(data) }),
+    remove: (customerId, id) => request(`/customers/${customerId}/accounts/${id}`, { method: 'DELETE' })
   }
 }
