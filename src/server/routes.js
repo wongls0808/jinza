@@ -1,4 +1,4 @@
-  // 清理 Excel 导出 '="内容"' 包裹
+// 清理 Excel 导出 '="内容"' 包裹
   const cleanCell = (v) => {
     let s = String(v ?? '').trim()
     if (/^=".*"$/.test(s)) s = s.replace(/^="/, '').replace(/"$/, '')
@@ -645,7 +645,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     let x = String(s).trim()
     // Remove patterns like ="123456" or leading/trailing quotes
     x = x.replace(/^=\"?/, '').replace(/\"?$/, '')
-    x = x.replace(/^="?/, '').replace(/"?$/, '')
+    x = x.replace(/^"?/, '').replace(/"?$/, '')
     x = x.replace(/^'+|'+$/g, '')
     return x || null
   }
@@ -1011,14 +1011,14 @@ router.get('/receipts/transactions', authMiddleware(true), requirePerm('view_rec
   `, [term])
   const rs = await query(`
     select t.*, s.account_number, s.account_name,
-           ra.id as matched_account_id, ra.account_name as matched_account_name
-      from bank_transactions t
-      join bank_statements s on s.id = t.statement_id
-      left join receiving_accounts ra on ra.bank_account = s.account_number
-     where (coalesce(t.description,'') ilike $4 or coalesce(t.cheque_ref,'') ilike $4 or coalesce(s.account_number,'') ilike $4 or coalesce(s.account_name,'') ilike $4)
-     order by ${sortCol} ${ord}
-     offset $1 limit $2
-  `, [offset, Number(pageSize), sortCol, term])
+         ra.id as matched_account_id, ra.account_name as matched_account_name
+    from bank_transactions t
+    join bank_statements s on s.id = t.statement_id
+    left join receiving_accounts ra on ra.bank_account = s.account_number
+   where (coalesce(t.description,'') ilike $3 or coalesce(t.cheque_ref,'') ilike $3 or coalesce(s.account_number,'') ilike $3 or coalesce(s.account_name,'') ilike $3)
+   order by ${sortCol} ${ord}
+   offset $1 limit $2
+`, [offset, Number(pageSize), term])
   res.json({ total: Number(total.rows[0].count), items: rs.rows })
 })
 
