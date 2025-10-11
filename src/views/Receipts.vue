@@ -9,10 +9,8 @@
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
-          <el-upload :show-file-list="false" :http-request="noop">
-            <el-button size="small" @click="pickFile">{{ $t('receipts.import') }}</el-button>
-            <input ref="fileInput" type="file" accept=".csv" style="display:none" @change="onPicked" />
-          </el-upload>
+          <el-button size="small" @click="pickFile">{{ $t('receipts.import') }}</el-button>
+          <input ref="fileInput" type="file" accept=".csv" style="display:none" @change="onPicked" />
           <div class="spacer"></div>
           <el-input v-model.trim="q" size="small" :placeholder="$t('receipts.searchTxn')" style="width:220px" @keyup.enter.native="loadTxns" />
         </div>
@@ -72,7 +70,6 @@ const sort = ref('trn_date')
 const order = ref('asc')
 const q = ref('')
 
-function noop() {}
 function pickFile() { fileInput.value && fileInput.value.click() }
 const fileInput = ref(null)
 
