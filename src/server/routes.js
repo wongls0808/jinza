@@ -888,8 +888,18 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (toInsert.length) {
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
       const flat = toInsert.flatMap(r => [stmtId, r.trn_date, r.cheque_ref, r.description, r.debit, r.credit, r.ref1, r.ref2, r.ref3, r.ref4, r.ref5, r.ref6])
-      await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params}`, flat)
-      return { stmtId, count: toInsert.length, skipped: rows.length - toInsert.length }
+      let inserted = 0, skipped = rows.length - toInsert.length
+      if (toInsert.length) {
+        try {
+          await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params} ON CONFLICT DO NOTHING`, flat)
+          inserted = toInsert.length
+        } catch (e) {
+          // 唯一约束冲突自动跳过
+          if (e.code === '23505') skipped += 1
+          else throw e
+        }
+      }
+      return { stmtId, count: inserted, skipped }
     }
     return { stmtId, count: 0, skipped: rows.length }
   }
