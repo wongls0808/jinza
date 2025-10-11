@@ -48,18 +48,80 @@ const today = new Date().toLocaleDateString()
 </script>
 
 <style scoped>
-.home { padding: 8px; }
-.hero { margin: 8px 8px 16px; }
-.welcome { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
-.meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
+.home {
+  padding: 16px;
+  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+  min-height: 100vh;
+}
+.hero {
+  margin: 16px 16px 24px;
+  text-align: center;
+}
+.welcome {
+  font-size: 28px;
+  font-weight: 700;
+  color: #4f8cff;
+  letter-spacing: .2px;
+}
+.meta {
+  margin-top: 6px;
+  color: #6b7b8c;
+  font-size: 14px;
+}
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+  justify-content: center;
 }
-.home-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; border-radius: 14px; }
-.home-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
-.icon { font-size: 28px; }
-.name { margin-top: 8px; font-weight: 600; color: var(--el-text-color-primary); }
-.desc { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 13px; }
+.home-card {
+  cursor: pointer;
+  transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1);
+  border-radius: 22px;
+  box-shadow: 0 8px 32px rgba(79,140,255,0.10), 0 1.5px 8px rgba(79,140,255,0.08);
+  background: rgba(255,255,255,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 18px 22px 18px;
+}
+.home-card:hover {
+  transform: scale(1.04) rotateX(8deg) rotateY(-6deg);
+  box-shadow: 0 16px 48px rgba(79,140,255,0.18), 0 2px 12px rgba(79,140,255,0.10);
+}
+.icon {
+  font-size: 38px;
+  margin-bottom: 10px;
+  color: #4f8cff;
+  filter: drop-shadow(0 2px 8px #4f8cff33);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+.home-card:hover .icon {
+  transform: scale(1.12) rotateX(12deg) rotateY(-8deg);
+}
+.name {
+  margin-top: 8px;
+  font-weight: 700;
+  color: #4f8cff;
+  font-size: 18px;
+  text-align: center;
+}
+.desc {
+  margin-top: 6px;
+  color: #6b7b8c;
+  font-size: 14px;
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .home-card {
+    padding: 18px 6px 12px 6px;
+    border-radius: 14px;
+  }
+  .name { font-size: 16px; }
+  .desc { font-size: 13px; }
+}
 </style>
