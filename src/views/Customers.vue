@@ -125,8 +125,8 @@
       <div v-loading="accDrawer.loading">
         <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
           <el-input v-model.trim="accDrawer.form.account_name" :placeholder="$t('customers.accounts.accountName')" style="width:200px" />
-          <el-select v-model="accDrawer.form.bank_id" filterable :placeholder="$t('customers.accounts.bank')" style="width:220px">
-            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id">
+          <el-select v-model="accDrawer.form.bank_id" filterable clearable :placeholder="$t('customers.accounts.bank')" style="width:220px">
+            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div style="display:inline-flex; align-items:center; gap:8px;">
                 <img :src="b.logo_url" style="height:16px" />
                 <span style="font-weight:600;">{{ b.zh }}</span>
@@ -168,16 +168,16 @@
     </el-drawer>
     <!-- 编辑客户账户 -->
   <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="560px">
-      <el-form :model="editAcc.form" label-width="90px" class="form">
-        <el-form-item label="账户名称"><el-input v-model.trim="editAcc.form.account_name" /></el-form-item>
+      <el-form :model="editAcc.form" label-width="120px" size="small" class="form">
+        <el-form-item label="账户名称"><el-input v-model.trim="editAcc.form.account_name" placeholder="账户名称" clearable /></el-form-item>
         <el-form-item label="银行">
-          <el-select v-model="editAcc.form.bank_id" filterable style="width:100%">
-            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' ' + b.en" />
+          <el-select v-model="editAcc.form.bank_id" filterable clearable style="width:100%" placeholder="银行">
+            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en" />
           </el-select>
         </el-form-item>
-        <el-form-item label="银行账户"><el-input v-model.trim="editAcc.form.bank_account" /></el-form-item>
+        <el-form-item label="银行账户"><el-input v-model.trim="editAcc.form.bank_account" placeholder="银行账户" clearable /></el-form-item>
         <el-form-item label="币种">
-          <el-select v-model="editAcc.form.currency_code" style="width:100%">
+          <el-select v-model="editAcc.form.currency_code" clearable style="width:100%" placeholder="币种">
             <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>

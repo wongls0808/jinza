@@ -31,7 +31,7 @@
     </el-card>
 
     <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" width="520px">
-      <el-form :model="dlg.form" label-width="90px" class="form">
+      <el-form :model="dlg.form" label-width="140px" size="small" class="form">
         <el-form-item :label="$t('banks.labels.code')" v-if="dlg.mode==='add'">
           <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" />
         </el-form-item>
@@ -42,7 +42,7 @@
           <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
         <el-form-item :label="$t('banks.labels.logoUrl')">
-          <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" />
+          <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" clearable />
         </el-form-item>
         <el-form-item :label="$t('banks.labels.uploadFile')">
           <input type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />

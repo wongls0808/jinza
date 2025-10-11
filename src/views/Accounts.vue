@@ -41,11 +41,13 @@
     </el-card>
 
     <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="600px">
-      <el-form :model="dlg.form" label-width="90px" class="form">
-        <el-form-item :label="$t('accounts.form.accountName')"><el-input v-model.trim="dlg.form.account_name" /></el-form-item>
+      <el-form :model="dlg.form" label-width="120px" size="small" class="form">
+        <el-form-item :label="$t('accounts.form.accountName')">
+          <el-input v-model.trim="dlg.form.account_name" :placeholder="$t('accounts.form.accountName')" clearable />
+        </el-form-item>
         <el-form-item :label="$t('accounts.form.bank')">
-          <el-select v-model="dlg.form.bank_id" filterable style="width:100%">
-            <el-option v-for="b in banks" :key="b.id" :value="b.id">
+          <el-select v-model="dlg.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('accounts.form.bank')">
+            <el-option v-for="b in banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div class="bankopt">
                 <img class="logo" :src="b.logo_url" />
                 <span class="zh">{{ b.zh }}</span>
@@ -54,9 +56,11 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item :label="$t('accounts.form.bankAccount')"><el-input v-model.trim="dlg.form.bank_account" /></el-form-item>
+        <el-form-item :label="$t('accounts.form.bankAccount')">
+          <el-input v-model.trim="dlg.form.bank_account" :placeholder="$t('accounts.form.bankAccount')" clearable />
+        </el-form-item>
         <el-form-item :label="$t('accounts.form.currency')">
-          <el-select v-model="dlg.form.currency_code" style="width:100%">
+          <el-select v-model="dlg.form.currency_code" clearable style="width:100%" :placeholder="$t('accounts.form.currency')">
             <el-option v-for="c in currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>
