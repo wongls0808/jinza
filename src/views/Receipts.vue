@@ -22,9 +22,6 @@
         </el-table-column>
         <el-table-column prop="account_number" :label="$t('receipts.accountNumber')" width="150" />
         <el-table-column prop="account_name" :label="$t('receipts.accountName')" width="200" />
-        <el-table-column prop="matched_account_name" :label="$t('receipts.matchedAccount')" width="180">
-          <template #default="{ row }">{{ row.matched_account_name || '-' }}</template>
-        </el-table-column>
         <el-table-column prop="cheque_ref" :label="$t('receipts.cheque')" width="140" />
         <el-table-column prop="description" :label="$t('receipts.desc')" />
         <el-table-column prop="debit" :label="$t('receipts.debit')" sortable="custom" width="120">

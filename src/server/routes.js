@@ -764,6 +764,13 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
           const obj = extractRow(row)
           if (obj) txnRows.push(obj)
         }
+      } else {
+        // No explicit header like "Trn Date"; attempt to parse every row
+        for (let i = 0; i < csvRows.length; i++) {
+          const row = csvRows[i]
+          const obj = extractRow(row)
+          if (obj) txnRows.push(obj)
+        }
       }
     } catch {}
 
