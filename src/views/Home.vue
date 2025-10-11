@@ -5,32 +5,27 @@
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
     <div class="grid">
-  <el-card v-if="has('view_receipts')" class="home-card jelly" v-tilt @click='go("/receipts")'>
-    <div class="icon"><OfficeBuilding /></div>
-    <div class="name">入账管理</div>
-    <div class="desc">银行流水、批量导入与去重</div>
-  </el-card>
-  <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click='go("/users")'>
+  <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
   <div class="icon"><User /></div>
         <div class="name">{{ t('home.users') }}</div>
         <div class="desc">{{ t('home.usersDesc') }}</div>
       </el-card>
-  <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click='go("/customers")'>
+  <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
   <div class="icon"><UserFilled /></div>
         <div class="name">{{ t('home.customers') }}</div>
         <div class="desc">{{ t('home.customersDesc') }}</div>
       </el-card>
-  <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click='go("/banks")'>
+  <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
   <div class="icon"><OfficeBuilding /></div>
         <div class="name">银行列表</div>
         <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
       </el-card>
-  <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click='go("/accounts")'>
+  <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
   <div class="icon"><OfficeBuilding /></div>
         <div class="name">收款账户</div>
         <div class="desc">银行账户、币种与期初余额</div>
       </el-card>
-  <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click='go("/settings")'>
+  <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>
         <div class="desc">{{ t('home.settingsDesc') }}</div>
@@ -44,7 +39,6 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
-import { OfficeBuilding, User, UserFilled, Setting } from '@element-plus/icons-vue'
 const router = useRouter()
 const go = (path) => router.push(path)
 const { has, state } = useAuth()

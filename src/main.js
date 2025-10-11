@@ -18,8 +18,6 @@ app.component('User', User)
 app.component('UserFilled', UserFilled)
 app.component('Box', Box)
 app.component('Document', Document)
-// 避免与 TS 全局 Document 类型产生解析冲突，提供一个安全别名
-app.component('DocumentIcon', Document)
 app.component('Setting', Setting)
 app.component('Lock', Lock)
 app.component('OfficeBuilding', OfficeBuilding)
