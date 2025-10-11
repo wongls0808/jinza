@@ -613,23 +613,19 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
 // ===== Receipts (Bank Statements) =====
 // Import CSV (raw text) and persist statement + transactions
 router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  try {
-    const text = (req.body || '').replace(/\r\n/g, '\n')
-    if (!text) return res.status(400).json({ error: 'empty body' })
-    const lines = text.split(/\n/).map(s => s.trim())
-    // Parse header key-values like "Account Number:\t3236912309"
-    const kv = {}
-    let i = 0
-    for (; i < lines.length; i++) {
-      const line = lines[i]
-      if (!line) continue
-      if (/^Trn\.?\s*Date/i.test(line) || /^Transaction Type/i.test(line)) break
-      const m = /^(.*?):\s*(.*)$/.exec(line)
-      if (m) kv[m[1].trim()] = m[2].trim()
-    }
-    // Skip until header row begins with Trn. Date
-    for (; i < lines.length; i++) { if (/^Trn\.?\s*Date/i.test(lines[i])) { i++; break } }
-    // Insert statement
+  const num = (v) => v == null ? null : Number(String(v).replace(/[^0-9.\-]/g, ''))
+  const parseDate = (s) => {
+    if (!s) return null
+    const str = String(s).trim()
+    // dd/MM/yyyy -> convert to MM/dd/yyyy for Date()
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return new Date(str.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3'))
+    // yyyy-MM-dd or yyyy/MM/dd
+    if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(str)) return new Date(str)
+    // MM/dd/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return new Date(str)
+    return null
+  }
+  const insertAll = async (kv, rows) => {
     const stmtIns = await query(
       `insert into bank_statements(
         account_number, account_name, account_type,
@@ -641,53 +637,129 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         raw_filename, uploaded_by
       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       returning id`, [
-        kv['Account Number'], kv['Account Name'], kv['Account Type'],
-        kv['From Date'] ? new Date(kv['From Date']) : null,
-        kv['To Date'] ? new Date(kv['To Date']) : null,
-        kv['Available Balance'] ? Number(String(kv['Available Balance']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['Current Balance'] ? Number(String(kv['Current Balance']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['Generation Date'] ? new Date(kv['Generation Date']) : null,
+        kv['Account Number'] || kv['Account No.'] || kv['ACCOUNT NUMBER'] || null,
+        kv['Account Name'] || kv['ACCOUNT NAME'] || null,
+        kv['Account Type'] || kv['ACCOUNT TYPE'] || null,
+        parseDate(kv['From Date'] || kv['Period From']),
+        parseDate(kv['To Date'] || kv['Period To']),
+        num(kv['Available Balance']),
+        num(kv['Current Balance']),
+        parseDate(kv['Generation Date']),
         kv['Generation Time'] || null,
-        kv['Interest Paid YTD'] ? Number(String(kv['Interest Paid YTD']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['Interest Accrual'] ? Number(String(kv['Interest Accrual']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['Hold Amount'] ? Number(String(kv['Hold Amount']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['One Day Float'] ? Number(String(kv['One Day Float']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['Online Float'] ? Number(String(kv['Online Float']).replace(/[^0-9.\-]/g, '')) : null,
-        kv['OD Limit'] ? Number(String(kv['OD Limit']).replace(/[^0-9.\-]/g, '')) : null,
+        num(kv['Interest Paid YTD']),
+        num(kv['Interest Accrual']),
+        num(kv['Hold Amount']),
+        num(kv['One Day Float']),
+        num(kv['Online Float']),
+        num(kv['OD Limit']),
         (req.query.filename || ''), req.user.id
       ])
     const stmtId = stmtIns.rows[0].id
-
-    const txns = []
-    for (; i < lines.length; i++) {
-      const l = lines[i]
-      if (!l) continue
-      // Expect TSV-like or multi-space delimited; split conservatively by tab, else by 2+ spaces
-      let cols = l.split('\t')
-      if (cols.length === 1) cols = l.split(/\s{2,}/)
-      // Expected columns: date, cheque/ref, description, debit, credit, ref1..ref6
-      if (cols.length < 3) continue
-      const [d, cheque, desc, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6] = cols
-      // Skip header or non-date lines
-      if (!/\d{2}\/\d{2}\/\d{4}/.test(d)) continue
-      txns.push([
-        stmtId,
-        new Date(d.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3')),
-        cheque || null,
-        desc || null,
-        debit ? Number(String(debit).replace(/[^0-9.\-]/g, '')) : null,
-        credit ? Number(String(credit).replace(/[^0-9.\-]/g, '')) : null,
-        ref1 || null, ref2 || null, ref3 || null, ref4 || null, ref5 || null, ref6 || null
-      ])
-    }
-    if (txns.length) {
-      const params = txns.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
-      const flat = txns.flat()
+    if (rows.length) {
+      const params = rows.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
+      const flat = rows.flatMap(r => [stmtId, r.trn_date, r.cheque_ref, r.description, r.debit, r.credit, r.ref1, r.ref2, r.ref3, r.ref4, r.ref5, r.ref6])
       await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params}`, flat)
+      return { stmtId, count: rows.length }
     }
-    res.json({ ok: true, statement_id: stmtId, inserted: txns.length })
+    return { stmtId, count: 0 }
+  }
+
+  try {
+    let text = req.body || ''
+    if (!text || typeof text !== 'string') return res.status(400).json({ error: 'empty body' })
+    text = text.replace(/^\ufeff/, '').replace(/\r\n/g, '\n')
+
+    // First pass: try CSV mode
+    let kv = {}
+    let txnRows = []
+    try {
+      const csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true })
+      // collect kv before header
+      let headerIdx = -1
+      for (let i = 0; i < csvRows.length; i++) {
+        const row = csvRows[i].map(c => String(c).trim())
+        const first = row[0] || ''
+        if (/^Trn\.?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
+        if (row.length >= 2 && first) {
+          const key = first.replace(/:$/, '')
+          kv[key] = row[1]
+        }
+      }
+      if (headerIdx >= 0) {
+        for (let i = headerIdx + 1; i < csvRows.length; i++) {
+          const row = csvRows[i]
+          if (!row || row.length === 0) continue
+          const d = (row[0] || '').toString().trim()
+          if (!/\d{2}\/\d{2}\/\d{4}/.test(d) && !/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(d)) continue
+          const obj = {
+            trn_date: parseDate(d),
+            cheque_ref: (row[1] ?? '').toString().trim() || null,
+            description: (row[2] ?? '').toString().trim() || null,
+            debit: row[3] != null && row[3] !== '' ? num(row[3]) : null,
+            credit: row[4] != null && row[4] !== '' ? num(row[4]) : null,
+            ref1: row[5] || null,
+            ref2: row[6] || null,
+            ref3: row[7] || null,
+            ref4: row[8] || null,
+            ref5: row[9] || null,
+            ref6: row[10] || null,
+          }
+          txnRows.push(obj)
+        }
+      }
+    } catch {}
+
+    // Fallback: whitespace/TSV mode
+    if (!txnRows.length) {
+      const lines = text.split(/\n/).map(s => s.trim())
+      let i = 0
+      for (; i < lines.length; i++) {
+        const line = lines[i]
+        if (!line) continue
+        if (/^Trn\.?\s*Date/i.test(line) || /^Transaction Type/i.test(line)) break
+        const m = /^(.*?)[\t,:]\s*(.*)$/.exec(line) // support key: value and key, value
+        if (m) kv[m[1].trim()] = m[2].trim()
+      }
+      for (; i < lines.length; i++) { if (/^Trn\.?\s*Date/i.test(lines[i])) { i++; break } }
+      for (; i < lines.length; i++) {
+        const l = lines[i]
+        if (!l) continue
+        let cols = l.split('\t')
+        if (cols.length === 1) cols = l.split(/\s{2,}/)
+        if (cols.length < 3) continue
+        const [d, cheque, desc, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6] = cols
+        if (!/\d{2}\/\d{2}\/\d{4}/.test(d)) continue
+        txnRows.push({
+          trn_date: parseDate(d),
+          cheque_ref: cheque || null,
+          description: desc || null,
+          debit: debit ? num(debit) : null,
+          credit: credit ? num(credit) : null,
+          ref1: ref1 || null, ref2: ref2 || null, ref3: ref3 || null, ref4: ref4 || null, ref5: ref5 || null, ref6: ref6 || null
+        })
+      }
+    }
+
+    // Insert with one-time ensureSchema retry on relation-missing
+    try {
+      const { stmtId, count } = await insertAll(kv, txnRows)
+      return res.json({ ok: true, statement_id: stmtId, inserted: count })
+    } catch (e) {
+      if (e && (e.code === '42P01' || /relation\s+\"?bank_statements\"?\s+does not exist/i.test(e.message))) {
+        try {
+          await ensureSchema()
+          const { stmtId, count } = await insertAll(kv, txnRows)
+          return res.json({ ok: true, statement_id: stmtId, inserted: count })
+        } catch (e2) {
+          console.error('receipts import retry failed', e2)
+          return res.status(400).json({ error: 'import failed' })
+        }
+      }
+      console.error('receipts import failed', e)
+      return res.status(400).json({ error: 'import failed' })
+    }
   } catch (e) {
-    console.error('receipts import failed', e)
+    console.error('receipts import failed (outer)', e)
     res.status(400).json({ error: 'import failed' })
   }
 })

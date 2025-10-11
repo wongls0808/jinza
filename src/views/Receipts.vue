@@ -81,8 +81,16 @@ async function onPicked(e) {
   if (!f) return
   try {
     const text = await f.text()
-    await api.receipts.importCsv(text, f.name || '')
-    ElMessage.success('导入成功')
+    const res = await api.receipts.importCsv(text, f.name || '')
+    if (res && typeof res.inserted === 'number') {
+      if (res.inserted > 0) {
+        ElMessage.success(`导入成功，新增 ${res.inserted} 条交易`)
+      } else {
+        ElMessage.warning('导入完成，但未识别到交易行，请检查 CSV 格式')
+      }
+    } else {
+      ElMessage.success('导入成功')
+    }
     await loadStmts()
   } catch {
     ElMessage.error('导入失败')
