@@ -1,3 +1,1 @@
--- 清空所有银行交易和对账单数据
-TRUNCATE TABLE bank_transactions RESTART IDENTITY CASCADE;
-TRUNCATE TABLE bank_statements RESTART IDENTITY CASCADE;
+
