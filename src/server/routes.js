@@ -613,17 +613,72 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
 // ===== Receipts (Bank Statements) =====
 // Import CSV (raw text) and persist statement + transactions
 router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const num = (v) => v == null ? null : Number(String(v).replace(/[^0-9.\-]/g, ''))
+  const num = (v) => v == null || v === '' ? null : Number(String(v).replace(/[^0-9.\-]/g, ''))
+  const isNum = (v) => {
+    if (v == null || v === '') return false
+    const n = num(v)
+    return typeof n === 'number' && !isNaN(n)
+  }
+  const cleanCheque = (s) => {
+    if (s == null) return null
+    let x = String(s).trim()
+    // Remove patterns like ="123456" or leading/trailing quotes
+    x = x.replace(/^=\"?/, '').replace(/\"?$/, '')
+    x = x.replace(/^="?/, '').replace(/"?$/, '')
+    x = x.replace(/^'+|'+$/g, '')
+    return x || null
+  }
   const parseDate = (s) => {
     if (!s) return null
     const str = String(s).trim()
-    // dd/MM/yyyy -> convert to MM/dd/yyyy for Date()
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return new Date(str.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$2/$1/$3'))
+    // dd/MM/yyyy or dd-MM-yyyy or dd.MM.yyyy -> convert to MM/dd/yyyy
+    if (/^\d{2}[\/.\-]\d{2}[\/.\-]\d{4}$/.test(str)) {
+      const m = str.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/)
+      if (m) return new Date(`${m[2]}/${m[1]}/${m[3]}`)
+    }
     // yyyy-MM-dd or yyyy/MM/dd
     if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(str)) return new Date(str)
     // MM/dd/yyyy
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return new Date(str)
     return null
+  }
+  const extractRow = (rawRow) => {
+    const row = (rawRow || []).map(c => (c == null ? '' : String(c).trim()))
+    const d = row[0]
+    const dateObj = parseDate(d)
+    if (!dateObj) return null
+    const cheque = cleanCheque(row[1])
+    // Find amount columns near the end (up to 2 numeric values)
+    let debit = null, credit = null
+    const numsIdx = []
+    for (let i = row.length - 1; i >= 2; i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
+    if (numsIdx.length === 0 && isNum(row[3])) numsIdx.push(3)
+    if (numsIdx.length === 1) {
+      // Only one numeric column: decide sign? keep in credit and debit null if positive
+      const n = num(row[numsIdx[0]])
+      if (n != null && !isNaN(n)) {
+        // Heuristic: positive as credit, negative as debit
+        if (n < 0) debit = Math.abs(n); else credit = n
+      }
+    } else if (numsIdx.length >= 2) {
+      const n1 = num(row[numsIdx[1]])
+      const n0 = num(row[numsIdx[0]])
+      // Assign smaller index as debit (usually left), larger index as credit (right)
+      const a = Math.min(numsIdx[0], numsIdx[1])
+      const b = Math.max(numsIdx[0], numsIdx[1])
+      debit = num(row[a])
+      credit = num(row[b])
+      // Guard invalid
+      if (debit != null && credit != null && debit > 0 && credit > 0) {
+        // keep both
+      }
+    }
+    // Build description from columns between index 2 and first amount index (exclusive)
+    const cut = numsIdx.length ? Math.min(...numsIdx) : row.length
+    const descParts = []
+    for (let i = 2; i < cut; i++) { const v = row[i]; if (v) descParts.push(v) }
+    const description = descParts.join(' ').trim() || null
+    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1: null, ref2: null, ref3: null, ref4: null, ref5: null, ref6: null }
   }
   const insertAll = async (kv, rows) => {
     const stmtIns = await query(
@@ -655,13 +710,31 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         (req.query.filename || ''), req.user.id
       ])
     const stmtId = stmtIns.rows[0].id
-    if (rows.length) {
-      const params = rows.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
-      const flat = rows.flatMap(r => [stmtId, r.trn_date, r.cheque_ref, r.description, r.debit, r.credit, r.ref1, r.ref2, r.ref3, r.ref4, r.ref5, r.ref6])
-      await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params}`, flat)
-      return { stmtId, count: rows.length }
+    let toInsert = rows
+    // Suppress duplicates for same account across existing statements: (account_number, date, cheque_ref, debit, credit)
+    const accNo = kv['Account Number'] || kv['Account No.'] || kv['ACCOUNT NUMBER'] || null
+    if (accNo && rows.length) {
+      const tuples = rows.map(r => [r.trn_date?.toISOString().slice(0,10), r.cheque_ref || '', r.debit || 0, r.credit || 0])
+      const params = tuples.map((_, i) => `($${i*4+1},$${i*4+2},$${i*4+3},$${i*4+4})`).join(',')
+      const flat = tuples.flat()
+      const existed = await query(
+        `select t.trn_date::date as d, coalesce(t.cheque_ref,'') as c, coalesce(t.debit,0) as db, coalesce(t.credit,0) as cr
+           from bank_transactions t
+           join bank_statements s on s.id = t.statement_id
+          where s.account_number = $${flat.length+1}
+            and (t.trn_date::date, coalesce(t.cheque_ref,''), coalesce(t.debit,0), coalesce(t.credit,0)) in (values ${params})`,
+        [...flat, accNo]
+      )
+      const set = new Set(existed.rows.map(r => `${r.d}|${r.c}|${r.db}|${r.cr}`))
+      toInsert = rows.filter(r => !set.has(`${r.trn_date?.toISOString().slice(0,10)}|${r.cheque_ref || ''}|${r.debit || 0}|${r.credit || 0}`))
     }
-    return { stmtId, count: 0 }
+    if (toInsert.length) {
+      const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
+      const flat = toInsert.flatMap(r => [stmtId, r.trn_date, r.cheque_ref, r.description, r.debit, r.credit, r.ref1, r.ref2, r.ref3, r.ref4, r.ref5, r.ref6])
+      await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params}`, flat)
+      return { stmtId, count: toInsert.length, skipped: rows.length - toInsert.length }
+    }
+    return { stmtId, count: 0, skipped: rows.length }
   }
 
   try {
@@ -688,23 +761,8 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       if (headerIdx >= 0) {
         for (let i = headerIdx + 1; i < csvRows.length; i++) {
           const row = csvRows[i]
-          if (!row || row.length === 0) continue
-          const d = (row[0] || '').toString().trim()
-          if (!/\d{2}\/\d{2}\/\d{4}/.test(d) && !/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(d)) continue
-          const obj = {
-            trn_date: parseDate(d),
-            cheque_ref: (row[1] ?? '').toString().trim() || null,
-            description: (row[2] ?? '').toString().trim() || null,
-            debit: row[3] != null && row[3] !== '' ? num(row[3]) : null,
-            credit: row[4] != null && row[4] !== '' ? num(row[4]) : null,
-            ref1: row[5] || null,
-            ref2: row[6] || null,
-            ref3: row[7] || null,
-            ref4: row[8] || null,
-            ref5: row[9] || null,
-            ref6: row[10] || null,
-          }
-          txnRows.push(obj)
+          const obj = extractRow(row)
+          if (obj) txnRows.push(obj)
         }
       }
     } catch {}
@@ -726,30 +784,21 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         if (!l) continue
         let cols = l.split('\t')
         if (cols.length === 1) cols = l.split(/\s{2,}/)
-        if (cols.length < 3) continue
-        const [d, cheque, desc, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6] = cols
-        if (!/\d{2}\/\d{2}\/\d{4}/.test(d)) continue
-        txnRows.push({
-          trn_date: parseDate(d),
-          cheque_ref: cheque || null,
-          description: desc || null,
-          debit: debit ? num(debit) : null,
-          credit: credit ? num(credit) : null,
-          ref1: ref1 || null, ref2: ref2 || null, ref3: ref3 || null, ref4: ref4 || null, ref5: ref5 || null, ref6: ref6 || null
-        })
+        const obj = extractRow(cols)
+        if (obj) txnRows.push(obj)
       }
     }
 
     // Insert with one-time ensureSchema retry on relation-missing
     try {
-      const { stmtId, count } = await insertAll(kv, txnRows)
-      return res.json({ ok: true, statement_id: stmtId, inserted: count })
+      const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
+      return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped })
     } catch (e) {
       if (e && (e.code === '42P01' || /relation\s+\"?bank_statements\"?\s+does not exist/i.test(e.message))) {
         try {
           await ensureSchema()
-          const { stmtId, count } = await insertAll(kv, txnRows)
-          return res.json({ ok: true, statement_id: stmtId, inserted: count })
+          const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
+          return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped })
         } catch (e2) {
           console.error('receipts import retry failed', e2)
           return res.status(400).json({ error: 'import failed' })
@@ -762,6 +811,33 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     console.error('receipts import failed (outer)', e)
     res.status(400).json({ error: 'import failed' })
   }
+})
+
+// List all transactions across statements, with account info and matched receiving account
+router.get('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const { page = 1, pageSize = 20, sort = 'trn_date', order = 'asc', q = '' } = req.query
+  const offset = (Number(page) - 1) * Number(pageSize)
+  const sortMap = { trn_date: 't.trn_date', debit: 't.debit', credit: 't.credit', account_number: 's.account_number' }
+  const sortCol = sortMap[String(sort)] || 't.trn_date'
+  const ord = String(order).toLowerCase() === 'desc' ? 'desc' : 'asc'
+  const term = `%${q}%`
+  const total = await query(`
+    select count(*)
+      from bank_transactions t
+      join bank_statements s on s.id = t.statement_id
+     where (coalesce(t.description,'') ilike $1 or coalesce(t.cheque_ref,'') ilike $1 or coalesce(s.account_number,'') ilike $1 or coalesce(s.account_name,'') ilike $1)
+  `, [term])
+  const rs = await query(`
+    select t.*, s.account_number, s.account_name,
+           ra.id as matched_account_id, ra.account_name as matched_account_name
+      from bank_transactions t
+      join bank_statements s on s.id = t.statement_id
+      left join receiving_accounts ra on ra.bank_account = s.account_number
+     where (coalesce(t.description,'') ilike $4 or coalesce(t.cheque_ref,'') ilike $4 or coalesce(s.account_number,'') ilike $4 or coalesce(s.account_name,'') ilike $4)
+     order by ${sortCol} ${ord}
+     offset $1 limit $2
+  `, [offset, Number(pageSize), sortCol, term])
+  res.json({ total: Number(total.rows[0].count), items: rs.rows })
 })
 
 router.get('/receipts/statements', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {

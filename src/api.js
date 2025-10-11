@@ -56,7 +56,8 @@ export const api = {
     receipts: {
       importCsv: (text, filename='') => request(`/receipts/import?${new URLSearchParams({ filename }).toString() }`, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
       listStatements: (params={}) => request(`/receipts/statements?${new URLSearchParams(params).toString()}`),
-      listTxns: (id, params={}) => request(`/receipts/${id}/transactions?${new URLSearchParams(params).toString()}`)
+      listTxns: (id, params={}) => request(`/receipts/${id}/transactions?${new URLSearchParams(params).toString()}`),
+      listAllTransactions: (params={}) => request(`/receipts/transactions?${new URLSearchParams(params).toString()}`)
     },
   // Banks
   requestBanks: () => request('/banks'),
