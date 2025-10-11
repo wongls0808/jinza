@@ -659,15 +659,22 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
   }
   const extractRow = (rawRow) => {
     const row = (rawRow || []).map(c => (c == null ? '' : String(c).trim()))
-    const d = row[0]
-    const dateObj = parseDate(d)
-    if (!dateObj) return null
-    const cheque = cleanCheque(row[1])
-    // Find amount columns near the end (up to 2 numeric values)
+    // Find a date cell within the first 6 columns
+    let dateIdx = -1
+    let dateObj = null
+    const scanLimit = Math.min(row.length, 6)
+    for (let i = 0; i < scanLimit; i++) {
+      const d = row[i]
+      const parsed = parseDate(d)
+      if (parsed) { dateIdx = i; dateObj = parsed; break }
+    }
+    if (dateIdx < 0) return null
+    const cheque = cleanCheque(row[dateIdx + 1])
+    // Find amount columns near the end (up to 2 numeric values) after dateIdx
     let debit = null, credit = null
     const numsIdx = []
-    for (let i = row.length - 1; i >= 2; i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
-    if (numsIdx.length === 0 && isNum(row[3])) numsIdx.push(3)
+    for (let i = row.length - 1; i > dateIdx + 1; i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
+    if (numsIdx.length === 0 && isNum(row[dateIdx + 2])) numsIdx.push(dateIdx + 2)
     if (numsIdx.length === 1) {
       // Only one numeric column: decide sign? keep in credit and debit null if positive
       const n = parseAmount(row[numsIdx[0]])
@@ -689,7 +696,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     // Build description from columns between index 2 and first amount index (exclusive)
     const cut = numsIdx.length ? Math.min(...numsIdx) : row.length
     const descParts = []
-    for (let i = 2; i < cut; i++) { const v = row[i]; if (v) descParts.push(v) }
+    for (let i = dateIdx + 2; i < cut; i++) { const v = row[i]; if (v) descParts.push(v) }
     const description = descParts.join(' ').trim() || null
     return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1: null, ref2: null, ref3: null, ref4: null, ref5: null, ref6: null }
   }
