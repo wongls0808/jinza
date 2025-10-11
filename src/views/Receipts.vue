@@ -28,7 +28,7 @@
         <el-table-column prop="reference" label="Reference" width="180">
           <template #default="{ row }">{{ [row.ref1, row.ref2, row.ref3].filter(Boolean).join(' ') }}</template>
         </el-table-column>
-        <el-table-column prop="description" :label="$t('receipts.desc')" />
+  <el-table-column prop="description" :label="$t('receipts.desc')" width="220" />
         <el-table-column prop="debit" :label="$t('receipts.debit')" sortable="custom" width="120">
           <template #default="{ row }">{{ money(row.debit) }}</template>
         </el-table-column>
