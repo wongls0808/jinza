@@ -897,15 +897,12 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         stmtId,
         r.trn_date ?? null,
         cleanText(r.cheque_ref),
-        cleanText(r.description),
         r.debit ?? null,
         r.credit ?? null,
         cleanText(r.ref1),
         cleanText(r.ref2),
         cleanText(r.ref3),
-        cleanText(r.ref4),
-        cleanText(r.ref5),
-        cleanText(r.ref6)
+        cleanText(r.account_number)
       ])
       let inserted = 0, skipped = rows.length - toInsert.length
       if (toInsert.length) {
