@@ -895,7 +895,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       let inserted = 0, skipped = rows.length - toInsert.length
       if (toInsert.length) {
         try {
-          await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params} ON CONFLICT DO NOTHING`, flat)
+          await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params} ON CONFLICT ON CONSTRAINT bank_transactions_unique_idx DO NOTHING`, flat)
           inserted = toInsert.length
         } catch (e) {
           // 唯一约束冲突自动跳过
