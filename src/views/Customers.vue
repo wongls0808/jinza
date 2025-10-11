@@ -34,7 +34,7 @@
         size="small"
         border
         style="width: 100%"
-        @selection-change="(val)=> selection = val"
+        @selection-change="(val)=> selection.value = val"
         @sort-change="onSort"
         @header-dragend="onColResize"
       >
@@ -140,10 +140,10 @@
           </el-select>
           <el-button type="primary" @click="addCusAccount">{{ $t('common.add') }}</el-button>
         </div>
-        <el-table :data="accDrawer.items" size="small" border style="width:100%">
-          <el-table-column type="index" :label="$t('customers.fields.index')" width="60" />
-          <el-table-column prop="account_name" :label="$t('customers.accounts.accountName')" width="160" />
-          <el-table-column :label="$t('customers.accounts.bank')" width="260">
+        <el-table :data="accDrawer.items" size="small" border style="width:100%" @header-dragend="onColResizeAcc">
+          <el-table-column type="index" column-key="__idx" :label="$t('customers.fields.index')" :width="colWAcc('__idx', 60)" />
+          <el-table-column prop="account_name" :label="$t('customers.accounts.accountName')" :width="colWAcc('account_name', 160)" />
+          <el-table-column column-key="bank" :label="$t('customers.accounts.bank')" :width="colWAcc('bank', 260)">
             <template #default="{ row }">
               <div style="display:inline-flex; align-items:center; gap:8px;">
                 <img :src="row.bank_logo" style="height:16px" />
@@ -152,8 +152,8 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="bank_account" :label="$t('customers.accounts.bankAccount')" width="200" />
-          <el-table-column prop="currency_code" :label="$t('customers.accounts.currency')" width="100" />
+          <el-table-column prop="bank_account" :label="$t('customers.accounts.bankAccount')" :width="colWAcc('bank_account', 200)" />
+          <el-table-column prop="currency_code" :label="$t('customers.accounts.currency')" :width="colWAcc('currency_code', 100)" />
           
           <el-table-column :label="$t('customers.fields.ops')" width="160">
             <template #default="{ row }">
@@ -199,6 +199,8 @@ import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 
 const { colW, onColResize, reset: resetTableMem } = useTableMemory('customers')
+// 客户抽屉里的账户表格使用单独的列宽记忆 key，避免与主列表互相影响
+const { colW: colWAcc, onColResize: onColResizeAcc } = useTableMemory('customer-accounts')
 
 const tableRef = ref()
 const rows = ref([])
@@ -461,6 +463,7 @@ async function downloadTemplate() {
   }
 }
 
+// 排序
 function onSort({ prop, order: ord }) {
   if (!prop) return
   sort.value = prop
@@ -468,8 +471,13 @@ function onSort({ prop, order: ord }) {
   reload()
 }
 
-function formatMoney(v) { return Number(v||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function formatPercent(v) { return Number(v||0).toFixed(2) }
+// 显示格式化
+function formatMoney(v) {
+  return Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function formatPercent(v) {
+  return Number(v || 0).toFixed(2)
+}
 
 // InputNumber 千分位展示与两位小数解析
 function moneyFormatter(value) {
@@ -498,7 +506,16 @@ function onPageChange(p) {
 }
 
 // 客户绑定的收款账户 Drawer
-const accDrawer = ref({ visible: false, loading: false, customer: null, items: [], banks: [], currencies: [], form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY' } })
+const accDrawer = ref({
+  visible: false,
+  loading: false,
+  customer: null,
+  items: [],
+  banks: [],
+  currencies: [],
+  form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY' }
+})
+
 async function openAccounts(cus) {
   accDrawer.value.visible = true
   accDrawer.value.customer = cus
@@ -512,11 +529,12 @@ async function openAccounts(cus) {
     accDrawer.value.items = items
     accDrawer.value.banks = banks
     accDrawer.value.currencies = currencies
-  accDrawer.value.form = { account_name: '', bank_id: banks[0]?.id || null, bank_account: '', currency_code: currencies[0]?.code || 'CNY' }
+    accDrawer.value.form = { account_name: '', bank_id: banks[0]?.id || null, bank_account: '', currency_code: currencies[0]?.code || 'CNY' }
   } finally {
     accDrawer.value.loading = false
   }
 }
+
 async function addCusAccount() {
   const c = accDrawer.value.customer
   const f = accDrawer.value.form
@@ -537,6 +555,7 @@ async function addCusAccount() {
   accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY' }
   ElMessage.success('已添加')
 }
+
 async function removeCusAccount(row) {
   const c = accDrawer.value.customer
   await api.customerAccounts.remove(c.id, row.id)
@@ -546,11 +565,13 @@ async function removeCusAccount(row) {
 
 // 编辑客户账户
 const editAcc = ref({ visible: false, loading: false, id: null, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY' } })
+
 function openEditCus(row) {
   editAcc.value.visible = true
   editAcc.value.id = row.id
   editAcc.value.form = { account_name: row.account_name, bank_id: row.bank_id, bank_account: row.bank_account, currency_code: row.currency_code }
 }
+
 async function doEditCusAccount() {
   const c = accDrawer.value.customer
   const id = editAcc.value.id
