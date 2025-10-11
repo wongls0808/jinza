@@ -625,457 +625,102 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
 
 // ===== Receipts (Bank Statements) =====
 // Import CSV (raw text) and persist statement + transactions
-router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const num = (v) => v == null || v === '' ? null : Number(String(v).replace(/[^0-9.\-]/g, ''))
-  const parseAmount = (v) => {
-    if (v == null) return null
-    let s = String(v).trim()
-    if (!s) return null
-    s = s.replace(/^=\"?/, '').replace(/\"?$/, '')
-    let sign = 1
-    if (/\bDR\b$/i.test(s)) { sign = -1; s = s.replace(/\bDR\b/i, '').trim() }
-    if (/\bCR\b$/i.test(s)) { sign = 1; s = s.replace(/\bCR\b/i, '').trim() }
-    const parenNeg = /^\((.*)\)$/.exec(s)
-    if (parenNeg) { sign = -1; s = parenNeg[1] }
-    s = s.replace(/[^0-9.\-]/g, '')
-    if (!s) return null
-    const n = Number(s)
-    if (isNaN(n)) return null
-    return sign * n
-  }
-  const isNum = (v) => parseAmount(v) != null
-  const cleanCheque = (s) => {
-    if (s == null) return null
-    let x = String(s).trim()
-    // Remove patterns like ="123456" or leading/trailing quotes
-    x = x.replace(/^=\"?/, '').replace(/\"?$/, '')
-    x = x.replace(/^"?/, '').replace(/"?$/, '')
-    x = x.replace(/^'+|'+$/g, '')
-    return x || null
-  }
-  const parseDate = (s) => {
-    if (!s) return null
-    const str = String(s).trim()
-    const [datePart] = str.split(/\s+/)
-    // Excel serial date (roughly between year 1950-2099): allow 20000..60000
-    if (/^\d{4,6}$/.test(datePart)) {
-      const n = Number(datePart)
-      if (!Number.isNaN(n) && n >= 20000 && n <= 60000) {
-        const base = new Date(Date.UTC(1899, 11, 30))
-        const d = new Date(base.getTime() + n * 86400000)
-        // construct using mm/dd/yyyy to avoid locale issues
-        return new Date(`${d.getUTCMonth()+1}/${d.getUTCDate()}/${d.getUTCFullYear()}`)
-      }
-    }
-    // Month-name dates: dd-MMM-yyyy / dd MMM yyyy / MMM dd, yyyy (3+ letters)
-    const monthMap = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 }
-    const normMon = (m) => monthMap[(m || '').slice(0,3).toLowerCase()] || null
-    let m
-    m = str.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s,](\d{2,4})$/)
-    if (m) {
-      const d = Number(m[1]); const mon = normMon(m[2]); const y = m[3].length===2 ? Number('20'+m[3]) : Number(m[3])
-      if (mon && d && y) return new Date(`${mon}/${d}/${y}`)
-    }
-    m = str.match(/^([A-Za-z]{3,})[-\s](\d{1,2})[,\s](\d{2,4})$/)
-    if (m) {
-      const mon = normMon(m[1]); const d = Number(m[2]); const y = m[3].length===2 ? Number('20'+m[3]) : Number(m[3])
-      if (mon && d && y) return new Date(`${mon}/${d}/${y}`)
-    }
-    const zh = /^\d{4}年\d{1,2}月\d{1,2}日$/.test(str)
-    if (zh) {
-      const m = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日$/)
-      if (m) return new Date(`${m[2]}/${m[3]}/${m[1]}`)
-    }
-    if (/^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/.test(datePart)) {
-      const m = datePart.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/)
-      if (m) return new Date(`${m[2]}/${m[1]}/${m[3].length === 2 ? ('20'+m[3]) : m[3]}`)
-    }
-    if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(datePart)) return new Date(datePart)
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(datePart)) return new Date(datePart)
-    return null
-  }
-  const normStr = (v) => (v == null ? '' : String(v).trim().toLowerCase())
-  const combineRefsNorm = (r) => normStr([r.ref1, r.ref2, r.ref3].filter(x => x != null && String(x).trim() !== '').join(' '))
-  const buildHeaderMap = (headerRow) => {
-    const map = {}
-    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, ' ').trim()
-    headerRow.forEach((h, i) => { map[norm(h)] = i })
-    const idx = (keys) => {
-      for (const k of keys) { const v = map[k]; if (typeof v === 'number') return v }
-      return -1
-    }
-    return {
-      date: idx(['trn date', 'transaction date', 'date', 'posting date', 'value date', '交易日期', '日期']),
-      cheque: (() => {
-        const c = idx(['cheque no ref no', 'cheque no', 'ref no', 'reference no', 'reference', 'reference #', 'cheque ref', 'cheque ref no', '支票号', '票据号', '参考号', '凭证号'])
-        return c
-      })(),
-      desc: idx(['transaction description', 'description', 'narration', 'details', 'remarks', 'remark', '摘要', '用途', '说明', '备注']),
-      debit: idx(['debit amount', 'debit', 'withdrawal', 'dr', '借方', '支出']),
-      credit: idx(['credit amount', 'credit', 'deposit', 'cr', '贷方', '收入']),
-      amount: idx(['amount', 'transaction amount', '金额']),
-      drcr: idx(['dr cr', 'dr/cr', 'dc', 'drcr', '借贷', '借贷方向', '借贷标志']),
-      ref: idx(['reference', '附言', '备注']),
-      ref1: idx(['reference 1', 'reference1', 'ref1', '参考 1', '参考1', '附言 1', '附言1']),
-      ref2: idx(['reference 2', 'reference2', 'ref2', '参考 2', '参考2', '附言 2', '附言2']),
-      ref3: idx(['reference 3', 'reference3', 'ref3', '参考 3', '参考3', '附言 3', '附言3']),
-      ref4: idx(['reference 4', 'reference4', 'ref4', '参考 4', '参考4', '附言 4', '附言4']),
-      ref5: idx(['reference 5', 'reference5', 'ref5', '参考 5', '参考5', '附言 5', '附言5']),
-      ref6: idx(['reference 6', 'reference6', 'ref6', '参考 6', '参考6', '附言 6', '附言6'])
-    }
-  }
-  const headerScore = (headerRow) => {
-    const names = headerRow.map(c => String(c || '').toLowerCase())
-    const has = (re) => names.some(n => re.test(n))
-    let score = 0
-    if (has(/\btrn\.?\s*date\b|transaction\s*date|\bdate\b|交易日期|日期/)) score++
-    if (has(/cheque|ref\.?\s*no|reference|支票|票据|参考|凭证/)) score++
-    if (has(/description|narration|remark|摘要|备注|说明/)) score++
-    if (has(/debit|withdrawal|dr|借方|支出/)) score++
-    if (has(/credit|deposit|cr|贷方|收入/)) score++
-    if (has(/amount|金额/)) score++
-    return score
-  }
-  const extractRowByHeader = (row, hmap) => {
-    const get = (idx) => (idx >= 0 && idx < row.length ? String(row[idx]).trim() : '')
-    const dateStr = get(hmap.date)
-    const dateObj = parseDate(dateStr)
-    if (!dateObj) return null
-    const cheque = cleanCheque(get(hmap.cheque))
-    let debit = null
-    let credit = null
-    if (hmap.debit >= 0) debit = parseAmount(get(hmap.debit))
-    if (hmap.credit >= 0) credit = parseAmount(get(hmap.credit))
-    if (debit == null && credit == null && hmap.amount >= 0) {
-      let amt = parseAmount(get(hmap.amount))
-      if (amt != null) {
-        const ind = hmap.drcr >= 0 ? get(hmap.drcr) : ''
-        if (/\bDR\b|借/i.test(ind)) amt = -Math.abs(amt)
-        if (/\bCR\b|贷/i.test(ind)) amt = Math.abs(amt)
-        if (amt < 0) { debit = Math.abs(amt); credit = null } else { credit = amt; debit = null }
-      }
-    }
-    // fallback if both null: use numeric heuristic like extractRow
-    if (debit == null && credit == null) {
-      const numsIdx = []
-      for (let i = row.length - 1; i > (hmap.date >= 0 ? hmap.date + 1 : 1); i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
-      if (numsIdx.length === 1) {
-        const n = parseAmount(row[numsIdx[0]])
-        if (n != null && !isNaN(n)) { if (n < 0) debit = Math.abs(n); else credit = n }
-      } else if (numsIdx.length >= 2) {
-        const a = Math.min(numsIdx[0], numsIdx[1])
-        const b = Math.max(numsIdx[0], numsIdx[1])
-        debit = parseAmount(row[a]); credit = parseAmount(row[b])
-      }
-    }
-  const description = hmap.desc >= 0 ? (get(hmap.desc) || null) : null
-  let ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
-  let ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
-  let ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
-  let ref4 = hmap.ref4 >= 0 ? (get(hmap.ref4) || null) : null
-  let ref5 = hmap.ref5 >= 0 ? (get(hmap.ref5) || null) : null
-  let ref6 = hmap.ref6 >= 0 ? (get(hmap.ref6) || null) : null
-    if (hmap.ref >= 0 && !ref1 && !ref2 && !ref3) {
-      const r = get(hmap.ref)
-      if (r) ref1 = r
-    }
-    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6 }
-  }
-  const extractRow = (rawRow) => {
-    const row = (rawRow || []).map(c => (c == null ? '' : String(c).trim()))
-    // Find a date cell within the first 6 columns
-    let dateIdx = -1
-    let dateObj = null
-  const scanLimit = Math.min(row.length, 10)
-    for (let i = 0; i < scanLimit; i++) {
-      const d = row[i]
-      const parsed = parseDate(d)
-      if (parsed) { dateIdx = i; dateObj = parsed; break }
-    }
-    if (dateIdx < 0) return null
-    const cheque = cleanCheque(row[dateIdx + 1])
-    // Find amount columns near the end (up to 2 numeric values) after dateIdx
-    let debit = null, credit = null
-    const numsIdx = []
-    for (let i = row.length - 1; i > dateIdx + 1; i--) { if (isNum(row[i])) numsIdx.push(i); if (numsIdx.length >= 2) break }
-    if (numsIdx.length === 0 && isNum(row[dateIdx + 2])) numsIdx.push(dateIdx + 2)
-    if (numsIdx.length === 1) {
-      // Only one numeric column: decide sign? keep in credit and debit null if positive
-      const n = parseAmount(row[numsIdx[0]])
-      if (n != null && !isNaN(n)) {
-        // Heuristic: positive as credit, negative as debit
-        if (n < 0) debit = Math.abs(n); else credit = n
-      }
-    } else if (numsIdx.length >= 2) {
-      // Assign smaller index as debit (usually left), larger index as credit (right)
-      const a = Math.min(numsIdx[0], numsIdx[1])
-      const b = Math.max(numsIdx[0], numsIdx[1])
-      debit = parseAmount(row[a])
-      credit = parseAmount(row[b])
-      // Guard invalid
-      if (debit != null && credit != null && debit > 0 && credit > 0) {
-        // keep both
-      }
-    }
-    // Build description from columns between index 2 and first amount index (exclusive)
-    const cut = numsIdx.length ? Math.min(...numsIdx) : row.length
-    const descParts = []
-    for (let i = dateIdx + 2; i < cut; i++) { const v = row[i]; if (v) descParts.push(v) }
-    const description = descParts.join(' ').trim() || null
-    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1: null, ref2: null, ref3: null, ref4: null, ref5: null, ref6: null }
-  }
-  const insertAll = async (kv, rows) => {
-    const stmtIns = await query(
-      `insert into bank_statements(
-        account_number, account_name, account_type,
-        period_from, period_to,
-        available_balance, current_balance,
-        generation_date, generation_time,
-        interest_paid_ytd, interest_accrual,
-        hold_amount, one_day_float, online_float, od_limit,
-        raw_filename, uploaded_by
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-      returning id`, [
-        kv['Account Number'] || kv['Account No.'] || kv['ACCOUNT NUMBER'] || null,
-        kv['Account Name'] || kv['ACCOUNT NAME'] || null,
-        kv['Account Type'] || kv['ACCOUNT TYPE'] || null,
-        parseDate(kv['From Date'] || kv['Period From']),
-        parseDate(kv['To Date'] || kv['Period To']),
-        num(kv['Available Balance']),
-        num(kv['Current Balance']),
-        parseDate(kv['Generation Date']),
-        kv['Generation Time'] || null,
-        num(kv['Interest Paid YTD']),
-        num(kv['Interest Accrual']),
-        num(kv['Hold Amount']),
-        num(kv['One Day Float']),
-        num(kv['Online Float']),
-        num(kv['OD Limit']),
-        (req.query.filename || ''), req.user.id
-      ])
-    const stmtId = stmtIns.rows[0].id
-    let toInsert = rows
-    // Suppress duplicates for same account across existing statements:
-    // (account_number filter) and fields: date, cheque/ref, description, combined(reference1-3), debit, credit
-    const accNo = kv['Account Number'] || kv['Account No.'] || kv['ACCOUNT NUMBER'] || null
-    if (accNo && rows.length) {
-      const tuples = rows.map(r => [
-        r.trn_date?.toISOString().slice(0,10),
-        cleanCell(r.cheque_ref),
-        cleanCell(r.description),
-        cleanCell(combineRefsNorm(r)),
-        Number(cleanCell(r.debit)) || 0,
-        Number(cleanCell(r.credit)) || 0
-      ])
-      const params = tuples.map((_, i) => `($${i*6+1}::date,$${i*6+2}::text,$${i*6+3}::text,$${i*6+4}::text,$${i*6+5}::numeric,$${i*6+6}::numeric)`).join(',')
-      const flat = tuples.flat()
-      const existed = await query(
-        `select t.trn_date::date as d,
-                lower(trim(coalesce(t.cheque_ref,''))) as c,
-                lower(trim(coalesce(t.description,''))) as desc,
-                lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))) as refs,
-                coalesce(t.debit,0) as db,
-                coalesce(t.credit,0) as cr
-           from bank_transactions t
-           join bank_statements s on s.id = t.statement_id
-          where s.account_number = $${flat.length+1}
-      and (t.trn_date::date,
-        lower(trim(coalesce(t.cheque_ref,''))),
-        lower(trim(coalesce(t.description,''))),
-        lower(trim(concat_ws(' ', nullif(trim(t.ref1),''), nullif(trim(t.ref2),''), nullif(trim(t.ref3),'')))),
-        coalesce(t.debit,0)::numeric, coalesce(t.credit,0)::numeric) in (values ${params})`,
-        [...flat, accNo]
-      )
-      const set = new Set(existed.rows.map(r => `${r.d || ''}|${r.c || ''}|${r.desc || ''}|${r.refs || ''}|${r.db || 0}|${r.cr || 0}`))
-  toInsert = rows.filter(r => !set.has(`${(r.trn_date ? r.trn_date.toISOString().slice(0,10) : '')}|${cleanCell(r.cheque_ref)}|${cleanCell(r.description)}|${cleanCell(combineRefsNorm(r))}|${Number(cleanCell(r.debit)) || 0}|${Number(cleanCell(r.credit)) || 0}`))
-    }
-    if (toInsert.length) {
-      const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
-      // 字段清洗函数
-      const cleanText = v => (v == null ? '' : String(v).trim().toLowerCase())
-      const flat = toInsert.flatMap(r => [
-        stmtId,
-        r.trn_date ?? null,
-        cleanText(r.cheque_ref),
-        r.debit ?? null,
-        r.credit ?? null,
-        cleanText(r.ref1),
-        cleanText(r.ref2),
-        cleanText(r.ref3),
-        cleanText(r.account_number)
-      ])
-      let inserted = 0, skipped = rows.length - toInsert.length
-      if (toInsert.length) {
-        try {
-          await query(`insert into bank_transactions(statement_id,trn_date,cheque_ref,description,debit,credit,ref1,ref2,ref3,ref4,ref5,ref6) values ${params} ON CONFLICT ON CONSTRAINT bank_transactions_unique_idx DO NOTHING`, flat)
-          inserted = toInsert.length
-        } catch (e) {
-          // 唯一约束冲突自动跳过
-          if (e.code === '23505') skipped += 1
-          else throw e
-        }
-      }
-      return { stmtId, count: inserted, skipped }
-    }
-    return { stmtId, count: 0, skipped: rows.length }
-  }
 
+// Receipts API
+router.get('/receipts', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const rs = await query('select * from receipts order by id desc')
+  res.json(rs.rows)
+})
+
+router.post('/receipts/import', authMiddleware(true), requirePerm('view_receipts'), express.text({ type: '*/*', limit: '10mb' }), async (req, res) => {
   try {
-    let text = req.body || ''
-    if (!text || typeof text !== 'string') return res.status(400).json({ error: 'empty body' })
-    text = text.replace(/^\ufeff/, '').replace(/\r\n/g, '\n')
-
-    // First pass: try CSV mode
-    let kv = {}
-    let txnRows = []
+    if (!req.body || typeof req.body !== 'string') return res.status(400).json({ error: 'empty body' })
+    const text = req.body.replace(/^ /, '') // strip BOM if any
+    let records = []
+    let usedColumns = false
     try {
-      let csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true })
-      const mostlySingle = csvRows.length > 3 && csvRows.filter(r => r.length <= 1).length / csvRows.length > 0.6
-      if (mostlySingle && /;/.test(text)) {
-        csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true, delimiter: ';' })
-      } else if (mostlySingle && /\|/.test(text)) {
-        csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true, delimiter: '|' })
-      }
-      // collect kv before header
-      let headerIdx = -1
-      for (let i = 0; i < Math.min(csvRows.length, 50); i++) {
-        const row = csvRows[i].map(c => cleanCell(c))
-        const first = row[0] || ''
-        if (/^Trn\.\?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
-        if (headerScore(row) >= 2) { headerIdx = i; break }
-        if (row.length >= 2 && first) {
-          const key = first.replace(/:$/, '')
-          kv[key] = row[1]
-        }
-      }
-      if (headerIdx >= 0) {
-        const headerRow = csvRows[headerIdx].map(c => cleanCell(c))
-        const hmap = buildHeaderMap(headerRow)
-        for (let i = headerIdx + 1; i < csvRows.length; i++) {
-          const row = csvRows[i].map(c => cleanCell(c))
-          let obj = extractRowByHeader(row, hmap)
-          if (!obj) obj = extractRow(row.map(c => cleanCell(c)))
-          if (obj) txnRows.push(obj)
-        }
-      } else {
-        // No explicit header like "Trn Date"; attempt to parse every row
-        for (let i = 0; i < csvRows.length; i++) {
-          const row = csvRows[i].map(c => cleanCell(c))
-          const obj = extractRow(row)
-          if (obj) txnRows.push(obj)
-        }
-      }
-    } catch {}
-
-    // Fallback: whitespace/TSV mode
-    if (!txnRows.length) {
-      const lines = text.split(/\n/).map(s => s.trim())
-      let i = 0
-      for (; i < lines.length; i++) {
-        const line = lines[i]
-        if (!line) continue
-        if (/^Trn\.?\s*Date/i.test(line) || /^Transaction Type/i.test(line)) break
-        const m = /^(.*?)[\t,:]\s*(.*)$/.exec(line) // support key: value and key, value
-        if (m) kv[m[1].trim()] = m[2].trim()
-      }
-      // seek to header line if present
-      let start = 0
-      for (let j = i; j < lines.length; j++) { if (/^Trn\.?\s*Date/i.test(lines[j])) { start = j + 1; break } }
-      const tryParseFrom = (startIdx) => {
-        for (let k = startIdx; k < lines.length; k++) {
-          const l = lines[k]
-          if (!l) continue
-          let cols = l.split('\t').map(cleanCell)
-          if (cols.length === 1) cols = l.split(/\s{2,}/).map(cleanCell)
-          const obj = extractRow(cols)
-          if (obj) txnRows.push(obj)
-        }
-      }
-      // first try from after header (if found)
-      if (start > 0) tryParseFrom(start)
-      // if still nothing, try parse the whole file (headerless)
-      if (!txnRows.length) tryParseFrom(0)
+      records = parseCsv(text, {
+        bom: true,
+        columns: true,
+        skip_empty_lines: true,
+        trim: true
+      })
+      usedColumns = true
+    } catch {
+      records = parseCsv(text, {
+        bom: true,
+        columns: false,
+        skip_empty_lines: true,
+        trim: true
+      })
+      usedColumns = false
     }
 
-    // Insert with one-time ensureSchema retry on relation-missing
-    try {
-      const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
-      return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped, parsed: txnRows.length })
-    } catch (e) {
-      if (e && (e.code === '42P01' || /relation\s+\"?bank_statements\"?\s+does not exist/i.test(e.message))) {
-        try {
-          await ensureSchema()
-          const { stmtId, count, skipped = 0 } = await insertAll(kv, txnRows)
-          return res.json({ ok: true, statement_id: stmtId, inserted: count, skipped, parsed: txnRows.length })
-        } catch (e2) {
-          console.error('receipts import retry failed', e2)
-          return res.status(400).json({ error: 'import failed' })
+    // Normalize rows
+    const normalized = []
+    const errors = []
+    if (usedColumns) {
+      let lineNo = 2
+      for (const r of records) {
+        const obj = {
+          account_number: (r.account_number ?? r['Account Number'] ?? '').toString().trim(),
+          trn_date: (r.trn_date ?? r['Trn. Date'] ?? '').toString().trim(),
+          cheque_ref_no: (r.cheque_ref_no ?? r['Cheque No/Ref No'] ?? '').toString().trim(),
+          debit_amount: Number(r.debit_amount ?? r['Debit Amount'] ?? 0),
+          credit_amount: Number(r.credit_amount ?? r['Credit Amount'] ?? 0),
+          reference1: (r.reference1 ?? r['Reference 1'] ?? '').toString().trim(),
+          reference2: (r.reference2 ?? r['Reference 2'] ?? '').toString().trim(),
+          reference3: (r.reference3 ?? r['Reference 3'] ?? '').toString().trim()
         }
+        if (!obj.account_number || !obj.trn_date) {
+          errors.push({ line: lineNo, reason: '缺少账号或交易日期' })
+        } else {
+          normalized.push(obj)
+        }
+        lineNo++
       }
-      console.error('receipts import failed', e)
-      return res.status(400).json({ error: 'import failed' })
+    } else {
+      let lineNo = 1
+      for (const r of records) {
+        const [account_number = '', trn_date = '', cheque_ref_no = '', debit_amount = 0, credit_amount = 0, reference1 = '', reference2 = '', reference3 = ''] = r
+        const obj = { account_number, trn_date, cheque_ref_no, debit_amount: Number(debit_amount), credit_amount: Number(credit_amount), reference1, reference2, reference3 }
+        if (!obj.account_number || !obj.trn_date) {
+          errors.push({ line: lineNo, reason: '缺少账号或交易日期' })
+        } else {
+          normalized.push(obj)
+        }
+        lineNo++
+      }
     }
+
+    if (!normalized.length) return res.json({ inserted: 0, errors })
+
+    // 去重插入
+    let inserted = 0
+    for (const r of normalized) {
+      try {
+        await query(
+          'insert into receipts(account_number, trn_date, cheque_ref_no, debit_amount, credit_amount, reference1, reference2, reference3) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict (account_number, trn_date, cheque_ref_no, debit_amount, credit_amount) do nothing',
+          [r.account_number, r.trn_date, r.cheque_ref_no, r.debit_amount, r.credit_amount, r.reference1, r.reference2, r.reference3]
+        )
+        inserted++
+      } catch (e) {
+        errors.push({ reason: '插入失败', detail: e?.message })
+      }
+    }
+    res.json({ inserted, errors })
   } catch (e) {
-    console.error('receipts import failed (outer)', e)
-    res.status(400).json({ error: 'import failed' })
+    res.status(400).json({ error: '解析或导入失败', detail: e?.message })
   }
 })
 
-// List all transactions across statements, with account info and matched receiving account
-router.get('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const { page = 1, pageSize = 20, sort = 'trn_date', order = 'asc', q = '' } = req.query
-  const offset = (Number(page) - 1) * Number(pageSize)
-  const sortMap = { trn_date: 't.trn_date', debit: 't.debit', credit: 't.credit', account_number: 's.account_number' }
-  const sortCol = sortMap[String(sort)] || 't.trn_date'
-  const ord = String(order).toLowerCase() === 'desc' ? 'desc' : 'asc'
-  const term = `%${q}%`
-  const total = await query(`
-    select count(*)
-      from bank_transactions t
-      join bank_statements s on s.id = t.statement_id
-     where (coalesce(t.description,'') ilike $1 or coalesce(t.cheque_ref,'') ilike $1 or coalesce(s.account_number,'') ilike $1 or coalesce(s.account_name,'') ilike $1)
-  `, [term])
-  const rs = await query(`
-    select t.*, s.account_number, s.account_name,
-         ra.id as matched_account_id, ra.account_name as matched_account_name
-    from bank_transactions t
-    join bank_statements s on s.id = t.statement_id
-    left join receiving_accounts ra on ra.bank_account = s.account_number
-   where (coalesce(t.description,'') ilike $3 or coalesce(t.cheque_ref,'') ilike $3 or coalesce(s.account_number,'') ilike $3 or coalesce(s.account_name,'') ilike $3)
-   order by ${sortCol} ${ord}
-   offset $1 limit $2
-`, [offset, Number(pageSize), term])
-  res.json({ total: Number(total.rows[0].count), items: rs.rows })
-})
-
-router.get('/receipts/statements', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const { page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
-  const offset = (Number(page) - 1) * Number(pageSize)
-  const sortMap = { id: 'id', generation_date: 'generation_date', account_number: 'account_number', period_from: 'period_from', period_to: 'period_to' }
-  const sortCol = sortMap[String(sort)] || 'id'
-  const ord = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc'
-  const total = await query('select count(*) from bank_statements')
-  const rs = await query(`select * from bank_statements order by ${sortCol} ${ord} offset $1 limit $2`, [offset, Number(pageSize)])
-  res.json({ total: Number(total.rows[0].count), items: rs.rows })
-})
-
-router.get('/receipts/:id/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const id = Number(req.params.id)
-  const { page = 1, pageSize = 20, sort = 'trn_date', order = 'asc', q = '' } = req.query
-  const offset = (Number(page) - 1) * Number(pageSize)
-  const sortMap = { trn_date: 'trn_date', debit: 'debit', credit: 'credit' }
-  const sortCol = sortMap[String(sort)] || 'trn_date'
-  const ord = String(order).toLowerCase() === 'desc' ? 'desc' : 'asc'
-  const term = `%${q}%`
-  const total = await query('select count(*) from bank_transactions where statement_id=$1 and (coalesce(description,\'\') ilike $2 or coalesce(cheque_ref,\'\') ilike $2)', [id, term])
-  const rs = await query(`select * from bank_transactions where statement_id=$1 and (coalesce(description,'') ilike $4 or coalesce(cheque_ref,'') ilike $4) order by ${sortCol} ${ord} offset $2 limit $3`, [id, offset, Number(pageSize), term])
-  res.json({ total: Number(total.rows[0].count), items: rs.rows })
-})
-
-// 批量删除银行交易（放在所有路由定义最后）
-router.delete('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const ids = req.body && req.body.ids
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '缺少待删除ID' })
-  await query(`DELETE FROM bank_transactions WHERE id = ANY($1::int[])`, [ids])
+router.post('/receipts/batch-delete', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const { ids } = req.body || {}
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
+  await query('delete from receipts where id = any($1::int[])', [ids])
   res.json({ ok: true })
 })
+
+
+
+

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 // Views
 import Home from '@/views/Home.vue'
+const Receipts = () => import('@/views/Receipts.vue')
 const UserManagement = () => import('@/views/UserManagement.vue')
 const ChangePassword = () => import('@/views/ChangePassword.vue')
 
@@ -22,6 +23,7 @@ export const routes = [
   { path: '/accounts', name: 'accounts', component: Accounts, meta: { perm: 'view_accounts' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
+  { path: '/receipts', name: 'receipts', component: Receipts, meta: { perm: 'view_receipts' } },
 ]
 
 const router = createRouter({
