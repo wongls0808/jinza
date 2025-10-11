@@ -614,11 +614,23 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
 // Import CSV (raw text) and persist statement + transactions
 router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
   const num = (v) => v == null || v === '' ? null : Number(String(v).replace(/[^0-9.\-]/g, ''))
-  const isNum = (v) => {
-    if (v == null || v === '') return false
-    const n = num(v)
-    return typeof n === 'number' && !isNaN(n)
+  const parseAmount = (v) => {
+    if (v == null) return null
+    let s = String(v).trim()
+    if (!s) return null
+    s = s.replace(/^=\"?/, '').replace(/\"?$/, '')
+    let sign = 1
+    if (/\bDR\b$/i.test(s)) { sign = -1; s = s.replace(/\bDR\b/i, '').trim() }
+    if (/\bCR\b$/i.test(s)) { sign = 1; s = s.replace(/\bCR\b/i, '').trim() }
+    const parenNeg = /^\((.*)\)$/.exec(s)
+    if (parenNeg) { sign = -1; s = parenNeg[1] }
+    s = s.replace(/[^0-9.\-]/g, '')
+    if (!s) return null
+    const n = Number(s)
+    if (isNaN(n)) return null
+    return sign * n
   }
+  const isNum = (v) => parseAmount(v) != null
   const cleanCheque = (s) => {
     if (s == null) return null
     let x = String(s).trim()
@@ -631,15 +643,18 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
   const parseDate = (s) => {
     if (!s) return null
     const str = String(s).trim()
-    // dd/MM/yyyy or dd-MM-yyyy or dd.MM.yyyy -> convert to MM/dd/yyyy
-    if (/^\d{2}[\/.\-]\d{2}[\/.\-]\d{4}$/.test(str)) {
-      const m = str.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/)
-      if (m) return new Date(`${m[2]}/${m[1]}/${m[3]}`)
+    const [datePart] = str.split(/\s+/)
+    const zh = /^\d{4}年\d{1,2}月\d{1,2}日$/.test(str)
+    if (zh) {
+      const m = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日$/)
+      if (m) return new Date(`${m[2]}/${m[3]}/${m[1]}`)
     }
-    // yyyy-MM-dd or yyyy/MM/dd
-    if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(str)) return new Date(str)
-    // MM/dd/yyyy
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return new Date(str)
+    if (/^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/.test(datePart)) {
+      const m = datePart.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/)
+      if (m) return new Date(`${m[2]}/${m[1]}/${m[3].length === 2 ? ('20'+m[3]) : m[3]}`)
+    }
+    if (/^\d{4}[-\/]\d{2}[-\/]\d{2}$/.test(datePart)) return new Date(datePart)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(datePart)) return new Date(datePart)
     return null
   }
   const extractRow = (rawRow) => {
@@ -655,19 +670,17 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     if (numsIdx.length === 0 && isNum(row[3])) numsIdx.push(3)
     if (numsIdx.length === 1) {
       // Only one numeric column: decide sign? keep in credit and debit null if positive
-      const n = num(row[numsIdx[0]])
+      const n = parseAmount(row[numsIdx[0]])
       if (n != null && !isNaN(n)) {
         // Heuristic: positive as credit, negative as debit
         if (n < 0) debit = Math.abs(n); else credit = n
       }
     } else if (numsIdx.length >= 2) {
-      const n1 = num(row[numsIdx[1]])
-      const n0 = num(row[numsIdx[0]])
       // Assign smaller index as debit (usually left), larger index as credit (right)
       const a = Math.min(numsIdx[0], numsIdx[1])
       const b = Math.max(numsIdx[0], numsIdx[1])
-      debit = num(row[a])
-      credit = num(row[b])
+      debit = parseAmount(row[a])
+      credit = parseAmount(row[b])
       // Guard invalid
       if (debit != null && credit != null && debit > 0 && credit > 0) {
         // keep both
@@ -746,7 +759,11 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
     let kv = {}
     let txnRows = []
     try {
-      const csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true })
+      let csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true })
+      const mostlySingle = csvRows.length > 3 && csvRows.filter(r => r.length <= 1).length / csvRows.length > 0.6
+      if (mostlySingle && /;/.test(text)) {
+        csvRows = parseCsv(text, { bom: true, relax_column_count: true, skip_empty_lines: true, trim: true, delimiter: ';' })
+      }
       // collect kv before header
       let headerIdx = -1
       for (let i = 0; i < csvRows.length; i++) {
