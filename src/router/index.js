@@ -9,7 +9,6 @@ const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
 const Banks = () => import('@/views/Banks.vue')
 const Accounts = () => import('@/views/Accounts.vue')
-const Receipts = () => import('@/views/Receipts.vue')
 const Settings = () => import('@/views/Settings.vue')
 const NoAccess = () => import('@/views/NoAccess.vue')
 
