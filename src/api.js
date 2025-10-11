@@ -69,6 +69,7 @@ export const api = {
   customerAccounts: {
     list: (customerId) => request(`/customers/${customerId}/accounts`),
     create: (customerId, data) => request(`/customers/${customerId}/accounts`, { method: 'POST', body: JSON.stringify(data) }),
-    remove: (customerId, id) => request(`/customers/${customerId}/accounts/${id}`, { method: 'DELETE' })
+    remove: (customerId, id) => request(`/customers/${customerId}/accounts/${id}`, { method: 'DELETE' }),
+    update: (customerId, id, data) => request(`/customers/${customerId}/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   }
 }

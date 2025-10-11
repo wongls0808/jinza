@@ -165,8 +165,9 @@
           <el-table-column prop="opening_balance" label="期初余额" width="140">
             <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="100">
+          <el-table-column label="操作" width="160">
             <template #default="{ row }">
+              <el-button link type="primary" @click="openEditCus(row)">编辑</el-button>
               <el-popconfirm title="确定删除？" @confirm="removeCusAccount(row)">
                 <template #reference><el-button link type="danger">删除</el-button></template>
               </el-popconfirm>
@@ -175,6 +176,40 @@
         </el-table>
       </div>
     </el-drawer>
+    <!-- 编辑客户账户 -->
+    <el-dialog v-model="editAcc.visible" title="编辑账户" width="560px">
+      <el-form :model="editAcc.form" label-width="90px" class="form">
+        <el-form-item label="账户名称"><el-input v-model.trim="editAcc.form.account_name" /></el-form-item>
+        <el-form-item label="银行">
+          <el-select v-model="editAcc.form.bank_id" filterable style="width:100%">
+            <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' ' + b.en" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="银行账户"><el-input v-model.trim="editAcc.form.bank_account" /></el-form-item>
+        <el-form-item label="币种">
+          <el-select v-model="editAcc.form.currency_code" style="width:100%">
+            <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="期初余额">
+          <el-input-number
+            v-model="editAcc.form.opening_balance"
+            :precision="2"
+            :min="0"
+            :step="100"
+            controls-position="right"
+            placeholder="0.00"
+            :formatter="moneyFormatter"
+            :parser="moneyParser"
+            style="width:100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editAcc.visible=false">取消</el-button>
+        <el-button type="primary" :loading="editAcc.loading" @click="doEditCusAccount">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -505,7 +540,17 @@ async function addCusAccount() {
   const c = accDrawer.value.customer
   const f = accDrawer.value.form
   if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请完整填写'); return }
-  await api.customerAccounts.create(c.id, f)
+  try {
+    await api.customerAccounts.create(c.id, f)
+  } catch (e) {
+    let msg = e?.message || ''
+    try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
+    if (/已存在/.test(msg) || /exists/i.test(msg)) {
+      ElMessage.error('该客户下该银行账户已存在')
+      return
+    }
+    throw e
+  }
   const items = await api.customerAccounts.list(c.id)
   accDrawer.value.items = items
   accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY', opening_balance: 0 }
@@ -516,6 +561,37 @@ async function removeCusAccount(row) {
   await api.customerAccounts.remove(c.id, row.id)
   accDrawer.value.items = await api.customerAccounts.list(c.id)
   ElMessage.success('已删除')
+}
+
+// 编辑客户账户
+const editAcc = ref({ visible: false, loading: false, id: null, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
+function openEditCus(row) {
+  editAcc.value.visible = true
+  editAcc.value.id = row.id
+  editAcc.value.form = { account_name: row.account_name, bank_id: row.bank_id, bank_account: row.bank_account, currency_code: row.currency_code, opening_balance: Number(row.opening_balance)||0 }
+}
+async function doEditCusAccount() {
+  const c = accDrawer.value.customer
+  const id = editAcc.value.id
+  const f = editAcc.value.form
+  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请完整填写'); return }
+  editAcc.value.loading = true
+  try {
+    await api.customerAccounts.update(c.id, id, f)
+    editAcc.value.visible = false
+    accDrawer.value.items = await api.customerAccounts.list(c.id)
+    ElMessage.success('已保存')
+  } catch (e) {
+    let msg = e?.message || ''
+    try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
+    if (/已存在/.test(msg) || /exists/i.test(msg)) {
+      ElMessage.error('该客户下该银行账户已存在')
+    } else {
+      ElMessage.error('保存失败：' + msg)
+    }
+  } finally {
+    editAcc.value.loading = false
+  }
 }
 </script>
 

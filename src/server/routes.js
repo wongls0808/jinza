@@ -417,11 +417,16 @@ router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_c
   const cid = Number(req.params.id)
   const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
-  const rs = await query(
-    'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5,$6) returning *',
-    [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase(), Number(opening_balance)||0]
-  )
-  res.json(rs.rows[0])
+  try {
+    const rs = await query(
+      'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5,$6) returning *',
+      [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase(), Number(opening_balance)||0]
+    )
+    res.json(rs.rows[0])
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: '该客户下该银行账户已存在' })
+    throw e
+  }
 })
 
 router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
@@ -430,6 +435,30 @@ router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm(
   const rs = await query('delete from customer_receiving_accounts where id=$1 and customer_id=$2', [aid, cid])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
+})
+
+router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const cid = Number(req.params.id)
+  const aid = Number(req.params.aid)
+  const { account_name, bank_id, bank_account, currency_code, opening_balance } = req.body || {}
+  const fields = []
+  const values = []
+  let idx = 1
+  if (account_name !== undefined) { fields.push(`account_name=$${idx++}`); values.push(account_name) }
+  if (bank_id !== undefined) { fields.push(`bank_id=$${idx++}`); values.push(Number(bank_id)) }
+  if (bank_account !== undefined) { fields.push(`bank_account=$${idx++}`); values.push(bank_account) }
+  if (currency_code !== undefined) { fields.push(`currency_code=$${idx++}`); values.push(String(currency_code).toUpperCase()) }
+  if (opening_balance !== undefined) { fields.push(`opening_balance=$${idx++}`); values.push(Number(opening_balance)||0) }
+  if (!fields.length) return res.status(400).json({ error: 'no changes' })
+  values.push(aid); values.push(cid)
+  try {
+    const rs = await query(`update customer_receiving_accounts set ${fields.join(', ')} where id=$${idx++} and customer_id=$${idx} returning *`, values)
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+    res.json(rs.rows[0])
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: '该客户下该银行账户已存在' })
+    throw e
+  }
 })
 
 // Banks CRUD (server-managed)

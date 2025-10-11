@@ -108,6 +108,9 @@ export async function ensureSchema() {
       opening_balance numeric default 0,
       created_at timestamptz default now()
     );
+
+    create unique index if not exists ux_cus_acc_customer_bank_no
+      on customer_receiving_accounts(customer_id, bank_id, bank_account);
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
