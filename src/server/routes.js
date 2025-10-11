@@ -1,18 +1,4 @@
 // ...existing code...
-// ...existing code...
-// 批量删除银行交易（放在所有路由定义最后）
-router.delete('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const ids = req.body && req.body.ids
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '缺少待删除ID' })
-  await query(`DELETE FROM bank_transactions WHERE id = ANY($1::int[])`, [ids])
-  res.json({ ok: true })
-})
-router.delete('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
-  const ids = req.body && req.body.ids
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '缺少待删除ID' })
-  await query(`DELETE FROM bank_transactions WHERE id = ANY($1::int[])`, [ids])
-  res.json({ ok: true })
-})
   const cleanCell = (v) => {
     let s = String(v ?? '').trim()
     if (/^=".*"$/.test(s)) s = s.replace(/^="/, '').replace(/"$/, '')
@@ -1058,4 +1044,12 @@ router.get('/receipts/:id/transactions', authMiddleware(true), requirePerm('view
   const total = await query('select count(*) from bank_transactions where statement_id=$1 and (coalesce(description,\'\') ilike $2 or coalesce(cheque_ref,\'\') ilike $2)', [id, term])
   const rs = await query(`select * from bank_transactions where statement_id=$1 and (coalesce(description,'') ilike $4 or coalesce(cheque_ref,'') ilike $4) order by ${sortCol} ${ord} offset $2 limit $3`, [id, offset, Number(pageSize), term])
   res.json({ total: Number(total.rows[0].count), items: rs.rows })
+})
+
+// 批量删除银行交易（放在所有路由定义最后）
+router.delete('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const ids = req.body && req.body.ids
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '缺少待删除ID' })
+  await query(`DELETE FROM bank_transactions WHERE id = ANY($1::int[])`, [ids])
+  res.json({ ok: true })
 })
