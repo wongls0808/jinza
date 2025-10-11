@@ -1,6 +1,10 @@
 <template>
   <div class="page container">
-    <div class="head"><div class="title">银行列表</div></div>
+    <div class="head">
+      <div class="title">银行列表</div>
+      <div class="spacer"></div>
+      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+    </div>
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
@@ -11,12 +15,12 @@
       </template>
 
       <div class="cards">
-        <div v-for="(b,i) in banks" :key="b.code" class="bank-card">
+        <div class="bank-card" v-for="(b,i) in banks" :key="b.id">
           <div class="idx">{{ i + 1 }}</div>
-          <img class="logo" :src="b.logo_url || b.logo" :alt="b.en" @error="onImgErr" />
+          <img class="logo" :src="b.logo_url || ('/banks/' + ((b.code || 'public').toLowerCase()) + '.svg')" @error="onImgErr" />
           <div class="names">
-            <div class="zh text-clip" :title="b.zh">{{ b.zh }}</div>
-            <div class="en text-clip" :title="b.en">{{ b.en }}</div>
+            <span class="zh text-clip">{{ b.zh }}</span>
+            <span class="en text-clip">{{ b.en }}</span>
           </div>
           <div class="ops">
             <el-button link @click="openEdit(b)">替换Logo</el-button>
@@ -26,7 +30,6 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑银行 -->
     <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? '新增银行' : '替换 Logo'" width="520px">
       <el-form :model="dlg.form" label-width="90px" class="form">
         <el-form-item label="代码" v-if="dlg.mode==='add'">

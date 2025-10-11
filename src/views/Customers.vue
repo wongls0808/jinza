@@ -2,6 +2,8 @@
   <div class="page container">
     <div class="head">
       <div class="title">客户管理</div>
+      <div class="spacer"></div>
+  <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
 
   <el-card class="jelly">
@@ -34,22 +36,23 @@
         style="width: 100%"
         @selection-change="(val)=> selection = val"
         @sort-change="onSort"
+        @header-dragend="onColResize"
       >
         <el-table-column type="selection" width="50" />
         <el-table-column label="序号" type="index" width="70" />
-        <el-table-column prop="abbr" label="简称" sortable="custom" width="140" />
-        <el-table-column prop="name" label="客户名" sortable="custom" min-width="180" />
-        <el-table-column prop="tax_rate" label="税率(%)" sortable="custom" width="100">
+        <el-table-column prop="abbr" label="简称" sortable="custom" :width="colW('abbr', 140)" />
+        <el-table-column prop="name" label="客户名" sortable="custom" :min-width="colW('name', 180)" />
+        <el-table-column prop="tax_rate" label="税率(%)" sortable="custom" :width="colW('tax_rate', 100)">
           <template #default="{ row }">{{ formatPercent(row.tax_rate) }}</template>
         </el-table-column>
-        <el-table-column prop="opening_myr" label="马币金额(期初)" sortable="custom" width="160">
+        <el-table-column prop="opening_myr" label="马币金额(期初)" sortable="custom" :width="colW('opening_myr', 160)">
           <template #default="{ row }">{{ formatMoney(row.opening_myr) }}</template>
         </el-table-column>
-        <el-table-column prop="opening_cny" label="人民币金额(期初)" sortable="custom" width="160">
+        <el-table-column prop="opening_cny" label="人民币金额(期初)" sortable="custom" :width="colW('opening_cny', 160)">
           <template #default="{ row }">{{ formatMoney(row.opening_cny) }}</template>
         </el-table-column>
-        <el-table-column prop="submitter" label="提交人" width="140" />
-        <el-table-column label="操作" width="120">
+        <el-table-column prop="submitter" label="提交人" :width="colW('submitter', 140)" />
+        <el-table-column label="操作" :width="colW('ops', 120)">
           <template #default="{ row }">
             <el-button link type="primary" @click="openAccounts(row)">收款账户</el-button>
           </template>
@@ -193,6 +196,9 @@ import { ref, onMounted } from 'vue'
 import Papa from 'papaparse'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
+import { useTableMemory } from '@/composables/useTableMemory'
+
+const { colW, onColResize, reset: resetTableMem } = useTableMemory('customers')
 
 const tableRef = ref()
 const rows = ref([])

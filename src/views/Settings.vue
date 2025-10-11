@@ -1,6 +1,10 @@
 <template>
   <div class="page container">
-    <h2 style="margin:8px 0 16px;">{{ t('settings.title') }}</h2>
+    <div class="head" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
+      <h2 style="margin:0;">{{ t('settings.title') }}</h2>
+      <div class="spacer" style="flex:1"></div>
+      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+    </div>
     <el-card>
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
         <div class="item">

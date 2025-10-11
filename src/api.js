@@ -1,4 +1,13 @@
 const API_BASE = '/api'
+// 简易内存缓存（页面会刷新失效），用于字典接口减轻重复请求
+const _cache = new Map() // key -> { time: number, data: any, ttl: number }
+function setCache(key, data, ttlMs) { _cache.set(key, { time: Date.now(), data, ttl: ttlMs }) }
+function getCache(key) {
+  const it = _cache.get(key)
+  if (!it) return null
+  if (Date.now() - it.time > (it.ttl || 0)) { _cache.delete(key); return null }
+  return it.data
+}
 
 function getToken() {
   const raw = localStorage.getItem('auth_user')
@@ -49,11 +58,27 @@ export const api = {
   deleteBank: (id) => request(`/banks/${id}`, { method: 'DELETE' }),
   resetBanks: () => request('/banks/reset-defaults', { method: 'POST' }),
   updateBank: (id, data) => request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  banks: { all: () => request('/banks') },
+  banks: {
+    all: async () => {
+      const key = 'banks.all'
+      const cached = getCache(key)
+      if (cached) return cached
+      const data = await request('/banks')
+      setCache(key, data, 3 * 60 * 1000) // 3 分钟
+      return data
+    }
+  },
 
   // Currencies
   currencies: {
-    list: () => request('/currencies'),
+    list: async () => {
+      const key = 'currencies.list'
+      const cached = getCache(key)
+      if (cached) return cached
+      const data = await request('/currencies')
+      setCache(key, data, 5 * 60 * 1000) // 5 分钟
+      return data
+    },
     create: (code, name) => request('/currencies', { method: 'POST', body: JSON.stringify({ code, name }) }),
     remove: (code) => request(`/currencies/${code}`, { method: 'DELETE' })
   },

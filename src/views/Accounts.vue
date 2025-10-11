@@ -1,6 +1,10 @@
 <template>
   <div class="page container">
-    <div class="head"><div class="title">收款账户</div></div>
+    <div class="head">
+      <div class="title">收款账户</div>
+      <div class="spacer"></div>
+      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+    </div>
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
@@ -9,10 +13,10 @@
         </div>
       </template>
 
-      <el-table :data="rows" size="small" border style="width:100%">
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="account_name" label="账户名称" min-width="160" />
-        <el-table-column label="银行" min-width="260">
+      <el-table :data="rows" size="small" border style="width:100%" @header-dragend="onColResize">
+        <el-table-column type="index" label="#" :width="colW('idx', 60)" />
+        <el-table-column prop="account_name" label="账户名称" :min-width="colW('account_name', 160)" />
+        <el-table-column label="银行" :min-width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
               <img class="logo" :src="row.bank_logo" alt="logo" />
@@ -21,12 +25,12 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="bank_account" label="银行账户" min-width="200" />
-        <el-table-column prop="currency_code" label="币种" width="100" />
-        <el-table-column prop="opening_balance" label="期初余额" width="140">
+  <el-table-column prop="bank_account" label="银行账户" :min-width="colW('bank_account', 200)" />
+  <el-table-column prop="currency_code" label="币种" :width="colW('currency', 100)" />
+  <el-table-column prop="opening_balance" label="期初余额" :width="colW('opening_balance', 140)">
           <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" :width="colW('ops', 100)">
           <template #default="{ row }">
             <el-popconfirm title="确定删除？" @confirm="remove(row)">
               <template #reference><el-button link type="danger">删除</el-button></template>
@@ -82,6 +86,9 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
+import { useTableMemory } from '@/composables/useTableMemory'
+
+const { colW, onColResize } = useTableMemory('accounts')
 
 const rows = ref([])
 const banks = ref([])
