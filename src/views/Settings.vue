@@ -28,23 +28,23 @@
     <el-card style="margin-top:16px;">
       <template #header>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div style="font-weight:600;">币种设置</div>
-          <div style="opacity:.6;font-size:12px;">共 {{ currencies.length }} 个</div>
+          <div style="font-weight:600;">{{ t('settings.currenciesTitle') }}</div>
+          <div style="opacity:.6;font-size:12px;">{{ t('settings.currencies.count', { n: currencies.length }) }}</div>
         </div>
       </template>
 
       <div class="add-row">
-        <el-input v-model="newCode" placeholder="币种代码，如 CNY / USD" style="width:150px" maxlength="8" @input="newCode = (newCode || '').toUpperCase().trim()" />
-        <el-input v-model="newName" placeholder="显示名称，如 人民币 / 美元" style="width:240px" maxlength="32" />
-        <el-button type="primary" :loading="adding" @click="onAddCurrency">添加</el-button>
+        <el-input v-model="newCode" :placeholder="t('settings.currencies.addPlaceholderCode')" style="width:150px" maxlength="8" @input="newCode = (newCode || '').toUpperCase().trim()" />
+        <el-input v-model="newName" :placeholder="t('settings.currencies.addPlaceholderName')" style="width:240px" maxlength="32" />
+        <el-button type="primary" :loading="adding" @click="onAddCurrency">{{ t('common.add') }}</el-button>
       </div>
 
       <el-table :data="currencies" size="small" v-loading="loading" :border="true" style="width:100%;">
-        <el-table-column prop="code" label="代码" width="120" />
-        <el-table-column prop="name" label="名称" />
-        <el-table-column label="操作" width="120">
+        <el-table-column prop="code" :label="t('settings.currencies.code')" width="120" />
+        <el-table-column prop="name" :label="t('settings.currencies.name')" />
+        <el-table-column :label="t('customers.fields.ops')" width="120">
           <template #default="{ row }">
-            <el-button size="small" type="danger" text @click="onRemove(row)">删除</el-button>
+            <el-button size="small" type="danger" text @click="onRemove(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>

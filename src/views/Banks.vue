@@ -1,16 +1,16 @@
 <template>
   <div class="page container">
     <div class="head">
-      <div class="title">银行列表</div>
+      <div class="title">{{ $t('banks.title') }}</div>
       <div class="spacer"></div>
       <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
-          <el-button size="small" @click="openAdd">新增</el-button>
+          <el-button size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
           <div class="spacer"></div>
-          <el-button type="primary" size="small" @click="reset">重置为默认</el-button>
+          <el-button type="primary" size="small" @click="reset">{{ $t('banks.resetDefaults') }}</el-button>
         </div>
       </template>
 
@@ -23,35 +23,35 @@
             <span class="en text-clip">{{ b.en }}</span>
           </div>
           <div class="ops">
-            <el-button link @click="openEdit(b)">替换Logo</el-button>
-            <el-button type="danger" link @click="remove(b.code)">删除</el-button>
+            <el-button link @click="openEdit(b)">{{ $t('banks.replaceLogo') }}</el-button>
+            <el-button type="danger" link @click="remove(b.code)">{{ $t('common.delete') }}</el-button>
           </div>
         </div>
       </div>
     </el-card>
 
-    <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? '新增银行' : '替换 Logo'" width="520px">
+    <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" width="520px">
       <el-form :model="dlg.form" label-width="90px" class="form">
-        <el-form-item label="代码" v-if="dlg.mode==='add'">
+        <el-form-item :label="$t('banks.labels.code')" v-if="dlg.mode==='add'">
           <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" />
         </el-form-item>
-        <el-form-item label="中文名" v-if="dlg.mode==='add'">
+        <el-form-item :label="$t('banks.labels.zh')" v-if="dlg.mode==='add'">
           <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" @input="dlg.form.zh = (dlg.form.zh || '').toUpperCase()" />
         </el-form-item>
-        <el-form-item label="英文名" v-if="dlg.mode==='add'">
+        <el-form-item :label="$t('banks.labels.en')" v-if="dlg.mode==='add'">
           <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
-        <el-form-item label="Logo URL">
+        <el-form-item :label="$t('banks.labels.logoUrl')">
           <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" />
         </el-form-item>
-        <el-form-item label="或 上传文件">
+        <el-form-item :label="$t('banks.labels.uploadFile')">
           <input type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
-          <div class="hint">若选择文件，将优先生成为 data URL 上传并覆盖 Logo URL</div>
+          <div class="hint">{{ $t('banks.hintFile') }}</div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dlg.visible=false">取消</el-button>
-        <el-button type="primary" :loading="dlg.loading" @click="submit">确定</el-button>
+        <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
   </div>

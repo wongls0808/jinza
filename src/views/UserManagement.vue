@@ -1,14 +1,14 @@
 <template>
   <div class="users container">
     <div class="page-head">
-      <div class="title">用户管理</div>
+  <div class="title">{{ $t('home.users') }}</div>
       <div class="spacer"></div>
   <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
       <div class="actions">
         <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:180px" size="small" />
         <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />
         <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:180px" size="small" />
-        <el-button type="primary" :loading="creating" size="small" @click="createUser">新增用户</el-button>
+  <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
       </div>
     </div>
 
@@ -22,8 +22,8 @@
             </div>
             <div class="ops">
               <el-switch v-model="u.is_active" @change="toggleActive(u)" active-text="启用" />
-              <el-button type="warning" size="small" @click="openReset(u)">重置密码</el-button>
-              <el-button type="danger" size="small" @click="confirmRemove(u)">删除</el-button>
+              <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
+              <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
           </div>
         </template>
@@ -44,23 +44,23 @@
     </div>
 
     <!-- 重置密码对话框 -->
-    <el-dialog v-model="reset.visible" title="重置密码" width="420px">
+  <el-dialog v-model="reset.visible" :title="$t('common.reset')" width="420px">
       <div style="display:grid;gap:12px;">
         <div>用户：<strong>{{ reset.user?.username }}</strong></div>
         <el-input v-model.trim="reset.password" type="password" placeholder="输入新的初始密码" />
       </div>
       <template #footer>
-        <el-button @click="reset.visible=false">取消</el-button>
-        <el-button type="warning" :loading="reset.loading" @click="doReset">确定重置</el-button>
+  <el-button @click="reset.visible=false">{{ $t('common.cancel') }}</el-button>
+  <el-button type="warning" :loading="reset.loading" @click="doReset">{{ $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 删除确认对话框 -->
-    <el-dialog v-model="removeDlg.visible" title="删除用户" width="420px">
-      <div>确认删除用户 <strong>{{ removeDlg.user?.username }}</strong> ？该操作不可恢复！</div>
+    <el-dialog v-model="removeDlg.visible" :title="$t('common.delete')" width="420px">
+      <div>{{ $t('common.confirmDelete') }} <strong>{{ removeDlg.user?.username }}</strong></div>
       <template #footer>
-        <el-button @click="removeDlg.visible=false">取消</el-button>
-        <el-button type="danger" :loading="removeDlg.loading" @click="doRemove">确定删除</el-button>
+        <el-button @click="removeDlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="danger" :loading="removeDlg.loading" @click="doRemove">{{ $t('common.delete') }}</el-button>
       </template>
     </el-dialog>
   </div>

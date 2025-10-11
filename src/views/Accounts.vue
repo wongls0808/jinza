@@ -1,7 +1,7 @@
 <template>
   <div class="page container">
     <div class="head">
-      <div class="title">收款账户</div>
+      <div class="title">{{ $t('accounts.title') }}</div>
       <div class="spacer"></div>
       <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
@@ -9,14 +9,14 @@
       <template #header>
         <div class="toolbar">
           <div class="spacer"></div>
-          <el-button type="primary" size="small" @click="openAdd">新增</el-button>
+          <el-button type="primary" size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
         </div>
       </template>
 
       <el-table :data="rows" size="small" border style="width:100%" @header-dragend="onColResize">
-        <el-table-column type="index" label="#" :width="colW('idx', 60)" />
-        <el-table-column prop="account_name" label="账户名称" :min-width="colW('account_name', 160)" />
-        <el-table-column label="银行" :min-width="colW('bank', 260)">
+        <el-table-column type="index" :label="$t('accounts.fields.index')" :width="colW('idx', 60)" />
+        <el-table-column prop="account_name" :label="$t('accounts.fields.accountName')" :width="colW('account_name', 160)" />
+        <el-table-column :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
               <img class="logo" :src="row.bank_logo" alt="logo" />
@@ -25,25 +25,25 @@
             </div>
           </template>
         </el-table-column>
-  <el-table-column prop="bank_account" label="银行账户" :min-width="colW('bank_account', 200)" />
-  <el-table-column prop="currency_code" label="币种" :width="colW('currency', 100)" />
-  <el-table-column prop="opening_balance" label="期初余额" :width="colW('opening_balance', 140)">
+  <el-table-column prop="bank_account" :label="$t('accounts.fields.bankAccount')" :width="colW('bank_account', 200)" />
+  <el-table-column prop="currency_code" :label="$t('accounts.fields.currency')" :width="colW('currency', 100)" />
+  <el-table-column prop="opening_balance" :label="$t('accounts.fields.openingBalance')" :width="colW('opening_balance', 140)">
           <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="colW('ops', 100)">
+        <el-table-column :label="$t('accounts.fields.ops')" :width="colW('ops', 100)">
           <template #default="{ row }">
-            <el-popconfirm title="确定删除？" @confirm="remove(row)">
-              <template #reference><el-button link type="danger">删除</el-button></template>
+            <el-popconfirm :title="$t('common.confirmDelete')" @confirm="remove(row)">
+              <template #reference><el-button link type="danger">{{ $t('common.delete') }}</el-button></template>
             </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dlg.visible" title="新增账户" width="600px">
+    <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="600px">
       <el-form :model="dlg.form" label-width="90px" class="form">
-        <el-form-item label="账户名称"><el-input v-model.trim="dlg.form.account_name" /></el-form-item>
-        <el-form-item label="银行">
+        <el-form-item :label="$t('accounts.form.accountName')"><el-input v-model.trim="dlg.form.account_name" /></el-form-item>
+        <el-form-item :label="$t('accounts.form.bank')">
           <el-select v-model="dlg.form.bank_id" filterable style="width:100%">
             <el-option v-for="b in banks" :key="b.id" :value="b.id">
               <div class="bankopt">
@@ -54,13 +54,13 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="银行账户"><el-input v-model.trim="dlg.form.bank_account" /></el-form-item>
-        <el-form-item label="币种">
+        <el-form-item :label="$t('accounts.form.bankAccount')"><el-input v-model.trim="dlg.form.bank_account" /></el-form-item>
+        <el-form-item :label="$t('accounts.form.currency')">
           <el-select v-model="dlg.form.currency_code" style="width:100%">
             <el-option v-for="c in currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>
-        <el-form-item label="期初余额">
+        <el-form-item :label="$t('accounts.form.openingBalance')">
           <el-input-number
             v-model="dlg.form.opening_balance"
             :precision="2"
@@ -75,8 +75,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dlg.visible=false">取消</el-button>
-        <el-button type="primary" :loading="dlg.loading" @click="submit">确定</el-button>
+        <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
   </div>

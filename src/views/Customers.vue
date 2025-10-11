@@ -1,7 +1,7 @@
 <template>
   <div class="page container">
     <div class="head">
-      <div class="title">客户管理</div>
+      <div class="title">{{ $t('customers.title') }}</div>
       <div class="spacer"></div>
   <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
@@ -9,23 +9,23 @@
   <el-card class="jelly">
       <template #header>
         <div class="toolbar">
-          <el-input v-model.trim="q" placeholder="搜索 简称/客户名" size="small" style="width:220px" @keyup.enter.native="reload" />
-          <el-button size="small" @click="reload">搜索</el-button>
+          <el-input v-model.trim="q" :placeholder="$t('customers.searchPlaceholder')" size="small" style="width:220px" @keyup.enter.native="reload" />
+          <el-button size="small" @click="reload">{{ $t('common.search') }}</el-button>
           <div class="spacer"></div>
           <el-dropdown>
-            <el-button size="small">导入</el-button>
+            <el-button size="small">{{ $t('common.import') }}</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="pickImport('auto')">CSV 导入（自动解析）</el-dropdown-item>
-                <el-dropdown-item @click="pickImport('simple')">CSV 导入（简单分割）</el-dropdown-item>
+                <el-dropdown-item @click="pickImport('auto')">{{ $t('customers.importAuto') }}</el-dropdown-item>
+                <el-dropdown-item @click="pickImport('simple')">{{ $t('customers.importSimple') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
           <input ref="filePicker" type="file" accept=".csv" style="display:none" @change="onFilePicked" />
-          <el-button size="small" @click="onExport">导出</el-button>
-          <el-button size="small" @click="downloadTemplate">模板</el-button>
-          <el-button type="primary" size="small" @click="openAdd">添加</el-button>
-          <el-button type="danger" size="small" :disabled="!selection.length" @click="removeSelected">删除</el-button>
+          <el-button size="small" @click="onExport">{{ $t('common.export') }}</el-button>
+          <el-button size="small" @click="downloadTemplate">{{ $t('common.template') }}</el-button>
+          <el-button type="primary" size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
+          <el-button type="danger" size="small" :disabled="!selection.length" @click="removeSelected">{{ $t('common.delete') }}</el-button>
         </div>
       </template>
       <el-table
@@ -38,23 +38,23 @@
         @sort-change="onSort"
         @header-dragend="onColResize"
       >
-        <el-table-column type="selection" width="50" />
-        <el-table-column label="序号" type="index" width="70" />
-        <el-table-column prop="abbr" label="简称" sortable="custom" :width="colW('abbr', 140)" />
-        <el-table-column prop="name" label="客户名" sortable="custom" :min-width="colW('name', 180)" />
-        <el-table-column prop="tax_rate" label="税率(%)" sortable="custom" :width="colW('tax_rate', 100)">
+        <el-table-column type="selection" column-key="__sel" :width="colW('__sel', 50)" />
+        <el-table-column :label="$t('customers.fields.index')" type="index" column-key="__idx" :width="colW('__idx', 70)" />
+        <el-table-column prop="abbr" :label="$t('customers.fields.abbr')" sortable="custom" :width="colW('abbr', 140)" />
+        <el-table-column prop="name" :label="$t('customers.fields.name')" sortable="custom" :width="colW('name', 180)" />
+        <el-table-column prop="tax_rate" :label="$t('customers.fields.taxRate')" sortable="custom" :width="colW('tax_rate', 100)">
           <template #default="{ row }">{{ formatPercent(row.tax_rate) }}</template>
         </el-table-column>
-        <el-table-column prop="opening_myr" label="马币金额(期初)" sortable="custom" :width="colW('opening_myr', 160)">
+        <el-table-column prop="opening_myr" :label="$t('customers.fields.openingMYR')" sortable="custom" :width="colW('opening_myr', 160)">
           <template #default="{ row }">{{ formatMoney(row.opening_myr) }}</template>
         </el-table-column>
-        <el-table-column prop="opening_cny" label="人民币金额(期初)" sortable="custom" :width="colW('opening_cny', 160)">
+        <el-table-column prop="opening_cny" :label="$t('customers.fields.openingCNY')" sortable="custom" :width="colW('opening_cny', 160)">
           <template #default="{ row }">{{ formatMoney(row.opening_cny) }}</template>
         </el-table-column>
-        <el-table-column prop="submitter" label="提交人" :width="colW('submitter', 140)" />
-        <el-table-column label="操作" :width="colW('ops', 120)">
+        <el-table-column prop="submitter" :label="$t('customers.fields.submitter')" :width="colW('submitter', 140)" />
+        <el-table-column :label="$t('customers.fields.ops')" :width="colW('ops', 120)">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openAccounts(row)">收款账户</el-button>
+            <el-button link type="primary" @click="openAccounts(row)">{{ $t('customers.viewAccounts') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -73,19 +73,19 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="addDlg.visible" title="添加客户" width="560px">
+    <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="560px">
       <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="90px" class="form">
-        <el-form-item label="简称">
+        <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="addDlg.form.abbr" placeholder="例如：HZ" />
         </el-form-item>
-        <el-form-item label="客户名" prop="name">
-          <el-input v-model.trim="addDlg.form.name" placeholder="请输入客户全称" />
+        <el-form-item :label="$t('customers.form.name')" prop="name">
+          <el-input v-model.trim="addDlg.form.name" placeholder="" />
         </el-form-item>
-        <el-form-item label="税率(%)" prop="tax_rate">
+        <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
           <el-input-number v-model="addDlg.form.tax_rate" :precision="2" :min="0" :max="100" :step="1" controls-position="right" placeholder="0-100" style="width:100%" />
         </el-form-item>
         <div class="grid2">
-          <el-form-item label="马币期初">
+          <el-form-item :label="$t('customers.form.openingMYR')">
             <el-input-number
               v-model="addDlg.form.opening_myr"
               :precision="2"
@@ -98,7 +98,7 @@
               style="width:100%"
             />
           </el-form-item>
-          <el-form-item label="人民币期初">
+          <el-form-item :label="$t('customers.form.openingCNY')">
             <el-input-number
               v-model="addDlg.form.opening_cny"
               :precision="2"
@@ -115,17 +115,17 @@
         <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
       </el-form>
       <template #footer>
-        <el-button @click="addDlg.visible=false">取消</el-button>
-        <el-button type="primary" :loading="addDlg.loading" @click="doAdd">确定</el-button>
+        <el-button @click="addDlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="addDlg.loading" @click="doAdd">{{ $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 客户收款账户抽屉 -->
-    <el-drawer v-model="accDrawer.visible" size="60%" :title="(accDrawer.customer?.name || '') + ' · 收款账户'">
+  <el-drawer v-model="accDrawer.visible" size="60%" :title="(accDrawer.customer?.name || '') + ' · ' + $t('customers.accounts.title')">
       <div v-loading="accDrawer.loading">
         <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
-          <el-input v-model.trim="accDrawer.form.account_name" placeholder="账户名称" style="width:200px" />
-          <el-select v-model="accDrawer.form.bank_id" filterable placeholder="银行" style="width:220px">
+          <el-input v-model.trim="accDrawer.form.account_name" :placeholder="$t('customers.accounts.accountName')" style="width:200px" />
+          <el-select v-model="accDrawer.form.bank_id" filterable :placeholder="$t('customers.accounts.bank')" style="width:220px">
             <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id">
               <div style="display:inline-flex; align-items:center; gap:8px;">
                 <img :src="b.logo_url" style="height:16px" />
@@ -134,16 +134,16 @@
               </div>
             </el-option>
           </el-select>
-          <el-input v-model.trim="accDrawer.form.bank_account" placeholder="银行账户" style="width:220px" />
-          <el-select v-model="accDrawer.form.currency_code" placeholder="币种" style="width:140px">
+          <el-input v-model.trim="accDrawer.form.bank_account" :placeholder="$t('customers.accounts.bankAccount')" style="width:220px" />
+          <el-select v-model="accDrawer.form.currency_code" :placeholder="$t('customers.accounts.currency')" style="width:140px">
             <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
-          <el-button type="primary" @click="addCusAccount">添加</el-button>
+          <el-button type="primary" @click="addCusAccount">{{ $t('common.add') }}</el-button>
         </div>
         <el-table :data="accDrawer.items" size="small" border style="width:100%">
-          <el-table-column type="index" width="60" />
-          <el-table-column prop="account_name" label="账户名称" min-width="160" />
-          <el-table-column label="银行" min-width="260">
+          <el-table-column type="index" :label="$t('customers.fields.index')" width="60" />
+          <el-table-column prop="account_name" :label="$t('customers.accounts.accountName')" width="160" />
+          <el-table-column :label="$t('customers.accounts.bank')" width="260">
             <template #default="{ row }">
               <div style="display:inline-flex; align-items:center; gap:8px;">
                 <img :src="row.bank_logo" style="height:16px" />
@@ -152,14 +152,14 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="bank_account" label="银行账户" min-width="200" />
-          <el-table-column prop="currency_code" label="币种" width="100" />
+          <el-table-column prop="bank_account" :label="$t('customers.accounts.bankAccount')" width="200" />
+          <el-table-column prop="currency_code" :label="$t('customers.accounts.currency')" width="100" />
           
-          <el-table-column label="操作" width="160">
+          <el-table-column :label="$t('customers.fields.ops')" width="160">
             <template #default="{ row }">
-              <el-button link type="primary" @click="openEditCus(row)">编辑</el-button>
-              <el-popconfirm title="确定删除？" @confirm="removeCusAccount(row)">
-                <template #reference><el-button link type="danger">删除</el-button></template>
+              <el-button link type="primary" @click="openEditCus(row)">{{ $t('common.edit') }}</el-button>
+              <el-popconfirm :title="$t('common.confirmDelete')" @confirm="removeCusAccount(row)">
+                <template #reference><el-button link type="danger">{{ $t('common.delete') }}</el-button></template>
               </el-popconfirm>
             </template>
           </el-table-column>
@@ -167,7 +167,7 @@
       </div>
     </el-drawer>
     <!-- 编辑客户账户 -->
-    <el-dialog v-model="editAcc.visible" title="编辑账户" width="560px">
+  <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="560px">
       <el-form :model="editAcc.form" label-width="90px" class="form">
         <el-form-item label="账户名称"><el-input v-model.trim="editAcc.form.account_name" /></el-form-item>
         <el-form-item label="银行">
@@ -184,8 +184,8 @@
         
       </el-form>
       <template #footer>
-        <el-button @click="editAcc.visible=false">取消</el-button>
-        <el-button type="primary" :loading="editAcc.loading" @click="doEditCusAccount">保存</el-button>
+        <el-button @click="editAcc.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="editAcc.loading" @click="doEditCusAccount">{{ $t('customers.accounts.save') }}</el-button>
       </template>
     </el-dialog>
   </div>

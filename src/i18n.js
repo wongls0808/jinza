@@ -20,6 +20,69 @@ const messages = {
       cancel: '取消',
       ok: '确定',
     },
+    customers: {
+      title: '客户管理',
+      searchPlaceholder: '搜索 简称/客户名',
+      importAuto: 'CSV 导入（自动解析）',
+      importSimple: 'CSV 导入（简单分割）',
+      viewAccounts: '收款账户',
+      addTitle: '添加客户',
+      fields: {
+        index: '序号',
+        abbr: '简称',
+        name: '客户名',
+        taxRate: '税率(%)',
+        openingMYR: '马币金额(期初)',
+        openingCNY: '人民币金额(期初)',
+        submitter: '提交人',
+        ops: '操作',
+      },
+      form: {
+        abbr: '简称',
+        name: '客户名',
+        taxRate: '税率(%)',
+        openingMYR: '马币期初',
+        openingCNY: '人民币期初',
+      },
+      accounts: {
+        title: '收款账户',
+        accountName: '账户名称',
+        bank: '银行',
+        bankAccount: '银行账户',
+        currency: '币种',
+        editTitle: '编辑账户',
+        save: '保存',
+      }
+    },
+    accounts: {
+      title: '收款账户',
+      addTitle: '新增账户',
+      fields: {
+        index: '#',
+        accountName: '账户名称',
+        bank: '银行',
+        bankAccount: '银行账户',
+        currency: '币种',
+        openingBalance: '期初余额',
+        ops: '操作',
+      },
+      form: {
+        accountName: '账户名称',
+        bank: '银行',
+        bankAccount: '银行账户',
+        currency: '币种',
+        openingBalance: '期初余额',
+      }
+    },
+    banks: {
+      title: '银行列表',
+      resetDefaults: '重置为默认',
+      replaceLogo: '替换Logo',
+      addTitle: '新增银行',
+      replaceTitle: '替换 Logo',
+      labels: { code: '代码', zh: '中文名', en: '英文名', logoUrl: 'Logo URL', uploadFile: '或 上传文件' },
+      hintFile: '若选择文件，将优先生成为 data URL 上传并覆盖 Logo URL'
+    },
     login: {
       title: '登录',
       username: '用户名',
@@ -47,6 +110,14 @@ const messages = {
       language: '语言',
       zh: '中文',
       en: '英文',
+      currenciesTitle: '币种设置',
+      currencies: {
+        code: '代码',
+        name: '名称',
+        addPlaceholderCode: '币种代码，如 CNY / USD',
+        addPlaceholderName: '显示名称，如 人民币 / 美元',
+        count: '共 {n} 个',
+      }
     }
   },
   en: {
@@ -67,6 +138,69 @@ const messages = {
       confirmDelete: 'Confirm delete?',
       cancel: 'Cancel',
       ok: 'OK',
+    },
+    customers: {
+      title: 'Customers',
+      searchPlaceholder: 'Search Abbr/Name',
+      importAuto: 'CSV Import (auto parse)',
+      importSimple: 'CSV Import (simple split)',
+      viewAccounts: 'Accounts',
+      addTitle: 'Add Customer',
+      fields: {
+        index: '#',
+        abbr: 'Abbr',
+        name: 'Name',
+        taxRate: 'Tax Rate(%)',
+        openingMYR: 'Opening MYR',
+        openingCNY: 'Opening CNY',
+        submitter: 'Submitter',
+        ops: 'Actions',
+      },
+      form: {
+        abbr: 'Abbr',
+        name: 'Name',
+        taxRate: 'Tax Rate(%)',
+        openingMYR: 'Opening MYR',
+        openingCNY: 'Opening CNY',
+      },
+      accounts: {
+        title: 'Accounts',
+        accountName: 'Account Name',
+        bank: 'Bank',
+        bankAccount: 'Bank Account',
+        currency: 'Currency',
+        editTitle: 'Edit Account',
+        save: 'Save',
+      }
+    },
+    accounts: {
+      title: 'Receiving Accounts',
+      addTitle: 'Add Account',
+      fields: {
+        index: '#',
+        accountName: 'Account Name',
+        bank: 'Bank',
+        bankAccount: 'Bank Account',
+        currency: 'Currency',
+        openingBalance: 'Opening Balance',
+        ops: 'Actions',
+      },
+      form: {
+        accountName: 'Account Name',
+        bank: 'Bank',
+        bankAccount: 'Bank Account',
+        currency: 'Currency',
+        openingBalance: 'Opening Balance',
+      }
+    },
+    banks: {
+      title: 'Banks',
+      resetDefaults: 'Reset to Defaults',
+      replaceLogo: 'Replace Logo',
+      addTitle: 'Add Bank',
+      replaceTitle: 'Replace Logo',
+      labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', logoUrl: 'Logo URL', uploadFile: 'Or Upload File' },
+      hintFile: 'If file is picked, a data URL will be used to upload and override the Logo URL'
     },
     login: {
       title: 'Sign In',
@@ -95,6 +229,14 @@ const messages = {
       language: 'Language',
       zh: 'Chinese',
       en: 'English',
+      currenciesTitle: 'Currency Settings',
+      currencies: {
+        code: 'Code',
+        name: 'Name',
+        addPlaceholderCode: 'Currency code, e.g. CNY / USD',
+        addPlaceholderName: 'Display name, e.g. Chinese Yuan / US Dollar',
+        count: 'Total {n}',
+      }
     }
   }
 }

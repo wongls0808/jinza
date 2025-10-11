@@ -14,8 +14,10 @@ export function useTableMemory(key) {
   let mem = load()
   const colW = (col, def) => mem[col] ?? def
   const onColResize = (newWidth, oldWidth, column, event) => {
-    if (!column || !column.property) return
-    mem = { ...mem, [column.property]: newWidth }
+    if (!column) return
+    const key = column.property || column.columnKey
+    if (!key) return
+    mem = { ...mem, [key]: newWidth }
     save(mem)
   }
   const reset = () => { mem = {}; save(mem) }
