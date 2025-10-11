@@ -135,17 +135,6 @@
           <el-select v-model="accDrawer.form.currency_code" placeholder="币种" style="width:140px">
             <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
-          <el-input-number
-            v-model="accDrawer.form.opening_balance"
-            :precision="2"
-            :min="0"
-            :step="100"
-            controls-position="right"
-            placeholder="0.00"
-            :formatter="moneyFormatter"
-            :parser="moneyParser"
-            style="width:180px"
-          />
           <el-button type="primary" @click="addCusAccount">添加</el-button>
         </div>
         <el-table :data="accDrawer.items" size="small" border style="width:100%">
@@ -162,9 +151,7 @@
           </el-table-column>
           <el-table-column prop="bank_account" label="银行账户" min-width="200" />
           <el-table-column prop="currency_code" label="币种" width="100" />
-          <el-table-column prop="opening_balance" label="期初余额" width="140">
-            <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
-          </el-table-column>
+          
           <el-table-column label="操作" width="160">
             <template #default="{ row }">
               <el-button link type="primary" @click="openEditCus(row)">编辑</el-button>
@@ -191,19 +178,7 @@
             <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>
-        <el-form-item label="期初余额">
-          <el-input-number
-            v-model="editAcc.form.opening_balance"
-            :precision="2"
-            :min="0"
-            :step="100"
-            controls-position="right"
-            placeholder="0.00"
-            :formatter="moneyFormatter"
-            :parser="moneyParser"
-            style="width:100%"
-          />
-        </el-form-item>
+        
       </el-form>
       <template #footer>
         <el-button @click="editAcc.visible=false">取消</el-button>
@@ -517,7 +492,7 @@ function onPageChange(p) {
 }
 
 // 客户绑定的收款账户 Drawer
-const accDrawer = ref({ visible: false, loading: false, customer: null, items: [], banks: [], currencies: [], form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
+const accDrawer = ref({ visible: false, loading: false, customer: null, items: [], banks: [], currencies: [], form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY' } })
 async function openAccounts(cus) {
   accDrawer.value.visible = true
   accDrawer.value.customer = cus
@@ -531,7 +506,7 @@ async function openAccounts(cus) {
     accDrawer.value.items = items
     accDrawer.value.banks = banks
     accDrawer.value.currencies = currencies
-    accDrawer.value.form = { account_name: '', bank_id: banks[0]?.id || null, bank_account: '', currency_code: currencies[0]?.code || 'CNY', opening_balance: 0 }
+  accDrawer.value.form = { account_name: '', bank_id: banks[0]?.id || null, bank_account: '', currency_code: currencies[0]?.code || 'CNY' }
   } finally {
     accDrawer.value.loading = false
   }
@@ -553,7 +528,7 @@ async function addCusAccount() {
   }
   const items = await api.customerAccounts.list(c.id)
   accDrawer.value.items = items
-  accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY', opening_balance: 0 }
+  accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY' }
   ElMessage.success('已添加')
 }
 async function removeCusAccount(row) {
@@ -564,11 +539,11 @@ async function removeCusAccount(row) {
 }
 
 // 编辑客户账户
-const editAcc = ref({ visible: false, loading: false, id: null, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
+const editAcc = ref({ visible: false, loading: false, id: null, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY' } })
 function openEditCus(row) {
   editAcc.value.visible = true
   editAcc.value.id = row.id
-  editAcc.value.form = { account_name: row.account_name, bank_id: row.bank_id, bank_account: row.bank_account, currency_code: row.currency_code, opening_balance: Number(row.opening_balance)||0 }
+  editAcc.value.form = { account_name: row.account_name, bank_id: row.bank_id, bank_account: row.bank_account, currency_code: row.currency_code }
 }
 async function doEditCusAccount() {
   const c = accDrawer.value.customer

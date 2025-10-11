@@ -403,7 +403,7 @@ router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'
 router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const cid = Number(req.params.id)
   const rs = await query(`
-    select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+    select a.id, a.account_name, a.bank_account, a.currency_code,
            b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
     from customer_receiving_accounts a
     left join banks b on b.id = a.bank_id
@@ -415,12 +415,12 @@ router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_cu
 
 router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const cid = Number(req.params.id)
-  const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
+  const { account_name, bank_id, bank_account, currency_code } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
   try {
     const rs = await query(
-      'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5,$6) returning *',
-      [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase(), Number(opening_balance)||0]
+      'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code) values($1,$2,$3,$4,$5) returning *',
+      [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase()]
     )
     res.json(rs.rows[0])
   } catch (e) {
@@ -440,7 +440,7 @@ router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm(
 router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const cid = Number(req.params.id)
   const aid = Number(req.params.aid)
-  const { account_name, bank_id, bank_account, currency_code, opening_balance } = req.body || {}
+  const { account_name, bank_id, bank_account, currency_code } = req.body || {}
   const fields = []
   const values = []
   let idx = 1
@@ -448,7 +448,6 @@ router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('vi
   if (bank_id !== undefined) { fields.push(`bank_id=$${idx++}`); values.push(Number(bank_id)) }
   if (bank_account !== undefined) { fields.push(`bank_account=$${idx++}`); values.push(bank_account) }
   if (currency_code !== undefined) { fields.push(`currency_code=$${idx++}`); values.push(String(currency_code).toUpperCase()) }
-  if (opening_balance !== undefined) { fields.push(`opening_balance=$${idx++}`); values.push(Number(opening_balance)||0) }
   if (!fields.length) return res.status(400).json({ error: 'no changes' })
   values.push(aid); values.push(cid)
   try {
