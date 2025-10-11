@@ -893,11 +893,11 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       const params = toInsert.map((_, idx) => `($${idx*12+1},$${idx*12+2},$${idx*12+3},$${idx*12+4},$${idx*12+5},$${idx*12+6},$${idx*12+7},$${idx*12+8},$${idx*12+9},$${idx*12+10},$${idx*12+11},$${idx*12+12})`).join(',')
       const flat = toInsert.flatMap(r => [
         stmtId,
-        r.trn_date ?? '',
+        r.trn_date ?? null,
         r.cheque_ref ?? '',
         r.description ?? '',
-        r.debit ?? '',
-        r.credit ?? '',
+        r.debit ?? null,
+        r.credit ?? null,
         r.ref1 ?? '',
         r.ref2 ?? '',
         r.ref3 ?? '',
