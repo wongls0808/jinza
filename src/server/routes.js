@@ -705,7 +705,10 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       ref: idx(['reference', '附言', '备注']),
       ref1: idx(['reference 1', 'reference1', 'ref1', '参考 1', '参考1', '附言 1', '附言1']),
       ref2: idx(['reference 2', 'reference2', 'ref2', '参考 2', '参考2', '附言 2', '附言2']),
-      ref3: idx(['reference 3', 'reference3', 'ref3', '参考 3', '参考3', '附言 3', '附言3'])
+      ref3: idx(['reference 3', 'reference3', 'ref3', '参考 3', '参考3', '附言 3', '附言3']),
+      ref4: idx(['reference 4', 'reference4', 'ref4', '参考 4', '参考4', '附言 4', '附言4']),
+      ref5: idx(['reference 5', 'reference5', 'ref5', '参考 5', '参考5', '附言 5', '附言5']),
+      ref6: idx(['reference 6', 'reference6', 'ref6', '参考 6', '参考6', '附言 6', '附言6'])
     }
   }
   const headerScore = (headerRow) => {
@@ -752,15 +755,18 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
         debit = parseAmount(row[a]); credit = parseAmount(row[b])
       }
     }
-    const description = hmap.desc >= 0 ? (get(hmap.desc) || null) : null
-    let ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
-    let ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
-    let ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
+  const description = hmap.desc >= 0 ? (get(hmap.desc) || null) : null
+  let ref1 = hmap.ref1 >= 0 ? (get(hmap.ref1) || null) : null
+  let ref2 = hmap.ref2 >= 0 ? (get(hmap.ref2) || null) : null
+  let ref3 = hmap.ref3 >= 0 ? (get(hmap.ref3) || null) : null
+  let ref4 = hmap.ref4 >= 0 ? (get(hmap.ref4) || null) : null
+  let ref5 = hmap.ref5 >= 0 ? (get(hmap.ref5) || null) : null
+  let ref6 = hmap.ref6 >= 0 ? (get(hmap.ref6) || null) : null
     if (hmap.ref >= 0 && !ref1 && !ref2 && !ref3) {
       const r = get(hmap.ref)
       if (r) ref1 = r
     }
-    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1, ref2, ref3, ref4: null, ref5: null, ref6: null }
+    return { trn_date: dateObj, cheque_ref: cheque, description, debit, credit, ref1, ref2, ref3, ref4, ref5, ref6 }
   }
   const extractRow = (rawRow) => {
     const row = (rawRow || []).map(c => (c == null ? '' : String(c).trim()))
@@ -897,7 +903,7 @@ router.post('/receipts/import', express.text({ type: '*/*', limit: '20mb' }), au
       }
       // collect kv before header
       let headerIdx = -1
-      for (let i = 0; i < Math.min(csvRows.length, 10); i++) {
+      for (let i = 0; i < Math.min(csvRows.length, 50); i++) {
         const row = csvRows[i].map(c => String(c).trim())
         const first = row[0] || ''
         if (/^Trn\.\?\s*Date/i.test(first) || /^Transaction\s*Date/i.test(first)) { headerIdx = i; break }
