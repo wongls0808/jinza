@@ -14,9 +14,9 @@
       </template>
 
       <el-table :data="rows" size="small" border style="width:100%" @header-dragend="onColResize">
-        <el-table-column type="index" :label="$t('accounts.fields.index')" :width="colW('idx', 60)" />
+        <el-table-column type="index" column-key="__idx" :label="$t('accounts.fields.index')" :width="colW('__idx', 60)" />
         <el-table-column prop="account_name" :label="$t('accounts.fields.accountName')" :width="colW('account_name', 160)" />
-        <el-table-column :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
+  <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
               <img class="logo" :src="row.bank_logo" alt="logo" />

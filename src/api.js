@@ -8,6 +8,7 @@ function getCache(key) {
   if (Date.now() - it.time > (it.ttl || 0)) { _cache.delete(key); return null }
   return it.data
 }
+function delCache(key) { _cache.delete(key) }
 
 function getToken() {
   const raw = localStorage.getItem('auth_user')
@@ -54,10 +55,26 @@ export const api = {
   ,
   // Banks
   requestBanks: () => request('/banks'),
-  createBank: (data) => request('/banks', { method: 'POST', body: JSON.stringify(data) }),
-  deleteBank: (id) => request(`/banks/${id}`, { method: 'DELETE' }),
-  resetBanks: () => request('/banks/reset-defaults', { method: 'POST' }),
-  updateBank: (id, data) => request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  createBank: async (data) => {
+    const res = await request('/banks', { method: 'POST', body: JSON.stringify(data) })
+    delCache('banks.all')
+    return res
+  },
+  deleteBank: async (id) => {
+    const res = await request(`/banks/${id}`, { method: 'DELETE' })
+    delCache('banks.all')
+    return res
+  },
+  resetBanks: async () => {
+    const res = await request('/banks/reset-defaults', { method: 'POST' })
+    delCache('banks.all')
+    return res
+  },
+  updateBank: async (id, data) => {
+    const res = await request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    delCache('banks.all')
+    return res
+  },
   banks: {
     all: async () => {
       const key = 'banks.all'
