@@ -16,13 +16,17 @@
         </div>
       </template>
 
-      <el-table :data="txns" size="small" border height="420" @sort-change="onSort" style="width:100%">
+      <el-table :data="txns" size="small" border height="600" @sort-change="onSort" style="width:100%" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="50" />
         <el-table-column prop="trn_date" :label="$t('receipts.trnDate')" sortable="custom" width="120">
           <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
         </el-table-column>
         <el-table-column prop="account_number" :label="$t('receipts.accountNumber')" width="150" />
         <el-table-column prop="account_name" :label="$t('receipts.accountName')" width="200" />
         <el-table-column prop="cheque_ref" :label="$t('receipts.cheque')" width="140" />
+        <el-table-column prop="reference" label="Reference" width="180">
+          <template #default="{ row }">{{ [row.ref1, row.ref2, row.ref3].filter(Boolean).join(' ') }}</template>
+        </el-table-column>
         <el-table-column prop="description" :label="$t('receipts.desc')" />
         <el-table-column prop="debit" :label="$t('receipts.debit')" sortable="custom" width="120">
           <template #default="{ row }">{{ money(row.debit) }}</template>
@@ -60,6 +64,7 @@ const pageSize = ref(20)
 const sort = ref('trn_date')
 const order = ref('asc')
 const q = ref('')
+const selectedRows = ref([])
 
 function pickFile() { fileInput.value && fileInput.value.click() }
 const fileInput = ref(null)
@@ -106,6 +111,7 @@ function onSort({ prop, order: ord }) {
 }
 function onPageSizeChange(ps) { pageSize.value = ps; page.value = 1; loadTxns() }
 function onPageChange(p) { page.value = p; loadTxns() }
+function onSelectionChange(val) { selectedRows.value = val }
 
 onMounted(loadTxns)
 </script>
