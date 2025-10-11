@@ -11,6 +11,7 @@
         <div class="toolbar">
           <el-button size="small" @click="pickFile">{{ $t('receipts.import') }}</el-button>
           <input ref="fileInput" type="file" accept=".csv,.tsv,.txt" style="display:none" @change="onPicked" />
+          <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="deleteSelected">批量删除</el-button>
           <div class="spacer"></div>
           <el-input v-model.trim="q" size="small" :placeholder="$t('receipts.searchTxn')" style="width:220px" @keyup.enter.native="loadTxns" />
         </div>
@@ -90,6 +91,19 @@ async function onPicked(e) {
     ElMessage.error('导入失败')
   } finally {
     e.target.value = ''
+  }
+}
+
+async function deleteSelected() {
+  if (!selectedRows.value.length) return
+  try {
+    const ids = selectedRows.value.map(row => row.id)
+    await api.receipts.deleteTransactions(ids)
+    ElMessage.success('删除成功')
+    await reload()
+    selectedRows.value = []
+  } catch {
+    ElMessage.error('删除失败')
   }
 }
 

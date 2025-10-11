@@ -1,3 +1,10 @@
+// 批量删除银行交易
+router.delete('/receipts/transactions', authMiddleware(true), requirePerm('view_receipts'), async (req, res) => {
+  const ids = req.body && req.body.ids
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '缺少待删除ID' })
+  await query(`DELETE FROM bank_transactions WHERE id = ANY($1::int[])`, [ids])
+  res.json({ ok: true })
+})
 // 清理 Excel 导出 '="内容"' 包裹
   const cleanCell = (v) => {
     let s = String(v ?? '').trim()
