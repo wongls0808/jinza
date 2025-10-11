@@ -94,7 +94,6 @@ const onSubmit = async () => {
 </script>
 
 <style scoped>
-<style scoped>
 .login-modern-bg {
   min-height: 100vh;
   background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
@@ -173,5 +172,4 @@ const onSubmit = async () => {
   from { opacity: 0; transform: translateY(40px); }
   to { opacity: 1; transform: none; }
 }
-</style>
 </style>
