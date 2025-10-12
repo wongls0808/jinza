@@ -159,16 +159,27 @@ async function importBankCsvText(text) {
   const dataText = lines.slice(headerIdx).join('\n')
   const rows = parseCsv(dataText, { bom: true, columns: true, skip_empty_lines: true, relax_quotes: true, relax_column_count: true, trim: true })
 
+  // Helper: case-insensitive, trimmed header name access
+  const get = (row, name) => {
+    const target = String(name).toLowerCase().replace(/\s+/g, ' ').trim()
+    for (const k of Object.keys(row)) {
+      const norm = String(k).toLowerCase().replace(/\s+/g, ' ').trim()
+      if (norm === target) return row[k]
+    }
+    return undefined
+  }
+
   const toInsert = []
   const preview = []
   for (const r of rows) {
-    const trnDate = parseDateDDMMYYYY(r['Trn. Date'])
-    const cheque = cleanCell(r['Cheque No/Ref No']) || null
-    const debit = parseAmount(r['Debit Amount'])
-    const credit = parseAmount(r['Credit Amount'])
-    const ref1 = cleanCell(r['Reference 1']) || null
-    const ref2 = cleanCell(r['Reference 2']) || null
-    const ref3 = cleanCell(r['Reference 3']) || null
+    // Only read required columns; all other columns (e.g., Transaction Description, Reference 4-6) are intentionally ignored
+    const trnDate = parseDateDDMMYYYY(get(r, 'Trn. Date'))
+    const cheque = cleanCell(get(r, 'Cheque No/Ref No')) || null
+    const debit = parseAmount(get(r, 'Debit Amount'))
+    const credit = parseAmount(get(r, 'Credit Amount'))
+    const ref1 = cleanCell(get(r, 'Reference 1')) || null
+    const ref2 = cleanCell(get(r, 'Reference 2')) || null
+    const ref3 = cleanCell(get(r, 'Reference 3')) || null
 
     // Skip completely empty amount rows
     if (!debit && !credit) continue

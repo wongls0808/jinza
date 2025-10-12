@@ -58,6 +58,7 @@
         <el-input v-model.trim="accountFilter" placeholder="按 Account Number 过滤" clearable style="width:260px" @keyup.enter="load" @clear="load" />
       </div>
       <el-table :data="rows" size="small" border style="width:100%">
+        <el-table-column prop="account_number" label="Account Number" width="160" />
         <el-table-column prop="trn_date" label="Trn. Date" width="120" />
         <el-table-column prop="cheque_ref_no" label="Cheque No/Ref No" width="160" />
         <el-table-column prop="debit_amount" label="Debit Amount" align="right" width="140" />
