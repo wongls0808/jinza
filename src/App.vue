@@ -119,16 +119,7 @@ const activeMenu = computed(() => {
 })
 
 // 导航背景色
-const navBgColor = computed(() => 'transparent')
-
-// 导航菜单相关
-const activeMenu = computed(() => {
-  return route.name || 'home'
-})
-
-const navBgColor = computed(() => {
-  return 'transparent' // 透明背景，使用顶部导航栏的背景色
-})
+const navBgColor = computed(() => 'transparent') // 透明背景，使用顶部导航栏的背景色
 
 // 菜单项选中处理
 function handleSelect(key) {
