@@ -112,7 +112,9 @@ onMounted(() => {
 const { locale, t } = useI18n()
 const lang = ref(locale.value)
 function onLangChange(v) { 
-  sessionStorage.setItem('lang', v); 
+  // 同时保存在sessionStorage和localStorage中
+  sessionStorage.setItem('lang', v);
+  localStorage.setItem('lang', v);
   locale.value = v;
 }
 watch(locale, (v) => lang.value = v)

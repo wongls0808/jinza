@@ -163,7 +163,15 @@
 
       <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable>
         <template #default="scope">
-          {{ scope.row.bank_name || '-' }}
+          <div class="bank-display">
+            <img 
+              v-if="scope.row.bank_id" 
+              :src="`/banks/${scope.row.bank_id?.toLowerCase()}.svg`" 
+              :alt="scope.row.bank_name" 
+              class="bank-logo" 
+              @error="e => e.target.style.display = 'none'" />
+            <span v-if="!scope.row.bank_id || !scope.row.bank_name">{{ scope.row.bank_name || '-' }}</span>
+          </div>
         </template>
       </el-table-column>
       
@@ -255,22 +263,28 @@
             v-model="form.account_number"
             filterable
             @change="handleAccountChange"
+            placeholder="选择收款账户"
             style="width: 100%">
             <el-option
               v-for="account in accounts"
               :key="account.bank_account"
-              :label="account.bank_account"
+              :label="`${account.bank_account} (${account.account_name})`"
               :value="account.bank_account">
               <div style="display: flex; justify-content: space-between; align-items: center">
                 <span>{{ account.bank_account }}</span>
-                <span style="font-size: 0.8em; color: #888">{{ account.bank_zh }}</span>
+                <span style="font-size: 0.85em; margin-left: 8px;">
+                  {{ account.account_name }}
+                </span>
               </div>
             </el-option>
           </el-select>
         </el-form-item>
         
         <el-form-item :label="t('transactions.bankName')" prop="bank_name">
-          <el-input v-model="form.bank_name" disabled />
+          <div class="bank-display">
+            <img v-if="selectedBankLogo" :src="selectedBankLogo" alt="Bank Logo" class="bank-logo" />
+            <span v-else>{{ form.bank_name }}</span>
+          </div>
         </el-form-item>
         
         <el-form-item :label="t('transactions.accountName')" prop="account_name">
@@ -553,6 +567,7 @@ const loading = ref(false)
 const searchQuery = ref('')
 const multipleSelection = ref([])
 const accounts = ref([])
+const selectedBankLogo = ref('')
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -718,30 +733,9 @@ const fetchTransactions = async () => {
     } else {
       ElMessage.error(t('transactions.fetchFailed'))
     }
-    
-    // 对于开发环境，提供一些测试数据以便界面可以展示
-    if (process.env.NODE_ENV === 'development') {
-      transactions.value = getMockTransactions()
-      pagination.total = transactions.value.length
-    }
+    // 移除了开发环境的测试数据
   } finally {
     loading.value = false
-  }
-  
-  // 本地开发时的模拟数据
-  function getMockTransactions() {
-    return Array(5).fill().map((_, i) => ({
-      id: i + 1,
-      account_number: '6226123456789000' + i,
-      transaction_date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-      cheque_ref_no: 'REF' + (1000 + i),
-      description: `测试交易 ${i + 1}`,
-      debit_amount: i % 2 === 0 ? (i + 1) * 1000 : 0,
-      credit_amount: i % 2 === 1 ? (i + 1) * 1000 : 0,
-      balance: 10000 - i * 1000,
-      category: i % 2 === 0 ? '支出' : '收入',
-      reference_1: `参考信息 ${i + 1}`
-    }))
   }
 }
 
@@ -1093,9 +1087,23 @@ const handleAccountChange = (accountNumber) => {
   if (selectedAccount) {
     form.bank_name = selectedAccount.bank_zh || selectedAccount.bank_en
     form.account_name = selectedAccount.account_name
+    
+    // 设置银行logo
+    if (selectedAccount.bank_code) {
+      try {
+        const logoPath = `/banks/${selectedAccount.bank_code.toLowerCase()}.svg`
+        selectedBankLogo.value = logoPath
+      } catch (error) {
+        console.error('获取银行Logo失败:', error)
+        selectedBankLogo.value = ''
+      }
+    } else {
+      selectedBankLogo.value = ''
+    }
   } else {
     form.bank_name = ''
     form.account_name = ''
+    selectedBankLogo.value = ''
   }
 }
 
@@ -1435,14 +1443,10 @@ onMounted(() => {
   } catch (error) {
     console.error('初始化交易管理视图失败:', error)
     ElMessage({
-      message: '页面初始化失败，将使用模拟数据',
-      type: 'warning',
+      message: '页面初始化失败，请检查网络连接或联系管理员',
+      type: 'error',
       duration: 5000
     })
-    // 使用模拟数据确保界面可用
-    if (transactions.value.length === 0) {
-      transactions.value = getMockTransactions()
-    }
   }
   window.addEventListener('resize', handleResize)
 })
@@ -1466,6 +1470,17 @@ const onBeforeUnmount = () => {
 
 .text-right {
   text-align: right;
+}
+
+.bank-display {
+  display: flex;
+  align-items: center;
+}
+
+.bank-logo {
+  height: 24px;
+  max-width: 100px;
+  object-fit: contain;
 }
 
 .stats-panel {
