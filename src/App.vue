@@ -116,8 +116,12 @@ function onLangChange(v) {
   sessionStorage.setItem('lang', v);
   localStorage.setItem('lang', v);
   locale.value = v;
+  try { document.documentElement.lang = v === 'zh' ? 'zh-CN' : 'en' } catch {}
 }
-watch(locale, (v) => lang.value = v)
+watch(locale, (v) => {
+  lang.value = v
+  try { document.documentElement.lang = v === 'zh' ? 'zh-CN' : 'en' } catch {}
+})
 const isLogin = computed(() => route.name === 'login')
 
 // 当前选中的菜单项
