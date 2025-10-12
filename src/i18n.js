@@ -388,7 +388,7 @@ const messages = {
   }
 }
 
-const locale = localStorage.getItem('lang') || 'zh'
+const locale = sessionStorage.getItem('lang') || localStorage.getItem('lang') || 'zh'
 
 export const i18n = createI18n({
   legacy: false,

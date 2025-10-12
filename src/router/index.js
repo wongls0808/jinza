@@ -34,7 +34,20 @@ const router = createRouter({
 // 登录与权限检查
 const readAuth = () => {
   try {
-    const data = JSON.parse(localStorage.getItem('auth_user') || 'null')
+    // 优先从会话存储中读取认证信息
+    let data = JSON.parse(sessionStorage.getItem('auth_user') || 'null')
+    
+    // 如果会话存储中没有，且设置了"记住我"，则从本地存储中读取
+    const rememberAuth = localStorage.getItem('remember_auth') === '1'
+    if (!data && rememberAuth) {
+      data = JSON.parse(localStorage.getItem('auth_user') || 'null')
+      
+      // 如果从本地存储中恢复了数据，同步到会话存储中
+      if (data) {
+        sessionStorage.setItem('auth_user', JSON.stringify(data))
+      }
+    }
+    
     if (!data) return { token: null, perms: [] }
     return { token: data.token, perms: data.perms || [], must_change_password: !!data.must_change_password }
   } catch { return { token: null, perms: [] } }

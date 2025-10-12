@@ -80,10 +80,33 @@ const router = useRouter()
 const route = useRoute()
 const { state, logout: doLogout, has } = useAuth()
 const authed = computed(() => !!state.token)
-const logout = () => { doLogout(); router.replace('/login') }
+
+// 增强登出功能，确保完全清除会话
+const logout = () => { 
+  doLogout(); 
+  sessionStorage.removeItem('auth_user'); // 确保清除会话存储
+  router.replace('/login') 
+}
+
+// 验证会话有效性
+const validateSession = () => {
+  const sessionData = sessionStorage.getItem('auth_user')
+  if (!sessionData && !route.meta.public) {
+    console.log('会话无效，重定向到登录页')
+    router.replace('/login')
+    return false
+  }
+  return true
+}
+
+// 在组件挂载时验证会话
+onMounted(() => {
+  validateSession()
+})
+
 const { locale, t } = useI18n()
 const lang = ref(locale.value)
-function onLangChange(v) { localStorage.setItem('lang', v); locale.value = v }
+function onLangChange(v) { sessionStorage.setItem('lang', v); locale.value = v }
 watch(locale, (v) => lang.value = v)
 const isLogin = computed(() => route.name === 'login')
 

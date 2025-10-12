@@ -65,6 +65,8 @@ const lang = ref(locale.value)
 
 function onLangChange(v) {
   locale.value = v
+  sessionStorage.setItem('lang', v)
+  // 保持向后兼容，同时也存储在localStorage
   localStorage.setItem('lang', v)
 }
 

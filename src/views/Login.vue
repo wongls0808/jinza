@@ -130,20 +130,23 @@ const onSubmit = async () => {
   try {
     const res = await api.login(form.value.username, form.value.password)
     
-    // 保存登录信息
+    // 保存登录信息，传递"记住我"选项
     save({ 
       token: res.token, 
       user: res.user, 
       perms: res.perms, 
       must_change_password: !!res.must_change_password 
-    })
+    }, remember.value)
     
-    // 记住登录状态设置
-    if (!remember.value) {
-      // 会话模式：刷新即失效
-      sessionStorage.setItem('auth_session', '1')
-    } else {
+    // 记录会话状态
+    if (remember.value) {
+      // 记住登录状态
+      localStorage.setItem('remember_auth', '1')
       sessionStorage.removeItem('auth_session')
+    } else {
+      // 会话模式：关闭浏览器即失效
+      localStorage.removeItem('remember_auth')
+      sessionStorage.setItem('auth_session', '1')
     }
     
     // 处理重定向
