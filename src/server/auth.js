@@ -23,8 +23,7 @@ export function authMiddleware(required = true) {
           'view_customers', 
           'view_banks', 
           'view_accounts', 
-          'view_settings',
-          'view_account_management'
+          'view_settings'
         ]
       }
       return next()
@@ -117,21 +116,6 @@ export async function ensureSchema() {
       opening_balance numeric default 0,
       created_at timestamptz default now()
     );
-    
-    create table if not exists account_management (
-      id serial primary key,
-      account_number text not null,
-      transaction_date date not null,
-      cheque_ref_no text,
-      debit_amount numeric default 0,
-      credit_amount numeric default 0,
-      reference_1 text,
-      reference_2 text,
-      reference_3 text,
-      created_at timestamptz default now(),
-      updated_at timestamptz default now(),
-      unique(account_number, transaction_date)
-    );
 
     create table if not exists customer_receiving_accounts (
       id serial primary key,
@@ -160,8 +144,7 @@ export async function seedInitialAdmin() {
     { code: 'view_customers', name: '客户模块' },
     { code: 'view_banks', name: '银行列表' },
     { code: 'view_accounts', name: '收款账户' },
-    { code: 'view_settings', name: '系统设置' },
-    { code: 'view_account_management', name: '入账管理' }
+    { code: 'view_settings', name: '系统设置' }
   ]
   for (const p of corePerms) {
     await query(

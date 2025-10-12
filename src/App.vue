@@ -19,10 +19,6 @@
             <el-icon><HomeFilled /></el-icon>
             <span>{{ t('home.title') }}</span>
           </el-menu-item>
-          <el-menu-item index="account-management" :route="{name: 'account-management'}" v-if="has('view_account_management') || true">
-            <el-icon><Document /></el-icon>
-            <span>{{ t('accountManagement.title') }}</span>
-          </el-menu-item>
           <el-menu-item index="customers" :route="{name: 'customers'}" v-if="has('view_customers')">
             <el-icon><UserFilled /></el-icon>
             <span>{{ t('customers.title') }}</span>
