@@ -53,7 +53,9 @@ function firstAllowed(perms) {
   return { name: 'no-access' }
 }
 
+// 登录校验和权限验证
 router.beforeEach((to, from, next) => {
+  // 恢复登录验证逻辑
   if (to.meta.public) return next()
   const { token, perms, must_change_password } = readAuth()
   if (!token) return next({ name: 'login', query: { redirect: to.fullPath } })

@@ -3,7 +3,7 @@
     <div class="page-head">
   <div class="title">{{ $t('home.users') }}</div>
       <div class="spacer"></div>
-  <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+      <!-- 移除了返回首页按钮 -->
       <div class="actions">
         <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:180px" size="small" />
         <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />

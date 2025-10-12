@@ -3,7 +3,7 @@
     <div class="head">
       <div class="title">{{ $t('accounts.title') }}</div>
       <div class="spacer"></div>
-      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+      <!-- 移除了返回首页按钮 -->
     </div>
     <el-card class="jelly">
       <template #header>

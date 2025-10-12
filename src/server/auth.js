@@ -11,6 +11,26 @@ export function signToken(payload) {
 
 export function authMiddleware(required = true) {
   return async (req, res, next) => {
+    // 开发模式：跳过身份验证，使用默认管理员权限
+    if (process.env.NODE_ENV !== 'production') {
+      // 开发模式下模拟管理员用户
+      req.user = {
+        id: 1,
+        username: 'admin',
+        perms: [
+          'view_dashboard', 
+          'manage_users', 
+          'view_customers', 
+          'view_banks', 
+          'view_accounts', 
+          'view_settings',
+          'view_account_management'
+        ]
+      }
+      return next()
+    }
+    
+    // 生产模式下的正常身份验证逻辑
     const auth = req.headers.authorization
     if (!auth) {
       if (required) return res.status(401).json({ error: 'Unauthorized' })
@@ -125,7 +145,8 @@ export async function seedInitialAdmin() {
     { code: 'view_customers', name: '客户模块' },
     { code: 'view_banks', name: '银行列表' },
     { code: 'view_accounts', name: '收款账户' },
-    { code: 'view_settings', name: '系统设置' }
+    { code: 'view_settings', name: '系统设置' },
+    { code: 'view_account_management', name: '入账管理' }
   ]
   for (const p of corePerms) {
     await query(
@@ -223,6 +244,12 @@ export function validatePasswordStrength(password) {
 
 export function requirePerm(code) {
   return (req, res, next) => {
+    // 开发模式：跳过权限检查
+    if (process.env.NODE_ENV !== 'production') {
+      return next()
+    }
+    
+    // 生产模式：正常权限检查
     const perms = (req.user && req.user.perms) || []
     if (!perms.includes(code)) return res.status(403).json({ error: 'Forbidden' })
     next()

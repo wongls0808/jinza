@@ -1,4 +1,6 @@
-const API_BASE = '/api'
+import { publicConfig } from './config.js'
+
+const API_BASE = publicConfig.apiBaseUrl
 // 简易内存缓存（页面会刷新失效），用于字典接口减轻重复请求
 const _cache = new Map() // key -> { time: number, data: any, ttl: number }
 function setCache(key, data, ttlMs) { _cache.set(key, { time: Date.now(), data, ttl: ttlMs }) }

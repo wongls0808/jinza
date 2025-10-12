@@ -3,7 +3,7 @@
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
         <div></div>
-        <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+        <!-- 移除了返回首页按钮 -->
       </div>
       <h2>首次登录需修改密码</h2>
       <form @submit.prevent="submit">

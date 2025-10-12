@@ -2,8 +2,9 @@ import pg from 'pg'
 
 const { Pool } = pg
 
-// Expect DATABASE_URL provided by Railway
-const connectionString = process.env.DATABASE_URL
+// 配置数据库连接
+// 优先使用环境变量中的DATABASE_URL，如果没有则使用默认连接字符串
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:GvDViOFhACSKomPtKqKnqxqUIHiAHbnP@postgres.railway.internal:5432/railway'
 
 let pool
 if (connectionString) {

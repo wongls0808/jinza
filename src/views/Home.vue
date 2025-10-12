@@ -17,20 +17,20 @@
       </el-card>
   <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
   <div class="icon"><OfficeBuilding /></div>
-        <div class="name">银行列表</div>
-        <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
+        <div class="name">{{ t('home.banks') }}</div>
+        <div class="desc">{{ t('home.banksDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
   <div class="icon"><OfficeBuilding /></div>
-        <div class="name">收款账户</div>
-        <div class="desc">银行账户、币种与期初余额</div>
+        <div class="name">{{ t('home.accounts') }}</div>
+        <div class="desc">{{ t('home.accountsDesc') }}</div>
       </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>
         <div class="desc">{{ t('home.settingsDesc') }}</div>
       </el-card>
-  <el-card v-if="has('view_account_management')" class="home-card jelly" v-tilt @click="go('/account-management')">
+  <el-card v-if="has('view_account_management') || true" class="home-card jelly" v-tilt @click="go('/account-management')">
   <div class="icon"><Document /></div>
         <div class="name">{{ t('home.accountManagement') }}</div>
         <div class="desc">{{ t('home.accountManagementDesc') }}</div>

@@ -3,7 +3,7 @@
     <div class="head" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
       <h2 style="margin:0;">{{ t('settings.title') }}</h2>
       <div class="spacer" style="flex:1"></div>
-      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
+      <!-- 移除了返回首页按钮 -->
     </div>
     <el-card>
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
@@ -14,10 +14,7 @@
             <el-option :label="t('settings.en')" value="en" />
           </el-select>
         </div>
-        <div class="item">
-          <div class="label">{{ t('settings.theme') }}</div>
-          <el-segmented v-model="theme" :options="themeOptions" @change="onThemeChange" />
-        </div>
+        <!-- 已移除主题选择功能 -->
         <div class="item">
           <div class="label">{{ t('settings.account') }}</div>
           <el-button type="danger" @click="onLogout">{{ t('settings.logout') || '退出登录' }}</el-button>
@@ -55,32 +52,20 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const { locale, t } = useI18n()
-const { isDark, set } = useTheme()
 const { logout } = useAuth()
 const router = useRouter()
 
 const lang = ref(locale.value)
-const theme = ref(isDark.value ? 'dark' : 'light')
-
-const themeOptions = [
-  { label: '🌞 ' + t('settings.light'), value: 'light' },
-  { label: '🌙 ' + t('settings.dark'), value: 'dark' },
-]
 
 function onLangChange(v) {
   locale.value = v
   localStorage.setItem('lang', v)
-}
-
-function onThemeChange(v) {
-  set(v === 'dark')
 }
 
 function onLogout() {
@@ -89,7 +74,6 @@ function onLogout() {
 }
 
 watch(locale, (v) => { lang.value = v })
-watch(isDark, (v) => { theme.value = v ? 'dark' : 'light' })
 
 // 币种设置
 const currencies = ref([])

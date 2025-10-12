@@ -6,6 +6,10 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { i18n } from './i18n'
 import Tilt from './directives/tilt'
+
+// 强制使用亮色主题
+document.documentElement.classList.remove('dark')
+localStorage.setItem('vueuse-color-scheme', 'light')
 import { User, UserFilled, Box, Document, Setting, Lock, OfficeBuilding, Search, Plus, Delete, Edit, HomeFilled, ArrowLeft, Upload, Download, Refresh } from '@element-plus/icons-vue'
 
 const app = createApp(App)
