@@ -1,90 +1,46 @@
 <template>
   <div class="home-layout">
-          <aside class="home-sidebar">
-            <div class="sidebar-header">
-              <div class="logo">Jinza</div>
-            </div>
-            <nav class="sidebar-nav">
-              <el-menu default-active="home" class="el-menu-vertical">
-                <el-menu-item index="home" @click="go('/')">
-                  <span>{{ t('home.dashboard') }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="has('manage_users')" index="users" @click="activeModule='users'">
-                  <span>{{ t('home.users') }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="has('view_customers')" index="customers" @click="go('/customers')">
-                  <span>{{ t('home.customers') }}</span>
-                </el-menu-item>
-                <el-menu-item v-if="has('view_banks')" index="banks" @click="go('/banks')">
-                  <span>银行列表</span>
-                </el-menu-item>
-                <el-menu-item v-if="has('view_accounts')" index="accounts" @click="go('/accounts')">
-                  <span>收款账户</span>
-                </el-menu-item>
-                <el-menu-item v-if="has('view_settings')" index="settings" @click="go('/settings')">
-                  <span>{{ t('home.settings') }}</span>
-                </el-menu-item>
-              </el-menu>
-            </nav>
-            <div class="sidebar-footer">
-              <div class="user-info">{{ username }}</div>
-              <div class="today">{{ today }}</div>
-            </div>
-          </aside>
-          <main class="home-main">
-            <div class="hero">
-                <!-- 移除欢迎词与 meta，仅保留主内容区 -->
-            </div>
-            <div class="main-content">
-              <div class="grid" v-if="!activeModule">
-                <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="activeModule='users'">
-                  <div class="icon"><User /></div>
-                  <div class="name">{{ t('home.users') }}</div>
-                  <div class="desc">{{ t('home.usersDesc') }}</div>
-                </el-card>
-                <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
-                  <div class="icon"><UserFilled /></div>
-                  <div class="name">{{ t('home.customers') }}</div>
-                  <div class="desc">{{ t('home.customersDesc') }}</div>
-                </el-card>
-                <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
-                  <div class="icon"><OfficeBuilding /></div>
-                  <div class="name">银行列表</div>
-                  <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
-                </el-card>
-                <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
-                  <div class="icon"><OfficeBuilding /></div>
-                  <div class="name">收款账户</div>
-                  <div class="desc">银行账户、币种与期初余额</div>
-                </el-card>
-                <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
-                  <div class="icon"><Setting /></div>
-                  <div class="name">{{ t('home.settings') }}</div>
-                  <div class="desc">{{ t('home.settingsDesc') }}</div>
-                </el-card>
-              </div>
-              <div v-if="activeModule==='users'" class="module-panel">
-                <UserManagement />
-              </div>
-            </div>
-          </main>
+    <aside class="home-sidebar">
+      <div class="sidebar-header">
+        <div class="logo">Jinza</div>
+      </div>
+      <nav class="sidebar-nav">
+        <el-menu :default-active="activePage" class="el-menu-vertical">
+          <el-menu-item index="users" @click="activePage='users'">用户管理</el-menu-item>
+          <el-menu-item index="customers" @click="activePage='customers'">客户管理</el-menu-item>
+          <el-menu-item index="banks" @click="activePage='banks'">银行列表</el-menu-item>
+          <el-menu-item index="accounts" @click="activePage='accounts'">收款账户</el-menu-item>
+          <el-menu-item index="settings" @click="activePage='settings'">系统设置</el-menu-item>
+        </el-menu>
+      </nav>
+    </aside>
+    <main class="home-main">
+      <div class="main-content">
+        <component :is="pageComponent" />
+      </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
-import { useI18n } from 'vue-i18n'
-import { computed } from 'vue'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import UserManagement from './UserManagement.vue'
-const router = useRouter()
-const go = (path) => router.push(path)
-const { has, state } = useAuth()
-const { t } = useI18n()
-const username = computed(() => state.user?.display_name || state.user?.username || '')
-const today = new Date().toLocaleDateString()
-const activeModule = ref(null)
+import Customers from './Customers.vue'
+import Banks from './Banks.vue'
+import Accounts from './Accounts.vue'
+import Settings from './Settings.vue'
+
+const activePage = ref('users')
+const pageComponent = computed(() => {
+  switch (activePage.value) {
+    case 'users': return UserManagement
+    case 'customers': return Customers
+    case 'banks': return Banks
+    case 'accounts': return Accounts
+    case 'settings': return Settings
+    default: return UserManagement
+  }
+})
 </script>
 
 <style scoped>
@@ -113,53 +69,51 @@ const activeModule = ref(null)
   top: 0;
   height: 100vh;
   z-index: 10;
-  font-size: 2rem;
-  font-weight: 800;
-  color: #4f8cff;
-  letter-spacing: 2px;
-}
-.logo {
-  font-family: 'Montserrat', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-.sidebar-nav {
-  flex: 1;
-  padding: 0 0 0 0;
-}
-.el-menu-vertical {
-  border: none;
-  background: transparent;
-}
-.sidebar-footer {
-  padding: 18px 0 32px 0;
-  text-align: center;
-  font-size: 15px;
-  color: #6b7b8c;
-}
-.user-info {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.today {
-  font-size: 13px;
-}
-.home-main {
-  width: 90vw;
-  min-width: 0;
-  max-width: calc(100vw - 120px);
-  padding: 0 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-.hero {
-  margin: 32px 0 24px 0;
-  text-align: left;
-  width: 100%;
-  max-width: 1400px;
-}
-.welcome {
-  font-size: 28px;
+  .home-layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100vw;
+    background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+    box-sizing: border-box;
+  }
+  .home-sidebar {
+    width: 10vw;
+    min-width: 120px;
+    max-width: 220px;
+    background: #fff;
+    box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding: 0;
+    position: sticky;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 10;
+  }
+  .home-main {
+    flex: 1;
+    min-width: 0;
+    padding: 0 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .main-content {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 70vh;
+    box-sizing: border-box;
+    background: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
   font-weight: 700;
   color: #4f8cff;
   letter-spacing: .2px;
