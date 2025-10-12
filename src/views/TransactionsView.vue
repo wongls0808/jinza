@@ -551,6 +551,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Papa from 'papaparse'
 import * as echarts from 'echarts/core'
+import { api } from '@/api'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import {
   TitleComponent,
@@ -685,49 +686,43 @@ const fetchTransactions = async () => {
     }
     
     // 构建查询参数
-    const params = new URLSearchParams()
-    params.append('page', pagination.page)
-    params.append('pageSize', pagination.pageSize)
-    params.append('sort', sort.value)
-    params.append('order', order.value)
+    const params = {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      sort: sort.value,
+      order: order.value
+    }
     
     if (searchQuery.value) {
-      params.append('searchTerm', searchQuery.value)
+      params.searchTerm = searchQuery.value
     }
     
     if (filters.startDate) {
-      params.append('startDate', filters.startDate)
+      params.startDate = filters.startDate
     }
     
     if (filters.endDate) {
-      params.append('endDate', filters.endDate)
+      params.endDate = filters.endDate
     }
     
     if (filters.account) {
-      params.append('account', filters.account)
+      params.account = filters.account
     }
     
     if (filters.category) {
-      params.append('category', filters.category)
+      params.category = filters.category
     }
     
     if (filters.minAmount) {
-      params.append('minAmount', filters.minAmount)
+      params.minAmount = filters.minAmount
     }
     
     if (filters.maxAmount) {
-      params.append('maxAmount', filters.maxAmount)
+      params.maxAmount = filters.maxAmount
     }
     
-    // 发送请求
-    const response = await fetch(`/api/transactions?${params.toString()}`)
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || response.statusText)
-    }
-    
-    const data = await response.json()
+    // 使用API获取数据
+    const data = await api.transactions.list(params)
     
     transactions.value = data.data
     pagination.total = data.pagination.total
@@ -779,33 +774,26 @@ const fetchTransactions = async () => {
 const fetchStats = async () => {
   try {
     // 构建查询参数
-    const params = new URLSearchParams()
+    const params = {}
     
     if (filters.startDate) {
-      params.append('startDate', filters.startDate)
+      params.startDate = filters.startDate
     }
     
     if (filters.endDate) {
-      params.append('endDate', filters.endDate)
+      params.endDate = filters.endDate
     }
     
     if (filters.account) {
-      params.append('account', filters.account)
+      params.account = filters.account
     }
     
     if (filters.category) {
-      params.append('category', filters.category)
+      params.category = filters.category
     }
     
-    // 发送请求
-    const response = await fetch(`/api/transactions/stats?${params.toString()}`)
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || response.statusText)
-    }
-    
-    const data = await response.json()
+    // 使用API获取统计数据
+    const data = await api.transactions.stats(params)
     stats.value = data
     
     // 延迟一下再渲染图表，确保DOM已经准备好
@@ -1135,33 +1123,26 @@ const removeFilter = (filterName) => {
 const exportTransactions = async () => {
   try {
     // 构建查询参数
-    const params = new URLSearchParams()
+    const params = {}
     
     if (filters.startDate) {
-      params.append('startDate', filters.startDate)
+      params.startDate = filters.startDate
     }
     
     if (filters.endDate) {
-      params.append('endDate', filters.endDate)
+      params.endDate = filters.endDate
     }
     
     if (filters.account) {
-      params.append('account', filters.account)
+      params.account = filters.account
     }
     
     if (filters.category) {
-      params.append('category', filters.category)
+      params.category = filters.category
     }
     
-    // 发送请求
-    const response = await fetch(`/api/transactions/export?${params.toString()}`)
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || response.statusText)
-    }
-    
-    const data = await response.json()
+    // 使用API获取导出数据
+    const data = await api.transactions.export(params)
     
     if (!data || data.length === 0) {
       ElMessage.warning(t('transactions.noDataToExport'))

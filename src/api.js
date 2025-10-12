@@ -121,6 +121,7 @@ export const api = {
   // 交易管理API
   transactions: {
     list: (params={}) => request(`/transactions?${new URLSearchParams(params).toString()}`),
-    stats: () => request('/transactions/stats')
+    stats: (params={}) => request(`/transactions/stats?${new URLSearchParams(params).toString()}`),
+    export: (params={}) => request(`/transactions/export?${new URLSearchParams(params).toString()}`)
   }
 }
