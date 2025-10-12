@@ -3,6 +3,7 @@ import express from 'express';
 import { query } from './db.js';
 import { authMiddleware, requirePerm } from './auth.js';
 import { parseCSV } from './utils.js';
+import { getMockTransactions, getMockTransactionStats } from './mockTransactions.js';
 
 export const transactionsRouter = express.Router();
 
@@ -10,8 +11,10 @@ export const transactionsRouter = express.Router();
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
     // 检查数据库连接
-    if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-      return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' });
+    if (!process.env.DATABASE_URL) {
+      // 使用模拟数据
+      console.log('使用模拟交易数据...');
+      return res.json(getMockTransactions(req.query));
     }
     
     const { 
@@ -141,6 +144,13 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
 // 获取交易统计信息
 transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    // 检查数据库连接
+    if (!process.env.DATABASE_URL) {
+      // 使用模拟数据
+      console.log('使用模拟交易统计数据...');
+      return res.json(getMockTransactionStats(req.query));
+    }
+    
     const { startDate, endDate, account } = req.query;
     let params = [];
     let paramIndex = 1;
