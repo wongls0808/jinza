@@ -164,13 +164,13 @@
       <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable>
         <template #default="scope">
           <div class="bank-display">
-            <img 
-              v-if="scope.row.bank_id" 
-              :src="`/banks/${scope.row.bank_id?.toLowerCase()}.svg`" 
-              :alt="scope.row.bank_name" 
-              class="bank-logo" 
+            <img
+              v-if="scope.row.bank_code"
+              :src="`/banks/${String(scope.row.bank_code).toLowerCase()}.svg`"
+              :alt="scope.row.bank_name"
+              class="bank-logo"
               @error="e => e.target.style.display = 'none'" />
-            <span v-if="!scope.row.bank_id || !scope.row.bank_name">{{ scope.row.bank_name || '-' }}</span>
+            <span v-if="!scope.row.bank_code">{{ scope.row.bank_name || '-' }}</span>
           </div>
         </template>
       </el-table-column>
@@ -1089,14 +1089,10 @@ const handleAccountChange = (accountNumber) => {
     form.account_name = selectedAccount.account_name
     
     // 设置银行logo
-    if (selectedAccount.bank_code) {
-      try {
-        const logoPath = `/banks/${selectedAccount.bank_code.toLowerCase()}.svg`
-        selectedBankLogo.value = logoPath
-      } catch (error) {
-        console.error('获取银行Logo失败:', error)
-        selectedBankLogo.value = ''
-      }
+    if (selectedAccount.bank_logo) {
+      selectedBankLogo.value = selectedAccount.bank_logo
+    } else if (selectedAccount.bank_code) {
+      selectedBankLogo.value = `/banks/${String(selectedAccount.bank_code).toLowerCase()}.svg`
     } else {
       selectedBankLogo.value = ''
     }

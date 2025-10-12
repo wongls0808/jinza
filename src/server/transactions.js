@@ -144,16 +144,17 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
         u.username AS "createdBy",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
-        a.bank_id,
-        a.account_name,
-        b.name_zh AS "bank_name",
-        b.name_en AS "bank_name_en"
+  a.account_name,
+  b.code AS "bank_code",
+  b.zh AS "bank_name",
+  b.en AS "bank_name_en",
+  b.logo_url AS "bank_logo"
       FROM 
         transactions t
       LEFT JOIN
         users u ON t.created_by = u.id
       LEFT JOIN
-        accounts a ON t.account_number = a.bank_account
+        receiving_accounts a ON t.account_number = a.bank_account
       LEFT JOIN
         banks b ON a.bank_id = b.id
       ${sqlWhere}
