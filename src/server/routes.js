@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import multer from 'multer'
 import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
+import { createTransactionsController } from './transactionsFallback.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -615,6 +616,12 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
 })
 
 // 注册交易管理API路由
-router.use('/transactions', transactionsRouter)
+// 在数据库未配置时使用模拟交易控制器，否则使用标准控制器
+if (!process.env.DATABASE_URL) {
+  console.log('数据库未配置，使用模拟交易数据...')
+  router.use('/transactions', createTransactionsController())
+} else {
+  router.use('/transactions', transactionsRouter)
+}
 
 
