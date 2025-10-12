@@ -11,83 +11,74 @@
           <el-menu-item index="settings" @click="activePage='settings'">系统设置</el-menu-item>
         </el-menu>
       </nav>
-    <template>
-      <router-view />
-    </template>
+    </header>
+    <router-view />
+  </div>
+</template>
 
-    <script setup>
-    // 首页已由路由自动渲染仪表盘，无需其它内容
-    </script>
+<script setup>
+// 首页已由路由自动渲染仪表盘，无需其它内容
+import { ref } from 'vue'
+const activePage = ref('users')
+</script>
 
-    <style scoped>
-    /* 保留空样式，后续可扩展 */
-    </style>
+<style scoped>
+/* 保留空样式，后续可扩展 */
+.home-layout {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  padding: 0;
-  position: sticky;
-  left: 0;
-  top: 0;
   height: 100vh;
-  z-index: 10;
-    .home-layout {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      width: 100vw;
-      background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
-      box-sizing: border-box;
-    }
-    .home-header {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      height: 64px;
-      background: #fff;
-      box-shadow: 0 2px 16px 0 rgba(79,140,255,0.08);
-      padding: 0 32px;
-      z-index: 20;
-    }
-      /* 移除旧 .logo 样式，保留新导航样式 */
-    .nav-bar {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      height: 100%;
-    }
-    .el-menu-horizontal {
-      border: none;
-      background: transparent;
-      font-size: 1.1rem;
-      height: 64px;
-      line-height: 64px;
-    }
-    .home-main {
-      flex: 1;
-      min-width: 0;
-      padding: 0 32px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: calc(100vh - 64px);
-      overflow-y: auto;
-    }
-    .main-content {
-      width: 100%;
-      max-width: 1400px;
-      margin: 32px auto 0 auto;
-      min-height: 70vh;
-      box-sizing: border-box;
-      background: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-    }
-  }
+  width: 100vw;
+  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+  box-sizing: border-box;
+}
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 64px;
+  background: #fff;
+  box-shadow: 0 2px 16px 0 rgba(79,140,255,0.08);
+  padding: 0 32px;
+  z-index: 20;
+}
+/* 移除旧 .logo 样式，保留新导航样式 */
+.nav-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+.el-menu-horizontal {
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  height: 64px;
+  line-height: 64px;
+}
+.home-main {
+  flex: 1;
+  min-width: 0;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+.main-content {
+  width: 100%;
+  max-width: 1400px;
+  margin: 32px auto 0 auto;
+  min-height: 70vh;
+  box-sizing: border-box;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
 .meta {
   margin-top: 6px;
   color: #6b7b8c;
@@ -99,7 +90,7 @@
   gap: 24px;
   justify-content: flex-start;
   width: 100%;
-/* 移除 .hero 样式 */
+  /* 移除 .hero 样式 */
   max-width: 1400px;
 }
 .home-card {
@@ -108,6 +99,7 @@
   border-radius: 22px;
   box-shadow: 0 8px 32px rgba(79,140,255,0.10), 0 1.5px 8px rgba(79,140,255,0.08);
   background: rgba(255,255,255,0.92);
+}
 .main-content {
   display: flex;
   flex-direction: column;
@@ -121,6 +113,7 @@
   align-items: center;
   justify-content: flex-start;
 }
+.home-card {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -187,19 +180,19 @@
   .name { font-size: 16px; }
   .desc { font-size: 13px; }
 }
-        .home-sidebar {
-          position: sticky;
-          left: 0;
-          top: 0;
-          height: 100vh;
-          z-index: 10;
-        }
-        .main-content {
-          width: 100%;
-          max-width: 1400px;
-          margin: 0 auto;
-          min-height: 70vh;
-          box-sizing: border-box;
-          background: none;
-        }
+.home-sidebar {
+  position: sticky;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  z-index: 10;
+}
+.main-content {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 70vh;
+  box-sizing: border-box;
+  background: none;
+}
 </style>

@@ -109,8 +109,6 @@ onMounted(loadStats)
     margin: 0 auto;
     padding: 24px 0;
   }
-  color: #4f8cff;
-}
 .chart-title {
   font-size: 1.1rem;
   color: #3b4890;
