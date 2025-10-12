@@ -30,6 +30,11 @@
         <div class="name">{{ t('home.settings') }}</div>
         <div class="desc">{{ t('home.settingsDesc') }}</div>
       </el-card>
+  <el-card v-if="has('view_account_management')" class="home-card jelly" v-tilt @click="go('/account-management')">
+  <div class="icon"><Document /></div>
+        <div class="name">{{ t('home.accountManagement') }}</div>
+        <div class="desc">{{ t('home.accountManagementDesc') }}</div>
+      </el-card>
     </div>
   </div>
 </template>
