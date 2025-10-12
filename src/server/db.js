@@ -38,3 +38,10 @@ export async function query(text, params) {
   }
   return res
 }
+
+// Gracefully close pool (for CLI tools like migrations)
+export async function closePool() {
+  if (pool) {
+    await pool.end()
+  }
+}

@@ -294,6 +294,70 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
   }
 });
 
+// 导出交易（根据相同筛选条件返回不分页的结果，用于前端导出 CSV）
+transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  try {
+    const { 
+      startDate,
+      endDate,
+      account,
+      category,
+      minAmount,
+      maxAmount,
+      searchTerm
+    } = req.query;
+
+    let params = [];
+    let paramIndex = 1;
+    let whereConditions = [];
+
+    if (startDate) { whereConditions.push(`transaction_date >= $${paramIndex++}`); params.push(startDate); }
+    if (endDate) { whereConditions.push(`transaction_date <= $${paramIndex++}`); params.push(endDate); }
+    if (account) { whereConditions.push(`account_number ILIKE $${paramIndex++}`); params.push(`%${account}%`); }
+    if (category) { whereConditions.push(`category = $${paramIndex++}`); params.push(category); }
+    if (minAmount) { whereConditions.push(`(debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`); params.push(Number(minAmount)); paramIndex++; }
+    if (maxAmount) { whereConditions.push(`(debit_amount <= $${paramIndex} OR credit_amount <= $${paramIndex})`); params.push(Number(maxAmount)); paramIndex++; }
+    if (searchTerm) {
+      whereConditions.push(`(
+        account_number ILIKE $${paramIndex} OR
+        cheque_ref_no ILIKE $${paramIndex} OR
+        reference_1 ILIKE $${paramIndex} OR
+        reference_2 ILIKE $${paramIndex} OR
+        reference_3 ILIKE $${paramIndex}
+      )`);
+      params.push(`%${searchTerm}%`);
+      paramIndex++;
+    }
+    const sqlWhere = whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+    const rs = await query(`
+      SELECT 
+        t.id, 
+        t.account_number,
+        to_char(t.transaction_date, 'YYYY-MM-DD') AS "transaction_date",
+        t.cheque_ref_no,
+        t.description,
+        t.debit_amount,
+        t.credit_amount,
+        t.reference_1, t.reference_2, t.reference_3,
+        a.account_name,
+        b.code AS "bank_code",
+        b.zh AS "bank_name",
+        b.en AS "bank_name_en"
+      FROM transactions t
+      LEFT JOIN receiving_accounts a ON t.account_number = a.bank_account
+      LEFT JOIN banks b ON a.bank_id = b.id
+      ${sqlWhere}
+      ORDER BY t.transaction_date DESC, t.id DESC
+    `, params);
+
+    res.json(rs.rows);
+  } catch (e) {
+    console.error('导出交易失败:', e);
+    res.status(500).json({ error: '导出交易失败', detail: e?.message });
+  }
+});
+
 // 下载导入模板（返回JSON样例，前端将转CSV）
 // 模板由前端自行定义/或另见导出模板接口
 
@@ -358,12 +422,88 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
   }
 })
 
-// 获取单个交易详情
+// 新增交易
+transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
+  try {
+    const {
+      account_number,
+      transaction_date,
+      cheque_ref_no,
+      description,
+      debit_amount = 0,
+      credit_amount = 0,
+      reference
+    } = req.body || {};
+
+    if (!account_number || !transaction_date) {
+      return res.status(400).json({ error: '缺少必要字段' });
+    }
+    const balance = Number(credit_amount || 0) - Number(debit_amount || 0);
+    const ref1 = reference || null;
+    const ref2 = null;
+    const ref3 = null;
+    const createdBy = req.user?.id || null;
+
+    const rs = await query(
+      `insert into transactions(
+        account_number, transaction_date, cheque_ref_no, description,
+        debit_amount, credit_amount, balance, reference_1, reference_2, reference_3, created_by
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+      [account_number, transaction_date, cheque_ref_no || null, description || null,
+       Number(debit_amount)||0, Number(credit_amount)||0, balance, ref1, ref2, ref3, createdBy]
+    );
+    res.json({ id: rs.rows[0].id });
+  } catch (e) {
+    console.error('新增交易失败:', e);
+    res.status(500).json({ error: '新增交易失败', detail: e?.message });
+  }
+});
+
+// 更新交易
+transactionsRouter.put('/:id', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const {
+      account_number,
+      transaction_date,
+      cheque_ref_no,
+      description,
+      debit_amount,
+      credit_amount,
+      reference
+    } = req.body || {};
+
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (account_number !== undefined) { fields.push(`account_number=$${idx++}`); values.push(account_number); }
+    if (transaction_date !== undefined) { fields.push(`transaction_date=$${idx++}`); values.push(transaction_date); }
+    if (cheque_ref_no !== undefined) { fields.push(`cheque_ref_no=$${idx++}`); values.push(cheque_ref_no || null); }
+    if (description !== undefined) { fields.push(`description=$${idx++}`); values.push(description || null); }
+    if (debit_amount !== undefined) { fields.push(`debit_amount=$${idx++}`); values.push(Number(debit_amount)||0); }
+    if (credit_amount !== undefined) { fields.push(`credit_amount=$${idx++}`); values.push(Number(credit_amount)||0); }
+    if (reference !== undefined) { fields.push(`reference_1=$${idx++}`); values.push(reference || null); }
+    if (!fields.length) return res.status(400).json({ error: '无修改内容' });
+    // 自动更新 balance
+    const setClause = fields.join(', ') + ', balance = coalesce(credit_amount,0) - coalesce(debit_amount,0), updated_at = now()';
+    values.push(id);
+    const rs = await query(`update transactions set ${setClause} where id=$${idx} returning id`, values);
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ id });
+  } catch (e) {
+    console.error('更新交易失败:', e);
+    res.status(500).json({ error: '更新交易失败', detail: e?.message });
+  }
+});
+
+// 批量导入交易
+// 旧的重复导入端点已移除，避免行为冲突
+
+// 获取单个交易详情（供查看弹窗使用）
 transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
-    const id = req.params.id;
-    
-    const result = await query(`
+    const id = Number(req.params.id);
+    const rs = await query(`
       SELECT 
         t.id, 
         t.account_number AS "accountNumber",
@@ -374,253 +514,29 @@ transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transacti
         t.credit_amount AS "creditAmount",
         t.balance,
         t.category,
-        t.reference_1 AS "reference1",
-        t.reference_2 AS "reference2",
-        t.reference_3 AS "reference3",
-        u.username AS "createdBy",
+        (coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,'')) AS "reference",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt"
-      FROM 
-        transactions t
-      LEFT JOIN
-        users u ON t.created_by = u.id
-      WHERE 
-        t.id = $1
+      FROM transactions t
+      WHERE t.id=$1
     `, [id]);
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: '找不到该交易记录' });
-    }
-    
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('获取交易详情失败:', error);
-    res.status(500).json({ error: '获取交易详情失败', detail: error.message });
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(rs.rows[0]);
+  } catch (e) {
+    console.error('获取交易详情失败:', e);
+    res.status(500).json({ error: '获取交易详情失败', detail: e?.message });
   }
 });
 
-// 创建新交易
-transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
+// 删除单个交易（用于行操作删除）
+transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('delete_transactions'), async (req, res) => {
   try {
-    const {
-      accountNumber,
-      transactionDate,
-      chequeRefNo,
-      description,
-      debitAmount,
-      creditAmount,
-      category,
-      reference1,
-      reference2,
-      reference3
-    } = req.body;
-    
-    // 验证必要字段
-    if (!accountNumber || !transactionDate) {
-      return res.status(400).json({ error: '账号和交易日期为必填字段' });
-    }
-    
-    // 计算余额
-    const balance = Number(creditAmount || 0) - Number(debitAmount || 0);
-    
-    const result = await query(`
-      INSERT INTO transactions (
-        account_number,
-        transaction_date,
-        cheque_ref_no,
-        description,
-        debit_amount,
-        credit_amount,
-        balance,
-        category,
-        reference_1,
-        reference_2,
-        reference_3,
-        created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING id
-    `, [
-      accountNumber,
-      transactionDate,
-      chequeRefNo || null,
-      description || null,
-      Number(debitAmount || 0),
-      Number(creditAmount || 0),
-      balance,
-      category || null,
-      reference1 || null,
-      reference2 || null,
-      reference3 || null,
-      req.user.id
-    ]);
-    
-    res.status(201).json({ 
-      message: '交易创建成功',
-      id: result.rows[0].id
-    });
-  } catch (error) {
-    console.error('创建交易失败:', error);
-    res.status(500).json({ error: '创建交易失败', detail: error.message });
+    const id = Number(req.params.id);
+    const rs = await query('delete from transactions where id=$1 returning id', [id]);
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('删除交易失败:', e);
+    res.status(500).json({ error: '删除交易失败', detail: e?.message });
   }
 });
-
-// 更新交易
-transactionsRouter.put('/:id', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
-  try {
-    const id = req.params.id;
-    const {
-      accountNumber,
-      transactionDate,
-      chequeRefNo,
-      description,
-      debitAmount,
-      creditAmount,
-      category,
-      reference1,
-      reference2,
-      reference3
-    } = req.body;
-    
-    // 验证必要字段
-    if (!accountNumber || !transactionDate) {
-      return res.status(400).json({ error: '账号和交易日期为必填字段' });
-    }
-    
-    // 计算余额
-    const balance = Number(creditAmount || 0) - Number(debitAmount || 0);
-    
-    const result = await query(`
-      UPDATE transactions SET
-        account_number = $1,
-        transaction_date = $2,
-        cheque_ref_no = $3,
-        description = $4,
-        debit_amount = $5,
-        credit_amount = $6,
-        balance = $7,
-        category = $8,
-        reference_1 = $9,
-        reference_2 = $10,
-        reference_3 = $11,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $12
-      RETURNING id
-    `, [
-      accountNumber,
-      transactionDate,
-      chequeRefNo || null,
-      description || null,
-      Number(debitAmount || 0),
-      Number(creditAmount || 0),
-      balance,
-      category || null,
-      reference1 || null,
-      reference2 || null,
-      reference3 || null,
-      id
-    ]);
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: '找不到该交易记录' });
-    }
-    
-    res.json({ message: '交易更新成功' });
-  } catch (error) {
-    console.error('更新交易失败:', error);
-    res.status(500).json({ error: '更新交易失败', detail: error.message });
-  }
-});
-
-// 删除交易
-transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
-  try {
-    const id = req.params.id;
-    
-    const result = await query('DELETE FROM transactions WHERE id = $1', [id]);
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: '找不到该交易记录' });
-    }
-    
-    res.json({ message: '交易删除成功' });
-  } catch (error) {
-    console.error('删除交易失败:', error);
-    res.status(500).json({ error: '删除交易失败', detail: error.message });
-  }
-});
-
-// 批量导入交易
-// 旧的重复导入端点已移除，避免行为冲突
-
-// 获取交易导出数据
-transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
-  try {
-    const {
-      startDate,
-      endDate,
-      account,
-      category
-    } = req.query;
-    
-    let params = [];
-    let paramIndex = 1;
-    
-    // 构建查询条件
-    let whereClause = '';
-    const whereConditions = [];
-    
-    if (startDate) {
-      whereConditions.push(`transaction_date >= $${paramIndex++}`);
-      params.push(startDate);
-    }
-    
-    if (endDate) {
-      whereConditions.push(`transaction_date <= $${paramIndex++}`);
-      params.push(endDate);
-    }
-    
-    if (account) {
-      whereConditions.push(`account_number ILIKE $${paramIndex++}`);
-      params.push(`%${account}%`);
-    }
-    
-    if (category) {
-      whereConditions.push(`category = $${paramIndex++}`);
-      params.push(category);
-    }
-    
-    if (whereConditions.length > 0) {
-      whereClause = 'WHERE ' + whereConditions.join(' AND ');
-    }
-    
-    // 查询数据
-    const result = await query(`
-      SELECT 
-        account_number AS "账号",
-        to_char(transaction_date, 'YYYY-MM-DD') AS "交易日期",
-        cheque_ref_no AS "支票/参考号",
-        description AS "描述",
-        debit_amount AS "借方金额",
-        credit_amount AS "贷方金额",
-        balance AS "余额",
-        category AS "类别",
-        reference_1 AS "参考1",
-        reference_2 AS "参考2",
-        reference_3 AS "参考3"
-      FROM 
-        transactions
-      ${whereClause}
-      ORDER BY 
-        transaction_date DESC, id DESC
-    `, params);
-    
-    // 返回数据
-    res.json(result.rows);
-  } catch (error) {
-    console.error('导出交易数据失败:', error);
-    res.status(500).json({ error: '导出交易数据失败', detail: error.message });
-  }
-});
-
-// 获取交易CSV模板
-// 旧模板端点移除：请使用导出功能或前端内置模板

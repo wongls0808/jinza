@@ -11,7 +11,9 @@
     "build": "vite build",
     "prestart": "vite build",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate": "node scripts/migrate.js",
+    "start:dev": "set NODE_ENV=development && node server.js"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

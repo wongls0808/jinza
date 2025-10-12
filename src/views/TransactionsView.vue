@@ -165,12 +165,12 @@
         <template #default="scope">
           <div class="bank-display">
             <img
-              v-if="scope.row.bank_code"
-              :src="`/banks/${String(scope.row.bank_code).toLowerCase()}.svg`"
+              v-if="getBankLogo(scope.row)"
+              :src="getBankLogo(scope.row)"
               :alt="scope.row.bank_name"
               class="bank-logo"
               @error="e => e.target.style.display = 'none'" />
-            <span v-if="!scope.row.bank_code">{{ scope.row.bank_name || '-' }}</span>
+            <span v-else>{{ scope.row.bank_name || '-' }}</span>
           </div>
         </template>
       </el-table-column>
@@ -533,7 +533,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Papa from 'papaparse'
@@ -784,9 +784,9 @@ const renderCharts = () => {
   if (monthlyEl) {
     monthlyChart = echarts.init(monthlyEl)
     
-    const months = stats.value.byMonth.map(item => item.month)
-    const debitData = stats.value.byMonth.map(item => Number(item.debit) || 0)
-    const creditData = stats.value.byMonth.map(item => Number(item.credit) || 0)
+  const months = (stats.value.monthly || []).map(item => item.month)
+  const debitData = (stats.value.monthly || []).map(item => Number(item.debit) || 0)
+  const creditData = (stats.value.monthly || []).map(item => Number(item.credit) || 0)
     
     const option = {
       tooltip: {
@@ -794,7 +794,7 @@ const renderCharts = () => {
         axisPointer: { type: 'shadow' }
       },
       legend: {
-        data: [t('transactions.debit'), t('transactions.credit')]
+        data: [t('transactions.debitAmount'), t('transactions.creditAmount')]
       },
       grid: {
         left: '3%',
@@ -811,14 +811,14 @@ const renderCharts = () => {
       },
       series: [
         {
-          name: t('transactions.debit'),
+          name: t('transactions.debitAmount'),
           type: 'bar',
           stack: 'total',
           color: '#F56C6C',
           data: debitData
         },
         {
-          name: t('transactions.credit'),
+          name: t('transactions.creditAmount'),
           type: 'bar',
           stack: 'total',
           color: '#67C23A',
@@ -839,7 +839,7 @@ const renderCharts = () => {
   if (categoryEl) {
     categoryChart = echarts.init(categoryEl)
     
-    const categoryData = stats.value.categories.map(item => ({
+    const categoryData = (stats.value.categories || []).map(item => ({
       name: item.category || t('transactions.uncategorized'),
       value: Number(item.count) || 0
     }))
@@ -851,7 +851,7 @@ const renderCharts = () => {
       },
       series: [
         {
-          name: t('transactions.transactionCount'),
+          name: t('transactions.totalTransactions'),
           type: 'pie',
           radius: ['40%', '70%'],
           avoidLabelOverlap: false,
@@ -923,6 +923,7 @@ const resetForm = () => {
     account_name: '',
     reference: ''
   })
+  selectedBankLogo.value = ''
   
   if (formRef.value) {
     formRef.value.resetFields()
@@ -950,6 +951,14 @@ const handleEdit = (row) => {
     account_name: row.account_name || '',
     reference: row.reference || ''
   })
+  // 编辑态：回填银行 Logo
+  if (row.bank_logo) {
+    selectedBankLogo.value = row.bank_logo
+  } else if (row.bank_code) {
+    selectedBankLogo.value = `/banks/${String(row.bank_code).toLowerCase()}.svg`
+  } else {
+    selectedBankLogo.value = ''
+  }
   
   dialogVisible.value = true
 }
@@ -1011,8 +1020,8 @@ const handleBatchDelete = async () => {
     
     const ids = multipleSelection.value.map(item => item.id)
     
-    // 这里需要添加批量删除的API调用
-    await api.deleteTransactions(ids)
+  // 调用批量删除 API
+  await api.transactions.deleteTransactions(ids)
     
     ElMessage.success(t('transactions.batchDeleteSuccess'))
     fetchTransactions()
@@ -1056,8 +1065,8 @@ const handleMatch = () => {
       exactMatch: false
     }
     
-    // 保存高级过滤设置
-    Object.assign(filters.value, advancedFilters)
+  // 保存高级过滤设置
+  Object.assign(filters, advancedFilters)
     
     // 执行搜索
     handleSearch()
@@ -1448,10 +1457,18 @@ onMounted(() => {
 })
 
 // 在组件卸载时释放资源
-const onBeforeUnmount = () => {
+onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   if (monthlyChart) monthlyChart.dispose()
   if (categoryChart) categoryChart.dispose()
+})
+
+// 辅助：获取银行 Logo（优先 DB 返回，其次按 bank_code 回退静态资源）
+function getBankLogo(row) {
+  if (!row) return ''
+  if (row.bank_logo) return row.bank_logo
+  if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
+  return ''
 }
 </script>
 

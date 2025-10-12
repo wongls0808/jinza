@@ -142,7 +142,15 @@ export const api = {
     export: (params={}) => request(`/transactions/export?${new URLSearchParams(params).toString()}`),
     deleteTransactions: (ids) => request('/transactions/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) })
   },
-  requestAccounts: () => request('/accounts')
+  // 返回收款账户列表（仅 items 数组，便于选择器直接使用）
+  requestAccounts: async () => {
+    const res = await request('/accounts')
+    // 服务端返回形如 { total, items }，这里仅透出 items
+    if (res && Array.isArray(res.items)) return res.items
+    // 兼容异常返回
+    if (Array.isArray(res)) return res
+    return []
+  }
   ,
   // 银行回单/对账单导入与查询
   receipts: {
