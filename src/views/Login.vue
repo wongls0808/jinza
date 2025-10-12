@@ -71,6 +71,14 @@
           </el-form>
           
           <div class="login-footer">
+            <!-- 语言切换组件 -->
+            <div class="lang-selector">
+              <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
+                <el-option label="中文" value="zh" />
+                <el-option label="English" value="en" />
+              </el-select>
+            </div>
+            
             <div class="system-info">
               <span>{{ t('login.systemVersion') }} v1.0.0</span>
               <span>© {{ new Date().getFullYear() }} {{ t('login.systemName') }}</span>
@@ -104,9 +112,17 @@ const form = ref({ username: '', password: '' })
 const remember = ref(true)
 const submitting = ref(false)
 const passwordInput = ref(null)
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const lang = ref(locale.value)
 
 const { save } = useAuth()
+
+// 语言切换处理函数
+function onLangChange(value) {
+  locale.value = value
+  sessionStorage.setItem('lang', value)
+  localStorage.setItem('lang', value) // 也存储在localStorage中保持兼容性
+}
 
 // 在用户名输入后按回车键，聚焦到密码输入框
 const focusPassword = () => {
@@ -163,7 +179,8 @@ const onSubmit = async () => {
     
     // 延迟跳转以显示成功消息
     setTimeout(() => {
-      router.replace(String(redirect))
+      // 使用路由跳转到主页，并重新加载页面以确保菜单正确显示
+      window.location.href = redirect === '/' ? '/' : String(redirect)
     }, 500)
     
   } catch (e) {
@@ -333,6 +350,14 @@ onMounted(() => {
 .login-footer {
   margin-top: 30px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.lang-selector {
+  margin-bottom: 10px;
 }
 
 .system-info {

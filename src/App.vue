@@ -1,6 +1,7 @@
 <template>
   <div class="app">
-    <el-header height="56px" class="topbar">
+    <!-- 顶部导航栏，仅在非登录页时显示 -->
+    <el-header v-if="!isLogin" height="56px" class="topbar">
       <div class="left-spacer">
         <!-- 左侧留空区域 -->
       </div>
