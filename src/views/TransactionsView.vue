@@ -163,25 +163,25 @@
       
       <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable />
       
-      <el-table-column :label="t('transactions.transactionDate')" prop="transaction_date" sortable>
+      <el-table-column :label="t('transactions.transactionDate')" prop="transaction_date" sortable width="140">
         <template #default="scope">
-          {{ formatDate(scope.row.transactionDate) }}
+          {{ formatDate(scope.row.transaction_date) }}
         </template>
       </el-table-column>
       
       <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" />
       
-      <el-table-column :label="t('transactions.description')" prop="description" show-overflow-tooltip />
+  <el-table-column :label="t('transactions.description')" prop="description" show-overflow-tooltip min-width="220" />
       
-      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable>
+      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
         <template #default="scope">
-          <span class="negative">{{ formatCurrency(scope.row.debitAmount) }}</span>
+          <span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span>
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable>
+      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
         <template #default="scope">
-          <span class="positive">{{ formatCurrency(scope.row.creditAmount) }}</span>
+          <span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span>
         </template>
       </el-table-column>
       
@@ -490,22 +490,22 @@
       width="600px">
       <el-descriptions :column="1" border>
         <el-descriptions-item :label="t('transactions.accountNumber')">
-          {{ currentTransaction.accountNumber }}
+          {{ currentTransaction.account_number }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.transactionDate')">
-          {{ formatDate(currentTransaction.transactionDate) }}
+          {{ formatDate(currentTransaction.transaction_date) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.chequeRefNo')">
-          {{ currentTransaction.chequeRefNo || '-' }}
+          {{ currentTransaction.cheque_ref_no || '-' }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.description')">
           {{ currentTransaction.description || '-' }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.debitAmount')">
-          <span class="negative">{{ formatCurrency(currentTransaction.debitAmount) }}</span>
+          <span class="negative">{{ formatCurrency(currentTransaction.debit_amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.creditAmount')">
-          <span class="positive">{{ formatCurrency(currentTransaction.creditAmount) }}</span>
+          <span class="positive">{{ formatCurrency(currentTransaction.credit_amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.balance')">
           <span :class="currentTransaction.balance >= 0 ? 'positive' : 'negative'">
@@ -1316,7 +1316,8 @@ const downloadTemplate = async () => {
 // 格式化方法
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return '0.00'
-  return Number(value).toLocaleString('zh-CN', {
+  // 使用浏览器当前语言环境格式化
+  return Number(value).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })
@@ -1324,7 +1325,14 @@ const formatCurrency = (value) => {
 
 const formatDate = (date) => {
   if (!date) return '-'
-  return date
+  // 若已是 YYYY-MM-DD 则直接返回
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return String(date)
+  const d = new Date(date)
+  if (isNaN(d)) return String(date)
+  const y = d.getFullYear()
+  const m = String(d.getMonth()+1).padStart(2,'0')
+  const day = String(d.getDate()).padStart(2,'0')
+  return `${y}-${m}-${day}`
 }
 
 const getCategoryTagType = (category) => {
