@@ -83,7 +83,7 @@
       </el-row>
       
       <el-row :gutter="20" class="chart-row">
-        <el-col :span="16">
+        <el-col :span="24">
           <el-card shadow="hover">
             <template #header>
               <div class="card-header">
@@ -91,17 +91,6 @@
               </div>
             </template>
             <div id="monthlyChart" class="chart-container"></div>
-          </el-card>
-        </el-col>
-        
-        <el-col :span="8">
-          <el-card shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>{{ t('transactions.byCategory') }}</span>
-              </div>
-            </template>
-            <div id="categoryChart" class="chart-container"></div>
           </el-card>
         </el-col>
       </el-row>
@@ -171,8 +160,6 @@
       
       <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" />
       
-  <el-table-column :label="t('transactions.description')" prop="description" show-overflow-tooltip min-width="220" />
-      
       <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
         <template #default="scope">
           <span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span>
@@ -182,23 +169,6 @@
       <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
         <template #default="scope">
           <span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span>
-        </template>
-      </el-table-column>
-      
-      <el-table-column :label="t('transactions.balance')" prop="balance" align="right" sortable>
-        <template #default="scope">
-          <span :class="scope.row.balance >= 0 ? 'positive' : 'negative'">
-            {{ formatCurrency(scope.row.balance) }}
-          </span>
-        </template>
-      </el-table-column>
-      
-      <el-table-column :label="t('transactions.category')" prop="category" sortable>
-        <template #default="scope">
-          <el-tag v-if="scope.row.category" :type="getCategoryTagType(scope.row.category)">
-            {{ scope.row.category }}
-          </el-tag>
-          <span v-else class="gray-text">{{ t('transactions.uncategorized') }}</span>
         </template>
       </el-table-column>
 
@@ -277,10 +247,6 @@
           <el-input v-model="form.cheque_ref_no" />
         </el-form-item>
         
-        <el-form-item :label="t('transactions.description')" prop="description">
-          <el-input v-model="form.description" type="textarea" rows="2" />
-        </el-form-item>
-        
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item :label="t('transactions.debitAmount')" prop="debit_amount">
@@ -304,20 +270,6 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
-        <el-form-item :label="t('transactions.category')" prop="category">
-          <el-select
-            v-model="form.category"
-            filterable
-            allow-create
-            style="width: 100%">
-            <el-option
-              v-for="category in categoryOptions"
-              :key="category"
-              :label="category"
-              :value="category" />
-          </el-select>
-        </el-form-item>
         
         <el-divider content-position="left">{{ t('transactions.references') }}</el-divider>
         
@@ -363,16 +315,6 @@
         
         <el-form-item :label="t('transactions.account')">
           <el-input v-model="filters.account" />
-        </el-form-item>
-        
-        <el-form-item :label="t('transactions.category')">
-          <el-select v-model="filters.category" filterable clearable style="width: 100%">
-            <el-option
-              v-for="category in categoryOptions"
-              :key="category"
-              :label="category"
-              :value="category" />
-          </el-select>
         </el-form-item>
         
         <el-form-item :label="t('transactions.amountRange')">
@@ -465,10 +407,8 @@
             <h4>{{ t('transactions.optionalColumns') }}</h4>
             <ul>
               <li><strong>{{ t('transactions.chequeRefNo') }}</strong>: {{ t('transactions.chequeRefNoDesc') }}</li>
-              <li><strong>{{ t('transactions.description') }}</strong>: {{ t('transactions.descriptionDesc') }}</li>
               <li><strong>{{ t('transactions.debitAmount') }}</strong>: {{ t('transactions.debitAmountDesc') }}</li>
               <li><strong>{{ t('transactions.creditAmount') }}</strong>: {{ t('transactions.creditAmountDesc') }}</li>
-              <li><strong>{{ t('transactions.category') }}</strong>: {{ t('transactions.categoryDesc') }}</li>
               <li><strong>{{ t('transactions.reference1') }}</strong>, <strong>{{ t('transactions.reference2') }}</strong>, <strong>{{ t('transactions.reference3') }}</strong>: {{ t('transactions.referencesDesc') }}</li>
             </ul>
           </div>
@@ -504,25 +444,11 @@
         <el-descriptions-item :label="t('transactions.chequeRefNo')">
           {{ currentTransaction.cheque_ref_no || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.description')">
-          {{ currentTransaction.description || '-' }}
-        </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.debitAmount')">
           <span class="negative">{{ formatCurrency(currentTransaction.debit_amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.creditAmount')">
           <span class="positive">{{ formatCurrency(currentTransaction.credit_amount) }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.balance')">
-          <span :class="currentTransaction.balance >= 0 ? 'positive' : 'negative'">
-            {{ formatCurrency(currentTransaction.balance) }}
-          </span>
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.category')">
-          <el-tag v-if="currentTransaction.category" :type="getCategoryTagType(currentTransaction.category)">
-            {{ currentTransaction.category }}
-          </el-tag>
-          <span v-else class="gray-text">{{ t('transactions.uncategorized') }}</span>
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.reference1')">
           {{ currentTransaction.reference1 || '-' }}

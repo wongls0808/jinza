@@ -42,10 +42,8 @@ transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_tran
       accountNumber: '000123456789',
       transactionDate: '2025-10-01',
       chequeRefNo: 'CHK20251001',
-      description: '工资收入',
       debitAmount: 0,
       creditAmount: 8500,
-      category: '收入',
       reference1: '工资',
       reference2: '',
       reference3: ''
@@ -94,10 +92,7 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       params.push(`%${account}%`);
     }
     
-    if (category) {
-      whereConditions.push(`category = $${paramIndex++}`);
-      params.push(category);
-    }
+    // 移除了类别筛选
     
     if (minAmount) {
       whereConditions.push(`(debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`);
@@ -114,7 +109,6 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
     if (searchTerm) {
       whereConditions.push(`(
         account_number ILIKE $${paramIndex} OR
-        description ILIKE $${paramIndex} OR
         cheque_ref_no ILIKE $${paramIndex} OR
         reference_1 ILIKE $${paramIndex} OR
         reference_2 ILIKE $${paramIndex} OR
@@ -144,11 +138,8 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
         t.account_number,
         to_char(t.transaction_date, 'YYYY-MM-DD') AS "trn_date",
         t.cheque_ref_no,
-        t.description,
         t.debit_amount,
         t.credit_amount,
-        t.balance,
-        t.category,
         t.reference_1 AS "reference1",
         t.reference_2 AS "reference2",
         t.reference_3 AS "reference3",
