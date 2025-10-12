@@ -1,36 +1,69 @@
 <template>
-  <div class="home container">
-    <div class="hero">
-      <div class="welcome">{{ t('home.welcome') }}</div>
-      <div class="meta">{{ username }} · {{ today }}</div>
-    </div>
-    <div class="grid">
-  <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
-  <div class="icon"><User /></div>
-        <div class="name">{{ t('home.users') }}</div>
-        <div class="desc">{{ t('home.usersDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
-  <div class="icon"><UserFilled /></div>
-        <div class="name">{{ t('home.customers') }}</div>
-        <div class="desc">{{ t('home.customersDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
-  <div class="icon"><OfficeBuilding /></div>
-        <div class="name">银行列表</div>
-        <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
-      </el-card>
-  <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
-  <div class="icon"><OfficeBuilding /></div>
-        <div class="name">收款账户</div>
-        <div class="desc">银行账户、币种与期初余额</div>
-      </el-card>
-  <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
-  <div class="icon"><Setting /></div>
-        <div class="name">{{ t('home.settings') }}</div>
-        <div class="desc">{{ t('home.settingsDesc') }}</div>
-      </el-card>
-    </div>
+  <div class="home-layout">
+    <aside class="home-sidebar">
+      <div class="sidebar-header">
+        <div class="logo">Jinza</div>
+      </div>
+      <nav class="sidebar-nav">
+        <el-menu default-active="home" class="el-menu-vertical">
+          <el-menu-item index="home" @click="go('/')">
+            <span>{{ t('home.dashboard') }}</span>
+          </el-menu-item>
+          <el-menu-item v-if="has('manage_users')" index="users" @click="go('/users')">
+            <span>{{ t('home.users') }}</span>
+          </el-menu-item>
+          <el-menu-item v-if="has('view_customers')" index="customers" @click="go('/customers')">
+            <span>{{ t('home.customers') }}</span>
+          </el-menu-item>
+          <el-menu-item v-if="has('view_banks')" index="banks" @click="go('/banks')">
+            <span>银行列表</span>
+          </el-menu-item>
+          <el-menu-item v-if="has('view_accounts')" index="accounts" @click="go('/accounts')">
+            <span>收款账户</span>
+          </el-menu-item>
+          <el-menu-item v-if="has('view_settings')" index="settings" @click="go('/settings')">
+            <span>{{ t('home.settings') }}</span>
+          </el-menu-item>
+        </el-menu>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">{{ username }}</div>
+        <div class="today">{{ today }}</div>
+      </div>
+    </aside>
+    <main class="home-main">
+      <div class="hero">
+        <div class="welcome">{{ t('home.welcome') }}</div>
+        <div class="meta">{{ username }} · {{ today }}</div>
+      </div>
+      <div class="grid">
+        <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
+          <div class="icon"><User /></div>
+          <div class="name">{{ t('home.users') }}</div>
+          <div class="desc">{{ t('home.usersDesc') }}</div>
+        </el-card>
+        <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
+          <div class="icon"><UserFilled /></div>
+          <div class="name">{{ t('home.customers') }}</div>
+          <div class="desc">{{ t('home.customersDesc') }}</div>
+        </el-card>
+        <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
+          <div class="icon"><OfficeBuilding /></div>
+          <div class="name">银行列表</div>
+          <div class="desc">中国与马来西亚主流银行（中英名与 Logo）</div>
+        </el-card>
+        <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
+          <div class="icon"><OfficeBuilding /></div>
+          <div class="name">收款账户</div>
+          <div class="desc">银行账户、币种与期初余额</div>
+        </el-card>
+        <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
+          <div class="icon"><Setting /></div>
+          <div class="name">{{ t('home.settings') }}</div>
+          <div class="desc">{{ t('home.settingsDesc') }}</div>
+        </el-card>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -48,14 +81,70 @@ const today = new Date().toLocaleDateString()
 </script>
 
 <style scoped>
-.home {
-  padding: 16px;
-  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+.home-layout {
+  display: flex;
   min-height: 100vh;
+  width: 100vw;
+  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+  box-sizing: border-box;
+}
+.home-sidebar {
+  width: 240px;
+  background: #fff;
+  box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 0;
+  position: relative;
+  z-index: 2;
+}
+.sidebar-header {
+  padding: 32px 0 18px 0;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #4f8cff;
+  letter-spacing: 2px;
+}
+.logo {
+  font-family: 'Montserrat', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.sidebar-nav {
+  flex: 1;
+  padding: 0 0 0 0;
+}
+.el-menu-vertical {
+  border: none;
+  background: transparent;
+}
+.sidebar-footer {
+  padding: 18px 0 32px 0;
+  text-align: center;
+  font-size: 15px;
+  color: #6b7b8c;
+}
+.user-info {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.today {
+  font-size: 13px;
+}
+.home-main {
+  flex: 1;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
 }
 .hero {
-  margin: 16px 16px 24px;
-  text-align: center;
+  margin: 32px 0 24px 0;
+  text-align: left;
+  width: 100%;
+  max-width: 1400px;
 }
 .welcome {
   font-size: 28px;
@@ -72,7 +161,9 @@ const today = new Date().toLocaleDateString()
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 24px;
-  justify-content: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 1400px;
 }
 .home-card {
   cursor: pointer;
@@ -113,9 +204,31 @@ const today = new Date().toLocaleDateString()
   text-align: center;
 }
 @media (max-width: 600px) {
+  .home-layout {
+    flex-direction: column;
+  }
+  .home-sidebar {
+    width: 100vw;
+    min-height: 60px;
+    flex-direction: row;
+    align-items: center;
+    box-shadow: none;
+    padding: 0 8px;
+  }
+  .sidebar-header, .sidebar-footer {
+    display: none;
+  }
+  .sidebar-nav {
+    flex: 1;
+    padding: 0;
+  }
+  .home-main {
+    padding: 0 8px;
+  }
   .grid {
     grid-template-columns: 1fr;
     gap: 16px;
+    max-width: 100vw;
   }
   .home-card {
     padding: 18px 6px 12px 6px;
