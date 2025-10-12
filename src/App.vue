@@ -106,9 +106,20 @@ onMounted(() => {
 
 const { locale, t } = useI18n()
 const lang = ref(locale.value)
-function onLangChange(v) { sessionStorage.setItem('lang', v); locale.value = v }
+function onLangChange(v) { 
+  sessionStorage.setItem('lang', v); 
+  locale.value = v;
+}
 watch(locale, (v) => lang.value = v)
 const isLogin = computed(() => route.name === 'login')
+
+// 当前选中的菜单项
+const activeMenu = computed(() => {
+  return route.name || 'home'
+})
+
+// 导航背景色
+const navBgColor = computed(() => 'transparent')
 
 // 导航菜单相关
 const activeMenu = computed(() => {
