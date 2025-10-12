@@ -35,6 +35,24 @@ function parseDateYYYYMMDD(v) {
   return s
 }
 
+// 下载导入模板（返回JSON样例，前端将转CSV）
+transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  return res.json([
+    {
+      accountNumber: '000123456789',
+      transactionDate: '2025-10-01',
+      chequeRefNo: 'CHK20251001',
+      description: '工资收入',
+      debitAmount: 0,
+      creditAmount: 8500,
+      category: '收入',
+      reference1: '工资',
+      reference2: '',
+      reference3: ''
+    }
+  ])
+})
+
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
@@ -251,22 +269,7 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
 });
 
 // 下载导入模板（返回JSON样例，前端将转CSV）
-transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
-  return res.json([
-    {
-      accountNumber: '000123456789',
-      transactionDate: '2025-10-01',
-      chequeRefNo: 'CHK20251001',
-      description: '工资收入',
-      debitAmount: 0,
-      creditAmount: 8500,
-      category: '收入',
-      reference1: '工资',
-      reference2: '',
-      reference3: ''
-    }
-  ])
-})
+// 模板由前端自行定义/或另见导出模板接口
 
 // 导入交易（接收JSON rows；前端已将CSV解析为指定字段）
 transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
@@ -521,157 +524,7 @@ transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('manage_tran
 });
 
 // 批量导入交易
-transactionsRouter.post('/import', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
-  try {
-    const { rows, options = {} } = req.body;
-    
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ error: '没有有效的数据' });
-    }
-    
-    const processedRows = [];
-    const errors = [];
-    
-    // 处理CSV数据
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        const row = rows[i];
-        
-        // 检查必要字段
-        if (!row.accountNumber || !row.transactionDate) {
-          errors.push({ row: i + 1, error: '账号和交易日期为必填字段' });
-          continue;
-        }
-        
-        // 处理日期格式
-        let transactionDate;
-        try {
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(row.transactionDate)) {
-            const dateObj = new Date(row.transactionDate);
-            if (isNaN(dateObj.getTime())) {
-              errors.push({ row: i + 1, error: '无效的日期格式' });
-              continue;
-            }
-            transactionDate = dateObj.toISOString().split('T')[0];
-          } else {
-            transactionDate = row.transactionDate;
-          }
-        } catch (e) {
-          errors.push({ row: i + 1, error: '日期格式错误: ' + e.message });
-          continue;
-        }
-        
-        // 处理金额
-        let debitAmount = 0;
-        let creditAmount = 0;
-        
-        if (row.debitAmount) {
-          debitAmount = Number(String(row.debitAmount).replace(/,/g, ''));
-          if (isNaN(debitAmount)) {
-            errors.push({ row: i + 1, error: '借方金额格式错误' });
-            continue;
-          }
-        }
-        
-        if (row.creditAmount) {
-          creditAmount = Number(String(row.creditAmount).replace(/,/g, ''));
-          if (isNaN(creditAmount)) {
-            errors.push({ row: i + 1, error: '贷方金额格式错误' });
-            continue;
-          }
-        }
-        
-        // 计算余额
-        const balance = creditAmount - debitAmount;
-        
-        // 添加处理后的数据
-        processedRows.push({
-          accountNumber: String(row.accountNumber).trim(),
-          transactionDate,
-          chequeRefNo: row.chequeRefNo ? String(row.chequeRefNo).trim() : null,
-          description: row.description ? String(row.description).trim() : null,
-          debitAmount,
-          creditAmount,
-          balance,
-          category: row.category ? String(row.category).trim() : null,
-          reference1: row.reference1 ? String(row.reference1).trim() : null,
-          reference2: row.reference2 ? String(row.reference2).trim() : null,
-          reference3: row.reference3 ? String(row.reference3).trim() : null
-        });
-      } catch (e) {
-        errors.push({ row: i + 1, error: e.message });
-      }
-    }
-    
-    // 批量插入处理后的数据
-    let inserted = 0;
-    const failed = [];
-    
-    for (const row of processedRows) {
-      try {
-        const result = await query(`
-          INSERT INTO transactions (
-            account_number,
-            transaction_date,
-            cheque_ref_no,
-            description,
-            debit_amount,
-            credit_amount,
-            balance,
-            category,
-            reference_1,
-            reference_2,
-            reference_3,
-            created_by
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          ON CONFLICT (account_number, transaction_date, cheque_ref_no) 
-          DO UPDATE SET
-            description = EXCLUDED.description,
-            debit_amount = EXCLUDED.debit_amount,
-            credit_amount = EXCLUDED.credit_amount,
-            balance = EXCLUDED.balance,
-            category = EXCLUDED.category,
-            reference_1 = EXCLUDED.reference_1,
-            reference_2 = EXCLUDED.reference_2,
-            reference_3 = EXCLUDED.reference_3,
-            updated_at = CURRENT_TIMESTAMP
-          RETURNING id
-        `, [
-          row.accountNumber,
-          row.transactionDate,
-          row.chequeRefNo || '',
-          row.description,
-          row.debitAmount,
-          row.creditAmount,
-          row.balance,
-          row.category,
-          row.reference1,
-          row.reference2,
-          row.reference3,
-          req.user.id
-        ]);
-        
-        inserted++;
-      } catch (e) {
-        failed.push({
-          data: row,
-          error: e.message
-        });
-      }
-    }
-    
-    res.json({
-      message: `成功导入 ${inserted} 条交易记录`,
-      total: rows.length,
-      inserted,
-      failed: failed.length,
-      errors: [...errors, ...failed]
-    });
-  } catch (error) {
-    console.error('批量导入交易失败:', error);
-    res.status(500).json({ error: '批量导入交易失败', detail: error.message });
-  }
-});
+// 旧的重复导入端点已移除，避免行为冲突
 
 // 获取交易导出数据
 transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
@@ -744,38 +597,4 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
 });
 
 // 获取交易CSV模板
-transactionsRouter.get('/template', authMiddleware(true), requirePerm('manage_transactions'), (req, res) => {
-  try {
-    const template = [
-      {
-        "账号": "示例账号",
-        "交易日期": "2025-01-01",
-        "支票/参考号": "CHQ12345",
-        "描述": "示例交易描述",
-        "借方金额": 1000,
-        "贷方金额": 0,
-        "类别": "支出",
-        "参考1": "参考信息1",
-        "参考2": "参考信息2",
-        "参考3": "参考信息3"
-      },
-      {
-        "账号": "示例账号",
-        "交易日期": "2025-01-02",
-        "支票/参考号": "DEP67890",
-        "描述": "示例存款",
-        "借方金额": 0,
-        "贷方金额": 2000,
-        "类别": "收入",
-        "参考1": "客户A",
-        "参考2": "",
-        "参考3": ""
-      }
-    ];
-    
-    res.json(template);
-  } catch (error) {
-    console.error('获取交易模板失败:', error);
-    res.status(500).json({ error: '获取交易模板失败', detail: error.message });
-  }
-});
+// 旧模板端点移除：请使用导出功能或前端内置模板

@@ -145,7 +145,7 @@ export const api = {
   // 银行回单/对账单导入与查询
   receipts: {
     list: (params={}) => request(`/receipts?${new URLSearchParams(params).toString()}`),
-    importText: (text) => request('/receipts/import-bank-text', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
+    importText: (text) => request('/receipts/import-text', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
     importFile: async (file) => {
       const form = new FormData()
       form.append('file', file)
@@ -156,7 +156,7 @@ export const api = {
         return null
       })()
       const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      const res = await fetch(`${API_BASE}/receipts/import-bank`, { method: 'POST', body: form, headers })
+      const res = await fetch(`${API_BASE}/receipts/import`, { method: 'POST', body: form, headers })
       if (!res.ok) {
         let msg = ''
         try { const j = await res.json(); msg = j?.error || j?.message || '' } catch { msg = await res.text() }
