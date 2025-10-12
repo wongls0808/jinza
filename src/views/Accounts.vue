@@ -1,11 +1,11 @@
 <template>
-  <div class="page container">
+  <div class="page accounts-page">
     <div class="head">
       <div class="title">{{ $t('accounts.title') }}</div>
       <div class="spacer"></div>
       <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
-    <el-card class="jelly">
+  <el-card class="jelly accounts-card">
       <template #header>
         <div class="toolbar">
           <div class="spacer"></div>
@@ -206,14 +206,76 @@ function onRowDblClick(row) {
 </script>
 
 <style scoped>
-.page { padding: 8px; }
-.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 8px; }
-.title { font-size: 18px; font-weight: 700; }
-.toolbar { display: flex; align-items: center; gap: 8px; }
-.spacer { flex: 1; }
-.form { display: grid; gap: 12px; }
-.bankcell, .bankopt { display: inline-flex; align-items: center; gap: 10px; }
-.bankcell .logo, .bankopt .logo { height: 16px; width: auto; object-fit: contain; }
-.bankcell .zh, .bankopt .zh { font-weight: 600; }
-.bankcell .en, .bankopt .en { color: var(--el-text-color-secondary); font-size: 12px; }
+
+.accounts-page {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+  box-sizing: border-box;
+  padding: 0;
+}
+.accounts-card {
+  width: 100%;
+  max-width: 1400px;
+  margin: 24px auto;
+  border-radius: 24px;
+  box-shadow: 0 6px 32px 0 rgba(60, 80, 180, 0.10), 0 1.5px 6px 0 rgba(60, 80, 180, 0.08);
+  background: #fff;
+  padding-bottom: 32px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 32px 0 8px;
+  width: 100%;
+  max-width: 1400px;
+}
+.title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #3b4890;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spacer {
+  flex: 1;
+}
+.form {
+  display: grid;
+  gap: 16px;
+  padding: 8px 0;
+}
+.bankcell, .bankopt {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.bankcell .logo, .bankopt .logo {
+  height: 20px;
+  width: auto;
+  object-fit: contain;
+}
+.bankcell .zh, .bankopt .zh {
+  font-weight: 600;
+  font-size: 1rem;
+}
+.bankcell .en, .bankopt .en {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.pager {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
 </style>
