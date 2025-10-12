@@ -1131,18 +1131,10 @@ const submitForm = async () => {
         reference: form.reference
       }
       
-      const url = isEdit.value ? `/api/transactions/${form.id}` : '/api/transactions'
-      const method = isEdit.value ? 'PUT' : 'POST'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || error.detail || response.statusText)
+      if (isEdit.value) {
+        await api.transactions.update(form.id, data)
+      } else {
+        await api.transactions.create(data)
       }
       
       ElMessage.success(
@@ -1321,7 +1313,7 @@ const submitImport = async () => {
       const transformed = {
         accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
         transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || '',
-        chequeRefNo: row.chequeRefNo || row['支票/参考号'] || row['Cheque/Ref No'] || '',
+        chequeRefNo: row.chequeRefNo || row['参考号'] || row['CheqRef No'] || '',
         description: row.description || row.描述 || row.Description || '',
         debitAmount: row.debitAmount || row.借方金额 || row['Debit Amount'] || 0,
         creditAmount: row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0,

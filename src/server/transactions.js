@@ -453,6 +453,7 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
 // 新增交易
 transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const {
       account_number,
       transaction_date,
@@ -490,6 +491,7 @@ transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transacti
 // 更新交易
 transactionsRouter.put('/:id', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const id = Number(req.params.id);
     const {
       account_number,
@@ -560,6 +562,7 @@ transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transacti
 // 删除单个交易（用于行操作删除）
 transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('delete_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const id = Number(req.params.id);
     const rs = await query('delete from transactions where id=$1 returning id', [id]);
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });

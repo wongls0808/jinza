@@ -140,7 +140,10 @@ export const api = {
     list: (params={}) => request(`/transactions?${new URLSearchParams(params).toString()}`),
     stats: (params={}) => request(`/transactions/stats?${new URLSearchParams(params).toString()}`),
     export: (params={}) => request(`/transactions/export?${new URLSearchParams(params).toString()}`),
-    deleteTransactions: (ids) => request('/transactions/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) })
+    deleteTransactions: (ids) => request('/transactions/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+    create: (data) => request('/transactions', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id) => request(`/transactions/${id}`, { method: 'DELETE' })
   },
   // 返回收款账户列表（仅 items 数组，便于选择器直接使用）
   requestAccounts: async () => {
