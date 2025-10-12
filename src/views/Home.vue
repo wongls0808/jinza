@@ -36,8 +36,8 @@
         <div class="welcome">{{ t('home.welcome') }}</div>
         <div class="meta">{{ username }} · {{ today }}</div>
       </div>
-      <div class="grid">
-        <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
+      <div class="grid" v-if="!activeModule">
+        <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="activeModule='users'">
           <div class="icon"><User /></div>
           <div class="name">{{ t('home.users') }}</div>
           <div class="desc">{{ t('home.usersDesc') }}</div>
@@ -63,6 +63,10 @@
           <div class="desc">{{ t('home.settingsDesc') }}</div>
         </el-card>
       </div>
+      <div v-if="activeModule==='users'" class="module-panel">
+        <UserManagement />
+        <el-button class="back-btn" type="info" @click="activeModule=null" style="margin:24px 0 0 0;">返回功能列表</el-button>
+      </div>
     </main>
   </div>
 </template>
@@ -72,12 +76,14 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
+import UserManagement from './UserManagement.vue'
 const router = useRouter()
 const go = (path) => router.push(path)
 const { has, state } = useAuth()
 const { t } = useI18n()
 const username = computed(() => state.user?.display_name || state.user?.username || '')
 const today = new Date().toLocaleDateString()
+const activeModule = ref(null)
 </script>
 
 <style scoped>
