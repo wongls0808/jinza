@@ -3,7 +3,6 @@
     <div class="head">
       <div class="title">{{ $t('accounts.title') }}</div>
       <div class="spacer"></div>
-      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
   <el-card class="jelly accounts-card">
       <template #header>

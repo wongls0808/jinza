@@ -3,7 +3,6 @@
     <div class="head">
       <div class="title">{{ $t('banks.title') }}</div>
       <div class="spacer"></div>
-      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
     <el-card class="jelly">
       <template #header>
@@ -150,7 +149,17 @@ function onImgErr(e) {
 </script>
 
 <style scoped>
-.page { padding: 8px; }
+.page {
+  padding: 0;
+  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+  min-height: 100vh;
+  width: 100vw;
+  position: fixed;
+  left: 0;
+  top: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 8px; }
 .title { font-size: 18px; font-weight: 700; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
