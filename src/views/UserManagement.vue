@@ -1,5 +1,5 @@
 <template>
-  <NavBar :activePage="'users'" @navigate="onNavigate" />
+  <NavBar :activePage="'users'" :username="state.user?.display_name || state.user?.username || '用户'" @navigate="onNavigate" />
   <div class="users container">
     <div class="page-head">
   <div class="title">{{ $t('home.users') }}</div>
@@ -68,6 +68,8 @@
 
 <script setup>
 import NavBar from '@/components/NavBar.vue'
+import { useAuth } from '@/composables/useAuth'
+const { state } = useAuth()
 function onNavigate(page) {
   // 可根据需要实现页面跳转逻辑
 }

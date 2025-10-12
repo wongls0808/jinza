@@ -41,10 +41,42 @@ const username = computed(() => state.user?.username || '用户')
 </script>
 
 <style scoped>
-.page { padding: 8px; }
-.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 8px; }
-.title { font-size: 18px; font-weight: 700; }
-.toolbar { display: flex; align-items: center; gap: 8px; }
-.spacer { flex: 1; }
-.placeholder { color: var(--el-text-color-secondary); padding: 16px; }
+  .page {
+    min-height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+    box-sizing: border-box;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 32px 0 8px;
+    width: 100%;
+    max-width: 1200px;
+  }
+  .title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #3b4890;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .placeholder {
+    color: var(--el-text-color-secondary);
+    padding: 16px;
+  }
 </style>

@@ -84,24 +84,31 @@ onMounted(loadStats)
   color: #2b3a55;
   font-weight: 500;
 }
-.dashboard-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px 0;
-}
-.stat-card {
-  text-align: center;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(79,140,255,0.08);
-}
-.stat-title {
-  font-size: 1.1rem;
-  color: #3b4890;
-  margin-bottom: 8px;
-}
-.stat-value {
-  font-size: 2.2rem;
-  font-weight: 700;
+  .dashboard-page {
+    min-height: 100vh;
+    width: 100vw;
+    background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+    box-sizing: border-box;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+  .dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 32px 0 0 0;
+    width: 100%;
+    max-width: 1200px;
+  }
+  .dashboard-content {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 0;
+  }
   color: #4f8cff;
 }
 .chart-title {

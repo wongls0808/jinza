@@ -214,26 +214,27 @@ function onRowDblClick(row) {
 
 <style scoped>
 
-.accounts-page {
-  min-height: 100vh;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
-  box-sizing: border-box;
-  padding: 0;
-}
-.accounts-card {
-  width: 100%;
-  max-width: 1400px;
-  margin: 24px auto;
-  border-radius: 24px;
-  box-shadow: 0 6px 32px 0 rgba(60, 80, 180, 0.10), 0 1.5px 6px 0 rgba(60, 80, 180, 0.08);
-  background: #fff;
-  padding-bottom: 32px;
-}
+  .accounts-page {
+    min-height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+    box-sizing: border-box;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  .accounts-card {
+    width: 100%;
+    max-width: 1200px;
+    margin: 24px auto;
+    border-radius: 24px;
+    box-shadow: 0 6px 32px 0 rgba(60, 80, 180, 0.10), 0 1.5px 6px 0 rgba(60, 80, 180, 0.08);
+    background: #fff;
+    padding-bottom: 32px;
+  }
 .head {
   display: flex;
   align-items: center;

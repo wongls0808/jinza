@@ -150,9 +150,37 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.page { padding: 24px; }
-.grid { display: grid; gap: 16px; }
-.label { margin-bottom: 8px; color: var(--el-text-color-secondary); }
-.add-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+</style>
+.page {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
+  box-sizing: border-box;
+  padding: 0;
+  overflow-x: hidden;
+}
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 0;
+}
+.grid {
+  display: grid;
+  gap: 16px;
+}
+.label {
+  margin-bottom: 8px;
+  color: var(--el-text-color-secondary);
+}
+.add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 </style>
