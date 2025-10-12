@@ -163,9 +163,9 @@
       
       <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable />
       
-      <el-table-column :label="t('transactions.transactionDate')" prop="transaction_date" sortable width="140">
+      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable width="140">
         <template #default="scope">
-          {{ formatDate(scope.row.transaction_date) }}
+          {{ formatDate(scope.row.trn_date) }}
         </template>
       </el-table-column>
       
@@ -201,6 +201,12 @@
           <span v-else class="gray-text">{{ t('transactions.uncategorized') }}</span>
         </template>
       </el-table-column>
+
+      <el-table-column :label="t('transactions.reference1')" prop="reference1" show-overflow-tooltip />
+      
+      <el-table-column :label="t('transactions.reference2')" prop="reference2" show-overflow-tooltip />
+      
+      <el-table-column :label="t('transactions.reference3')" prop="reference3" show-overflow-tooltip />
       
       <el-table-column label="" width="100">
         <template #default="scope">
@@ -259,9 +265,9 @@
           <el-input v-model="form.account_number" />
         </el-form-item>
         
-        <el-form-item :label="t('transactions.transactionDate')" prop="transaction_date">
+        <el-form-item :label="t('transactions.transactionDate')" prop="trn_date">
           <el-date-picker
-            v-model="form.transaction_date"
+            v-model="form.trn_date"
             type="date"
             style="width: 100%"
             value-format="YYYY-MM-DD" />
@@ -493,7 +499,7 @@
           {{ currentTransaction.account_number }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.transactionDate')">
-          {{ formatDate(currentTransaction.transaction_date) }}
+          {{ formatDate(currentTransaction.trn_date) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.chequeRefNo')">
           {{ currentTransaction.cheque_ref_no || '-' }}

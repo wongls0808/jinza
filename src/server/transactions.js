@@ -141,12 +141,12 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
     const result = await query(`
       SELECT 
         t.id, 
-        t.account_number AS "accountNumber",
-        to_char(t.transaction_date, 'YYYY-MM-DD') AS "transactionDate",
-        t.cheque_ref_no AS "chequeRefNo",
+        t.account_number,
+        to_char(t.transaction_date, 'YYYY-MM-DD') AS "trn_date",
+        t.cheque_ref_no,
         t.description,
-        t.debit_amount AS "debitAmount",
-        t.credit_amount AS "creditAmount",
+        t.debit_amount,
+        t.credit_amount,
         t.balance,
         t.category,
         t.reference_1 AS "reference1",
