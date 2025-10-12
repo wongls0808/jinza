@@ -71,14 +71,14 @@ const pageComponent = computed(() => {
   z-index: 10;
   .home-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
     width: 100vw;
     background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
     box-sizing: border-box;
   }
   .home-sidebar {
-    width: 10vw;
-    min-width: 120px;
+    width: 220px;
+    min-width: 220px;
     max-width: 220px;
     background: #fff;
     box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
@@ -101,11 +101,13 @@ const pageComponent = computed(() => {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
+    height: 100vh;
+    overflow-y: auto;
   }
   .main-content {
     width: 100%;
     max-width: 1400px;
-    margin: 0 auto;
+    margin: 32px auto 0 auto;
     min-height: 70vh;
     box-sizing: border-box;
     background: none;
