@@ -11,6 +11,7 @@
         <el-menu-item index="customers" @click="$emit('navigate', 'customers')"><i class="el-icon-s-custom"></i> 客户管理</el-menu-item>
         <el-menu-item index="banks" @click="$emit('navigate', 'banks')"><i class="el-icon-bank-card"></i> 银行列表</el-menu-item>
         <el-menu-item index="accounts" @click="$emit('navigate', 'accounts')"><i class="el-icon-wallet"></i> 收款账户</el-menu-item>
+        <el-menu-item index="transactions" @click="$emit('navigate', 'transactions')"><i class="el-icon-document"></i> 交易管理</el-menu-item>
         <el-submenu index="more">
           <template #title><i class="el-icon-more"></i> 更多</template>
           <el-menu-item index="invoices" @click="$emit('navigate', 'invoices')">发票管理</el-menu-item>

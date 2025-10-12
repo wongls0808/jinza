@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import multer from 'multer'
 import { parseCSV, removeDuplicates } from './utils.js'
+import { transactionsRouter } from './transactions.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -613,6 +614,7 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   res.send(BOM + [header, sample].join('\n'))
 })
 
-// 以后可以添加新的入账管理API
+// 注册交易管理API路由
+router.use('/transactions', transactionsRouter)
 
 

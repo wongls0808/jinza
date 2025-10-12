@@ -25,6 +25,11 @@
         <div class="name">{{ t('home.accounts') }}</div>
         <div class="desc">{{ t('home.accountsDesc') }}</div>
       </el-card>
+  <el-card v-if="has('view_transactions')" class="home-card jelly" v-tilt @click="go('/transactions')">
+  <div class="icon"><Document /></div>
+        <div class="name">{{ t('home.transactions') }}</div>
+        <div class="desc">{{ t('home.transactionsDesc') }}</div>
+      </el-card>
   <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
   <div class="icon"><Setting /></div>
         <div class="name">{{ t('home.settings') }}</div>
@@ -39,6 +44,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
+import { User, UserFilled, OfficeBuilding, Setting, Document } from '@element-plus/icons-vue'
 const router = useRouter()
 const go = (path) => router.push(path)
 const { has, state } = useAuth()

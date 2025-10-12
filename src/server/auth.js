@@ -23,6 +23,7 @@ export function authMiddleware(required = true) {
           'view_customers', 
           'view_banks', 
           'view_accounts', 
+          'view_transactions',
           'view_settings'
         ]
       }
@@ -144,6 +145,7 @@ export async function seedInitialAdmin() {
     { code: 'view_customers', name: '客户模块' },
     { code: 'view_banks', name: '银行列表' },
     { code: 'view_accounts', name: '收款账户' },
+    { code: 'view_transactions', name: '交易管理' },
     { code: 'view_settings', name: '系统设置' }
   ]
   for (const p of corePerms) {
