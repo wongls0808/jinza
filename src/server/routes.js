@@ -5,8 +5,11 @@ import { query } from './db.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import multer from 'multer'
+import { parseCSV, removeDuplicates } from './utils.js'
 
 export const router = express.Router()
+const upload = multer({ dest: 'uploads/' })
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -609,3 +612,19 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   const BOM = '\ufeff'
   res.send(BOM + [header, sample].join('\n'))
 })
+
+// Account Management API
+router.post('/api/accounts/import', upload.single('file'), async (req, res) => {
+  try {
+    const filePath = req.file.path;
+    const accounts = await parseCSV(filePath);
+    const uniqueAccounts = removeDuplicates(accounts);
+
+    // Save uniqueAccounts to the database (to be implemented)
+
+    res.status(200).json({ message: 'CSV imported successfully', data: uniqueAccounts });
+  } catch (error) {
+    console.error('Error importing CSV:', error);
+    res.status(500).json({ message: 'Failed to import CSV' });
+  }
+});

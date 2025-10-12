@@ -118,7 +118,19 @@ const messages = {
         addPlaceholderName: '显示名称，如 人民币 / 美元',
         count: '共 {n} 个',
       }
-    }
+    },
+    accountManagement: {
+      title: '入账管理',
+      importCSV: '导入 CSV',
+      accountNumber: '账号',
+      transactionDate: '交易日期',
+      chequeRefNo: '支票号/参考号',
+      debitAmount: '借方金额',
+      creditAmount: '贷方金额',
+      reference1: '参考 1',
+      reference2: '参考 2',
+      reference3: '参考 3',
+    },
   },
   en: {
     app: {
