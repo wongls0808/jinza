@@ -94,10 +94,13 @@ const activeModule = ref(null)
   width: 100vw;
   background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
   box-sizing: border-box;
+  overflow: hidden;
 }
 .home-sidebar {
   width: 160px;
+  width: 10vw;
   min-width: 120px;
+  max-width: 220px;
   background: #fff;
   box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
   display: flex;
@@ -105,12 +108,11 @@ const activeModule = ref(null)
   justify-content: space-between;
   align-items: stretch;
   padding: 0;
-  position: relative;
-  z-index: 2;
-}
-.sidebar-header {
-  padding: 32px 0 18px 0;
-  text-align: center;
+  position: sticky;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  z-index: 10;
   font-size: 2rem;
   font-weight: 800;
   color: #4f8cff;
@@ -141,7 +143,9 @@ const activeModule = ref(null)
   font-size: 13px;
 }
 .home-main {
-  flex: 1;
+  width: 90vw;
+  min-width: 0;
+  max-width: calc(100vw - 120px);
   padding: 0 32px;
   display: flex;
   flex-direction: column;
@@ -267,8 +271,8 @@ const activeModule = ref(null)
           z-index: 10;
         }
         .main-content {
-          width: calc(100vw - 160px);
-          max-width: calc(1400px - 160px);
+          width: 100%;
+          max-width: 1400px;
           margin: 0 auto;
           min-height: 70vh;
           box-sizing: border-box;
