@@ -11,6 +11,7 @@ const Banks = () => import('@/views/Banks.vue')
 const Accounts = () => import('@/views/Accounts.vue')
 const Settings = () => import('@/views/Settings.vue')
 const NoAccess = () => import('@/views/NoAccess.vue')
+const AccountManagement = () => import('@/views/AccountManagement.vue')
 
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -22,6 +23,7 @@ export const routes = [
   { path: '/accounts', name: 'accounts', component: Accounts, meta: { perm: 'view_accounts' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
+  { path: '/account-management', name: 'account-management', component: AccountManagement, meta: { perm: 'view_account_management' } },
 ]
 
 const router = createRouter({
