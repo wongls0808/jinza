@@ -88,7 +88,7 @@ export function getMockTransactions(params = {}) {
     filteredData = filteredData.filter(tx => new Date(tx.transaction_date) >= new Date(startDate));
   }
   if (endDate) {
-    filteredData = filteredData.filter(tx => new Date(tx.transactionDate) <= new Date(endDate));
+    filteredData = filteredData.filter(tx => new Date(tx.transaction_date) <= new Date(endDate));
   }
   
   // 分类过滤

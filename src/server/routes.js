@@ -615,13 +615,29 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   res.send(BOM + [header, sample].join('\n'))
 })
 
-// 注册交易管理API路由
-// 在数据库未配置时使用模拟交易控制器，否则使用标准控制器
-if (!process.env.DATABASE_URL) {
-  console.log('数据库未配置，使用模拟交易数据...')
-  router.use('/transactions', createTransactionsController())
-} else {
-  router.use('/transactions', transactionsRouter)
-}
+// 注册交易管理API路由（动态选择：无数据库或缺表则使用模拟数据）
+let useMockTransactions = !process.env.DATABASE_URL
+;(async () => {
+  if (!useMockTransactions) {
+    try {
+      const rs = await query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='transactions'
+        ) AS exists;
+      `)
+      useMockTransactions = !rs?.rows?.[0]?.exists
+      if (useMockTransactions) console.warn('未检测到 transactions 表，交易API将使用模拟数据')
+    } catch (e) {
+      console.warn('检测 transactions 表失败，交易API将使用模拟数据。原因：', e?.message)
+      useMockTransactions = true
+    }
+  }
+})()
+
+const mockCtrl = createTransactionsController()
+router.use('/transactions', (req, res, next) => {
+  return useMockTransactions ? mockCtrl(req, res, next) : transactionsRouter(req, res, next)
+})
 
 

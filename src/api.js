@@ -13,9 +13,22 @@ function getCache(key) {
 function delCache(key) { _cache.delete(key) }
 
 function getToken() {
-  const raw = localStorage.getItem('auth_user')
-  if (!raw) return null
-  try { return JSON.parse(raw).token || null } catch { return null }
+  // 优先从会话存储读取，保证“关闭浏览器需重登”的逻辑生效
+  try {
+    const ss = sessionStorage.getItem('auth_user')
+    if (ss) {
+      const data = JSON.parse(ss)
+      if (data?.token) return data.token
+    }
+  } catch {}
+
+  // 回退到本地存储（支持“记住我”场景）
+  try {
+    const ls = localStorage.getItem('auth_user')
+    if (!ls) return null
+    const data = JSON.parse(ls)
+    return data?.token || null
+  } catch { return null }
 }
 
 export async function request(path, opts = {}) {
@@ -23,7 +36,11 @@ export async function request(path, opts = {}) {
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) {
+    let msg = ''
+    try { const j = await res.json(); msg = j?.error || j?.message || '' } catch { msg = await res.text() }
+    throw new Error(msg || `HTTP ${res.status}`)
+  }
   const ct = res.headers.get('content-type') || ''
   if (ct.includes('application/json')) return res.json()
   return res.text()
