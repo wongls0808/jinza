@@ -616,9 +616,21 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   res.send(BOM + [header, sample].join('\n'))
 })
 
-// 注册交易管理API路由 - 生产模式下始终使用真实数据
-// 删除了模拟数据检测和切换逻辑，强制使用真实数据
-router.use('/transactions', transactionsRouter)
+// 注册交易管理API路由
+// 说明：
+// - 生产环境（或显式未开启开关）默认使用真实数据库路由
+// - 当开发环境缺少数据库配置时，可通过环境变量 ALLOW_TRANSACTIONS_MOCK=1 启用模拟数据
+// - 若 DATABASE_URL 未配置且未显式禁用（生产下请勿开启），则回退到模拟数据，避免前端页面不可用
+const mockCtrl = createTransactionsController()
+router.use('/transactions', (req, res, next) => {
+  const allowMock = process.env.ALLOW_TRANSACTIONS_MOCK === '1'
+  const hasDb = !!process.env.DATABASE_URL
+  // 在没有数据库的情况下，且允许 mock 时，使用模拟
+  if (!hasDb && allowMock) {
+    return mockCtrl(req, res, next)
+  }
+  return transactionsRouter(req, res, next)
+})
 
 // Receipts (bank statements import & listing)
 router.use('/receipts', receiptsRouter)
