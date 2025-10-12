@@ -404,68 +404,38 @@
       v-model="importDialogVisible"
       :title="t('transactions.importTransactions')"
       width="650px">
-      <el-tabs v-model="importTab">
-        <el-tab-pane :label="t('transactions.uploadFile')" name="upload">
-          <div class="upload-area">
-            <el-upload
-              class="transaction-upload"
-              drag
-              action=""
-              :auto-upload="false"
-              :on-change="handleFileChange"
-              :file-list="fileList"
-              accept=".csv,.xls,.xlsx">
-              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">
-                {{ t('transactions.dropFiles') }} <em>{{ t('transactions.clickUpload') }}</em>
-              </div>
-              <template #tip>
-                <div class="el-upload__tip">
-                  {{ t('transactions.supportedFormats') }}
-                </div>
-              </template>
-            </el-upload>
+      <div class="upload-area">
+        <el-upload
+          class="transaction-upload"
+          drag
+          action=""
+          :auto-upload="false"
+          :on-change="handleFileChange"
+          :file-list="fileList"
+          accept=".csv,.xls,.xlsx">
+          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+          <div class="el-upload__text">
+            {{ t('transactions.dropFiles') }} <em>{{ t('transactions.clickUpload') }}</em>
           </div>
-          
-          <div v-if="previewData.length > 0" class="preview-section">
-            <h4>{{ t('transactions.dataPreview') }}</h4>
-            <el-table :data="previewData.slice(0, 5)" border size="small" max-height="250">
-              <el-table-column 
-                v-for="header in previewHeaders" 
-                :key="header" 
-                :prop="header" 
-                :label="header" />
-            </el-table>
-            <div class="preview-info">{{ t('transactions.showingPreview', { count: 5, total: previewData.length }) }}</div>
-          </div>
-        </el-tab-pane>
-        
-        <el-tab-pane :label="t('transactions.downloadTemplate')" name="template">
-          <div class="template-info">
-            <p>{{ t('transactions.templateInfo') }}</p>
-            <el-button type="primary" @click="downloadTemplate">
-              <el-icon><download /></el-icon>
-              {{ t('transactions.downloadTemplate') }}
-            </el-button>
-          </div>
-          
-          <div class="template-format">
-            <h4>{{ t('transactions.requiredColumns') }}</h4>
-            <ul>
-              <li><strong>{{ t('transactions.accountNumber') }}</strong>: {{ t('transactions.accountNumberDesc') }}</li>
-              <li><strong>{{ t('transactions.transactionDate') }}</strong>: {{ t('transactions.transactionDateDesc') }}</li>
-            </ul>
-            
-            <h4>{{ t('transactions.optionalColumns') }}</h4>
-            <ul>
-              <li><strong>{{ t('transactions.chequeRefNo') }}</strong>: {{ t('transactions.chequeRefNoDesc') }}</li>
-              <li><strong>{{ t('transactions.debitAmount') }}</strong>: {{ t('transactions.debitAmountDesc') }}</li>
-              <li><strong>{{ t('transactions.creditAmount') }}</strong>: {{ t('transactions.creditAmountDesc') }}</li>
-              <li><strong>{{ t('transactions.reference') }}</strong>: {{ t('transactions.referencesDesc') }}</li>
-            </ul>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+          <template #tip>
+            <div class="el-upload__tip">
+              {{ t('transactions.supportedFormats') }}
+            </div>
+          </template>
+        </el-upload>
+      </div>
+
+      <div v-if="previewData.length > 0" class="preview-section">
+        <h4>{{ t('transactions.dataPreview') }}</h4>
+        <el-table :data="previewData.slice(0, 5)" border size="small" max-height="250">
+          <el-table-column 
+            v-for="header in previewHeaders" 
+            :key="header" 
+            :prop="header" 
+            :label="header" />
+        </el-table>
+        <div class="preview-info">{{ t('transactions.showingPreview', { count: 5, total: previewData.length }) }}</div>
+      </div>
       
       <template #footer>
         <span class="dialog-footer">
@@ -602,7 +572,8 @@ const importDialogVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
 const importSubmitting = ref(false)
-const importTab = ref('upload')
+// 原始CSV文本（用于固定格式导入时传给后端，保持文件头中的 Account Number 等信息）
+const originalCsvText = ref('')
 const currentTransaction = ref({})
 const fileList = ref([])
 const previewData = ref([])
@@ -903,10 +874,10 @@ const showAddDialog = () => {
 }
 
 const showImportDialog = () => {
-  importTab.value = 'upload'
   fileList.value = []
   previewData.value = []
   previewHeaders.value = []
+  originalCsvText.value = ''
   importDialogVisible.value = true
 }
 
@@ -1256,7 +1227,14 @@ const handleFileChange = (file) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
-      Papa.parse(e.target.result, {
+      const fullText = String(e.target.result || '')
+      originalCsvText.value = fullText
+      // 仅解析从表头 Trn. Date 开始的数据区，以适配固定银行格式
+      const lines = fullText.replace(/\r\n/g, '\n').split('\n')
+      const headerIdx = lines.findIndex(l => /^\s*Trn\.\s*Date\s*,/i.test(l))
+      const textToParse = headerIdx >= 0 ? lines.slice(headerIdx).join('\n') : fullText
+
+      Papa.parse(textToParse, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
@@ -1289,13 +1267,18 @@ const handleFileChange = (file) => {
 }
 
 const checkRequiredFields = (fields) => {
-  // 检查必要字段
-  const requiredFields = ['账号', 'accountNumber', '交易日期', 'transactionDate']
-  const normalizedFields = fields.map(f => f.toLowerCase())
-  
-  return requiredFields.some(field => 
-    normalizedFields.includes(field.toLowerCase())
+  if (!Array.isArray(fields)) return false
+  const lower = fields.map(f => String(f || '').toLowerCase())
+  // 固定银行格式：必须同时包含以下表头
+  const fixedOk = ['trn. date','cheque no/ref no','transaction description','debit amount','credit amount']
+    .every(h => lower.includes(h))
+  // 通用格式：至少包含 账号/Account Number 与 交易日期/Transaction Date
+  const genericOk = (
+    lower.includes('accountnumber') || lower.includes('账号') || lower.includes('account number')
+  ) && (
+    lower.includes('transactiondate') || lower.includes('交易日期') || lower.includes('transaction date')
   )
+  return fixedOk || genericOk
 }
 
 const submitImport = async () => {
@@ -1314,10 +1297,9 @@ const submitImport = async () => {
 
     let result
     if (looksLikeFixed) {
-      // 将原始文件内容拼回文本：为保持一致性，提示用户建议直接使用“CSV文本导入”路径
-      // 这里从 previewData 反序列化为 CSV 文本以调用固定接口
-      const csvText = Papa.unparse(previewData.value, { header: true })
-      result = await api.transactions.importCsvText(csvText)
+      // 直接发送原始CSV文本，保留文件头中的 Account Number 等信息
+      if (!originalCsvText.value) throw new Error('empty csv text')
+      result = await api.transactions.importCsvText(originalCsvText.value)
     } else {
       // 回退到通用 JSON 导入
       const transformedData = previewData.value.map(row => ({
