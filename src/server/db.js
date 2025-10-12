@@ -3,8 +3,18 @@ import pg from 'pg'
 const { Pool } = pg
 
 // 配置数据库连接
-// 优先使用环境变量中的DATABASE_URL，如果没有则使用默认连接字符串
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:GvDViOFhACSKomPtKqKnqxqUIHiAHbnP@postgres.railway.internal:5432/railway'
+// 优先使用环境变量中的DATABASE_URL，如果没有则使用开发环境连接字符串
+let connectionString;
+if (process.env.DATABASE_URL) {
+  connectionString = process.env.DATABASE_URL;
+} else if (process.env.NODE_ENV !== 'production') {
+  // 开发环境使用本地PostgreSQL
+  connectionString = 'postgresql://postgres:postgres@localhost:5432/jinza';
+  console.log('使用开发环境数据库连接');
+} else {
+  // 生产环境默认配置
+  connectionString = 'postgresql://postgres:GvDViOFhACSKomPtKqKnqxqUIHiAHbnP@postgres.railway.internal:5432/railway';
+}
 
 let pool
 if (connectionString) {

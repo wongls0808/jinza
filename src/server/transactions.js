@@ -9,6 +9,11 @@ export const transactionsRouter = express.Router();
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    // 检查数据库连接
+    if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' });
+    }
+    
     const { 
       page = 1, 
       pageSize = 20, 

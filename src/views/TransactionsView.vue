@@ -679,6 +679,11 @@ const fetchTransactions = async () => {
   loading.value = true
   
   try {
+    // 开发环境提示
+    if (process.env.NODE_ENV === 'development') {
+      console.log('开发环境提示：请确保已配置数据库连接')
+    }
+    
     // 构建查询参数
     const params = new URLSearchParams()
     params.append('page', pagination.page)
@@ -733,9 +738,41 @@ const fetchTransactions = async () => {
     }
   } catch (error) {
     console.error('获取交易数据失败:', error)
-    ElMessage.error(t('transactions.fetchFailed'))
+    
+    // 提供更详细的错误信息
+    if (error.message && error.message.includes('DATABASE_URL')) {
+      ElMessage({
+        message: '数据库连接错误：请确保数据库已正确配置',
+        type: 'error',
+        duration: 5000
+      })
+    } else {
+      ElMessage.error(t('transactions.fetchFailed'))
+    }
+    
+    // 对于开发环境，提供一些测试数据以便界面可以展示
+    if (process.env.NODE_ENV === 'development') {
+      transactions.value = getMockTransactions()
+      pagination.total = transactions.value.length
+    }
   } finally {
     loading.value = false
+  }
+  
+  // 本地开发时的模拟数据
+  function getMockTransactions() {
+    return Array(5).fill().map((_, i) => ({
+      id: i + 1,
+      accountNumber: '6226123456789000' + i,
+      transactionDate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
+      chequeRefNo: 'REF' + (1000 + i),
+      description: `测试交易 ${i + 1}`,
+      debitAmount: i % 2 === 0 ? (i + 1) * 1000 : 0,
+      creditAmount: i % 2 === 1 ? (i + 1) * 1000 : 0,
+      balance: 10000 - i * 1000,
+      category: i % 2 === 0 ? '支出' : '收入',
+      reference1: `参考信息 ${i + 1}`
+    }))
   }
 }
 
@@ -1329,7 +1366,20 @@ const handleResize = () => {
 
 // 生命周期钩子
 onMounted(() => {
-  fetchTransactions()
+  try {
+    fetchTransactions()
+  } catch (error) {
+    console.error('初始化交易管理视图失败:', error)
+    ElMessage({
+      message: '页面初始化失败，将使用模拟数据',
+      type: 'warning',
+      duration: 5000
+    })
+    // 使用模拟数据确保界面可用
+    if (transactions.value.length === 0) {
+      transactions.value = getMockTransactions()
+    }
+  }
   window.addEventListener('resize', handleResize)
 })
 
