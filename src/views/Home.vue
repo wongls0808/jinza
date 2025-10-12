@@ -1,11 +1,9 @@
 <template>
   <div class="home-layout">
-    <aside class="home-sidebar">
-      <div class="sidebar-header">
-        <div class="logo">Jinza</div>
-      </div>
-      <nav class="sidebar-nav">
-        <el-menu :default-active="activePage" class="el-menu-vertical">
+    <header class="home-header">
+      <div class="logo">Jinza</div>
+      <nav class="nav-bar">
+        <el-menu :default-active="activePage" mode="horizontal" class="el-menu-horizontal">
           <el-menu-item index="users" @click="activePage='users'">用户管理</el-menu-item>
           <el-menu-item index="customers" @click="activePage='customers'">客户管理</el-menu-item>
           <el-menu-item index="banks" @click="activePage='banks'">银行列表</el-menu-item>
@@ -13,7 +11,7 @@
           <el-menu-item index="settings" @click="activePage='settings'">系统设置</el-menu-item>
         </el-menu>
       </nav>
-    </aside>
+    </header>
     <main class="home-main">
       <div class="main-content">
         <component :is="pageComponent" />
@@ -69,57 +67,62 @@ const pageComponent = computed(() => {
   top: 0;
   height: 100vh;
   z-index: 10;
-  .home-layout {
-    display: flex;
-    height: 100vh;
-    width: 100vw;
-    background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
-    box-sizing: border-box;
+    .home-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
+      box-sizing: border-box;
+    }
+    .home-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      height: 64px;
+      background: #fff;
+      box-shadow: 0 2px 16px 0 rgba(79,140,255,0.08);
+      padding: 0 32px;
+      z-index: 20;
+    }
+      /* 移除旧 .logo 样式，保留新导航样式 */
+    .nav-bar {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+    .el-menu-horizontal {
+      border: none;
+      background: transparent;
+      font-size: 1.1rem;
+      height: 64px;
+      line-height: 64px;
+    }
+    .home-main {
+      flex: 1;
+      min-width: 0;
+      padding: 0 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: calc(100vh - 64px);
+      overflow-y: auto;
+    }
+    .main-content {
+      width: 100%;
+      max-width: 1400px;
+      margin: 32px auto 0 auto;
+      min-height: 70vh;
+      box-sizing: border-box;
+      background: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
   }
-  .home-sidebar {
-    width: 220px;
-    min-width: 220px;
-    max-width: 220px;
-    background: #fff;
-    box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    padding: 0;
-    position: sticky;
-    left: 0;
-    top: 0;
-    height: 100vh;
-    z-index: 10;
-  }
-  .home-main {
-    flex: 1;
-    min-width: 0;
-    padding: 0 32px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    height: 100vh;
-    overflow-y: auto;
-  }
-  .main-content {
-    width: 100%;
-    max-width: 1400px;
-    margin: 32px auto 0 auto;
-    min-height: 70vh;
-    box-sizing: border-box;
-    background: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-  }
-  font-weight: 700;
-  color: #4f8cff;
-  letter-spacing: .2px;
-}
 .meta {
   margin-top: 6px;
   color: #6b7b8c;
