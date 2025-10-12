@@ -116,5 +116,11 @@ export const api = {
     create: (customerId, data) => request(`/customers/${customerId}/accounts`, { method: 'POST', body: JSON.stringify(data) }),
     remove: (customerId, id) => request(`/customers/${customerId}/accounts/${id}`, { method: 'DELETE' }),
     update: (customerId, id, data) => request(`/customers/${customerId}/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+  },
+  
+  // 交易管理API
+  transactions: {
+    list: (params={}) => request(`/transactions?${new URLSearchParams(params).toString()}`),
+    stats: () => request('/transactions/stats')
   }
 }

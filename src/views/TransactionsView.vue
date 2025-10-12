@@ -161,25 +161,25 @@
       
       <el-table-column type="selection" width="55" />
       
-      <el-table-column :label="t('transactions.accountNumber')" prop="accountNumber" sortable />
+      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable />
       
-      <el-table-column :label="t('transactions.transactionDate')" prop="transactionDate" sortable>
+      <el-table-column :label="t('transactions.transactionDate')" prop="transaction_date" sortable>
         <template #default="scope">
           {{ formatDate(scope.row.transactionDate) }}
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.chequeRefNo')" prop="chequeRefNo" />
+      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" />
       
       <el-table-column :label="t('transactions.description')" prop="description" show-overflow-tooltip />
       
-      <el-table-column :label="t('transactions.debitAmount')" prop="debitAmount" align="right" sortable>
+      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable>
         <template #default="scope">
           <span class="negative">{{ formatCurrency(scope.row.debitAmount) }}</span>
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.creditAmount')" prop="creditAmount" align="right" sortable>
+      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable>
         <template #default="scope">
           <span class="positive">{{ formatCurrency(scope.row.creditAmount) }}</span>
         </template>
@@ -255,20 +255,20 @@
         label-width="120px"
         label-position="left">
         
-        <el-form-item :label="t('transactions.accountNumber')" prop="accountNumber">
-          <el-input v-model="form.accountNumber" />
+        <el-form-item :label="t('transactions.accountNumber')" prop="account_number">
+          <el-input v-model="form.account_number" />
         </el-form-item>
         
-        <el-form-item :label="t('transactions.transactionDate')" prop="transactionDate">
+        <el-form-item :label="t('transactions.transactionDate')" prop="transaction_date">
           <el-date-picker
-            v-model="form.transactionDate"
+            v-model="form.transaction_date"
             type="date"
             style="width: 100%"
             value-format="YYYY-MM-DD" />
         </el-form-item>
         
-        <el-form-item :label="t('transactions.chequeRefNo')" prop="chequeRefNo">
-          <el-input v-model="form.chequeRefNo" />
+        <el-form-item :label="t('transactions.chequeRefNo')" prop="cheque_ref_no">
+          <el-input v-model="form.cheque_ref_no" />
         </el-form-item>
         
         <el-form-item :label="t('transactions.description')" prop="description">
@@ -277,9 +277,9 @@
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item :label="t('transactions.debitAmount')" prop="debitAmount">
+            <el-form-item :label="t('transactions.debitAmount')" prop="debit_amount">
               <el-input-number
-                v-model="form.debitAmount"
+                v-model="form.debit_amount"
                 :precision="2"
                 :step="100"
                 :min="0"
@@ -288,9 +288,9 @@
           </el-col>
           
           <el-col :span="12">
-            <el-form-item :label="t('transactions.creditAmount')" prop="creditAmount">
+            <el-form-item :label="t('transactions.creditAmount')" prop="credit_amount">
               <el-input-number
-                v-model="form.creditAmount"
+                v-model="form.credit_amount"
                 :precision="2"
                 :step="100"
                 :min="0"
@@ -634,16 +634,16 @@ const form = reactive({
 })
 
 const rules = {
-  accountNumber: [
+  account_number: [
     { required: true, message: t('transactions.accountNumberRequired'), trigger: 'blur' }
   ],
-  transactionDate: [
+  transaction_date: [
     { required: true, message: t('transactions.transactionDateRequired'), trigger: 'change' }
   ],
-  debitAmount: [
+  debit_amount: [
     { type: 'number', min: 0, message: t('transactions.debitAmountMin'), trigger: 'change' }
   ],
-  creditAmount: [
+  credit_amount: [
     { type: 'number', min: 0, message: t('transactions.creditAmountMin'), trigger: 'change' }
   ]
 }
@@ -763,15 +763,15 @@ const fetchTransactions = async () => {
   function getMockTransactions() {
     return Array(5).fill().map((_, i) => ({
       id: i + 1,
-      accountNumber: '6226123456789000' + i,
-      transactionDate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-      chequeRefNo: 'REF' + (1000 + i),
+      account_number: '6226123456789000' + i,
+      transaction_date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
+      cheque_ref_no: 'REF' + (1000 + i),
       description: `测试交易 ${i + 1}`,
-      debitAmount: i % 2 === 0 ? (i + 1) * 1000 : 0,
-      creditAmount: i % 2 === 1 ? (i + 1) * 1000 : 0,
+      debit_amount: i % 2 === 0 ? (i + 1) * 1000 : 0,
+      credit_amount: i % 2 === 1 ? (i + 1) * 1000 : 0,
       balance: 10000 - i * 1000,
       category: i % 2 === 0 ? '支出' : '收入',
-      reference1: `参考信息 ${i + 1}`
+      reference_1: `参考信息 ${i + 1}`
     }))
   }
 }
@@ -828,9 +828,9 @@ const renderCharts = () => {
   if (monthlyEl) {
     monthlyChart = echarts.init(monthlyEl)
     
-    const months = stats.value.monthly.map(item => item.month)
-    const debitData = stats.value.monthly.map(item => Number(item.debit) || 0)
-    const creditData = stats.value.monthly.map(item => Number(item.credit) || 0)
+    const months = stats.value.byMonth.map(item => item.month)
+    const debitData = stats.value.byMonth.map(item => Number(item.debit) || 0)
+    const creditData = stats.value.byMonth.map(item => Number(item.credit) || 0)
     
     const option = {
       tooltip: {
@@ -957,16 +957,16 @@ const showImportDialog = () => {
 const resetForm = () => {
   Object.assign(form, {
     id: null,
-    accountNumber: '',
-    transactionDate: new Date().toISOString().split('T')[0],
-    chequeRefNo: '',
+    account_number: '',
+    transaction_date: new Date().toISOString().split('T')[0],
+    cheque_ref_no: '',
     description: '',
-    debitAmount: 0,
-    creditAmount: 0,
+    debit_amount: 0,
+    credit_amount: 0,
     category: '',
-    reference1: '',
-    reference2: '',
-    reference3: ''
+    reference_1: '',
+    reference_2: '',
+    reference_3: ''
   })
   
   if (formRef.value) {

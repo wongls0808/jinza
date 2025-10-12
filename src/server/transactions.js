@@ -10,13 +10,6 @@ export const transactionsRouter = express.Router();
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
-    // 检查数据库连接
-    if (!process.env.DATABASE_URL) {
-      // 使用模拟数据
-      console.log('使用模拟交易数据...');
-      return res.json(getMockTransactions(req.query));
-    }
-    
     const { 
       page = 1, 
       pageSize = 20, 
@@ -144,13 +137,6 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
 // 获取交易统计信息
 transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
-    // 检查数据库连接
-    if (!process.env.DATABASE_URL) {
-      // 使用模拟数据
-      console.log('使用模拟交易统计数据...');
-      return res.json(getMockTransactionStats(req.query));
-    }
-    
     const { startDate, endDate, account } = req.query;
     let params = [];
     let paramIndex = 1;
