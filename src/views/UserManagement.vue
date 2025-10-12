@@ -1,4 +1,5 @@
 <template>
+  <NavBar :activePage="'users'" @navigate="onNavigate" />
   <div class="users container">
     <div class="page-head">
   <div class="title">{{ $t('home.users') }}</div>
@@ -66,9 +67,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { api } from '@/api'
-import { ElMessage } from 'element-plus'
+import NavBar from '@/components/NavBar.vue'
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
 
 const users = ref([])
 const perms = ref([])

@@ -1,4 +1,5 @@
 <template>
+  <NavBar :activePage="'settings'" @navigate="onNavigate" />
   <div class="page container">
     <div class="head" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
       <h2 style="margin:0;">{{ t('settings.title') }}</h2>
@@ -52,6 +53,10 @@
 </template>
 
 <script setup>
+import NavBar from '@/components/NavBar.vue'
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'

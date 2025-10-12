@@ -1,4 +1,5 @@
 <template>
+  <NavBar :activePage="'banks'" @navigate="onNavigate" />
   <div class="page container">
     <div class="head">
       <div class="title">{{ $t('banks.title') }}</div>
@@ -57,6 +58,10 @@
   </template>
 
 <script setup>
+import NavBar from '@/components/NavBar.vue'
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
