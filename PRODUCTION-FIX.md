@@ -93,3 +93,37 @@ git push origin main
 - 如果您没有直接访问数据库的权限，请联系系统管理员执行SQL语句
 - 确保在执行SQL前备份数据库
 - 如有任何问题，请联系技术支持团队
+
+### 附：403 Forbidden（交易保存/编辑/删除失败）
+
+现象：
+- `POST /api/transactions`、`PUT /api/transactions/:id` 或 `POST /api/transactions/batch-delete` 返回 403；
+- 前端控制台报错：保存交易失败: Error: Forbidden。
+
+原因：
+- 生产环境开启了严格权限检查，当前用户缺少交易写入或删除权限。
+
+修复步骤（在生产数据库执行）：
+
+```sql
+-- 1) 确保权限条目存在
+insert into permissions(code, name) values
+    ('manage_transactions','交易写入'),
+    ('delete_transactions','交易删除')
+on conflict(code) do nothing;
+
+-- 2) 授予给管理员（将 admin 替换为你的管理员用户名）
+insert into user_permissions(user_id, permission_id)
+select u.id, p.id
+from users u
+join permissions p on p.code in ('manage_transactions','delete_transactions')
+where u.username = 'admin'
+and not exists (
+    select 1 from user_permissions up where up.user_id = u.id and up.permission_id = p.id
+);
+```
+
+完成后请在前端：
+1) 退出并重新登录（刷新令牌中的权限集合）；
+2) 再次尝试保存/编辑/删除交易；
+3) 可访问 `/api/auth/me` 检查返回的 `perms` 是否包含上述权限。

@@ -148,6 +148,9 @@ export async function seedInitialAdmin() {
     { code: 'view_banks', name: '银行列表' },
     { code: 'view_accounts', name: '收款账户' },
     { code: 'view_transactions', name: '交易管理' },
+    // 交易写入与删除权限（用于新增/编辑/批量删除等操作）
+    { code: 'manage_transactions', name: '交易写入' },
+    { code: 'delete_transactions', name: '交易删除' },
     { code: 'view_settings', name: '系统设置' }
   ]
   for (const p of corePerms) {

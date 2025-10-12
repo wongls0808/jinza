@@ -1145,9 +1145,9 @@ const submitForm = async () => {
       fetchTransactions()
     } catch (error) {
       console.error('保存交易失败:', error)
-      ElMessage.error(
-        isEdit.value ? t('transactions.updateFailed') : t('transactions.createFailed')
-      )
+      const baseMsg = isEdit.value ? t('transactions.updateFailed') : t('transactions.createFailed')
+      const detail = (error && error.message) ? `: ${error.message}` : ''
+      ElMessage.error(`${baseMsg}${detail}`)
     } finally {
       submitting.value = false
     }
@@ -1313,7 +1313,7 @@ const submitImport = async () => {
       const transformed = {
         accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
         transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || '',
-        chequeRefNo: row.chequeRefNo || row['参考号'] || row['CheqRef No'] || '',
+        chequeRefNo: row.chequeRefNo || row['参考号'] || row['Ref No'] || '',
         description: row.description || row.描述 || row.Description || '',
         debitAmount: row.debitAmount || row.借方金额 || row['Debit Amount'] || 0,
         creditAmount: row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0,
