@@ -9,6 +9,7 @@ import multer from 'multer'
 import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
+import receiptsRouter from './receipts.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -639,5 +640,8 @@ const mockCtrl = createTransactionsController()
 router.use('/transactions', (req, res, next) => {
   return useMockTransactions ? mockCtrl(req, res, next) : transactionsRouter(req, res, next)
 })
+
+// Receipts (bank statements import & listing)
+router.use('/receipts', receiptsRouter)
 
 
