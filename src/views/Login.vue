@@ -81,6 +81,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { User, Lock } from '@element-plus/icons-vue'
+import { useAuth } from '@/composables/useAuth'
 
 // Composables
 const router = useRouter()
