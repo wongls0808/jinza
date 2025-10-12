@@ -96,7 +96,8 @@ const activeModule = ref(null)
   box-sizing: border-box;
 }
 .home-sidebar {
-  width: 240px;
+  width: 160px;
+  min-width: 120px;
   background: #fff;
   box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
   display: flex;
@@ -266,8 +267,8 @@ const activeModule = ref(null)
           z-index: 10;
         }
         .main-content {
-          width: 100%;
-          max-width: 1400px;
+          width: calc(100vw - 160px);
+          max-width: calc(1400px - 160px);
           margin: 0 auto;
           min-height: 70vh;
           box-sizing: border-box;
