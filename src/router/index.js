@@ -1,19 +1,27 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // Views
+import Home from '@/views/Home.vue'
 const UserManagement = () => import('@/views/UserManagement.vue')
+const ChangePassword = () => import('@/views/ChangePassword.vue')
+
+const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
 const Banks = () => import('@/views/Banks.vue')
 const Accounts = () => import('@/views/Accounts.vue')
 const Settings = () => import('@/views/Settings.vue')
+const NoAccess = () => import('@/views/NoAccess.vue')
 
 export const routes = [
+  { path: '/login', name: 'login', component: Login, meta: { public: true } },
+  { path: '/change-password', name: 'change-password', component: ChangePassword, meta: { public: false } },
+  { path: '/', name: 'home', component: Home, meta: { perm: 'view_dashboard' } },
   { path: '/users', name: 'users', component: UserManagement, meta: { perm: 'manage_users' } },
   { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
   { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
   { path: '/accounts', name: 'accounts', component: Accounts, meta: { perm: 'view_accounts' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
-  { path: '/', redirect: '/users' },
+  { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
 
 const router = createRouter({
@@ -30,24 +38,28 @@ const readAuth = () => {
   } catch { return { token: null, perms: [] } }
 }
 
-// 权限不足时默认跳转用户管理
+// 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
 function firstAllowed(perms) {
-  const order = ['users','customers','banks','accounts','settings']
+  const order = ['home','users','customers','banks','accounts','settings']
   for (const name of order) {
     const r = routes.find(r => r.name === name)
     if (!r) continue
     const need = r.meta?.perm
     if (!need || perms.includes(need)) return { name }
   }
-  return { name: 'users' }
+  // 若没有任何匹配，回到登录页
+  return { name: 'no-access' }
 }
 
 router.beforeEach((to, from, next) => {
-  const { token, perms } = readAuth()
-  const need = to.meta?.perm
-  if (!token) return next({ name: 'users' })
+  if (to.meta.public) return next()
+  const { token, perms, must_change_password } = readAuth()
+  if (!token) return next({ name: 'login', query: { redirect: to.fullPath } })
+  if (must_change_password && to.name !== 'change-password') return next({ name: 'change-password' })
+  const need = to.meta.perm
   if (need && !perms.includes(need)) {
     const target = firstAllowed(perms)
+    // 避免跳转到同名路由导致循环
     if (target.name === to.name) return next()
     return next(target)
   }

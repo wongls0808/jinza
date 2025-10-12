@@ -1,9 +1,9 @@
 <template>
-  <NavBar :activePage="'banks'" :username="state.user?.display_name || state.user?.username || '用户'" @navigate="onNavigate" />
   <div class="page container">
     <div class="head">
       <div class="title">{{ $t('banks.title') }}</div>
       <div class="spacer"></div>
+      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
     <el-card class="jelly">
       <template #header>
@@ -13,7 +13,7 @@
           <el-button type="primary" size="small" @click="reset">{{ $t('banks.resetDefaults') }}</el-button>
         </div>
       </template>
-        <NavBar :activePage="'banks'" :username="username" @navigate="onNavigate" />
+
       <div class="cards">
         <div class="bank-card" v-for="(b,i) in banks" :key="b.id">
           <div class="idx">{{ i + 1 }}</div>
@@ -58,12 +58,6 @@
   </template>
 
 <script setup>
-import { useAuth } from '@/composables/useAuth'
-const { state } = useAuth()
-import NavBar from '@/components/NavBar.vue'
-function onNavigate(page) {
-  // 可根据需要实现页面跳转逻辑
-}
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
@@ -86,12 +80,10 @@ async function remove(code) {
   } catch {}
 }
 
-import { computed } from 'vue'
 async function reset() {
   await api.resetBanks()
   await load()
   ElMessage.success('已重置到默认列表')
-const username = computed(() => state.user?.username || '用户')
 }
 
 function openAdd() {
@@ -158,17 +150,7 @@ function onImgErr(e) {
 </script>
 
 <style scoped>
-.page {
-  padding: 0;
-  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
-  min-height: 100vh;
-  width: 100vw;
-  position: fixed;
-  left: 0;
-  top: 0;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
+.page { padding: 8px; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 8px; }
 .title { font-size: 18px; font-weight: 700; }
 .toolbar { display: flex; align-items: center; gap: 8px; }

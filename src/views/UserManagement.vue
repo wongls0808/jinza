@@ -1,13 +1,13 @@
 <template>
-  <NavBar :activePage="'users'" :username="state.user?.display_name || state.user?.username || '用户'" @navigate="onNavigate" />
   <div class="users container">
     <div class="page-head">
   <div class="title">{{ $t('home.users') }}</div>
       <div class="spacer"></div>
+  <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
       <div class="actions">
-  <el-input v-model.trim="newUser.username" :placeholder="$t('user.username')" style="width:180px" size="small" />
-  <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('user.initPassword')" style="width:180px" size="small" />
-  <el-input v-model.trim="newUser.display_name" :placeholder="$t('user.displayName')" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:180px" size="small" />
   <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
       </div>
     </div>
@@ -21,7 +21,7 @@
               <div class="username">@{{ u.username }}</div>
             </div>
             <div class="ops">
-              <el-switch v-model="u.is_active" @change="toggleActive(u)" :active-text="$t('user.active')" />
+              <el-switch v-model="u.is_active" @change="toggleActive(u)" active-text="启用" />
               <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
               <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
@@ -46,8 +46,8 @@
     <!-- 重置密码对话框 -->
   <el-dialog v-model="reset.visible" :title="$t('common.reset')" width="420px">
       <div style="display:grid;gap:12px;">
-  <div>{{ $t('user.user') }}：<strong>{{ reset.user?.username }}</strong></div>
-  <el-input v-model.trim="reset.password" type="password" :placeholder="$t('user.resetPasswordPlaceholder')" />
+        <div>用户：<strong>{{ reset.user?.username }}</strong></div>
+        <el-input v-model.trim="reset.password" type="password" placeholder="输入新的初始密码" />
       </div>
       <template #footer>
   <el-button @click="reset.visible=false">{{ $t('common.cancel') }}</el-button>
@@ -67,12 +67,9 @@
 </template>
 
 <script setup>
-import NavBar from '@/components/NavBar.vue'
-import { useAuth } from '@/composables/useAuth'
-const { state } = useAuth()
-function onNavigate(page) {
-  // 可根据需要实现页面跳转逻辑
-}
+import { ref, onMounted } from 'vue'
+import { api } from '@/api'
+import { ElMessage } from 'element-plus'
 
 const users = ref([])
 const perms = ref([])
@@ -97,15 +94,15 @@ async function load() {
 }
 
 async function createUser() {
-  if (!newUser.value.username || !newUser.value.password) return alert($t('user.fillUsernamePassword'))
+  if (!newUser.value.username || !newUser.value.password) return alert('请填写用户名与密码')
   creating.value = true
   try {
     await api.users.create(newUser.value)
     newUser.value = { username: '', password: '', display_name: '' }
     await load()
-  ElMessage.success($t('user.createSuccess'))
+    ElMessage.success('用户已创建（首登需改密）')
   } catch (e) {
-  ElMessage.error($t('user.createFail') + (e.message || ''))
+    ElMessage.error('创建失败：' + (e.message || ''))
   } finally {
     creating.value = false
   }
@@ -114,9 +111,9 @@ async function createUser() {
 async function toggleActive(u) {
   try {
     await api.users.update(u.id, { is_active: u.is_active })
-  ElMessage.success($t('user.statusUpdated'))
+    ElMessage.success('状态已更新')
   } catch (e) {
-  ElMessage.error($t('user.updateFail'))
+    ElMessage.error('更新失败')
   }
 }
 
@@ -172,137 +169,17 @@ onMounted(load)
 </script>
 
 <style scoped>
-.users {
-  padding: 0;
-  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
-  min-height: 100vh;
-  width: 100vw;
-  position: fixed;
-  left: 0;
-  top: 0;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-.page-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  justify-content: center;
-}
-.title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #4f8cff;
-}
+.users { padding: 0; }
+.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.title { font-size: 18px; font-weight: 600; }
 .spacer { flex: 1; }
-.actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.cards {
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 28px;
-  justify-content: center;
-}
-.user-card {
-  padding: 0;
-  border-radius: 22px;
-  box-shadow: 0 8px 32px rgba(79,140,255,0.10), 0 1.5px 8px rgba(79,140,255,0.08);
-  background: rgba(255,255,255,0.96);
-  transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.user-card:hover {
-  transform: scale(1.04) rotateX(8deg) rotateY(-6deg);
-  box-shadow: 0 16px 48px rgba(79,140,255,0.18), 0 2px 12px rgba(79,140,255,0.10);
-}
-.row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: space-between;
-  width: 100%;
-}
-.name {
-  font-weight: 700;
-  font-size: 18px;
-  color: #4f8cff;
-}
-.username {
-  color: #6b7b8c;
-  font-size: 13px;
-}
-.perms {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-  justify-content: center;
-}
-.perm-tag {
-  cursor: pointer;
-  user-select: none;
-  border-radius: 8px;
-  transition: box-shadow .18s, transform .18s;
-}
-.perm-tag:hover {
-  box-shadow: 0 2px 8px #4f8cff33;
-  transform: scale(1.08);
-}
-.ops {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.el-button[type="primary"], .el-button[type="danger"], .el-button[type="warning"] {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px #4f8cff22;
-.users {
-  background: none;
-  min-height: 0;
-  width: 100%;
-  position: static;
-}
-.users-list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-}
-  transition: background .18s, box-shadow .18s;
-}
-.el-button[type="primary"] {
-  background: linear-gradient(90deg, #4f8cff 0%, #a1e3ff 100%);
-  color: #fff;
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-  gap: 32px;
-  justify-content: center;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-}
-.el-button[type="primary"]:hover {
-  background: linear-gradient(90deg, #3a6fd8 0%, #7fd8ff 100%);
-}
-@media (max-width: 600px) {
-  .cards {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .user-card {
-    border-radius: 14px;
-  }
-  .name { font-size: 16px; }
-  .username { font-size: 12px; }
-}
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.user-card { padding: 0; }
+.row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.name { font-weight: 600; font-size: 15px; }
+.username { color: var(--el-text-color-secondary); font-size: 12px; }
+.perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.perm-tag { cursor: pointer; user-select: none; }
+.ops { display: flex; gap: 8px; align-items: center; }
 </style>

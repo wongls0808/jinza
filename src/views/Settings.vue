@@ -1,9 +1,9 @@
 <template>
-  <NavBar :activePage="'settings'" @navigate="onNavigate" />
   <div class="page container">
     <div class="head" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
       <h2 style="margin:0;">{{ t('settings.title') }}</h2>
       <div class="spacer" style="flex:1"></div>
+      <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
     <el-card>
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
@@ -53,10 +53,6 @@
 </template>
 
 <script setup>
-import NavBar from '@/components/NavBar.vue'
-function onNavigate(page) {
-  // 可根据需要实现页面跳转逻辑
-}
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
@@ -150,37 +146,9 @@ onMounted(() => {
 })
 </script>
 
-</style>
-.page {
-  min-height: 100vh;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 100%);
-  box-sizing: border-box;
-  padding: 0;
-  overflow-x: hidden;
-}
-.container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 0;
-}
-.grid {
-  display: grid;
-  gap: 16px;
-}
-.label {
-  margin-bottom: 8px;
-  color: var(--el-text-color-secondary);
-}
-.add-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
+<style scoped>
+.page { padding: 24px; }
+.grid { display: grid; gap: 16px; }
+.label { margin-bottom: 8px; color: var(--el-text-color-secondary); }
+.add-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 </style>

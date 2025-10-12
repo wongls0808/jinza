@@ -1,9 +1,9 @@
 <template>
-  <NavBar :activePage="'settings'" :username="username" @navigate="onNavigate" />
   <div class="change-pass">
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
         <div></div>
+        <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
       </div>
       <h2>首次登录需修改密码</h2>
       <form @submit.prevent="submit">
@@ -30,9 +30,7 @@
 </template>
 
 <script setup>
-import NavBar from '@/components/NavBar.vue'
-import { ref, computed } from 'vue'
-import { useAuth } from '@/composables/useAuth'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -44,11 +42,6 @@ const confirm = ref('')
 const submitting = ref(false)
 const error = ref('')
 const reasons = ref([])
-function onNavigate(page) {
-  // 可根据需要实现页面跳转逻辑
-}
-const { state } = useAuth()
-const username = computed(() => state.user?.username || '用户')
 
 async function submit() {
   error.value = ''
