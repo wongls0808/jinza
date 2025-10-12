@@ -1,4 +1,5 @@
 <template>
+  <NavBar :activePage="'settings'" :username="username" @navigate="onNavigate" />
   <div class="change-pass">
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
@@ -29,7 +30,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import NavBar from '@/components/NavBar.vue'
+import { ref, computed } from 'vue'
+import { useAuth } from '@/composables/useAuth'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -41,6 +44,11 @@ const confirm = ref('')
 const submitting = ref(false)
 const error = ref('')
 const reasons = ref([])
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
+const { state } = useAuth()
+const username = computed(() => state.user?.username || '用户')
 
 async function submit() {
   error.value = ''

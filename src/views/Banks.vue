@@ -1,5 +1,5 @@
 <template>
-  <NavBar :activePage="'banks'" @navigate="onNavigate" />
+  <NavBar :activePage="'banks'" :username="state.user?.display_name || state.user?.username || '用户'" @navigate="onNavigate" />
   <div class="page container">
     <div class="head">
       <div class="title">{{ $t('banks.title') }}</div>
@@ -13,7 +13,7 @@
           <el-button type="primary" size="small" @click="reset">{{ $t('banks.resetDefaults') }}</el-button>
         </div>
       </template>
-
+        <NavBar :activePage="'banks'" :username="username" @navigate="onNavigate" />
       <div class="cards">
         <div class="bank-card" v-for="(b,i) in banks" :key="b.id">
           <div class="idx">{{ i + 1 }}</div>
@@ -58,6 +58,8 @@
   </template>
 
 <script setup>
+import { useAuth } from '@/composables/useAuth'
+const { state } = useAuth()
 import NavBar from '@/components/NavBar.vue'
 function onNavigate(page) {
   // 可根据需要实现页面跳转逻辑
@@ -84,10 +86,12 @@ async function remove(code) {
   } catch {}
 }
 
+import { computed } from 'vue'
 async function reset() {
   await api.resetBanks()
   await load()
   ElMessage.success('已重置到默认列表')
+const username = computed(() => state.user?.username || '用户')
 }
 
 function openAdd() {

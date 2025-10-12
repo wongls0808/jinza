@@ -1,4 +1,5 @@
 <template>
+  <NavBar :activePage="'invoices'" :username="username" @navigate="onNavigate" />
   <div class="page container">
     <div class="head"><div class="title">发票管理</div></div>
     <el-card class="jelly">
@@ -27,9 +28,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import NavBar from '@/components/NavBar.vue'
+import { ref, computed } from 'vue'
+import { useAuth } from '@/composables/useAuth'
 const q = ref('')
 function noop() {}
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
+const { state } = useAuth()
+const username = computed(() => state.user?.username || '用户')
 </script>
 
 <style scoped>

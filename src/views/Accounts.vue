@@ -1,5 +1,5 @@
 <template>
-  <NavBar :activePage="'accounts'" @navigate="onNavigate" />
+  <NavBar :activePage="'accounts'" :username="username" @navigate="onNavigate" />
   <div class="page accounts-page">
     <div class="head">
       <div class="title">{{ $t('accounts.title') }}</div>
@@ -109,14 +109,17 @@
 
 <script setup>
 import NavBar from '@/components/NavBar.vue'
-function onNavigate(page) {
-  // 可根据需要实现页面跳转逻辑
-}
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useAuth } from '@/composables/useAuth'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 
+function onNavigate(page) {
+  // 可根据需要实现页面跳转逻辑
+}
+const { state } = useAuth()
+const username = computed(() => state.user?.username || '用户')
 const { colW, onColResize } = useTableMemory('accounts')
 
 const rows = ref([])
