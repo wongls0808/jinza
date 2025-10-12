@@ -18,7 +18,7 @@
           </el-input>
         </el-col>
         
-        <el-col :span="12">
+        <el-col :span="18">
           <el-button-group>
             <el-button type="primary" @click="showAddDialog">
               <el-icon><Plus /></el-icon>
@@ -35,6 +35,14 @@
             <el-button @click="showFiltersDialog" type="info">
               <el-icon><Filter /></el-icon>
               {{ t('transactions.advancedFilter') }}
+            </el-button>
+            <el-button @click="handleBatchDelete" type="danger" :disabled="!multipleSelection.length">
+              <el-icon><Delete /></el-icon>
+              {{ t('transactions.batchDelete') }}
+            </el-button>
+            <el-button @click="handleMatch" type="success">
+              <el-icon><Connection /></el-icon>
+              {{ t('transactions.match') }}
             </el-button>
           </el-button-group>
         </el-col>
@@ -145,12 +153,25 @@
       :data="transactions"
       style="width: 100%; margin-top: 20px;"
       @row-dblclick="handleRowDblClick"
+      @selection-change="handleSelectionChange"
       border
       stripe>
       
       <el-table-column type="selection" width="55" />
       
       <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable />
+
+      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable>
+        <template #default="scope">
+          {{ scope.row.bank_name || '-' }}
+        </template>
+      </el-table-column>
+      
+      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable>
+        <template #default="scope">
+          {{ scope.row.account_name || '-' }}
+        </template>
+      </el-table-column>
       
       <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable width="140">
         <template #default="scope">
@@ -159,6 +180,8 @@
       </el-table-column>
       
       <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" />
+      
+      <el-table-column :label="t('transactions.transactionDescription')" prop="transaction_description" show-overflow-tooltip />
       
       <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
         <template #default="scope">
@@ -172,11 +195,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column :label="t('transactions.reference1')" prop="reference1" show-overflow-tooltip />
-      
-      <el-table-column :label="t('transactions.reference2')" prop="reference2" show-overflow-tooltip />
-      
-      <el-table-column :label="t('transactions.reference3')" prop="reference3" show-overflow-tooltip />
+      <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip />
       
       <el-table-column label="" width="100">
         <template #default="scope">
@@ -232,7 +251,30 @@
         label-position="left">
         
         <el-form-item :label="t('transactions.accountNumber')" prop="account_number">
-          <el-input v-model="form.account_number" />
+          <el-select 
+            v-model="form.account_number"
+            filterable
+            @change="handleAccountChange"
+            style="width: 100%">
+            <el-option
+              v-for="account in accounts"
+              :key="account.bank_account"
+              :label="account.bank_account"
+              :value="account.bank_account">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span>{{ account.bank_account }}</span>
+                <span style="font-size: 0.8em; color: #888">{{ account.bank_zh }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item :label="t('transactions.bankName')" prop="bank_name">
+          <el-input v-model="form.bank_name" disabled />
+        </el-form-item>
+        
+        <el-form-item :label="t('transactions.accountName')" prop="account_name">
+          <el-input v-model="form.account_name" disabled />
         </el-form-item>
         
         <el-form-item :label="t('transactions.transactionDate')" prop="trn_date">
@@ -245,6 +287,10 @@
         
         <el-form-item :label="t('transactions.chequeRefNo')" prop="cheque_ref_no">
           <el-input v-model="form.cheque_ref_no" />
+        </el-form-item>
+        
+        <el-form-item :label="t('transactions.transactionDescription')" prop="transaction_description">
+          <el-input v-model="form.transaction_description" type="textarea" rows="2" />
         </el-form-item>
         
         <el-row :gutter="20">
@@ -271,18 +317,10 @@
           </el-col>
         </el-row>
         
-        <el-divider content-position="left">{{ t('transactions.references') }}</el-divider>
+        <el-divider content-position="left">{{ t('transactions.reference') }}</el-divider>
         
-        <el-form-item :label="t('transactions.reference1')" prop="reference1">
-          <el-input v-model="form.reference1" />
-        </el-form-item>
-        
-        <el-form-item :label="t('transactions.reference2')" prop="reference2">
-          <el-input v-model="form.reference2" />
-        </el-form-item>
-        
-        <el-form-item :label="t('transactions.reference3')" prop="reference3">
-          <el-input v-model="form.reference3" />
+        <el-form-item :label="t('transactions.reference')" prop="reference">
+          <el-input v-model="form.reference" />
         </el-form-item>
       </el-form>
       
@@ -409,7 +447,7 @@
               <li><strong>{{ t('transactions.chequeRefNo') }}</strong>: {{ t('transactions.chequeRefNoDesc') }}</li>
               <li><strong>{{ t('transactions.debitAmount') }}</strong>: {{ t('transactions.debitAmountDesc') }}</li>
               <li><strong>{{ t('transactions.creditAmount') }}</strong>: {{ t('transactions.creditAmountDesc') }}</li>
-              <li><strong>{{ t('transactions.reference1') }}</strong>, <strong>{{ t('transactions.reference2') }}</strong>, <strong>{{ t('transactions.reference3') }}</strong>: {{ t('transactions.referencesDesc') }}</li>
+              <li><strong>{{ t('transactions.reference') }}</strong>: {{ t('transactions.referencesDesc') }}</li>
             </ul>
           </div>
         </el-tab-pane>
@@ -438,11 +476,20 @@
         <el-descriptions-item :label="t('transactions.accountNumber')">
           {{ currentTransaction.account_number }}
         </el-descriptions-item>
+        <el-descriptions-item :label="t('transactions.bankName')">
+          {{ currentTransaction.bank_name || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('transactions.accountName')">
+          {{ currentTransaction.account_name || '-' }}
+        </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.transactionDate')">
           {{ formatDate(currentTransaction.trn_date) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.chequeRefNo')">
           {{ currentTransaction.cheque_ref_no || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('transactions.transactionDescription')">
+          {{ currentTransaction.transaction_description || '-' }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.debitAmount')">
           <span class="negative">{{ formatCurrency(currentTransaction.debit_amount) }}</span>
@@ -450,14 +497,8 @@
         <el-descriptions-item :label="t('transactions.creditAmount')">
           <span class="positive">{{ formatCurrency(currentTransaction.credit_amount) }}</span>
         </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.reference1')">
-          {{ currentTransaction.reference1 || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.reference2')">
-          {{ currentTransaction.reference2 || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item :label="t('transactions.reference3')">
-          {{ currentTransaction.reference3 || '-' }}
+        <el-descriptions-item :label="t('transactions.reference')">
+          {{ currentTransaction.reference || '-' }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('transactions.createdBy')">
           {{ currentTransaction.createdBy || '-' }}
@@ -510,6 +551,8 @@ const { t } = useI18n()
 const transactions = ref([])
 const loading = ref(false)
 const searchQuery = ref('')
+const multipleSelection = ref([])
+const accounts = ref([])
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -554,23 +597,22 @@ const previewHeaders = ref([])
 const formRef = ref(null)
 const form = reactive({
   id: null,
-  accountNumber: '',
-  transactionDate: '',
-  chequeRefNo: '',
-  description: '',
-  debitAmount: 0,
-  creditAmount: 0,
-  category: '',
-  reference1: '',
-  reference2: '',
-  reference3: ''
+  account_number: '',
+  trn_date: '',
+  cheque_ref_no: '',
+  transaction_description: '',
+  debit_amount: 0,
+  credit_amount: 0,
+  bank_name: '',
+  account_name: '',
+  reference: ''
 })
 
 const rules = {
   account_number: [
     { required: true, message: t('transactions.accountNumberRequired'), trigger: 'blur' }
   ],
-  transaction_date: [
+  trn_date: [
     { required: true, message: t('transactions.transactionDateRequired'), trigger: 'change' }
   ],
   debit_amount: [
@@ -878,15 +920,14 @@ const resetForm = () => {
   Object.assign(form, {
     id: null,
     account_number: '',
-    transaction_date: new Date().toISOString().split('T')[0],
+    trn_date: new Date().toISOString().split('T')[0],
     cheque_ref_no: '',
-    description: '',
+    transaction_description: '',
     debit_amount: 0,
     credit_amount: 0,
-    category: '',
-    reference_1: '',
-    reference_2: '',
-    reference_3: ''
+    bank_name: '',
+    account_name: '',
+    reference: ''
   })
   
   if (formRef.value) {
@@ -905,16 +946,15 @@ const handleEdit = (row) => {
   
   Object.assign(form, {
     id: row.id,
-    accountNumber: row.accountNumber,
-    transactionDate: row.transactionDate,
-    chequeRefNo: row.chequeRefNo || '',
-    description: row.description || '',
-    debitAmount: Number(row.debitAmount) || 0,
-    creditAmount: Number(row.creditAmount) || 0,
-    category: row.category || '',
-    reference1: row.reference1 || '',
-    reference2: row.reference2 || '',
-    reference3: row.reference3 || ''
+    account_number: row.account_number,
+    trn_date: row.trn_date,
+    cheque_ref_no: row.cheque_ref_no || '',
+    transaction_description: row.transaction_description || '',
+    debit_amount: Number(row.debit_amount) || 0,
+    credit_amount: Number(row.credit_amount) || 0,
+    bank_name: row.bank_name || '',
+    account_name: row.account_name || '',
+    reference: row.reference || ''
   })
   
   dialogVisible.value = true
@@ -954,6 +994,111 @@ const handleRowDblClick = (row) => {
   handleView(row)
 }
 
+// 处理表格多选
+const handleSelectionChange = (selection) => {
+  multipleSelection.value = selection
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (!multipleSelection.value.length) {
+    ElMessage.warning(t('transactions.selectItemsToDelete'))
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(t('transactions.confirmBatchDelete'), t('common.warning'), {
+      confirmButtonText: t('common.ok'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning'
+    })
+    
+    loading.value = true
+    
+    const ids = multipleSelection.value.map(item => item.id)
+    
+    // 这里需要添加批量删除的API调用
+    await api.deleteTransactions(ids)
+    
+    ElMessage.success(t('transactions.batchDeleteSuccess'))
+    fetchTransactions()
+  } catch (error) {
+    console.error('批量删除失败:', error)
+    if (error !== 'cancel') {
+      ElMessage.error(t('transactions.batchDeleteFailed'))
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+// 匹配功能
+const handleMatch = () => {
+  ElMessageBox.prompt(t('transactions.enterMatchPattern'), t('transactions.matchTransactions'), {
+    confirmButtonText: t('common.ok'),
+    cancelButtonText: t('common.cancel'),
+    inputPattern: /.+/,
+    inputErrorMessage: t('transactions.patternRequired'),
+    inputPlaceholder: t('transactions.matchPatternPlaceholder')
+  }).then(({ value }) => {
+    // 保存用户输入的匹配模式
+    const pattern = value.trim()
+    
+    // 显示匹配开始的消息
+    ElMessage({
+      type: 'info',
+      message: t('transactions.matchingStarted', { pattern }),
+      duration: 3000
+    })
+    
+    // 设置高级过滤条件，根据匹配模式进行搜索
+    searchQuery.value = pattern
+    
+    // 添加匹配模式到过滤器，这样可以在字段中进行更精确的搜索
+    // 这里同时搜索交易说明、参考号和合并的参考字段
+    const advancedFilters = {
+      searchQuery: pattern,
+      searchFields: ['transaction_description', 'cheque_ref_no', 'reference'],
+      exactMatch: false
+    }
+    
+    // 保存高级过滤设置
+    Object.assign(filters.value, advancedFilters)
+    
+    // 执行搜索
+    handleSearch()
+    
+    // 显示过滤提示
+    ElMessage({
+      type: 'success',
+      message: t('transactions.matchResultsShown'),
+      duration: 5000
+    })
+  }).catch(() => {})
+}
+
+// 获取账户列表
+const fetchAccounts = async () => {
+  try {
+    accounts.value = await api.requestAccounts()
+  } catch (error) {
+    console.error('获取账户列表失败:', error)
+    ElMessage.error(t('transactions.fetchAccountsFailed'))
+  }
+}
+
+// 账户选择变更时自动填充银行和账户名
+const handleAccountChange = (accountNumber) => {
+  const selectedAccount = accounts.value.find(a => a.bank_account === accountNumber)
+  if (selectedAccount) {
+    form.bank_name = selectedAccount.bank_zh || selectedAccount.bank_en
+    form.account_name = selectedAccount.account_name
+  } else {
+    form.bank_name = ''
+    form.account_name = ''
+  }
+}
+
 const submitForm = async () => {
   if (!formRef.value) return
   
@@ -964,16 +1109,13 @@ const submitForm = async () => {
     
     try {
       const data = {
-        accountNumber: form.accountNumber,
-        transactionDate: form.transactionDate,
-        chequeRefNo: form.chequeRefNo,
-        description: form.description,
-        debitAmount: form.debitAmount,
-        creditAmount: form.creditAmount,
-        category: form.category,
-        reference1: form.reference1,
-        reference2: form.reference2,
-        reference3: form.reference3
+        account_number: form.account_number,
+        transaction_date: form.trn_date,
+        cheque_ref_no: form.cheque_ref_no,
+        description: form.transaction_description,
+        debit_amount: form.debit_amount,
+        credit_amount: form.credit_amount,
+        reference: form.reference
       }
       
       const url = isEdit.value ? `/api/transactions/${form.id}` : '/api/transactions'
@@ -1289,6 +1431,7 @@ const handleResize = () => {
 onMounted(() => {
   try {
     fetchTransactions()
+    fetchAccounts()
   } catch (error) {
     console.error('初始化交易管理视图失败:', error)
     ElMessage({

@@ -42,11 +42,10 @@ transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_tran
       accountNumber: '000123456789',
       transactionDate: '2025-10-01',
       chequeRefNo: 'CHK20251001',
+      transactionDescription: 'Salary payment',
       debitAmount: 0,
       creditAmount: 8500,
-      reference1: '工资',
-      reference2: '',
-      reference3: ''
+      reference: 'REF123456'
     }
   ])
 })
@@ -138,18 +137,25 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
         t.account_number,
         to_char(t.transaction_date, 'YYYY-MM-DD') AS "trn_date",
         t.cheque_ref_no,
+        t.description AS "transaction_description",
         t.debit_amount,
         t.credit_amount,
-        t.reference_1 AS "reference1",
-        t.reference_2 AS "reference2",
-        t.reference_3 AS "reference3",
+        t.reference_1 || ' ' || t.reference_2 || ' ' || t.reference_3 AS "reference",
         u.username AS "createdBy",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
-        to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt"
+        to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
+        a.bank_id,
+        a.account_name,
+        b.name_zh AS "bank_name",
+        b.name_en AS "bank_name_en"
       FROM 
         transactions t
       LEFT JOIN
         users u ON t.created_by = u.id
+      LEFT JOIN
+        accounts a ON t.account_number = a.bank_account
+      LEFT JOIN
+        banks b ON a.bank_id = b.id
       ${sqlWhere}
       ORDER BY 
         ${sort} ${order === 'asc' ? 'ASC' : 'DESC'}
@@ -168,6 +174,34 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
   } catch (error) {
     console.error('获取交易数据失败:', error);
     res.status(500).json({ error: '获取交易数据失败', detail: error.message });
+  }
+});
+
+// 批量删除交易
+transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('delete_transactions'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: '无效的请求参数' });
+    }
+    
+    const placeholders = ids.map((_, idx) => `$${idx + 1}`).join(',');
+    
+    const result = await query(`
+      DELETE FROM transactions
+      WHERE id IN (${placeholders})
+      RETURNING id
+    `, ids);
+    
+    res.json({ 
+      success: true, 
+      message: '批量删除成功', 
+      deletedCount: result.rowCount 
+    });
+  } catch (error) {
+    console.error('批量删除交易失败:', error);
+    res.status(500).json({ error: '批量删除交易失败', detail: error.message });
   }
 });
 
