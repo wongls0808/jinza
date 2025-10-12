@@ -7,6 +7,34 @@ import { getMockTransactions, getMockTransactionStats } from './mockTransactions
 
 export const transactionsRouter = express.Router();
 
+// Helpers for import
+function cleanCell(v) {
+  if (v === null || v === undefined) return ''
+  let s = String(v).trim()
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) s = s.slice(1, -1)
+  const m = /^=\"(.*)\"$/.exec(s)
+  if (m) s = m[1]
+  return s.trim()
+}
+function parseAmount(v) {
+  const s = cleanCell(v).replace(/,/g, '').replace(/\s+/g, '')
+  if (!s) return 0
+  const n = Number(s)
+  return isNaN(n) ? 0 : n
+}
+function parseDateYYYYMMDD(v) {
+  // already YYYY-MM-DD -> passthrough
+  const s = cleanCell(v)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  // dd/mm/yyyy -> convert
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
+  if (m) {
+    const [_, d, mo, y] = m
+    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`
+  }
+  return s
+}
+
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
@@ -221,6 +249,85 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
     res.status(500).json({ error: '获取交易统计失败', detail: error.message });
   }
 });
+
+// 下载导入模板（返回JSON样例，前端将转CSV）
+transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  return res.json([
+    {
+      accountNumber: '000123456789',
+      transactionDate: '2025-10-01',
+      chequeRefNo: 'CHK20251001',
+      description: '工资收入',
+      debitAmount: 0,
+      creditAmount: 8500,
+      category: '收入',
+      reference1: '工资',
+      reference2: '',
+      reference3: ''
+    }
+  ])
+})
+
+// 导入交易（接收JSON rows；前端已将CSV解析为指定字段）
+transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  try {
+    // Ensure transactions table exists (self-healing)
+    await query(`
+      create table if not exists transactions (
+        id serial primary key,
+        account_number varchar(64) not null,
+        transaction_date date not null,
+        cheque_ref_no varchar(128),
+        description text,
+        debit_amount numeric(18,2) default 0,
+        credit_amount numeric(18,2) default 0,
+        balance numeric(18,2) default 0,
+        category varchar(64),
+        reference_1 varchar(128),
+        reference_2 varchar(128),
+        reference_3 varchar(128),
+        created_by int,
+        created_at timestamptz default now(),
+        updated_at timestamptz default now()
+      );
+    `)
+    const { rows } = req.body || {}
+    if (!Array.isArray(rows) || !rows.length) return res.json({ inserted: 0, failed: 0 })
+
+    let inserted = 0, failed = 0
+    for (const r of rows) {
+      try {
+        const account = cleanCell(r.accountNumber || r.account_number)
+        const trn = parseDateYYYYMMDD(r.transactionDate || r.transaction_date)
+        if (!account || !trn) { failed++; continue }
+        const cheque = cleanCell(r.chequeRefNo || r.cheque_ref_no) || null
+        const desc = cleanCell(r.description) || null
+        const debit = parseAmount(r.debitAmount || r.debit_amount)
+        const credit = parseAmount(r.creditAmount || r.credit_amount)
+        const balance = Number(credit || 0) - Number(debit || 0)
+        const category = r.category ? cleanCell(r.category) : null
+        const ref1 = cleanCell(r.reference1 || r.reference_1) || null
+        const ref2 = cleanCell(r.reference2 || r.reference_2) || null
+        const ref3 = cleanCell(r.reference3 || r.reference_3) || null
+
+        await query(
+          `insert into transactions(
+            account_number, transaction_date, cheque_ref_no, description,
+            debit_amount, credit_amount, balance, category, reference_1, reference_2, reference_3, created_by
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, category, ref1, ref2, ref3, req.user?.id || null]
+        )
+        inserted++
+      } catch (e) {
+        failed++
+      }
+    }
+    return res.json({ inserted, failed })
+  } catch (error) {
+    console.error('导入交易失败:', error)
+    return res.status(500).json({ error: '导入交易失败', detail: error?.message })
+  }
+})
 
 // 获取单个交易详情
 transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {

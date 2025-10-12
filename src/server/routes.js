@@ -616,23 +616,21 @@ router.get('/customers/template', authMiddleware(true), requirePerm('view_custom
   res.send(BOM + [header, sample].join('\n'))
 })
 
-// 注册交易管理API路由（动态选择：无数据库或缺表则使用模拟数据）
-let useMockTransactions = !process.env.DATABASE_URL
+// 注册交易管理API路由（动态选择：缺表或数据库不可用时使用模拟数据）
+let useMockTransactions = false
 ;(async () => {
-  if (!useMockTransactions) {
-    try {
-      const rs = await query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='transactions'
-        ) AS exists;
-      `)
-      useMockTransactions = !rs?.rows?.[0]?.exists
-      if (useMockTransactions) console.warn('未检测到 transactions 表，交易API将使用模拟数据')
-    } catch (e) {
-      console.warn('检测 transactions 表失败，交易API将使用模拟数据。原因：', e?.message)
-      useMockTransactions = true
-    }
+  try {
+    const rs = await query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema='public' AND table_name='transactions'
+      ) AS exists;
+    `)
+    useMockTransactions = !rs?.rows?.[0]?.exists
+    if (useMockTransactions) console.warn('未检测到 transactions 表，交易API将使用模拟数据')
+  } catch (e) {
+    console.warn('检测 transactions 表失败，交易API将使用模拟数据。原因：', e?.message)
+    useMockTransactions = true
   }
 })()
 

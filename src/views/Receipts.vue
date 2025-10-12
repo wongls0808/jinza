@@ -17,6 +17,9 @@
           >
             <el-button type="primary">选择CSV文件</el-button>
           </el-upload>
+          <el-divider direction="vertical" />
+          <el-date-picker v-model="promoteRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 280px" />
+          <el-button :disabled="!result?.account?.account_number" @click="promote" type="success">转入交易</el-button>
         </div>
       </template>
 
@@ -104,6 +107,7 @@ import { api } from '@/api'
 const result = ref(null)
 const sample = ref([])
 const accountFilter = ref('')
+const promoteRange = ref([])
 
 const rows = ref([])
 const total = ref(0)
@@ -119,6 +123,7 @@ async function onFileChange(file) {
     result.value = r
     sample.value = r.sample || []
     accountFilter.value = r?.account?.account_number || ''
+    if (r?.period?.from_date && r?.period?.to_date) promoteRange.value = [r.period.from_date, r.period.to_date]
     await load()
     ElMessage.success(`导入完成：成功 ${r.inserted} 条，重复 ${r.duplicates} 条`)
   } catch (e) {
@@ -130,6 +135,23 @@ async function load(){
   const resp = await api.receipts.list({ page: page.value, pageSize: pageSize.value, account_number: accountFilter.value || undefined })
   rows.value = resp.items || []
   total.value = resp.total || 0
+}
+
+async function promote(){
+  if (!result.value?.account?.account_number) return
+  const [start, end] = promoteRange.value || []
+  try {
+    const res = await fetch('/api/receipts/promote-to-transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_number: result.value.account.account_number, start_date: start, end_date: end })
+    })
+    if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j?.error || res.statusText) }
+    const data = await res.json()
+    ElMessage.success(`转入完成：处理 ${data.total||0} 条，已写入 ${data.inserted||0} 条`)
+  } catch (e) {
+    ElMessage.error(e?.message || '转入失败')
+  }
 }
 
 // 初次不加载，等待用户导入或手动过滤
