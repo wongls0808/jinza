@@ -3,17 +3,16 @@ import pg from 'pg'
 const { Pool } = pg
 
 // 配置数据库连接
-// 优先使用环境变量中的DATABASE_URL，如果没有则使用开发环境连接字符串
+// 推荐仅通过环境变量 DATABASE_URL 指定连接串
+// 可选：在本地开发时使用 DEV_LOCAL_DB 指定自定义连接串
 let connectionString;
 if (process.env.DATABASE_URL) {
   connectionString = process.env.DATABASE_URL;
-} else if (process.env.NODE_ENV !== 'production') {
-  // 开发环境使用本地PostgreSQL
-  connectionString = 'postgresql://postgres:postgres@localhost:5432/jinza';
-  console.log('使用开发环境数据库连接');
+} else if (process.env.DEV_LOCAL_DB) {
+  connectionString = process.env.DEV_LOCAL_DB;
+  console.log('使用 DEV_LOCAL_DB 作为开发数据库连接');
 } else {
-  // 生产环境默认配置
-  connectionString = 'postgresql://postgres:GvDViOFhACSKomPtKqKnqxqUIHiAHbnP@postgres.railway.internal:5432/railway';
+  connectionString = undefined; // 未配置数据库，将导致依赖 DB 的接口返回错误或回退到 mock（若开启）
 }
 
 let pool
@@ -29,7 +28,7 @@ if (connectionString) {
 }
 
 export async function query(text, params) {
-  if (!pool) throw new Error('DATABASE_URL not configured')
+  if (!pool) throw new Error('DATABASE_URL not configured: 请设置环境变量 DATABASE_URL 或 DEV_LOCAL_DB')
   const start = Date.now()
   const res = await pool.query(text, params)
   const duration = Date.now() - start

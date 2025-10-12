@@ -7,6 +7,30 @@ import { getMockTransactions, getMockTransactionStats } from './mockTransactions
 
 export const transactionsRouter = express.Router();
 
+// Ensure transactions table exists
+async function ensureTransactionsDDL() {
+  await query(`
+    create table if not exists transactions (
+      id serial primary key,
+      account_number varchar(64) not null,
+      transaction_date date not null,
+      cheque_ref_no varchar(128),
+      description text,
+      debit_amount numeric(18,2) default 0,
+      credit_amount numeric(18,2) default 0,
+      balance numeric(18,2) default 0,
+      category varchar(64),
+      reference_1 varchar(128),
+      reference_2 varchar(128),
+      reference_3 varchar(128),
+      created_by int,
+      created_at timestamptz default now(),
+      updated_at timestamptz default now()
+    );
+    create unique index if not exists ux_transactions_unique on transactions(account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount);
+  `)
+}
+
 // Helpers for import
 function cleanCell(v) {
   if (v === null || v === undefined) return ''
@@ -53,6 +77,8 @@ transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_tran
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    // 自愈：缺表时自动创建
+    await ensureTransactionsDDL()
     const { 
       page = 1, 
       pageSize = 20, 
@@ -209,6 +235,7 @@ transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('dele
 // 获取交易统计信息
 transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const { startDate, endDate, account } = req.query;
     let params = [];
     let paramIndex = 1;
@@ -297,6 +324,7 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
 // 导出交易（根据相同筛选条件返回不分页的结果，用于前端导出 CSV）
 transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const { 
       startDate,
       endDate,
@@ -502,6 +530,7 @@ transactionsRouter.put('/:id', authMiddleware(true), requirePerm('manage_transac
 // 获取单个交易详情（供查看弹窗使用）
 transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const id = Number(req.params.id);
     const rs = await query(`
       SELECT 

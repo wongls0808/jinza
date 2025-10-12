@@ -24,6 +24,8 @@ export function authMiddleware(required = true) {
           'view_banks', 
           'view_accounts', 
           'view_transactions',
+          'manage_transactions',
+          'delete_transactions',
           'view_settings'
         ]
       }
