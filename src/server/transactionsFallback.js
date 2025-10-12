@@ -1,6 +1,5 @@
 // 交易数据处理工具
 import express from 'express'
-import { api } from '../api.js'
 import { getMockTransactions, getMockTransactionStats } from './mockTransactions.js'
 
 // 创建一个包装函数，在没有数据库连接时使用模拟数据
