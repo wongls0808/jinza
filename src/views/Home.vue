@@ -30,8 +30,6 @@
         <div class="name">{{ t('home.settings') }}</div>
         <div class="desc">{{ t('home.settingsDesc') }}</div>
       </el-card>
-        <div class="desc">{{ t('home.accountManagementDesc') }}</div>
-      </el-card>
     </div>
   </div>
 </template>
