@@ -33,8 +33,7 @@
           </aside>
           <main class="home-main">
             <div class="hero">
-              <div class="welcome">{{ t('home.welcome') }}</div>
-              <div class="meta">{{ username }} · {{ today }}</div>
+                <!-- 移除欢迎词与 meta，仅保留主内容区 -->
             </div>
             <div class="main-content">
               <div class="grid" v-if="!activeModule">
@@ -66,7 +65,6 @@
               </div>
               <div v-if="activeModule==='users'" class="module-panel">
                 <UserManagement />
-                <el-button class="back-btn" type="info" @click="activeModule=null" style="margin:24px 0 0 0;">返回功能列表</el-button>
               </div>
             </div>
           </main>
@@ -172,6 +170,7 @@ const activeModule = ref(null)
   gap: 24px;
   justify-content: flex-start;
   width: 100%;
+/* 移除 .hero 样式 */
   max-width: 1400px;
 }
 .home-card {
@@ -180,6 +179,19 @@ const activeModule = ref(null)
   border-radius: 22px;
   box-shadow: 0 8px 32px rgba(79,140,255,0.10), 0 1.5px 8px rgba(79,140,255,0.08);
   background: rgba(255,255,255,0.92);
+.main-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+.users-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
   display: flex;
   flex-direction: column;
   align-items: center;

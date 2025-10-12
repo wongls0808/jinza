@@ -3,7 +3,6 @@
     <div class="page-head">
   <div class="title">{{ $t('home.users') }}</div>
       <div class="spacer"></div>
-  <el-button size="small" @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
       <div class="actions">
   <el-input v-model.trim="newUser.username" :placeholder="$t('user.username')" style="width:180px" size="small" />
   <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('user.initPassword')" style="width:180px" size="small" />
@@ -173,6 +172,12 @@ onMounted(load)
   padding: 0;
   background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
   min-height: 100vh;
+  width: 100vw;
+  position: fixed;
+  left: 0;
+  top: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 .page-head {
   display: flex;
@@ -254,11 +259,33 @@ onMounted(load)
 .el-button[type="primary"], .el-button[type="danger"], .el-button[type="warning"] {
   border-radius: 8px;
   box-shadow: 0 2px 8px #4f8cff22;
+.users {
+  background: none;
+  min-height: 0;
+  width: 100%;
+  position: static;
+}
+.users-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+}
   transition: background .18s, box-shadow .18s;
 }
 .el-button[type="primary"] {
   background: linear-gradient(90deg, #4f8cff 0%, #a1e3ff 100%);
   color: #fff;
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 32px;
+  justify-content: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
 }
 .el-button[type="primary"]:hover {
   background: linear-gradient(90deg, #3a6fd8 0%, #7fd8ff 100%);
