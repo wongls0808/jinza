@@ -11,52 +11,17 @@
           <el-menu-item index="settings" @click="activePage='settings'">系统设置</el-menu-item>
         </el-menu>
       </nav>
-    </header>
-    <main class="home-main">
-      <div class="main-content">
-        <component :is="pageComponent" />
-      </div>
-    </main>
-  </div>
-</template>
+    <template>
+      <router-view />
+    </template>
 
-<script setup>
-import { ref, computed } from 'vue'
-import UserManagement from './UserManagement.vue'
-import Customers from './Customers.vue'
-import Banks from './Banks.vue'
-import Accounts from './Accounts.vue'
-import Settings from './Settings.vue'
+    <script setup>
+    // 首页已由路由自动渲染仪表盘，无需其它内容
+    </script>
 
-const activePage = ref('users')
-const pageComponent = computed(() => {
-  switch (activePage.value) {
-    case 'users': return UserManagement
-    case 'customers': return Customers
-    case 'banks': return Banks
-    case 'accounts': return Accounts
-    case 'settings': return Settings
-    default: return UserManagement
-  }
-})
-</script>
-
-<style scoped>
-.home-layout {
-  display: flex;
-  min-height: 100vh;
-  width: 100vw;
-  background: linear-gradient(120deg, #e3f0ff 0%, #f8fbff 100%);
-  box-sizing: border-box;
-  overflow: hidden;
-}
-.home-sidebar {
-  width: 160px;
-  width: 10vw;
-  min-width: 120px;
-  max-width: 220px;
-  background: #fff;
-  box-shadow: 2px 0 16px 0 rgba(79,140,255,0.08);
+    <style scoped>
+    /* 保留空样式，后续可扩展 */
+    </style>
   display: flex;
   flex-direction: column;
   justify-content: space-between;

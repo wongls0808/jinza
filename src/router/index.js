@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // Views
-import Home from '@/views/Home.vue'
+const Dashboard = () => import('@/views/Dashboard.vue')
 const UserManagement = () => import('@/views/UserManagement.vue')
 const ChangePassword = () => import('@/views/ChangePassword.vue')
 
@@ -15,7 +15,7 @@ const NoAccess = () => import('@/views/NoAccess.vue')
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
   { path: '/change-password', name: 'change-password', component: ChangePassword, meta: { public: false } },
-  { path: '/', name: 'home', component: Home, meta: { perm: 'view_dashboard' } },
+  { path: '/', name: 'dashboard', component: Dashboard, meta: { perm: 'view_dashboard' } },
   { path: '/users', name: 'users', component: UserManagement, meta: { perm: 'manage_users' } },
   { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
   { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
