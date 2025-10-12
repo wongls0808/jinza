@@ -205,8 +205,9 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
 });
 
 // 批量删除交易
-transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('delete_transactions'), async (req, res) => {
+transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
+    await ensureTransactionsDDL()
     const { ids } = req.body;
     
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -451,7 +452,7 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
 })
 
 // 新增交易
-transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
+transactionsRouter.post('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const {
@@ -489,7 +490,7 @@ transactionsRouter.post('/', authMiddleware(true), requirePerm('manage_transacti
 });
 
 // 更新交易
-transactionsRouter.put('/:id', authMiddleware(true), requirePerm('manage_transactions'), async (req, res) => {
+transactionsRouter.put('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);
@@ -560,7 +561,7 @@ transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transacti
 });
 
 // 删除单个交易（用于行操作删除）
-transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('delete_transactions'), async (req, res) => {
+transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);
