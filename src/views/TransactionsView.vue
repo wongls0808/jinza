@@ -1307,10 +1307,20 @@ const submitImport = async () => {
   importSubmitting.value = true
   
   try {
-    // 将预览数据转换为后端所需的格式
-    const transformedData = previewData.value.map(row => {
-      // 处理字段映射，支持中英文字段名
-      const transformed = {
+    // 如果识别到固定表头（Trn. Date 等），优先走固定CSV导入接口
+    const headersLower = previewHeaders.value.map(h => String(h || '').toLowerCase())
+    const fixedHeaders = ['trn. date','cheque no/ref no','transaction description','debit amount','credit amount']
+    const looksLikeFixed = fixedHeaders.every(h => headersLower.includes(h))
+
+    let result
+    if (looksLikeFixed) {
+      // 将原始文件内容拼回文本：为保持一致性，提示用户建议直接使用“CSV文本导入”路径
+      // 这里从 previewData 反序列化为 CSV 文本以调用固定接口
+      const csvText = Papa.unparse(previewData.value, { header: true })
+      result = await api.transactions.importCsvText(csvText)
+    } else {
+      // 回退到通用 JSON 导入
+      const transformedData = previewData.value.map(row => ({
         accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
         transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || '',
         chequeRefNo: row.chequeRefNo || row['参考号'] || row['Ref No'] || '',
@@ -1321,35 +1331,32 @@ const submitImport = async () => {
         reference1: row.reference1 || row.参考1 || row['Reference 1'] || '',
         reference2: row.reference2 || row.参考2 || row['Reference 2'] || '',
         reference3: row.reference3 || row.参考3 || row['Reference 3'] || ''
+      }))
+      const response = await fetch('/api/transactions/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: transformedData })
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || error.detail || response.statusText)
       }
-      
-      return transformed
-    })
-    
-    const response = await fetch('/api/transactions/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: transformedData })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || error.detail || response.statusText)
+      result = await response.json()
     }
-    
-    const result = await response.json()
     
     importDialogVisible.value = false
     fileList.value = []
     previewData.value = []
     
-    ElMessage.success(t('transactions.importSuccess', { count: result.inserted }))
-    
-    if (result.failed > 0) {
-      ElMessage.warning(t('transactions.importPartial', { 
-        inserted: result.inserted,
-        failed: result.failed
-      }))
+    const ins = result?.inserted || 0
+    const skipped = result?.skipped || 0
+    const failed = result?.failed || 0
+    ElMessage.success(t('transactions.importSuccess', { count: ins }))
+    if (skipped > 0) {
+      ElMessage.info(`${t('transactions.importSkipped')}: ${skipped}`)
+    }
+    if (failed > 0) {
+      ElMessage.warning(t('transactions.importPartial', { inserted: ins, failed }))
     }
     
     fetchTransactions()

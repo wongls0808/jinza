@@ -1,5 +1,6 @@
 // 交易管理相关API
 import express from 'express';
+import { parse as parseCsv } from 'csv-parse/sync';
 import { query } from './db.js';
 import { authMiddleware, requirePerm } from './auth.js';
 import { parseCSV } from './utils.js';
@@ -414,9 +415,9 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
       );
     `)
     const { rows } = req.body || {}
-    if (!Array.isArray(rows) || !rows.length) return res.json({ inserted: 0, failed: 0 })
+    if (!Array.isArray(rows) || !rows.length) return res.json({ inserted: 0, failed: 0, skipped: 0 })
 
-    let inserted = 0, failed = 0
+    let inserted = 0, failed = 0, skipped = 0
     for (const r of rows) {
       try {
         const account = cleanCell(r.accountNumber || r.account_number)
@@ -428,26 +429,99 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
         const credit = parseAmount(r.creditAmount || r.credit_amount)
         const balance = Number(credit || 0) - Number(debit || 0)
         const category = r.category ? cleanCell(r.category) : null
-        const ref1 = cleanCell(r.reference1 || r.reference_1) || null
-        const ref2 = cleanCell(r.reference2 || r.reference_2) || null
-        const ref3 = cleanCell(r.reference3 || r.reference_3) || null
+        const r1 = cleanCell(r.reference1 || r.reference_1) || ''
+        const r2 = cleanCell(r.reference2 || r.reference_2) || ''
+        const r3 = cleanCell(r.reference3 || r.reference_3) || ''
+        const mergedRef = [r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' ') || null
 
-        await query(
+        const ins = await query(
           `insert into transactions(
             account_number, transaction_date, cheque_ref_no, description,
             debit_amount, credit_amount, balance, category, reference_1, reference_2, reference_3, created_by
-          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, category, ref1, ref2, ref3, req.user?.id || null]
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          on conflict (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) do nothing`,
+          [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, category, mergedRef, null, null, req.user?.id || null]
         )
-        inserted++
+        if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++
       } catch (e) {
         failed++
       }
     }
-    return res.json({ inserted, failed })
+    return res.json({ inserted, skipped, failed })
   } catch (error) {
     console.error('导入交易失败:', error)
     return res.status(500).json({ error: '导入交易失败', detail: error?.message })
+  }
+})
+
+// 以固定CSV文本导入交易（示例文件格式）
+// 要求：请求 Content-Type 为 text/plain 或 */*，body 为CSV纯文本
+transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  try {
+    await ensureTransactionsDDL()
+    const text = (req.body || '').toString()
+    if (!text || typeof text !== 'string') return res.status(400).json({ error: 'empty body' })
+
+    // 1) 提取账号（Account Number:,XXXXXXXX）
+    const mAcc = /(^|\n)\s*Account\s+Number\s*:\s*,\s*([^\r\n,]+)/i.exec(text)
+    const account = mAcc ? cleanCell(mAcc[2]) : ''
+    if (!account) return res.status(400).json({ error: '未找到 Account Number' })
+
+    // 2) 截取数据表头及其后的数据区块（以 Trn. Date 开头的一行作为表头）
+    const lines = text.replace(/\r\n/g, '\n').split('\n')
+    const headerIdx = lines.findIndex(l => /^\s*Trn\.\s*Date\s*,/i.test(l))
+    if (headerIdx < 0) return res.status(400).json({ error: '未找到数据表头 Trn. Date' })
+    const dataBlock = lines.slice(headerIdx).join('\n')
+
+    // 3) 使用 csv-parse 解析为对象数组
+    let records = []
+    try {
+      records = parseCsv(dataBlock, {
+        bom: true,
+        columns: true,
+        skip_empty_lines: true,
+        relax_column_count: true,
+        trim: true
+      })
+    } catch (e) {
+      return res.status(400).json({ error: 'CSV 解析失败', detail: e?.message })
+    }
+
+    if (!Array.isArray(records) || !records.length) return res.json({ inserted: 0, skipped: 0, failed: 0 })
+
+    let inserted = 0, skipped = 0, failed = 0
+    for (const r of records) {
+      try {
+        const trn = parseDateYYYYMMDD(r['Trn. Date'])
+        const cheque = cleanCell(r['Cheque No/Ref No']) || null
+        const desc = cleanCell(r['Transaction Description']) || null
+        const debit = parseAmount(r['Debit Amount'])
+        const credit = parseAmount(r['Credit Amount'])
+        const balance = Number(credit || 0) - Number(debit || 0)
+        const r1 = cleanCell(r['Reference 1']) || ''
+        const r2 = cleanCell(r['Reference 2']) || ''
+        const r3 = cleanCell(r['Reference 3']) || ''
+        const mergedRef = [r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' ') || null
+        if (!trn) { failed++; continue }
+
+        const ins = await query(
+          `insert into transactions(
+            account_number, transaction_date, cheque_ref_no, description,
+            debit_amount, credit_amount, balance, reference_1, reference_2, reference_3, created_by
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          on conflict (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) do nothing`,
+          [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, mergedRef, null, null, req.user?.id || null]
+        )
+        if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++
+      } catch (e) {
+        failed++
+      }
+    }
+
+    return res.json({ inserted, skipped, failed })
+  } catch (e) {
+    console.error('import-csv failed', e)
+    return res.status(500).json({ error: '导入交易失败', detail: e?.message })
   }
 })
 

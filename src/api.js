@@ -143,7 +143,25 @@ export const api = {
     deleteTransactions: (ids) => request('/transactions/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
     create: (data) => request('/transactions', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    remove: (id) => request(`/transactions/${id}`, { method: 'DELETE' })
+    remove: (id) => request(`/transactions/${id}`, { method: 'DELETE' }),
+    // 固定格式银行对账单：CSV 文本导入
+    importCsvText: async (text) => {
+      // 使用 fetch 发送 text/plain，带鉴权头
+      const token = (function(){
+        try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        return null
+      })()
+      const headers = { 'Content-Type': 'text/plain;charset=utf-8' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_BASE}/transactions/import-csv`, { method: 'POST', headers, body: text })
+      if (!res.ok) {
+        let msg = ''
+        try { const j = await res.json(); msg = j?.error || j?.message || '' } catch { msg = await res.text() }
+        throw new Error(msg || `HTTP ${res.status}`)
+      }
+      return res.json()
+    }
   },
   // 返回收款账户列表（仅 items 数组，便于选择器直接使用）
   requestAccounts: async () => {
