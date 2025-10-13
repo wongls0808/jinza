@@ -460,6 +460,24 @@ transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('view_tr
   }
 })
 
+// 取消交易关联：清空匹配信息并将 matched=false，使其回到未匹配状态（表1）
+transactionsRouter.post('/:id/unmatch', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  try {
+    await ensureTransactionsDDL()
+    const id = Number(req.params.id)
+    if (!id) return res.status(400).json({ error: 'missing id' })
+    const rs = await query(
+      `update transactions set matched=false, match_type=null, match_target_id=null, match_target_name=null, matched_by=null, matched_at=null, updated_at=now() where id=$1 returning id`,
+      [id]
+    )
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('unmatch failed', e)
+    res.status(500).json({ error: 'unmatch failed', detail: e.message })
+  }
+})
+
 // 下载导入模板（返回JSON样例，前端将转CSV）
 // 模板由前端自行定义/或另见导出模板接口
 

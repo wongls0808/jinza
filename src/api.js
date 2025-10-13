@@ -141,6 +141,7 @@ export const api = {
     stats: (params={}) => request(`/transactions/stats?${new URLSearchParams(params).toString()}`),
     export: (params={}) => request(`/transactions/export?${new URLSearchParams(params).toString()}`),
     match: (id, payload) => request(`/transactions/${id}/match`, { method: 'POST', body: JSON.stringify(payload) }),
+    unmatch: (id) => request(`/transactions/${id}/unmatch`, { method: 'POST' }),
     deleteTransactions: (ids) => request('/transactions/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
     create: (data) => request('/transactions', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

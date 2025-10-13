@@ -64,16 +64,19 @@
       :data="transactions"
       style="width: 100%; margin-top: 20px;"
       border
-      stripe>
+      stripe
+      @row-dblclick="onRowDblClick"
+      @header-dragend="onColResize"
+    >
 
-      <el-table-column type="selection" width="55" />
+      <el-table-column type="selection" :width="colW('sel',55)" column-key="sel" />
 
-      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable width="140">
+      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" column-key="trn_date" sortable :width="colW('trn_date',140)">
         <template #default="scope">{{ formatDate(scope.row.trn_date) }}</template>
       </el-table-column>
-      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable width="160" />
+      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" column-key="account_number" sortable :width="colW('account_number',160)" />
 
-      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable width="160">
+      <el-table-column :label="t('transactions.bankName')" prop="bank_name" column-key="bank_name" sortable :width="colW('bank_name',160)">
         <template #default="scope">
           <div class="bank-display">
             <img v-if="getBankLogo(scope.row)" :src="getBankLogo(scope.row)" :alt="scope.row.bank_name" class="bank-logo" @error="e => e.target.style.display = 'none'" />
@@ -82,24 +85,24 @@
         </template>
       </el-table-column>
 
-      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable width="180">
+      <el-table-column :label="t('transactions.accountName')" prop="account_name" column-key="account_name" sortable :width="colW('account_name',180)">
         <template #default="scope">{{ scope.row.account_name || '-' }}</template>
       </el-table-column>
 
-      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" width="160" />
+      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" column-key="cheque_ref_no" :width="colW('cheque_ref_no',160)" />
 
       <!-- 参考（原“关联人”展示在此列右侧的新“关联”中作为后备） -->
-      <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip width="240" />
+      <el-table-column :label="t('transactions.reference')" prop="reference" column-key="reference" show-overflow-tooltip :width="colW('reference',240)" />
 
-      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
+      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" column-key="debit_amount" align="right" sortable :width="colW('debit_amount',140)">
         <template #default="scope"><span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span></template>
       </el-table-column>
-      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
+      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" column-key="credit_amount" align="right" sortable :width="colW('credit_amount',140)">
         <template #default="scope"><span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span></template>
       </el-table-column>
 
       <!-- 新增：关联（优先显示关联对象名，其次显示关联人） -->
-      <el-table-column :label="t('transactions.relation')" prop="relation" show-overflow-tooltip width="220">
+      <el-table-column :label="t('transactions.relation')" prop="relation" column-key="relation" show-overflow-tooltip :width="colW('relation',220)">
         <template #default="scope">{{ scope.row.match_target_name || scope.row.reference || '-' }}</template>
       </el-table-column>
     </el-table>
@@ -114,6 +117,37 @@
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange" />
     </div>
+
+    <!-- 编辑/取消关联弹窗 -->
+    <el-dialog v-model="editDialogVisible" :title="t('transactions.editRelation')" width="520px">
+      <div>
+        <el-form label-width="96px">
+          <el-form-item :label="t('transactions.selectCustomer')">
+            <el-select
+              v-model="editForm.customerId"
+              filterable
+              remote
+              reserve-keyword
+              :remote-method="searchCustomers"
+              :loading="customersLoading"
+              :placeholder="t('transactions.searchCustomerPlaceholder')"
+              style="width: 100%"
+            >
+              <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer" style="display:flex; justify-content: space-between; width:100%">
+          <el-button @click="editDialogVisible=false">{{ t('common.cancel') }}</el-button>
+          <div>
+            <el-button type="danger" :loading="editing" @click="doUnmatch">{{ t('transactions.unmatch') }}</el-button>
+            <el-button type="primary" :loading="editing" @click="confirmEdit">{{ t('transactions.confirm') }}</el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
   
 </template>
@@ -124,6 +158,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
+import { useTableMemory } from '@/composables/useTableMemory'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -134,6 +169,16 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0, pages: 0 })
 const filters = reactive({ startDate: '', endDate: '' })
 const dateRange = ref([])
+// 列宽记忆
+const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions-table-2')
+
+// 双击行弹窗状态
+const editDialogVisible = ref(false)
+const editing = ref(false)
+const editingRow = ref(null)
+const customerOptions = ref([])
+const customersLoading = ref(false)
+const editForm = reactive({ customerId: null })
 
 watch(dateRange, (val) => {
   if (val && val.length === 2) {
@@ -241,6 +286,58 @@ function getBankLogo(row) {
   if (row.bank_logo) return row.bank_logo
   if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
   return ''
+}
+
+// 行双击：打开编辑/取消关联弹窗
+function onRowDblClick(row) {
+  editingRow.value = row
+  editForm.customerId = null
+  editDialogVisible.value = true
+}
+
+// 远程搜索客户
+async function searchCustomers(q) {
+  customersLoading.value = true
+  try {
+    const res = await api.customers.list({ q, pageSize: 20 })
+    customerOptions.value = (res?.items || []).map(it => ({ label: it.name, value: it.id, raw: it }))
+  } catch (e) {
+    ElMessage.error(t('transactions.fetchFailed'))
+  } finally {
+    customersLoading.value = false
+  }
+}
+
+// 提交编辑（仅替换关联对象为所选客户）
+async function confirmEdit() {
+  if (!editingRow.value?.id) return
+  if (!editForm.customerId) { ElMessage.warning(t('transactions.selectCustomerFirst')); return }
+  editing.value = true
+  try {
+    const picked = customerOptions.value.find(o => o.value === editForm.customerId)
+    const name = picked?.raw?.name || picked?.label || ''
+    await api.transactions.match(editingRow.value.id, { type: 'customer', targetId: editForm.customerId, targetName: name })
+    ElMessage.success(t('transactions.matchSuccess'))
+    editDialogVisible.value = false
+    // 刷新表2；该记录仍属于 matched，会以新关联展示
+    await fetchTransactions()
+  } catch (e) {
+    ElMessage.error(e?.message || t('transactions.matchFailed'))
+  } finally { editing.value = false }
+}
+
+// 取消关联：调用 unmatch，记录应回到表1（表2将不再展示）
+async function doUnmatch() {
+  if (!editingRow.value?.id) return
+  editing.value = true
+  try {
+    await api.transactions.unmatch(editingRow.value.id)
+    ElMessage.success(t('transactions.unmatchSuccess'))
+    editDialogVisible.value = false
+    await fetchTransactions()
+  } catch (e) {
+    ElMessage.error(e?.message || t('transactions.unmatchFailed'))
+  } finally { editing.value = false }
 }
 </script>
 
