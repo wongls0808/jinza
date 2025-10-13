@@ -8,9 +8,9 @@
       </el-button>
     </div>
 
-    <el-card class="filters" shadow="never">
-      <el-form :model="filters" label-width="120px">
-        <el-form-item :label="t('transactions.dateRange')">
+    <el-card class="filters compact" shadow="never">
+      <el-form :model="filters" inline size="small" label-width="0" class="filters-inline">
+        <el-form-item>
           <el-date-picker
             v-model="dateRange"
             type="daterange"
@@ -18,21 +18,21 @@
             :start-placeholder="t('transactions.startDate')"
             :end-placeholder="t('transactions.endDate')"
             value-format="YYYY-MM-DD"
-            style="width: 100%" />
+            style="width: 260px" />
         </el-form-item>
-        <el-form-item :label="t('transactions.accountNumber')">
-          <el-input v-model.trim="filters.account" :placeholder="t('transactions.accountNumber')" />
+        <el-form-item>
+          <el-input v-model.trim="filters.account" clearable :placeholder="t('transactions.accountNumber')" style="width: 180px" />
         </el-form-item>
-        <el-form-item :label="t('transactions.accountName')">
-          <el-input v-model.trim="filters.accountName" :placeholder="t('transactions.accountName')" />
+        <el-form-item>
+          <el-input v-model.trim="filters.accountName" clearable :placeholder="t('transactions.accountName')" style="width: 180px" />
         </el-form-item>
-        <el-form-item :label="t('transactions.relation')">
-          <el-input v-model.trim="filters.relation" :placeholder="t('transactions.relation')" />
+        <el-form-item>
+          <el-input v-model.trim="filters.relation" clearable :placeholder="t('transactions.relation')" style="width: 180px" />
         </el-form-item>
-        <div class="filter-actions">
+        <el-form-item>
           <el-button @click="clearFilters">{{ t('transactions.clear') }}</el-button>
           <el-button type="primary" @click="fetchStats">{{ t('transactions.apply') }}</el-button>
-        </div>
+        </el-form-item>
       </el-form>
     </el-card>
 
@@ -359,7 +359,9 @@ async function doUnmatch() {
 <style scoped>
 .transactions-stats { padding: 20px; }
 .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.filters { margin-bottom: 16px; }
+.filters { margin-bottom: 12px; }
+.filters.compact { padding: 8px 12px; }
+.filters-inline { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .filter-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .stats-panel { margin-top: 8px; }
 .stat-card { text-align: center; }
