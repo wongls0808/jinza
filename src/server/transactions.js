@@ -501,9 +501,13 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
 
     if (!Array.isArray(records) || !records.length) return res.json({ inserted: 0, skipped: 0, failed: 0 })
 
-    // 识别行内“Account Number”列（可能带或不带冒号）
+    // 识别行内“Account Number”列（容错：去空白/标点/大小写）
     const keys = Object.keys(records[0] || {})
-    const accCol = keys.find(k => /^(\s*Account\s*Number\s*:?\s*)$/i.test(k)) || null
+    const normalize = (s) => String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '') // 去掉非字母数字
+    const keyMap = new Map(keys.map(k => [normalize(k), k]))
+    const accCol = keyMap.get('accountnumber') || keyMap.get('accountno') || null
 
     let inserted = 0, skipped = 0, failed = 0
     for (const r of records) {

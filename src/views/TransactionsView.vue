@@ -1310,12 +1310,24 @@ const submitImport = async () => {
     const ins = result?.inserted || 0
     const skipped = result?.skipped || 0
     const failed = result?.failed || 0
-    const parts = []
-    parts.push(`${t('transactions.imported')}: ${ins}`)
-    if (skipped > 0) parts.push(`${t('transactions.skipped')}: ${skipped}`)
-    if (failed > 0) parts.push(`${t('transactions.failed')}: ${failed}`)
-    ElMessage.success(parts.join(' ｜ '))
-    
+    const summary = [
+      `${t('transactions.imported')}: ${ins}`,
+      skipped > 0 ? `${t('transactions.skipped')}: ${skipped}` : '',
+      failed > 0 ? `${t('transactions.failed')}: ${failed}` : ''
+    ].filter(Boolean).join(' ｜ ')
+
+    if (ins > 0) {
+      ElMessage.success(summary)
+    } else if (skipped > 0 && failed === 0) {
+      ElMessage.warning(`${t('transactions.noNewRecords')} ｜ ${summary}`)
+    } else if (failed > 0) {
+      ElMessage.error(summary)
+    } else {
+      ElMessage.info(summary)
+    }
+
+    // 导入完返回第一页并刷新（避免当前筛选导致“看起来没数据”）
+    pagination.page = 1
     fetchTransactions()
   } catch (error) {
     console.error('导入交易数据失败:', error)
