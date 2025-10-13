@@ -20,6 +20,15 @@
             value-format="YYYY-MM-DD"
             style="width: 100%" />
         </el-form-item>
+        <el-form-item :label="t('transactions.accountNumber')">
+          <el-input v-model.trim="filters.account" :placeholder="t('transactions.accountNumber')" />
+        </el-form-item>
+        <el-form-item :label="t('transactions.accountName')">
+          <el-input v-model.trim="filters.accountName" :placeholder="t('transactions.accountName')" />
+        </el-form-item>
+        <el-form-item :label="t('transactions.relation')">
+          <el-input v-model.trim="filters.relation" :placeholder="t('transactions.relation')" />
+        </el-form-item>
         <div class="filter-actions">
           <el-button @click="clearFilters">{{ t('transactions.clear') }}</el-button>
           <el-button type="primary" @click="fetchStats">{{ t('transactions.apply') }}</el-button>
@@ -167,7 +176,7 @@ const stats = ref({ summary: {}, monthly: [], categories: [] })
 const transactions = ref([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0, pages: 0 })
-const filters = reactive({ startDate: '', endDate: '' })
+const filters = reactive({ startDate: '', endDate: '', account: '', accountName: '', relation: '' })
 const dateRange = ref([])
 // 列宽记忆
 const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions-table-2')
@@ -192,9 +201,12 @@ watch(dateRange, (val) => {
 
 const fetchStats = async () => {
   try {
-    const params = {}
+  const params = { status: 'matched' }
     if (filters.startDate) params.startDate = filters.startDate
     if (filters.endDate) params.endDate = filters.endDate
+  if (filters.account) params.account = filters.account
+  if (filters.accountName) params.accountName = filters.accountName
+  if (filters.relation) params.relation = filters.relation
     const data = await api.transactions.stats(params)
     stats.value = data || { summary: {}, monthly: [], categories: [] }
     // 同步加载列表数据（表2自身独立取数）
@@ -211,6 +223,9 @@ const fetchTransactions = async () => {
   const params = { page: pagination.page, pageSize: pagination.pageSize, status: 'matched' }
     if (filters.startDate) params.startDate = filters.startDate
     if (filters.endDate) params.endDate = filters.endDate
+    if (filters.account) params.account = filters.account
+    if (filters.accountName) params.accountName = filters.accountName
+    if (filters.relation) params.relation = filters.relation
     const data = await api.transactions.list(params)
     transactions.value = Array.isArray(data?.data) ? data.data.map(normalizeRow) : []
     pagination.total = data.pagination.total

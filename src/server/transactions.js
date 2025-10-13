@@ -134,9 +134,13 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       if (startDate) add(i => `transaction_date >= $${i}`, startDate);
       if (endDate) add(i => `transaction_date <= $${i}`, endDate);
       if (account) add(i => `account_number ILIKE $${i}`, `%${account}%`);
+      // 账户名称（需要 join receiving_accounts 作为别名 a）
+      const { accountName, relation } = req.query || {}
+      if (accountName) add(i => `a.account_name ILIKE $${i}`, `%${accountName}%`)
       // 类别已取消
       if (minAmount) add(i => `(debit_amount >= $${i} OR credit_amount >= $${i})`, Number(minAmount));
       if (maxAmount) add(i => `(debit_amount <= $${i} OR credit_amount <= $${i})`, Number(maxAmount));
+      if (relation) add(i => `match_target_name ILIKE $${i}`, `%${relation}%`)
       if (searchTerm) {
         const amountOnly = String(searchAmountOnly || '').toLowerCase() in { '1':1, 'true':1 };
         const numeric = Number(String(searchTerm).replace(/[,\s]/g, ''))
@@ -162,7 +166,8 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
     const { whereClause: whereForCount, params: paramsForCount } = buildWhere(1);
     const countResult = await query(`
       SELECT COUNT(*) as total
-      FROM transactions
+      FROM transactions t
+      LEFT JOIN receiving_accounts a ON t.account_number = a.bank_account
       ${whereForCount}
     `, paramsForCount);
     const total = parseInt(countResult.rows[0].total || '0', 10);
@@ -266,6 +271,7 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
   try {
     await ensureTransactionsDDL()
     const { startDate, endDate, account } = req.query;
+    const { accountName, relation, status } = req.query || {}
     let params = [];
     let paramIndex = 1;
     
@@ -273,19 +279,34 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
     let whereClause = '';
     const whereConditions = [];
     
+    // 默认按照表2（已匹配）统计；若显式传入 status，可覆盖
+    if (!status || String(status).toLowerCase() === 'matched') {
+      whereConditions.push(`coalesce(t.matched,false) = true`)
+    } else if (String(status).toLowerCase() === 'pending') {
+      whereConditions.push(`coalesce(t.matched,false) = false`)
+    }
+
     if (startDate) {
-      whereConditions.push(`transaction_date >= $${paramIndex++}`);
+      whereConditions.push(`t.transaction_date >= $${paramIndex++}`);
       params.push(startDate);
     }
     
     if (endDate) {
-      whereConditions.push(`transaction_date <= $${paramIndex++}`);
+      whereConditions.push(`t.transaction_date <= $${paramIndex++}`);
       params.push(endDate);
     }
     
     if (account) {
-      whereConditions.push(`account_number ILIKE $${paramIndex++}`);
+      whereConditions.push(`t.account_number ILIKE $${paramIndex++}`);
       params.push(`%${account}%`);
+    }
+    if (accountName) {
+      whereConditions.push(`a.account_name ILIKE $${paramIndex++}`)
+      params.push(`%${accountName}%`)
+    }
+    if (relation) {
+      whereConditions.push(`t.match_target_name ILIKE $${paramIndex++}`)
+      params.push(`%${relation}%`)
     }
     
     if (whereConditions.length > 0) {
@@ -296,29 +317,31 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
     const result = await query(`
       SELECT
         COUNT(*) AS "totalTransactions",
-        SUM(debit_amount) AS "totalDebit",
-        SUM(credit_amount) AS "totalCredit",
-        (SUM(credit_amount) - SUM(debit_amount)) AS "netBalance",
-        MIN(transaction_date) AS "earliestDate",
-        MAX(transaction_date) AS "latestDate",
-        COUNT(DISTINCT account_number) AS "accountCount",
-        COUNT(DISTINCT category) AS "categoryCount"
+        SUM(t.debit_amount) AS "totalDebit",
+        SUM(t.credit_amount) AS "totalCredit",
+        (SUM(t.credit_amount) - SUM(t.debit_amount)) AS "netBalance",
+        MIN(t.transaction_date) AS "earliestDate",
+        MAX(t.transaction_date) AS "latestDate",
+        COUNT(DISTINCT t.account_number) AS "accountCount",
+        COUNT(DISTINCT t.category) AS "categoryCount"
       FROM 
-        transactions
+        transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
       ${whereClause}
     `, params);
     
     // 获取按月统计
     const monthlyStats = await query(`
       SELECT
-        TO_CHAR(transaction_date, 'YYYY-MM') AS month,
-        SUM(debit_amount) AS debit,
-        SUM(credit_amount) AS credit
+        TO_CHAR(t.transaction_date, 'YYYY-MM') AS month,
+        SUM(t.debit_amount) AS debit,
+        SUM(t.credit_amount) AS credit
       FROM 
-        transactions
+        transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
       ${whereClause}
       GROUP BY 
-        TO_CHAR(transaction_date, 'YYYY-MM')
+        TO_CHAR(t.transaction_date, 'YYYY-MM')
       ORDER BY
         month ASC
     `, params);
@@ -326,15 +349,16 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('view_transac
     // 获取按类别统计
     const categoryStats = await query(`
       SELECT
-        COALESCE(category, '未分类') AS category,
+        COALESCE(t.category, '未分类') AS category,
         COUNT(*) AS count,
-        SUM(debit_amount) AS debit,
-        SUM(credit_amount) AS credit
+        SUM(t.debit_amount) AS debit,
+        SUM(t.credit_amount) AS credit
       FROM 
-        transactions
+        transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
       ${whereClause}
       GROUP BY 
-        category
+        t.category
       ORDER BY
         count DESC
     `, params);
