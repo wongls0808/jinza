@@ -51,6 +51,12 @@
         <el-table-column prop="opening_cny" :label="$t('customers.fields.openingCNY')" sortable="custom" :width="colW('opening_cny', 160)">
           <template #default="{ row }">{{ formatMoney(row.opening_cny) }}</template>
         </el-table-column>
+        <el-table-column prop="balance_myr" :label="$t('customers.fields.balanceMYR')" sortable="custom" :width="colW('balance_myr', 160)">
+          <template #default="{ row }"><span class="pos" v-if="Number(row.balance_myr) >= 0">{{ formatMoney(row.balance_myr) }}</span><span class="neg" v-else>{{ formatMoney(row.balance_myr) }}</span></template>
+        </el-table-column>
+        <el-table-column prop="balance_cny" :label="$t('customers.fields.balanceCNY')" sortable="custom" :width="colW('balance_cny', 160)">
+          <template #default="{ row }"><span class="pos" v-if="Number(row.balance_cny) >= 0">{{ formatMoney(row.balance_cny) }}</span><span class="neg" v-else>{{ formatMoney(row.balance_cny) }}</span></template>
+        </el-table-column>
         <el-table-column prop="submitter" :label="$t('customers.fields.submitter')" :width="colW('submitter', 140)" />
         <el-table-column :label="$t('customers.fields.ops')" :width="colW('ops', 120)">
           <template #default="{ row }">

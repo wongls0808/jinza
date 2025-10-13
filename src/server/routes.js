@@ -148,8 +148,37 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
   const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const term = `%${q}%`
+  // 统计总数
   const total = await query("select count(*) from customers where name ilike $1 or coalesce(abbr,'') ilike $1", [term])
-  const rows = await query(`select * from customers where name ilike $1 or coalesce(abbr,'') ilike $1 order by ${sort} ${order === 'asc' ? 'asc' : 'desc'} offset $2 limit $3`, [term, offset, Number(pageSize)])
+
+  // 聚合匹配到客户的交易净额，按货币分 MYR / CNY
+  const rows = await query(`
+    with tx_agg as (
+      select 
+        t.match_target_id as customer_id,
+        upper(a.currency_code) as currency,
+        sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
+      from transactions t
+      left join receiving_accounts a on a.bank_account = t.account_number
+      where coalesce(t.matched,false) = true and t.match_type = 'customer'
+      group by t.match_target_id, upper(a.currency_code)
+    ), tx_pivot as (
+      select customer_id,
+             sum(case when currency = 'MYR' then net else 0 end) as net_myr,
+             sum(case when currency = 'CNY' then net else 0 end) as net_cny
+      from tx_agg
+      group by customer_id
+    )
+    select 
+      c.*, 
+      coalesce(c.opening_myr,0) + coalesce(p.net_myr,0) as balance_myr,
+      coalesce(c.opening_cny,0) + coalesce(p.net_cny,0) as balance_cny
+    from customers c
+    left join tx_pivot p on p.customer_id = c.id
+    where c.name ilike $1 or coalesce(c.abbr,'') ilike $1
+    order by ${sort} ${order === 'asc' ? 'asc' : 'desc'}
+    offset $2 limit $3
+  `, [term, offset, Number(pageSize)])
   res.json({ total: Number(total.rows[0].count), items: rows.rows })
 })
 
