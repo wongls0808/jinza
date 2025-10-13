@@ -78,8 +78,108 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('view_transactio
 
 fxRouter.get('/settlements', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   await ensureDDL()
-  const rs = await query(`select * from fx_settlements order by id desc limit 200`)
-  res.json(rs.rows)
+  const { customerId, startDate, endDate, page = 1, pageSize = 20 } = req.query
+  const where = []
+  const params = []
+  let idx = 1
+  if (customerId) { where.push(`s.customer_id = $${idx++}`); params.push(Number(customerId)) }
+  if (startDate) { where.push(`s.settle_date >= $${idx++}`); params.push(startDate) }
+  if (endDate)   { where.push(`s.settle_date <= $${idx++}`); params.push(endDate) }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : ''
+  const total = await query(`select count(*) from fx_settlements s ${whereSql}`, params)
+  const offset = (Number(page)-1) * Number(pageSize)
+  const rows = await query(
+    `select s.*, coalesce(u.display_name, u.username) as created_by_name
+     from fx_settlements s
+     left join users u on u.id = s.created_by
+     ${whereSql}
+     order by s.id desc offset $${idx++} limit $${idx++}`,
+    [...params, offset, Number(pageSize)]
+  )
+  res.json({ total: Number(total.rows[0].count || 0), items: rows.rows })
+})
+
+// 结汇单：列表导出（按筛选），scope=all|page（默认 all）
+fxRouter.get('/settlements/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const { customerId, startDate, endDate, page = 1, pageSize = 20, scope = 'all' } = req.query
+  const where = []
+  const params = []
+  let idx = 1
+  if (customerId) { where.push(`s.customer_id = $${idx++}`); params.push(Number(customerId)) }
+  if (startDate) { where.push(`s.settle_date >= $${idx++}`); params.push(startDate) }
+  if (endDate)   { where.push(`s.settle_date <= $${idx++}`); params.push(endDate) }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : ''
+  let limitSql = ''
+  if (String(scope) === 'page') {
+    const offset = (Number(page)-1) * Number(pageSize)
+    limitSql = ` offset ${offset} limit ${Number(pageSize)}`
+  }
+  const rs = await query(
+    `select s.*, coalesce(u.display_name, u.username) as created_by_name
+     from fx_settlements s
+     left join users u on u.id = s.created_by
+     ${whereSql}
+     order by s.id desc${limitSql}`,
+    params
+  )
+  const header = ['ID','Customer ID','Customer Name','Settle Date','Rate','Total Base','Total Settled','Created By','Created At']
+  const rows = rs.rows.map(h => [h.id, h.customer_id, h.customer_name||'', h.settle_date, h.rate, h.total_base, h.total_settled, h.created_by_name||'', h.created_at])
+  const csvRows = [header, ...rows]
+  const csv = csvRows.map(r => r.map(v => {
+    const s = v==null? '': String(v)
+    return (/[",\n]/.test(s)) ? '"'+s.replace(/"/g,'""')+'"' : s
+  }).join(',')).join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename=Settlements-${Date.now()}.csv`)
+  res.send('\uFEFF' + csv)
+})
+
+// 结汇单：明细
+fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`select s.*, coalesce(u.display_name, u.username) as created_by_name from fx_settlements s left join users u on u.id=s.created_by where s.id=$1`, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`select * from fx_settlement_items where settlement_id=$1 order by id desc`, [id])
+  res.json({ ...head.rows[0], items: items.rows })
+})
+
+// 结汇单：导出 CSV
+fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`select * from fx_settlements where id=$1`, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`select * from fx_settlement_items where settlement_id=$1 order by id`, [id])
+  // 生成 CSV
+  const h = head.rows[0]
+  const headerLines = [
+    ['Settlement ID', h.id],
+    ['Customer ID', h.customer_id],
+    ['Customer Name', h.customer_name||''],
+    ['Settle Date', h.settle_date?.toISOString?.().slice(0,10) || h.settle_date || ''],
+    ['Rate', h.rate],
+    ['Customer Tax Rate', h.customer_tax_rate],
+    ['Total Base', h.total_base],
+    ['Total Settled', h.total_settled],
+    ['Created By', h.created_by||''],
+    ['Created At', h.created_at?.toISOString?.() || h.created_at || ''],
+    [],
+  ]
+  const itemHeader = ['Transaction ID','TRN Date','Account Number','Amount Base','Amount Settled']
+  const itemRows = items.rows.map(r => [r.transaction_id, r.trn_date||'', r.account_number||'', r.amount_base, r.amount_settled])
+  const csvRows = [...headerLines, itemHeader, ...itemRows]
+  const csv = csvRows.map(row => (Array.isArray(row) ? row.map(v => {
+    const s = (v==null?'' : String(v))
+    if (s.includes('"') || s.includes(',') || s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"'
+    return s
+  }).join(',') : '').toString()).join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename=Settlement-${id}.csv`)
+  res.send('\uFEFF' + csv)
 })
 
 // 创建付款单
@@ -103,6 +203,109 @@ fxRouter.post('/payments', authMiddleware(true), requirePerm('view_transactions'
 
 fxRouter.get('/payments', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   await ensureDDL()
-  const rs = await query(`select * from fx_payments order by id desc limit 200`)
-  res.json(rs.rows)
+  const { customerId, startDate, endDate, page = 1, pageSize = 20 } = req.query
+  const where = []
+  const params = []
+  let idx = 1
+  if (customerId) { where.push(`p.customer_id = $${idx++}`); params.push(Number(customerId)) }
+  if (startDate) { where.push(`p.pay_date >= $${idx++}`); params.push(startDate) }
+  if (endDate)   { where.push(`p.pay_date <= $${idx++}`); params.push(endDate) }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : ''
+  const total = await query(`select count(*) from fx_payments p ${whereSql}`, params)
+  const offset = (Number(page)-1) * Number(pageSize)
+  const rows = await query(
+    `with agg as (
+       select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
+     )
+     select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.total_amount,0) as total_amount
+     from fx_payments p
+     left join users u on u.id = p.created_by
+     left join agg a on a.payment_id = p.id
+     ${whereSql}
+     order by p.id desc offset $${idx++} limit $${idx++}`,
+    [...params, offset, Number(pageSize)]
+  )
+  res.json({ total: Number(total.rows[0].count || 0), items: rows.rows })
+})
+
+// 付款单：列表导出（按筛选），scope=all|page（默认 all）
+fxRouter.get('/payments/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const { customerId, startDate, endDate, page = 1, pageSize = 20, scope = 'all' } = req.query
+  const where = []
+  const params = []
+  let idx = 1
+  if (customerId) { where.push(`p.customer_id = $${idx++}`); params.push(Number(customerId)) }
+  if (startDate) { where.push(`p.pay_date >= $${idx++}`); params.push(startDate) }
+  if (endDate)   { where.push(`p.pay_date <= $${idx++}`); params.push(endDate) }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : ''
+  let limitSql = ''
+  if (String(scope) === 'page') {
+    const offset = (Number(page)-1) * Number(pageSize)
+    limitSql = ` offset ${offset} limit ${Number(pageSize)}`
+  }
+  const rs = await query(
+    `with agg as (
+       select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
+     )
+     select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.total_amount,0) as total_amount
+     from fx_payments p
+     left join users u on u.id = p.created_by
+     left join agg a on a.payment_id = p.id
+     ${whereSql}
+     order by p.id desc${limitSql}`,
+    params
+  )
+  const header = ['ID','Customer ID','Customer Name','Pay Date','Total Amount','Created By','Created At']
+  const rows = rs.rows.map(h => [h.id, h.customer_id, h.customer_name||'', h.pay_date, h.total_amount, h.created_by_name||'', h.created_at])
+  const csvRows = [header, ...rows]
+  const csv = csvRows.map(r => r.map(v => {
+    const s = v==null? '': String(v)
+    return (/[",\n]/.test(s)) ? '"'+s.replace(/"/g,'""')+'"' : s
+  }).join(',')).join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename=Payments-${Date.now()}.csv`)
+  res.send('\uFEFF' + csv)
+})
+
+// 付款单：明细
+fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`select p.*, coalesce(u.display_name, u.username) as created_by_name from fx_payments p left join users u on u.id=p.created_by where p.id=$1`, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`select * from fx_payment_items where payment_id=$1 order by id desc`, [id])
+  res.json({ ...head.rows[0], items: items.rows })
+})
+
+// 付款单：导出 CSV
+fxRouter.get('/payments/:id/export', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`select * from fx_payments where id=$1`, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`select * from fx_payment_items where payment_id=$1 order by id`, [id])
+  const h = head.rows[0]
+  const headerLines = [
+    ['Payment ID', h.id],
+    ['Customer ID', h.customer_id],
+    ['Customer Name', h.customer_name||''],
+    ['Pay Date', h.pay_date?.toISOString?.().slice(0,10) || h.pay_date || ''],
+    ['Created By', h.created_by||''],
+    ['Created At', h.created_at?.toISOString?.() || h.created_at || ''],
+    [],
+  ]
+  const itemHeader = ['Account ID','Account Name','Bank Account','Currency','Amount']
+  const itemRows = items.rows.map(r => [r.account_id, r.account_name||'', r.bank_account||'', r.currency_code||'', r.amount])
+  const csvRows = [...headerLines, itemHeader, ...itemRows]
+  const csv = csvRows.map(row => (Array.isArray(row) ? row.map(v => {
+    const s = (v==null?'' : String(v))
+    if (s.includes('"') || s.includes(',') || s.includes('\n')) return '"'+s.replace(/"/g,'""')+'"'
+    return s
+  }).join(',') : '').toString()).join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename=Payment-${id}.csv`)
+  res.send('\uFEFF' + csv)
 })

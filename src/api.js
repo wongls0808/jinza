@@ -169,11 +169,64 @@ export const api = {
   // FX - 结汇/付款
   fx: {
     settlements: {
-      list: () => request('/fx/settlements'),
+      list: (params={}) => request(`/fx/settlements?${new URLSearchParams(params).toString()}`),
+      exportListCsv: async (params={}) => {
+        const token = (function(){
+          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          return null
+        })()
+        const headers = { }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const url = `/fx/settlements/export?${new URLSearchParams(params).toString()}`
+        const res = await fetch(`${API_BASE}${url}`, { headers })
+        if (!res.ok) throw new Error(await res.text())
+        return res.text()
+      },
+      detail: (id) => request(`/fx/settlements/${id}`),
+      exportCsv: async (id) => {
+        // 直接返回文本（CSV），由调用方触发下载
+        const token = (function(){
+          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          return null
+        })()
+        const headers = { }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const res = await fetch(`${API_BASE}/fx/settlements/${id}/export`, { headers })
+        if (!res.ok) throw new Error(await res.text())
+        return res.text()
+      },
       create: (data) => request('/fx/settlements', { method: 'POST', body: JSON.stringify(data) })
     },
     payments: {
-      list: () => request('/fx/payments'),
+      list: (params={}) => request(`/fx/payments?${new URLSearchParams(params).toString()}`),
+      exportListCsv: async (params={}) => {
+        const token = (function(){
+          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          return null
+        })()
+        const headers = { }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const url = `/fx/payments/export?${new URLSearchParams(params).toString()}`
+        const res = await fetch(`${API_BASE}${url}`, { headers })
+        if (!res.ok) throw new Error(await res.text())
+        return res.text()
+      },
+      detail: (id) => request(`/fx/payments/${id}`),
+      exportCsv: async (id) => {
+        const token = (function(){
+          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          return null
+        })()
+        const headers = { }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const res = await fetch(`${API_BASE}/fx/payments/${id}/export`, { headers })
+        if (!res.ok) throw new Error(await res.text())
+        return res.text()
+      },
       create: (data) => request('/fx/payments', { method: 'POST', body: JSON.stringify(data) })
     }
   },
