@@ -475,10 +475,9 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
     const text = (req.body || '').toString()
     if (!text || typeof text !== 'string') return res.status(400).json({ error: 'empty body' })
 
-    // 1) 提取账号（Account Number:,XXXXXXXX）
+    // 1) 先尝试从文件头提取默认账号（Account Number:,XXXXXXXX）
     const mAcc = /(^|\n)\s*Account\s+Number\s*:\s*,\s*([^\r\n,]+)/i.exec(text)
-    const account = mAcc ? cleanCell(mAcc[2]) : ''
-    if (!account) return res.status(400).json({ error: '未找到 Account Number' })
+    const defaultAccount = mAcc ? cleanCell(mAcc[2]) : ''
 
     // 2) 截取数据表头及其后的数据区块（以 Trn. Date 开头的一行作为表头）
     const lines = text.replace(/\r\n/g, '\n').split('\n')
@@ -502,9 +501,17 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
 
     if (!Array.isArray(records) || !records.length) return res.json({ inserted: 0, skipped: 0, failed: 0 })
 
+    // 识别行内“Account Number”列（可能带或不带冒号）
+    const keys = Object.keys(records[0] || {})
+    const accCol = keys.find(k => /^(\s*Account\s*Number\s*:?\s*)$/i.test(k)) || null
+
     let inserted = 0, skipped = 0, failed = 0
     for (const r of records) {
       try {
+        // 优先使用行内账号，其次使用文件头默认账号
+        const rowAcc = accCol ? cleanCell(r[accCol]) : ''
+        const account = rowAcc || defaultAccount
+        if (!account) { failed++; continue }
         const trn = parseDateYYYYMMDD(r['Trn. Date'])
         const cheque = cleanCell(r['Cheque No/Ref No']) || null
         const desc = cleanCell(r['Transaction Description']) || null
