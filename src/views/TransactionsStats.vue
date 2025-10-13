@@ -57,6 +57,58 @@
         </el-col>
       </el-row>
     </div>
+
+    <!-- 表2：复制表1（交易列表）结构，但逻辑隔离 -->
+    <el-table
+      v-loading="loading"
+      :data="transactions"
+      style="width: 100%; margin-top: 20px;"
+      border
+      stripe>
+
+      <el-table-column type="selection" width="55" />
+
+      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable width="140">
+        <template #default="scope">{{ formatDate(scope.row.trn_date) }}</template>
+      </el-table-column>
+      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable width="160" />
+
+      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable width="160">
+        <template #default="scope">
+          <div class="bank-display">
+            <img v-if="getBankLogo(scope.row)" :src="getBankLogo(scope.row)" :alt="scope.row.bank_name" class="bank-logo" @error="e => e.target.style.display = 'none'" />
+            <span v-else>{{ scope.row.bank_name || '-' }}</span>
+          </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable width="180">
+        <template #default="scope">{{ scope.row.account_name || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" width="160" />
+
+      <!-- 改为匹配列：关联人（使用 reference 字段） -->
+      <el-table-column :label="t('transactions.relationPerson')" prop="reference" show-overflow-tooltip width="200" />
+
+      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
+        <template #default="scope"><span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span></template>
+      </el-table-column>
+      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
+        <template #default="scope"><span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span></template>
+      </el-table-column>
+    </el-table>
+
+    <div class="pagination">
+      <el-pagination
+        v-model:currentPage="pagination.page"
+        v-model:page-size="pagination.pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="pagination.total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange" />
+    </div>
   </div>
   
 </template>
@@ -72,6 +124,9 @@ const router = useRouter()
 const { t } = useI18n()
 
 const stats = ref({ summary: {}, monthly: [], categories: [] })
+const transactions = ref([])
+const loading = ref(false)
+const pagination = reactive({ page: 1, pageSize: 20, total: 0, pages: 0 })
 const filters = reactive({ startDate: '', endDate: '' })
 const dateRange = ref([])
 
@@ -92,11 +147,32 @@ const fetchStats = async () => {
     if (filters.endDate) params.endDate = filters.endDate
     const data = await api.transactions.stats(params)
     stats.value = data || { summary: {}, monthly: [], categories: [] }
+    // 同步加载列表数据（表2自身独立取数）
+    await fetchTransactions()
   } catch (error) {
     console.error('获取统计数据失败:', error)
     ElMessage.error(t('transactions.fetchFailed'))
   }
 }
+
+const fetchTransactions = async () => {
+  loading.value = true
+  try {
+    const params = { page: pagination.page, pageSize: pagination.pageSize }
+    if (filters.startDate) params.startDate = filters.startDate
+    if (filters.endDate) params.endDate = filters.endDate
+    const data = await api.transactions.list(params)
+    transactions.value = data.data
+    pagination.total = data.pagination.total
+    pagination.pages = data.pagination.pages
+  } catch (e) {
+    console.error('获取交易列表失败:', e)
+    ElMessage.error(t('transactions.fetchFailed'))
+  } finally { loading.value = false }
+}
+
+const handleSizeChange = (size) => { pagination.pageSize = size; fetchTransactions() }
+const handleCurrentChange = (page) => { pagination.page = page; fetchTransactions() }
 
 const goBack = () => router.push({ name: 'transactions' })
 const clearFilters = () => { dateRange.value = []; filters.startDate = ''; filters.endDate = ''; fetchStats() }
@@ -116,6 +192,9 @@ onMounted(() => { fetchStats() })
 .filter-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .stats-panel { margin-top: 8px; }
 .stat-card { text-align: center; }
+.bank-display { display: flex; align-items: center; }
+.bank-logo { height: 24px; max-width: 100px; object-fit: contain; }
+.pagination { margin-top: 20px; display: flex; justify-content: center; }
 .stat-title { font-size: 14px; color: #909399; }
 .stat-value { font-size: 24px; font-weight: bold; margin-top: 8px; }
 .positive { color: #67C23A; }
