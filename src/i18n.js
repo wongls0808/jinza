@@ -283,7 +283,12 @@ const messages = {
       customerTaxRate: '客户税率(%)',
       createSettlement: '生成结汇单',
       createPayment: '生成付款单',
-      amount: '金额'
+      amount: '金额',
+      selectedBase: '已选合计(基币)',
+      selectedSettled: '已选折算合计',
+      paymentTotal: '付款金额合计',
+      settlementCreated: '已生成结汇单：{n} 笔，基币 {base}，折算 {settled}',
+      paymentCreated: '已生成付款单：{n} 笔，总额 {total}'
     },
   },
   en: {
@@ -302,7 +307,12 @@ const messages = {
       customerTaxRate: 'Customer Tax(%)',
       createSettlement: 'Create Settlement',
       createPayment: 'Create Payment',
-      amount: 'Amount'
+      amount: 'Amount',
+      selectedBase: 'Selected Total (Base)',
+      selectedSettled: 'Selected Total (Converted)',
+      paymentTotal: 'Payment Total',
+      settlementCreated: 'Settlement created: {n} items, base {base}, converted {settled}',
+      paymentCreated: 'Payment created: {n} items, total {total}'
     },
     common: {
       backHome: 'Back to Home',
