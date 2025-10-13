@@ -162,7 +162,7 @@ const fetchTransactions = async () => {
     if (filters.startDate) params.startDate = filters.startDate
     if (filters.endDate) params.endDate = filters.endDate
     const data = await api.transactions.list(params)
-    transactions.value = data.data
+    transactions.value = Array.isArray(data?.data) ? data.data.map(normalizeRow) : []
     pagination.total = data.pagination.total
     pagination.pages = data.pagination.pages
   } catch (e) {
@@ -183,6 +183,60 @@ const formatCurrency = (value) => {
 }
 
 onMounted(() => { fetchStats() })
+
+// 将不同来源的字段标准化为表格使用的统一结构
+function normalizeRow(row) {
+  const r = row || {}
+  const dateVal = r.trn_date || r.transaction_date || r.date || r.trnDate
+  const acctNo = r.account_number || r.accountNumber || r.account || ''
+  const bankName = r.bank_name || r.bankName || r.bank_zh || r.bank_en || r.bank || ''
+  const acctName = r.account_name || r.accountName || ''
+  const refNo = r.cheque_ref_no || r.chequeRefNo || r.ref_no || r.refNo || ''
+  const refCombined = r.reference
+    || [r.reference1, r.reference2, r.reference3].filter(Boolean).join(' ').trim()
+    || [r.reference_1, r.reference_2, r.reference_3].filter(Boolean).join(' ').trim()
+    || ''
+  const debit = (r.debit_amount ?? r.debitAmount ?? 0)
+  const credit = (r.credit_amount ?? r.creditAmount ?? 0)
+
+  // 透传 logo/code 以供渲染
+  const bank_logo = r.bank_logo
+  const bank_code = r.bank_code || r.bankCode
+
+  return {
+    ...r,
+    trn_date: dateVal,
+    account_number: acctNo,
+    bank_name: bankName,
+    account_name: acctName,
+    cheque_ref_no: refNo,
+  reference: String(refCombined || '').replace(/\s+/g,' ').replace(/x{3,}/gi,'').trim(),
+    debit_amount: Number(String(debit).toString().replace(/,/g,'')) || 0,
+    credit_amount: Number(String(credit).toString().replace(/,/g,'')) || 0,
+    bank_logo,
+    bank_code
+  }
+}
+
+// 与列表页一致的日期格式化
+function formatDate(date) {
+  if (!date) return '-'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return String(date)
+  const d = new Date(date)
+  if (isNaN(d)) return String(date)
+  const y = d.getFullYear()
+  const m = String(d.getMonth()+1).padStart(2,'0')
+  const day = String(d.getDate()).padStart(2,'0')
+  return `${y}-${m}-${day}`
+}
+
+// 获取银行logo，与列表页保持一致逻辑
+function getBankLogo(row) {
+  if (!row) return ''
+  if (row.bank_logo) return row.bank_logo
+  if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
+  return ''
+}
 </script>
 
 <style scoped>
