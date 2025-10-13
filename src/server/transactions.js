@@ -160,6 +160,11 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
           )`, `%${searchTerm}%`)
         }
       }
+      // 排除已结汇过的交易
+      const { excludeSettled } = req.query || {}
+      if (excludeSettled && String(excludeSettled).toLowerCase() !== 'false') {
+        filters.push(`NOT EXISTS (SELECT 1 FROM fx_settlement_items si WHERE si.transaction_id = t.id)`)
+      }
       const whereClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
       return { whereClause, params: vals };
     }

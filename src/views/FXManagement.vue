@@ -23,6 +23,11 @@
           <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
             <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
           </el-select>
+          <el-select v-model="settleMode" style="min-width:140px">
+            <el-option :label="t('fx.modeAutoProrate')" value="auto" />
+            <el-option :label="t('fx.modeFull')" value="full" />
+          </el-select>
+          <el-input-number v-if="settleMode==='auto'" v-model="settleBaseInput" :precision="2" :step="100" :min="0" :max="myrBalance" :placeholder="t('fx.baseAmount')" />
           <span class="balance">MYR {{ money(myrBalance) }}</span>
           <el-button type="primary" :disabled="!canCreateSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
         </div>
@@ -110,8 +115,10 @@ const canCreateSettlement = computed(() => !!(settleDate.value && customerId.val
 const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0)))
 
 const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (Number(r.credit_amount || 0) - Number(r.debit_amount || 0)), 0))
-const selectedSettledTotal = computed(() => selectedBaseTotal.value * Number(rate.value || 0))
+const selectedSettledTotal = computed(() => Math.round((selectedBaseTotal.value * Number(rate.value || 0))))
 const paymentTotal = computed(() => accounts.value.reduce((s, a) => s + (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0), 0))
+const settleMode = ref('auto') // 'auto' 自动平摊 | 'full' 全额按选中明细
+const settleBaseInput = ref(0)
 
 const selectedCustomer = computed(() => customers.value.find(c => c.id === customerId.value) || null)
 const myrBalance = computed(() => Number(selectedCustomer.value?.balance_myr || 0))
@@ -130,7 +137,7 @@ async function loadMatched(){
   customerTaxRate.value = 0
   if (!customerId.value) return
   // 获取该客户已匹配交易（表2）
-  const data = await api.transactionsByCustomer(customerId.value, { pageSize: 1000 })
+  const data = await api.transactionsByCustomer(customerId.value, { pageSize: 1000, excludeSettled: 1 })
   matchedRows.value = Array.isArray(data?.data) ? data.data : []
   selMatched.value = []
   // 读取客户税率
@@ -154,13 +161,57 @@ function onCustomerChangePay(){
 }
 
 async function createSettlement(){
-  const items = selMatched.value.map(r => ({
-    transaction_id: r.id,
-    account_number: r.account_number,
-    trn_date: r.trn_date || r.transaction_date,
-    amount_base: Number(r.credit_amount||0) - Number(r.debit_amount||0),
-    amount_settled: (Number(r.credit_amount||0) - Number(r.debit_amount||0)) * Number(rate.value)
-  }))
+  if (!selMatched.value.length) return
+  const baseSum = selectedBaseTotal.value
+  // 校验余额：自动平摊模式下，输入金额需 >0 且不大于 MYR 余额和所选基币合计
+  if (settleMode.value === 'auto') {
+    const amt = Number(settleBaseInput.value || 0)
+    if (amt <= 0) { ElMessage.error(t('fx.errAmountRequired')); return }
+    if (amt > myrBalance.value) { ElMessage.error(t('fx.errExceedBalance')); return }
+    if (amt > baseSum) { ElMessage.error(t('fx.errExceedSelected')); return }
+  } else {
+    if (baseSum <= 0) { ElMessage.error(t('fx.errNothingToSettle')); return }
+    if (baseSum > myrBalance.value) { ElMessage.error(t('fx.errExceedBalance')); return }
+  }
+
+  const r = Number(rate.value || 0)
+  if (!r || r <= 0) { ElMessage.error(t('fx.errRateRequired')); return }
+
+  let items = []
+  if (settleMode.value === 'auto') {
+    const target = Number(settleBaseInput.value || 0)
+    // 比例 = 每条基币金额 / 基币总额，最后一条吃掉误差，折算金额四舍五入到元（整数）
+    let remain = target
+    let remainCny = Math.round(target * r)
+    for (let i = 0; i < selMatched.value.length; i++) {
+      const row = selMatched.value[i]
+      const base = Number(row.credit_amount||0) - Number(row.debit_amount||0)
+      let baseAlloc = i === selMatched.value.length - 1 ? remain : Math.floor((base / baseSum) * target * 100) / 100
+      if (baseAlloc > base) baseAlloc = base // 不超过单条可用金额
+      const cnyAlloc = i === selMatched.value.length - 1 ? remainCny : Math.round(baseAlloc * r)
+      items.push({
+        transaction_id: row.id,
+        account_number: row.account_number,
+        trn_date: row.trn_date || row.transaction_date,
+        amount_base: baseAlloc,
+        amount_settled: cnyAlloc
+      })
+      remain = Math.max(0, +(remain - baseAlloc).toFixed(2))
+      remainCny = Math.max(0, remainCny - cnyAlloc)
+    }
+  } else {
+    // 全额：按所选明细全额，各自折算四舍五入到元
+    items = selMatched.value.map(r => {
+      const base = Number(r.credit_amount||0) - Number(r.debit_amount||0)
+      return {
+        transaction_id: r.id,
+        account_number: r.account_number,
+        trn_date: r.trn_date || r.transaction_date,
+        amount_base: base,
+        amount_settled: Math.round(base * r)
+      }
+    })
+  }
   const found = customers.value.find(c => c.id === customerId.value)
   await api.fx.settlements.create({
     customer_id: customerId.value,
@@ -173,13 +224,13 @@ async function createSettlement(){
   ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))
   // 清空并刷新
   selMatched.value = []
-  matchedRows.value = []
+  // 重新加载列表并排除已结汇交易
+  await loadMatched()
   settleDate.value = formatToday()
   rate.value = null
   customerTaxRate.value = 0
   // 重新加载客户匹配交易（若仍保留客户）
   await loadCustomers()
-  if (customerId.value) await loadMatched()
 }
 
 async function loadAccounts(){
