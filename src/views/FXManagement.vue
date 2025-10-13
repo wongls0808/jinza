@@ -5,7 +5,10 @@
     <div class="fx-split">
       <el-card class="section left" shadow="never">
         <template #header>
-          <div class="section-hd">{{ t('fx.settlementArea') }}</div>
+          <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span>{{ t('fx.settlementArea') }}</span>
+            <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.viewHistory') }}</el-button>
+          </div>
         </template>
         <div class="settle-filters">
           <el-date-picker v-model="settleDate" type="date" :placeholder="t('fx.settleDate')" value-format="YYYY-MM-DD" />
@@ -37,7 +40,10 @@
 
       <el-card class="section right" shadow="never">
         <template #header>
-          <div class="section-hd">{{ t('fx.paymentArea') }}</div>
+          <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span>{{ t('fx.paymentArea') }}</span>
+            <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.viewHistory') }}</el-button>
+          </div>
         </template>
         <div class="pay-filters">
           <el-select v-model="payCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:260px" @change="loadAccounts">
@@ -131,6 +137,14 @@ async function createSettlement(){
     items
   })
   ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))
+  // 清空并刷新
+  selMatched.value = []
+  matchedRows.value = []
+  settleDate.value = ''
+  rate.value = null
+  customerTaxRate.value = 0
+  // 重新加载客户匹配交易（若仍保留客户）
+  if (customerId.value) await loadMatched()
 }
 
 async function loadAccounts(){
@@ -157,6 +171,11 @@ async function createPayment(){
   })
   const n = accounts.value.filter(a => Number(a._amount) > 0).length
   ElMessage.success(t('fx.paymentCreated', { n, total: money(paymentTotal.value) }))
+  // 清空并刷新
+  payDate.value = ''
+  accounts.value = accounts.value.map(a => ({ ...a, _amount: 0 }))
+  selAccounts.value = []
+  if (payCustomerId.value) await loadAccounts()
 }
 
 onMounted(loadCustomers)
