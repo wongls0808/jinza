@@ -88,19 +88,19 @@
 
       <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" width="160" />
 
-      <!-- 改为匹配列：关联人（使用 reference 字段） -->
-      <el-table-column :label="t('transactions.relationPerson')" prop="reference" show-overflow-tooltip width="200" />
-
-      <!-- 新增：关联对象（显示匹配目标名称） -->
-      <el-table-column :label="t('transactions.relationObject')" prop="match_target_name" show-overflow-tooltip width="200">
-        <template #default="scope">{{ scope.row.match_target_name || '-' }}</template>
-      </el-table-column>
+      <!-- 参考（原“关联人”展示在此列右侧的新“关联”中作为后备） -->
+      <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip width="240" />
 
       <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
         <template #default="scope"><span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span></template>
       </el-table-column>
       <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
         <template #default="scope"><span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span></template>
+      </el-table-column>
+
+      <!-- 新增：关联（优先显示关联对象名，其次显示关联人） -->
+      <el-table-column :label="t('transactions.relation')" prop="relation" show-overflow-tooltip width="220">
+        <template #default="scope">{{ scope.row.match_target_name || scope.row.reference || '-' }}</template>
       </el-table-column>
     </el-table>
 
