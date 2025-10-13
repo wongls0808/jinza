@@ -106,71 +106,46 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       maxAmount,
       searchTerm
     } = req.query;
-    
+
     const offset = (Number(page) - 1) * Number(pageSize);
-    let params = [Number(pageSize), offset];
-    let paramIndex = 3;
-    
-    // 构建基础查询
-    let sqlWhere = '';
-    const whereConditions = [];
-    
-    // 添加过滤条件
-    if (startDate) {
-      whereConditions.push(`transaction_date >= $${paramIndex++}`);
-      params.push(startDate);
+
+    // 构建过滤条件（可复用，支持不同占位符起始索引）
+    function buildWhere(baseIndex = 1) {
+      const filters = [];
+      const vals = [];
+      const add = (builder, val) => { const idx = baseIndex + vals.length; filters.push(builder(idx)); vals.push(val); };
+      if (startDate) add(i => `transaction_date >= $${i}`, startDate);
+      if (endDate) add(i => `transaction_date <= $${i}`, endDate);
+      if (account) add(i => `account_number ILIKE $${i}`, `%${account}%`);
+      // 类别已取消
+      if (minAmount) add(i => `(debit_amount >= $${i} OR credit_amount >= $${i})`, Number(minAmount));
+      if (maxAmount) add(i => `(debit_amount <= $${i} OR credit_amount <= $${i})`, Number(maxAmount));
+      if (searchTerm) add(i => `(
+        account_number ILIKE $${i} OR
+        cheque_ref_no ILIKE $${i} OR
+        reference_1 ILIKE $${i} OR
+        reference_2 ILIKE $${i} OR
+        reference_3 ILIKE $${i}
+      )`, `%${searchTerm}%`);
+      const whereClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
+      return { whereClause, params: vals };
     }
-    
-    if (endDate) {
-      whereConditions.push(`transaction_date <= $${paramIndex++}`);
-      params.push(endDate);
-    }
-    
-    if (account) {
-      whereConditions.push(`account_number ILIKE $${paramIndex++}`);
-      params.push(`%${account}%`);
-    }
-    
-    // 移除了类别筛选
-    
-    if (minAmount) {
-      whereConditions.push(`(debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`);
-      params.push(Number(minAmount));
-      paramIndex++;
-    }
-    
-    if (maxAmount) {
-      whereConditions.push(`(debit_amount <= $${paramIndex} OR credit_amount <= $${paramIndex})`);
-      params.push(Number(maxAmount));
-      paramIndex++;
-    }
-    
-    if (searchTerm) {
-      whereConditions.push(`(
-        account_number ILIKE $${paramIndex} OR
-        cheque_ref_no ILIKE $${paramIndex} OR
-        reference_1 ILIKE $${paramIndex} OR
-        reference_2 ILIKE $${paramIndex} OR
-        reference_3 ILIKE $${paramIndex}
-      )`);
-      params.push(`%${searchTerm}%`);
-      paramIndex++;
-    }
-    
-    if (whereConditions.length > 0) {
-      sqlWhere = 'WHERE ' + whereConditions.join(' AND ');
-    }
-    
-    // 获取总记录数
+
+    // 生成 count 查询条件（从 $1 开始）
+    const { whereClause: whereForCount, params: paramsForCount } = buildWhere(1);
     const countResult = await query(`
       SELECT COUNT(*) as total
       FROM transactions
-      ${sqlWhere}
-    `, params.slice(2));
-    
-    const total = parseInt(countResult.rows[0].total);
-    
-    // 获取分页数据
+      ${whereForCount}
+    `, paramsForCount);
+    const total = parseInt(countResult.rows[0].total || '0', 10);
+
+    // 生成数据查询条件（$1,$2 预留给 LIMIT/OFFSET，从 $3 开始）
+    const { whereClause: whereForData, params: paramsForData } = buildWhere(3);
+    const allowedSort = new Set(['transaction_date','account_number','cheque_ref_no','debit_amount','credit_amount','created_at','updated_at','id']);
+    const sortField = allowedSort.has(String(sort)) ? String(sort) : 'transaction_date';
+    const sortOrder = String(order).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
     const result = await query(`
       SELECT 
         t.id, 
@@ -202,11 +177,11 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       LEFT JOIN users u ON t.created_by = u.id
       LEFT JOIN receiving_accounts a ON t.account_number = a.bank_account
       LEFT JOIN banks b ON a.bank_id = b.id
-      ${sqlWhere}
+      ${whereForData}
       ORDER BY 
-        ${sort} ${order === 'asc' ? 'ASC' : 'DESC'}
+        ${sortField} ${sortOrder}
       LIMIT $1 OFFSET $2
-    `, params);
+    `, [Number(pageSize), offset, ...paramsForData]);
     
     res.json({
       data: result.rows,
