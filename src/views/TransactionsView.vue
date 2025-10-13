@@ -318,6 +318,38 @@
       </template>
     </el-dialog>
     
+    <!-- 匹配对话框（仅客户） -->
+    <el-dialog
+      v-model="matchDialogVisible"
+      :title="t('transactions.matchTransactions')"
+      width="520px">
+      <el-form label-width="120px">
+        <el-form-item :label="t('transactions.selectCustomer')">
+          <el-select
+            v-model="matchForm.customerId"
+            filterable
+            remote
+            :remote-method="searchCustomers"
+            :loading="customersLoading"
+            :placeholder="t('transactions.searchCustomerPlaceholder')"
+            style="width: 100%">
+            <el-option
+              v-for="c in customerOptions"
+              :key="c.id"
+              :label="c.name"
+              :value="c.id" />
+          </el-select>
+        </el-form-item>
+        <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="matchDialogVisible=false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="matching" @click="confirmMatch">{{ t('common.ok') }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 高级筛选对话框 -->
     <el-dialog
       v-model="filtersDialogVisible"
@@ -638,8 +670,10 @@ const fetchTransactions = async () => {
       params.maxAmount = filters.maxAmount
     }
     
-    // 使用API获取数据
-    const data = await api.transactions.list(params)
+  // 仅拉取未匹配（表1语义）
+  params.status = 'pending'
+  // 使用API获取数据
+  const data = await api.transactions.list(params)
     
     transactions.value = data.data
     pagination.total = data.pagination.total
@@ -859,37 +893,50 @@ const handleBatchDelete = async () => {
 }
 
 // 匹配功能（行操作）
+// 匹配（客户）弹窗
+const matchDialogVisible = ref(false)
+const matching = ref(false)
+const customersLoading = ref(false)
+const customerOptions = ref([])
+const matchForm = reactive({ id: null, customerId: null })
+
 const handleMatchRow = (row) => {
-  ElMessageBox.prompt(t('transactions.enterMatchPattern'), t('transactions.matchTransactions'), {
-    confirmButtonText: t('common.ok'),
-    cancelButtonText: t('common.cancel'),
-    inputPattern: /.+/,
-    inputErrorMessage: t('transactions.patternRequired'),
-    inputPlaceholder: t('transactions.matchPatternPlaceholder')
-  }).then(({ value }) => {
-    // 保存用户输入的匹配模式
-    const pattern = value.trim()
-    // 添加匹配模式到过滤器，这样可以在字段中进行更精确的搜索
-    // 这里同时搜索交易说明、参考号和合并的参考字段
-    const advancedFilters = {
-      searchQuery: pattern,
-      searchFields: ['transaction_description', 'cheque_ref_no', 'reference'],
-      exactMatch: false
-    }
-    
-  // 保存高级过滤设置
-  Object.assign(filters, advancedFilters)
-    
-    // 执行搜索
-    handleSearch()
-    
-    // 显示过滤提示
-    ElMessage({
-      type: 'success',
-      message: t('transactions.matchResultsShown'),
-      duration: 5000
-    })
-  }).catch(() => {})
+  matchForm.id = row?.id || null
+  matchForm.customerId = null
+  customerOptions.value = []
+  matchDialogVisible.value = true
+}
+
+const searchCustomers = async (q) => {
+  customersLoading.value = true
+  try {
+    const res = await api.customers.list({ q: q || '', page: 1, pageSize: 20 })
+    customerOptions.value = Array.isArray(res?.items) ? res.items : []
+  } finally {
+    customersLoading.value = false
+  }
+}
+
+const confirmMatch = async () => {
+  if (!matchForm.id || !matchForm.customerId) {
+    ElMessage.warning(t('transactions.selectCustomerFirst'))
+    return
+  }
+  try {
+    matching.value = true
+    const c = customerOptions.value.find(x => x.id === matchForm.customerId)
+    const name = c?.name || ''
+    await api.transactions.match(matchForm.id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
+    matchDialogVisible.value = false
+    ElMessage.success(t('transactions.matchSuccess'))
+    // 刷新（未匹配列表将自动剔除此条）
+    fetchTransactions()
+  } catch (e) {
+    console.error('match failed', e)
+    ElMessage.error(t('transactions.matchFailed'))
+  } finally {
+    matching.value = false
+  }
 }
 
 // 获取账户列表
