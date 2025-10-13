@@ -48,10 +48,10 @@
           </el-button-group>
         </div>
         <div class="toolbar-right">
-          <el-switch
-            v-model="showStats"
-            :inactive-text="t('transactions.showStats')"
-            @change="toggleStats" />
+          <el-button type="default" @click="goToStats">
+            <el-icon><DataAnalysis /></el-icon>
+            {{ t('transactions.showStats') }}
+          </el-button>
         </div>
       </div>
     </div>
@@ -474,6 +474,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Papa from 'papaparse'
@@ -482,6 +483,7 @@ import { useTableMemory } from '@/composables/useTableMemory'
 
 
 const { t } = useI18n()
+const router = useRouter()
 
 // 列宽记忆（transactions 表）
 const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions')
@@ -502,7 +504,7 @@ const pagination = reactive({
 })
 const sort = ref('transaction_date')
 const order = ref('desc')
-const showStats = ref(false)
+const showStats = ref(false) // 保留变量但不在此页使用
 const stats = ref({ summary: {}, monthly: [], categories: [] })
 const filters = reactive({
   startDate: '',
@@ -714,11 +716,8 @@ const handleCurrentChange = (page) => {
   fetchTransactions()
 }
 
-const toggleStats = () => {
-  if (showStats.value) {
-    fetchStats()
-  }
-}
+const toggleStats = () => {}
+const goToStats = () => { router.push({ name: 'transactions-stats' }) }
 
 const showAddDialog = () => {
   isEdit.value = false
