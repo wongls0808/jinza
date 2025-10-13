@@ -90,15 +90,27 @@
         </el-col>
       </el-row>
       
+      <!-- 独立统计表（按月汇总） -->
       <el-row :gutter="20" class="chart-row">
         <el-col :span="24">
           <el-card shadow="hover">
             <template #header>
               <div class="card-header">
-                <span>{{ t('transactions.monthlyTrend') }}</span>
+                <span>{{ t('transactions.statsDetail') }}</span>
               </div>
             </template>
-            <div id="monthlyChart" class="chart-container"></div>
+            <el-table :data="monthlyTable" size="small" border style="width:100%">
+              <el-table-column :label="t('transactions.month')" prop="month" width="140" />
+              <el-table-column :label="t('transactions.debitTotal')" prop="debit" align="right" width="160">
+                <template #default="{ row }"><span class="negative">{{ formatCurrency(row.debit) }}</span></template>
+              </el-table-column>
+              <el-table-column :label="t('transactions.creditTotal')" prop="credit" align="right" width="160">
+                <template #default="{ row }"><span class="positive">{{ formatCurrency(row.credit) }}</span></template>
+              </el-table-column>
+              <el-table-column :label="t('transactions.net')" prop="net" align="right" width="160">
+                <template #default="{ row }"><span :class="row.net >= 0 ? 'positive' : 'negative'">{{ formatCurrency(row.net) }}</span></template>
+              </el-table-column>
+            </el-table>
           </el-card>
         </el-col>
       </el-row>
@@ -489,28 +501,9 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Papa from 'papaparse'
-import * as echarts from 'echarts/core'
 import { api } from '@/api'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent
-} from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
 import { useTableMemory } from '@/composables/useTableMemory'
 
-echarts.use([
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-  BarChart,
-  LineChart,
-  PieChart,
-  CanvasRenderer
-])
 
 const { t } = useI18n()
 
@@ -535,6 +528,16 @@ const sort = ref('transaction_date')
 const order = ref('desc')
 const showStats = ref(false)
 const stats = ref({ summary: {}, monthly: [], categories: [] })
+// 月度统计表数据（由后端 stats.monthly 转换得到）
+const monthlyTable = computed(() => {
+  const arr = Array.isArray(stats.value?.monthly) ? stats.value.monthly : []
+  return arr.map(it => ({
+    month: it.month,
+    debit: Number(it.debit) || 0,
+    credit: Number(it.credit) || 0,
+    net: (Number(it.credit) || 0) - (Number(it.debit) || 0)
+  }))
+})
 const filters = reactive({
   startDate: '',
   endDate: '',
@@ -596,9 +599,7 @@ const rules = {
   ]
 }
 
-// 图表实例
-let monthlyChart = null
-let categoryChart = null
+// 已移除图表
 
 // 类别选项
 const categoryOptions = ref([
@@ -723,116 +724,14 @@ const fetchStats = async () => {
     const data = await api.transactions.stats(params)
     stats.value = data
     
-    // 延迟一下再渲染图表，确保DOM已经准备好
-    setTimeout(() => {
-      renderCharts()
-    }, 100)
+    // 图表已移除，无需渲染
   } catch (error) {
     console.error('获取统计数据失败:', error)
     ElMessage.error(t('transactions.statsFetchFailed'))
   }
 }
 
-const renderCharts = () => {
-  // 渲染月度趋势图
-  if (monthlyChart) {
-    monthlyChart.dispose()
-  }
-  
-  const monthlyEl = document.getElementById('monthlyChart')
-  if (monthlyEl) {
-    monthlyChart = echarts.init(monthlyEl)
-    
-  const months = (stats.value.monthly || []).map(item => item.month)
-  const debitData = (stats.value.monthly || []).map(item => Number(item.debit) || 0)
-  const creditData = (stats.value.monthly || []).map(item => Number(item.credit) || 0)
-    
-    const option = {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' }
-      },
-      legend: {
-        data: [t('transactions.debitAmount'), t('transactions.creditAmount')]
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: months
-      },
-      yAxis: {
-        type: 'value'
-      },
-      series: [
-        {
-          name: t('transactions.debitAmount'),
-          type: 'bar',
-          stack: 'total',
-          color: '#F56C6C',
-          data: debitData
-        },
-        {
-          name: t('transactions.creditAmount'),
-          type: 'bar',
-          stack: 'total',
-          color: '#67C23A',
-          data: creditData
-        }
-      ]
-    }
-    
-    monthlyChart.setOption(option)
-  }
-  
-  // 渲染类别饼图
-  if (categoryChart) {
-    categoryChart.dispose()
-  }
-  
-  const categoryEl = document.getElementById('categoryChart')
-  if (categoryEl) {
-    categoryChart = echarts.init(categoryEl)
-    
-    const categoryData = (stats.value.categories || []).map(item => ({
-      name: item.category || t('transactions.uncategorized'),
-      value: Number(item.count) || 0
-    }))
-    
-    const option = {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b}: {c} ({d}%)'
-      },
-      series: [
-        {
-          name: t('transactions.totalTransactions'),
-          type: 'pie',
-          radius: ['40%', '70%'],
-          avoidLabelOverlap: false,
-          label: {
-            show: true,
-            formatter: '{b}: {c} ({d}%)'
-          },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: '14',
-              fontWeight: 'bold'
-            }
-          },
-          data: categoryData
-        }
-      ]
-    }
-    
-    categoryChart.setOption(option)
-  }
-}
+// 已移除 renderCharts 图表渲染逻辑
 
 const handleSearch = () => {
   pagination.page = 1
@@ -1403,10 +1302,7 @@ const getCategoryTagType = (category) => {
 }
 
 // 监听窗口大小变化，调整图表大小
-const handleResize = () => {
-  if (monthlyChart) monthlyChart.resize()
-  if (categoryChart) categoryChart.resize()
-}
+const handleResize = () => {}
 
 // 生命周期钩子
 onMounted(() => {
@@ -1427,8 +1323,6 @@ onMounted(() => {
 // 在组件卸载时释放资源
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  if (monthlyChart) monthlyChart.dispose()
-  if (categoryChart) categoryChart.dispose()
 })
 
 // 辅助：获取银行 Logo（优先 DB 返回，其次按 bank_code 回退静态资源）
