@@ -60,6 +60,19 @@ function parseDateYYYYMMDD(v) {
   return s
 }
 
+// 清洗参考字段：去除连续空白，移除 3 个及以上的 X/x 片段，并整体 trim
+function sanitizeReferenceText(s) {
+  if (!s) return null
+  let t = String(s)
+  // 移除大小写不敏感的 X{3,}
+  t = t.replace(/x{3,}/gi, '')
+  // 合并连续空白为单空格
+  t = t.replace(/\s+/g, ' ')
+  // 去除前后空白
+  t = t.trim()
+  return t || null
+}
+
 // 下载导入模板（返回JSON样例，前端将转CSV）
 transactionsRouter.get('/template', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
   return res.json([
@@ -167,23 +180,28 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
         t.description AS "transaction_description",
         t.debit_amount,
         t.credit_amount,
-        t.reference_1 || ' ' || t.reference_2 || ' ' || t.reference_3 AS "reference",
+        trim(
+          regexp_replace(
+            regexp_replace(
+              coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,''),
+              '\\s+', ' ', 'g'
+            ),
+            '(?i)x{3,}', '', 'g'
+          )
+        ) AS "reference",
         u.username AS "createdBy",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
-  a.account_name,
-  b.code AS "bank_code",
-  b.zh AS "bank_name",
-  b.en AS "bank_name_en",
-  b.logo_url AS "bank_logo"
+        a.account_name,
+        b.code AS "bank_code",
+        b.zh AS "bank_name",
+        b.en AS "bank_name_en",
+        b.logo_url AS "bank_logo"
       FROM 
         transactions t
-      LEFT JOIN
-        users u ON t.created_by = u.id
-      LEFT JOIN
-        receiving_accounts a ON t.account_number = a.bank_account
-      LEFT JOIN
-        banks b ON a.bank_id = b.id
+      LEFT JOIN users u ON t.created_by = u.id
+      LEFT JOIN receiving_accounts a ON t.account_number = a.bank_account
+      LEFT JOIN banks b ON a.bank_id = b.id
       ${sqlWhere}
       ORDER BY 
         ${sort} ${order === 'asc' ? 'ASC' : 'DESC'}
@@ -360,7 +378,7 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
     }
     const sqlWhere = whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-    const rs = await query(`
+      const rs = await query(`
       SELECT 
         t.id, 
         t.account_number,
@@ -369,7 +387,7 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
         t.description,
         t.debit_amount,
         t.credit_amount,
-        t.reference_1, t.reference_2, t.reference_3,
+          trim(regexp_replace(regexp_replace(coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,''),'\\s+',' ','g'),'(?i)x{3,}','','g')) as reference,
         a.account_name,
         b.code AS "bank_code",
         b.zh AS "bank_name",
@@ -432,7 +450,7 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('view_trans
         const r1 = cleanCell(r.reference1 || r.reference_1) || ''
         const r2 = cleanCell(r.reference2 || r.reference_2) || ''
         const r3 = cleanCell(r.reference3 || r.reference_3) || ''
-        const mergedRef = [r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' ') || null
+          const mergedRef = sanitizeReferenceText([r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' '))
 
         const ins = await query(
           `insert into transactions(
@@ -500,8 +518,8 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
         const balance = Number(credit || 0) - Number(debit || 0)
         const r1 = cleanCell(r['Reference 1']) || ''
         const r2 = cleanCell(r['Reference 2']) || ''
-        const r3 = cleanCell(r['Reference 3']) || ''
-        const mergedRef = [r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' ') || null
+  const r3 = cleanCell(r['Reference 3']) || ''
+  const mergedRef = sanitizeReferenceText([r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' '))
         if (!trn) { failed++; continue }
 
         const ins = await query(
@@ -543,7 +561,7 @@ transactionsRouter.post('/', authMiddleware(true), requirePerm('view_transaction
       return res.status(400).json({ error: '缺少必要字段' });
     }
     const balance = Number(credit_amount || 0) - Number(debit_amount || 0);
-    const ref1 = reference || null;
+  const ref1 = sanitizeReferenceText(reference) || null;
     const ref2 = null;
     const ref3 = null;
     const createdBy = req.user?.id || null;
@@ -587,7 +605,7 @@ transactionsRouter.put('/:id', authMiddleware(true), requirePerm('view_transacti
     if (description !== undefined) { fields.push(`description=$${idx++}`); values.push(description || null); }
     if (debit_amount !== undefined) { fields.push(`debit_amount=$${idx++}`); values.push(Number(debit_amount)||0); }
     if (credit_amount !== undefined) { fields.push(`credit_amount=$${idx++}`); values.push(Number(credit_amount)||0); }
-    if (reference !== undefined) { fields.push(`reference_1=$${idx++}`); values.push(reference || null); }
+  if (reference !== undefined) { fields.push(`reference_1=$${idx++}`); values.push(sanitizeReferenceText(reference) || null); }
     if (!fields.length) return res.status(400).json({ error: '无修改内容' });
     // 自动更新 balance
     const setClause = fields.join(', ') + ', balance = coalesce(credit_amount,0) - coalesce(debit_amount,0), updated_at = now()';
@@ -620,7 +638,7 @@ transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transacti
         t.credit_amount AS "creditAmount",
         t.balance,
         t.category,
-        (coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,'')) AS "reference",
+        trim(regexp_replace(regexp_replace(coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,''),'\\s+',' ','g'),'(?i)x{3,}','','g')) AS "reference",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt"
       FROM transactions t

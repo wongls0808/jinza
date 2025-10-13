@@ -4,8 +4,8 @@
     
     <!-- 顶部工具栏 -->
     <div class="toolbar">
-      <el-row :gutter="20">
-        <el-col :span="6">
+      <div class="toolbar-row">
+        <div class="toolbar-left">
           <el-input
             v-model="searchQuery"
             :placeholder="t('transactions.searchPlaceholder')"
@@ -16,9 +16,8 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-        </el-col>
-        
-        <el-col :span="18">
+        </div>
+        <div class="toolbar-center">
           <el-button-group>
             <el-button type="primary" @click="showAddDialog">
               <el-icon><Plus /></el-icon>
@@ -40,20 +39,15 @@
               <el-icon><Delete /></el-icon>
               {{ t('transactions.batchDelete') }}
             </el-button>
-            <el-button @click="handleMatch" type="success">
-              <el-icon><Connection /></el-icon>
-              {{ t('transactions.match') }}
-            </el-button>
           </el-button-group>
-        </el-col>
-        
-        <el-col :span="6" class="text-right">
+        </div>
+        <div class="toolbar-right">
           <el-switch
             v-model="showStats"
             :inactive-text="t('transactions.showStats')"
             @change="toggleStats" />
-        </el-col>
-      </el-row>
+        </div>
+      </div>
     </div>
     
     <!-- 统计信息面板 -->
@@ -153,15 +147,23 @@
       :data="transactions"
       style="width: 100%; margin-top: 20px;"
       @row-dblclick="handleRowDblClick"
+      @header-dragend="onColResize"
       @selection-change="handleSelectionChange"
       border
       stripe>
       
       <el-table-column type="selection" width="55" />
-      
-      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable />
 
-      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable>
+      <!-- 列顺序：交易日期、账号、银行、账户名称、参考号、参考、借方金额、贷方金额 -->
+      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable :width="colW('trn_date', 140)">
+        <template #default="scope">
+          {{ formatDate(scope.row.trn_date) }}
+        </template>
+      </el-table-column>
+
+      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable :width="colW('account_number', 160)" />
+
+      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable :width="colW('bank_name', 160)">
         <template #default="scope">
           <div class="bank-display">
             <img
@@ -175,60 +177,34 @@
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable>
+      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable :width="colW('account_name', 180)">
         <template #default="scope">
           {{ scope.row.account_name || '-' }}
         </template>
       </el-table-column>
-      
-      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable width="140">
-        <template #default="scope">
-          {{ formatDate(scope.row.trn_date) }}
-        </template>
-      </el-table-column>
-      
-      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" />
-      
-      <el-table-column :label="t('transactions.transactionDescription')" prop="transaction_description" show-overflow-tooltip />
-      
-      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
+
+      <el-table-column :label="t('transactions.chequeRefNo')" prop="cheque_ref_no" :width="colW('cheque_ref_no', 160)" />
+
+      <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip :width="colW('reference', 240)" />
+
+      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable :width="colW('debit_amount', 140)">
         <template #default="scope">
           <span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span>
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable width="140">
+      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable :width="colW('credit_amount', 140)">
         <template #default="scope">
           <span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip />
-      
       <el-table-column label="" width="100">
         <template #default="scope">
-          <el-dropdown trigger="click">
-            <el-button type="primary" text size="small">
-              {{ t('common.actions') }}
-              <el-icon><ArrowDown /></el-icon>
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleView(scope.row)">
-                  <el-icon><View /></el-icon>
-                  {{ t('common.view') }}
-                </el-dropdown-item>
-                <el-dropdown-item @click="handleEdit(scope.row)">
-                  <el-icon><Edit /></el-icon>
-                  {{ t('common.edit') }}
-                </el-dropdown-item>
-                <el-dropdown-item @click="handleDelete(scope.row)" divided>
-                  <el-icon><Delete /></el-icon>
-                  {{ t('common.delete') }}
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <el-button type="success" text size="small" @click="handleMatchRow(scope.row)">
+            <el-icon><Connection /></el-icon>
+            {{ t('transactions.match') }}
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -965,7 +941,7 @@ const handleDelete = (row) => {
 }
 
 const handleRowDblClick = (row) => {
-  handleView(row)
+  handleEdit(row)
 }
 
 // 处理表格多选
@@ -1007,7 +983,7 @@ const handleBatchDelete = async () => {
 }
 
 // 匹配功能
-const handleMatch = () => {
+const handleDelete = (row) => {
   ElMessageBox.prompt(t('transactions.enterMatchPattern'), t('transactions.matchTransactions'), {
     confirmButtonText: t('common.ok'),
     cancelButtonText: t('common.cancel'),
@@ -1018,16 +994,7 @@ const handleMatch = () => {
     // 保存用户输入的匹配模式
     const pattern = value.trim()
     
-    // 显示匹配开始的消息
-    ElMessage({
-      type: 'info',
-      message: t('transactions.matchingStarted', { pattern }),
-      duration: 3000
-    })
-    
-    // 设置高级过滤条件，根据匹配模式进行搜索
-    searchQuery.value = pattern
-    
+      await api.transactions.remove(row.id)
     // 添加匹配模式到过滤器，这样可以在字段中进行更精确的搜索
     // 这里同时搜索交易说明、参考号和合并的参考字段
     const advancedFilters = {
@@ -1333,13 +1300,11 @@ const submitImport = async () => {
     const ins = result?.inserted || 0
     const skipped = result?.skipped || 0
     const failed = result?.failed || 0
-    ElMessage.success(t('transactions.importSuccess', { count: ins }))
-    if (skipped > 0) {
-      ElMessage.info(`${t('transactions.importSkipped')}: ${skipped}`)
-    }
-    if (failed > 0) {
-      ElMessage.warning(t('transactions.importPartial', { inserted: ins, failed }))
-    }
+    const parts = []
+    parts.push(`${t('transactions.imported')}: ${ins}`)
+    if (skipped > 0) parts.push(`${t('transactions.skipped')}: ${skipped}`)
+    if (failed > 0) parts.push(`${t('transactions.failed')}: ${failed}`)
+    ElMessage.success(parts.join(' ｜ '))
     
     fetchTransactions()
   } catch (error) {
