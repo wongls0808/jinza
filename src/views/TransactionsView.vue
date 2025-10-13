@@ -16,6 +16,12 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
+          <el-checkbox
+            v-model="searchAmountOnly"
+            class="amount-only"
+            @change="handleSearch">
+            金额
+          </el-checkbox>
         </div>
         <div class="toolbar-center">
           <el-button-group>
@@ -515,6 +521,7 @@ const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions')
 const transactions = ref([])
 const loading = ref(false)
 const searchQuery = ref('')
+const searchAmountOnly = ref(true)
 const multipleSelection = ref([])
 const accounts = ref([])
 const selectedBankLogo = ref('')
@@ -635,6 +642,7 @@ const fetchTransactions = async () => {
     
     if (searchQuery.value) {
       params.searchTerm = searchQuery.value
+      params.searchAmountOnly = searchAmountOnly.value ? '1' : '0'
     }
     
     if (filters.startDate) {
@@ -1161,7 +1169,7 @@ const exportTransactions = async () => {
     }
     
     // 使用API获取导出数据
-    const data = await api.transactions.export(params)
+  const data = await api.transactions.export({ ...params, searchAmountOnly: searchAmountOnly.value ? '1' : '0' })
     
     if (!data || data.length === 0) {
       ElMessage.warning(t('transactions.noDataToExport'))
@@ -1437,11 +1445,17 @@ function getBankLogo(row) {
   flex-wrap: nowrap;
 }
 .toolbar-left {
-  flex: 0 0 320px; /* 搜索框固定宽度，可按需调整 */
+  flex: 0 0 380px; /* 搜索区包含输入与复选框，稍加宽 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .toolbar-left :deep(.el-input),
 .toolbar-left .el-input {
   width: 100%;
+}
+.toolbar-left .amount-only {
+  white-space: nowrap;
 }
 .toolbar-center {
   flex: 1 1 auto;

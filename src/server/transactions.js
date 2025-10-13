@@ -104,7 +104,8 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       category,
       minAmount,
       maxAmount,
-      searchTerm
+      searchTerm,
+      searchAmountOnly
     } = req.query;
 
     const offset = (Number(page) - 1) * Number(pageSize);
@@ -120,13 +121,23 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       // 类别已取消
       if (minAmount) add(i => `(debit_amount >= $${i} OR credit_amount >= $${i})`, Number(minAmount));
       if (maxAmount) add(i => `(debit_amount <= $${i} OR credit_amount <= $${i})`, Number(maxAmount));
-      if (searchTerm) add(i => `(
-        account_number ILIKE $${i} OR
-        cheque_ref_no ILIKE $${i} OR
-        reference_1 ILIKE $${i} OR
-        reference_2 ILIKE $${i} OR
-        reference_3 ILIKE $${i}
-      )`, `%${searchTerm}%`);
+      if (searchTerm) {
+        const amountOnly = String(searchAmountOnly || '').toLowerCase() in { '1':1, 'true':1 };
+        const numeric = Number(String(searchTerm).replace(/[,\s]/g, ''))
+        if (amountOnly && !Number.isNaN(numeric) && String(searchTerm).trim() !== '') {
+          // 精确金额匹配（借方或贷方任一等于该值）
+          add(i => `(debit_amount = $${i} OR credit_amount = $${i})`, numeric)
+        } else {
+          // 全局模糊
+          add(i => `(
+            account_number ILIKE $${i} OR
+            cheque_ref_no ILIKE $${i} OR
+            reference_1 ILIKE $${i} OR
+            reference_2 ILIKE $${i} OR
+            reference_3 ILIKE $${i}
+          )`, `%${searchTerm}%`)
+        }
+      }
       const whereClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
       return { whereClause, params: vals };
     }
@@ -327,7 +338,8 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
       category,
       minAmount,
       maxAmount,
-      searchTerm
+      searchTerm,
+      searchAmountOnly
     } = req.query;
 
     let params = [];
@@ -341,15 +353,23 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
     if (minAmount) { whereConditions.push(`(debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`); params.push(Number(minAmount)); paramIndex++; }
     if (maxAmount) { whereConditions.push(`(debit_amount <= $${paramIndex} OR credit_amount <= $${paramIndex})`); params.push(Number(maxAmount)); paramIndex++; }
     if (searchTerm) {
-      whereConditions.push(`(
-        account_number ILIKE $${paramIndex} OR
-        cheque_ref_no ILIKE $${paramIndex} OR
-        reference_1 ILIKE $${paramIndex} OR
-        reference_2 ILIKE $${paramIndex} OR
-        reference_3 ILIKE $${paramIndex}
-      )`);
-      params.push(`%${searchTerm}%`);
-      paramIndex++;
+      const amountOnly = String(searchAmountOnly || '').toLowerCase() in { '1':1, 'true':1 };
+      const numeric = Number(String(searchTerm).replace(/[,\s]/g, ''))
+      if (amountOnly && !Number.isNaN(numeric) && String(searchTerm).trim() !== '') {
+        whereConditions.push(`(debit_amount = $${paramIndex} OR credit_amount = $${paramIndex})`)
+        params.push(numeric)
+        paramIndex++
+      } else {
+        whereConditions.push(`(
+          account_number ILIKE $${paramIndex} OR
+          cheque_ref_no ILIKE $${paramIndex} OR
+          reference_1 ILIKE $${paramIndex} OR
+          reference_2 ILIKE $${paramIndex} OR
+          reference_3 ILIKE $${paramIndex}
+        )`)
+        params.push(`%${searchTerm}%`)
+        paramIndex++
+      }
     }
     const sqlWhere = whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
