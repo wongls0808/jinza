@@ -493,6 +493,7 @@ import {
   GridComponent
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useTableMemory } from '@/composables/useTableMemory'
 
 echarts.use([
   TitleComponent,
@@ -506,6 +507,9 @@ echarts.use([
 ])
 
 const { t } = useI18n()
+
+// 列宽记忆（transactions 表）
+const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions')
 
 // 数据和状态
 const transactions = ref([])
@@ -982,8 +986,8 @@ const handleBatchDelete = async () => {
   }
 }
 
-// 匹配功能
-const handleDelete = (row) => {
+// 匹配功能（行操作）
+const handleMatchRow = (row) => {
   ElMessageBox.prompt(t('transactions.enterMatchPattern'), t('transactions.matchTransactions'), {
     confirmButtonText: t('common.ok'),
     cancelButtonText: t('common.cancel'),
@@ -993,8 +997,6 @@ const handleDelete = (row) => {
   }).then(({ value }) => {
     // 保存用户输入的匹配模式
     const pattern = value.trim()
-    
-      await api.transactions.remove(row.id)
     // 添加匹配模式到过滤器，这样可以在字段中进行更精确的搜索
     // 这里同时搜索交易说明、参考号和合并的参考字段
     const advancedFilters = {
