@@ -1426,7 +1426,37 @@ function getBankLogo(row) {
 }
 
 .toolbar {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+}
+
+/* 工具栏一行三段：左(检索框)、中(功能键)、右(显示统计开关) */
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+.toolbar-left {
+  flex: 0 0 320px; /* 搜索框固定宽度，可按需调整 */
+}
+.toolbar-left :deep(.el-input),
+.toolbar-left .el-input {
+  width: 100%;
+}
+.toolbar-center {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+}
+.toolbar-center :deep(.el-button-group),
+.toolbar-center .el-button-group {
+  display: inline-flex;
+  flex-wrap: nowrap; /* 按钮不换行 */
+}
+.toolbar-right {
+  margin-left: auto; /* 将开关推到最右侧 */
+  display: flex;
+  align-items: center;
 }
 
 .text-right {
