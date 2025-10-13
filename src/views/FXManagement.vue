@@ -2,10 +2,6 @@
   <div class="fx-page">
     <div class="page-hd">
       <h1>{{ t('fx.title') }}</h1>
-      <div class="hd-actions">
-        <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.settlementHistory') }}</el-button>
-        <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.paymentHistory') }}</el-button>
-      </div>
     </div>
 
     <div class="fx-split">
@@ -13,7 +9,6 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.settlementArea') }}</span>
-            <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="settle-filters">
@@ -30,17 +25,17 @@
           <span>{{ t('fx.selectedBase') }}: {{ money(selectedBaseTotal) }}</span>
           <span>{{ t('fx.selectedSettled') }}: {{ money(selectedSettledTotal) }}</span>
         </div>
-  <el-table :data="matchedRows" size="small" border @selection-change="onSelMatchedChange">
+  <el-table :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" width="120" />
-          <el-table-column prop="account_number" :label="t('transactions.accountNumber')" width="160" />
-          <el-table-column prop="account_name" :label="t('transactions.accountName')" width="180" />
-          <el-table-column :label="t('transactions.bankName')" width="80" align="center">
+          <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
+          <el-table-column prop="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
+          <el-table-column prop="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
+          <el-table-column :label="t('transactions.bankName')" :width="colWSettle('bank_logo',80)" align="center">
             <template #default="{ row }">
               <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" :label="t('transactions.creditAmount')" width="120" align="right">
+          <el-table-column prop="credit_amount" :label="t('transactions.creditAmount')" :width="colWSettle('credit_amount',120)" align="right">
             <template #default="{ row }">{{ money(row.credit_amount) }}</template>
           </el-table-column>
         </el-table>
@@ -50,7 +45,6 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.paymentArea') }}</span>
-            <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="pay-filters">
@@ -64,17 +58,17 @@
         <div class="totals">
           <span>{{ t('fx.paymentTotal') }}: {{ money(paymentTotal) }}</span>
         </div>
-  <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange">
+  <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="account_name" :label="t('customers.accounts.accountName')" />
-          <el-table-column :label="t('banks.title')" width="80" align="center">
+          <el-table-column prop="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
+          <el-table-column :label="t('banks.title')" :width="colWPay('bank_logo',80)" align="center">
             <template #default="{ row }">
               <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
             </template>
           </el-table-column>
-          <el-table-column prop="bank_account" :label="t('customers.accounts.bankAccount')" />
-          <el-table-column prop="currency_code" :label="t('customers.accounts.currency')" width="120" />
-          <el-table-column :label="t('fx.amount')" width="160">
+          <el-table-column prop="bank_account" :label="t('customers.accounts.bankAccount')" :width="colWPay('bank_account',200)" />
+          <el-table-column prop="currency_code" :label="t('customers.accounts.currency')" :width="colWPay('currency_code',120)" />
+          <el-table-column :label="t('fx.amount')" :width="colWPay('amount',160)">
             <template #default="{ row }">
               <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" style="width:140px" />
             </template>
@@ -90,6 +84,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
+import { useTableMemory } from '@/composables/useTableMemory'
 
 const { t } = useI18n()
 
@@ -105,6 +100,9 @@ const payCustomerId = ref(null)
 const payDate = ref('')
 const accounts = ref([])
 const selAccounts = ref([])
+
+const { colW: colWSettle, onColResize: onColResizeSettle } = useTableMemory('fx-mgmt-settlement')
+const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('fx-mgmt-payment')
 
 const canCreateSettlement = computed(() => !!(settleDate.value && customerId.value && rate.value && selMatched.value.length))
 const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0)))
@@ -244,7 +242,6 @@ function onSelAccountsChange(val){
 <style scoped>
  .fx-page { padding: 8px; }
  .page-hd { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px; }
- .hd-actions { display:flex; gap: 8px; }
  .fx-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
  .section-hd { font-weight: 700; }
  .settle-filters, .pay-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }

@@ -13,18 +13,28 @@
       <el-button type="primary" @click="exportCsv('all')">{{ t('common.export') }} ({{ t('common.filtered') }})</el-button>
     </div>
     <el-table :data="rows" border size="small" @header-dragend="onColResize">
-      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column :label="t('common.no')" width="70">
+        <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
+      </el-table-column>
+      <el-table-column prop="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
       <el-table-column prop="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
       <el-table-column prop="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)" />
       <el-table-column prop="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_amount) }}</template>
       </el-table-column>
-      <el-table-column prop="created_at" :label="t('common.createdAt')" :width="colW('created_at', 180)" />
+      <el-table-column prop="created_at" :label="t('common.createdAt')" :width="colW('created_at', 140)">
+        <template #default="{ row }">{{ (row.created_at||'').toString().slice(0,10) }}</template>
+      </el-table-column>
       <el-table-column prop="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
-      <el-table-column :label="t('common.actions')" width="140" align="center">
+      <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button size="small" type="primary" @click="downloadCsv(row)">CSV</el-button>
+          <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
+            <template #reference>
+              <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
+            </template>
+          </el-popconfirm>
         </template>
       </el-table-column>
     </el-table>
@@ -123,6 +133,10 @@ async function downloadCsv(row){
   a.download = `Payment-${row.id}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+async function removeBill(row){
+  await api.request(`/fx/payments/${row.id}`, { method: 'DELETE' })
+  reload()
 }
 </script>
 

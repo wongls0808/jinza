@@ -26,7 +26,11 @@ export function authMiddleware(required = true) {
           'view_transactions',
           'manage_transactions',
           'delete_transactions',
-          'view_settings'
+          'view_settings',
+          // FX permissions (dev mode): view/manage/delete
+          'view_fx',
+          'manage_fx',
+          'delete_fx'
         ]
       }
       return next()
@@ -151,7 +155,11 @@ export async function seedInitialAdmin() {
     // 交易写入与删除权限（用于新增/编辑/批量删除等操作）
     { code: 'manage_transactions', name: '交易写入' },
     { code: 'delete_transactions', name: '交易删除' },
-    { code: 'view_settings', name: '系统设置' }
+    { code: 'view_settings', name: '系统设置' },
+    // FX 模块权限
+    { code: 'view_fx', name: '结汇管理-查看' },
+    { code: 'manage_fx', name: '结汇管理-编辑' },
+    { code: 'delete_fx', name: '结汇管理-删除' }
   ]
   for (const p of corePerms) {
     await query(
