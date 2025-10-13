@@ -272,11 +272,37 @@ const messages = {
       batchDeleteSuccess: '批量删除成功',
       batchDeleteFailed: '批量删除失败',
     },
+    fx: {
+      title: '结汇管理',
+      settlementArea: '结汇区',
+      paymentArea: '付款区',
+      settleDate: '结汇日期',
+      payDate: '付款日期',
+      selectCustomer: '选择客户',
+      rate: '汇率',
+      customerTaxRate: '客户税率(%)',
+      createSettlement: '生成结汇单',
+      createPayment: '生成付款单',
+      amount: '金额'
+    },
   },
   en: {
     app: {
       title: 'Enterprise Management',
       logout: 'Logout',
+    },
+    fx: {
+      title: 'FX Management',
+      settlementArea: 'Settlement',
+      paymentArea: 'Payment',
+      settleDate: 'Settle Date',
+      payDate: 'Pay Date',
+      selectCustomer: 'Select Customer',
+      rate: 'Rate',
+      customerTaxRate: 'Customer Tax(%)',
+      createSettlement: 'Create Settlement',
+      createPayment: 'Create Payment',
+      amount: 'Amount'
     },
     common: {
       backHome: 'Back to Home',

@@ -133,7 +133,9 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       const add = (builder, val) => { const idx = baseIndex + vals.length; filters.push(builder(idx)); vals.push(val); };
       if (startDate) add(i => `transaction_date >= $${i}`, startDate);
       if (endDate) add(i => `transaction_date <= $${i}`, endDate);
-      if (account) add(i => `account_number ILIKE $${i}`, `%${account}%`);
+  if (account) add(i => `account_number ILIKE $${i}`, `%${account}%`);
+  const { matchTargetId } = req.query || {}
+  if (matchTargetId) add(i => `match_target_id = $${i}`, Number(matchTargetId))
       // 账户名称（需要 join receiving_accounts 作为别名 a）
       const { accountName, relation } = req.query || {}
       if (accountName) add(i => `a.account_name ILIKE $${i}`, `%${accountName}%`)

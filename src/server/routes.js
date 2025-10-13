@@ -9,6 +9,7 @@ import multer from 'multer'
 import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
+import { fxRouter } from './fx.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -668,6 +669,9 @@ router.use('/transactions', (req, res, next) => {
   }
   return transactionsRouter(req, res, next)
 })
+
+// 结汇管理路由
+router.use('/fx', fxRouter)
 
 
 

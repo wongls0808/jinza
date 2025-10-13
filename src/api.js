@@ -166,6 +166,19 @@ export const api = {
     }
   },
   // 返回收款账户列表（仅 items 数组，便于选择器直接使用）
+  // FX - 结汇/付款
+  fx: {
+    settlements: {
+      list: () => request('/fx/settlements'),
+      create: (data) => request('/fx/settlements', { method: 'POST', body: JSON.stringify(data) })
+    },
+    payments: {
+      list: () => request('/fx/payments'),
+      create: (data) => request('/fx/payments', { method: 'POST', body: JSON.stringify(data) })
+    }
+  },
+  // 按客户拉取已匹配交易，辅助结汇区
+  transactionsByCustomer: (customerId, params={}) => request(`/transactions?${new URLSearchParams({ status:'matched', matchTargetId: customerId, ...params }).toString()}`),
   requestAccounts: async () => {
     const res = await request('/accounts')
     // 服务端返回形如 { total, items }，这里仅透出 items

@@ -36,6 +36,10 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('transactions.title') }}</span>
           </el-menu-item>
+          <el-menu-item index="fx" :route="{name: 'fx'}" v-if="has('view_transactions')">
+            <el-icon><Document /></el-icon>
+            <span>{{ t('fx.title') }}</span>
+          </el-menu-item>
           <el-menu-item index="users" :route="{name: 'users'}" v-if="has('manage_users')">
             <el-icon><User /></el-icon>
             <span>{{ t('home.users') }}</span>
