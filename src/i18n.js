@@ -80,6 +80,7 @@ const messages = {
         bankAccount: '银行账户',
         currency: '币种',
         openingBalance: '期初余额',
+        balance: '余额',
         ops: '操作',
       },
       form: {

@@ -38,6 +38,9 @@
         <el-table-column prop="opening_balance" :label="$t('accounts.fields.openingBalance')" sortable="custom" :width="colW('opening_balance', 140)">
           <template #default="{ row }">{{ formatMoney(row.opening_balance) }}</template>
         </el-table-column>
+        <el-table-column prop="balance" :label="$t('accounts.fields.balance')" sortable="custom" :width="colW('balance', 140)">
+          <template #default="{ row }">{{ formatMoney(row.balance) }}</template>
+        </el-table-column>
         <el-table-column :label="$t('accounts.fields.ops')" :width="colW('ops', 100)">
           <template #default="{ row }">
             <el-popconfirm :title="$t('common.confirmDelete')" @confirm="remove(row)">

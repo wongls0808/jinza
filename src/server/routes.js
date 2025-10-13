@@ -390,6 +390,8 @@ router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), asyn
     bank_account: 'a.bank_account',
     currency_code: 'a.currency_code',
     opening_balance: 'a.opening_balance',
+    // 可按计算余额排序：按 opening_balance + 净额 排序
+    balance: '(a.opening_balance + coalesce(agg.net_amount,0))',
     bank_zh: 'b.zh',
     bank_code: 'b.code'
   }
@@ -397,10 +399,17 @@ router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), asyn
   const ord = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc'
   const totalRs = await query('select count(*) from receiving_accounts')
   const rs = await query(
-    `select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+    `with agg as (
+       select account_number, sum(credit_amount) - sum(debit_amount) as net_amount
+       from transactions
+       group by account_number
+     )
+     select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
+            (a.opening_balance + coalesce(agg.net_amount,0)) as balance,
             b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
        from receiving_accounts a
        left join banks b on b.id = a.bank_id
+       left join agg on agg.account_number = a.bank_account
       order by ${sortCol} ${ord}
       offset $1 limit $2`,
     [offset, Number(pageSize)]
