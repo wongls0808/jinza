@@ -91,6 +91,11 @@
       <!-- 改为匹配列：关联人（使用 reference 字段） -->
       <el-table-column :label="t('transactions.relationPerson')" prop="reference" show-overflow-tooltip width="200" />
 
+      <!-- 新增：关联对象（显示匹配目标名称） -->
+      <el-table-column :label="t('transactions.relationObject')" prop="match_target_name" show-overflow-tooltip width="200">
+        <template #default="scope">{{ scope.row.match_target_name || '-' }}</template>
+      </el-table-column>
+
       <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable width="140">
         <template #default="scope"><span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span></template>
       </el-table-column>
@@ -158,7 +163,7 @@ const fetchStats = async () => {
 const fetchTransactions = async () => {
   loading.value = true
   try {
-    const params = { page: pagination.page, pageSize: pagination.pageSize }
+  const params = { page: pagination.page, pageSize: pagination.pageSize, status: 'matched' }
     if (filters.startDate) params.startDate = filters.startDate
     if (filters.endDate) params.endDate = filters.endDate
     const data = await api.transactions.list(params)

@@ -29,6 +29,14 @@ async function ensureTransactionsDDL() {
       updated_at timestamptz default now()
     );
     create unique index if not exists ux_transactions_unique on transactions(account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount);
+    -- 扩展匹配相关字段（幂等）
+    alter table transactions
+      add column if not exists matched boolean default false,
+      add column if not exists match_type varchar(32),
+      add column if not exists match_target_id int,
+      add column if not exists match_target_name varchar(255),
+      add column if not exists matched_by int,
+      add column if not exists matched_at timestamptz;
   `)
 }
 
@@ -107,7 +115,8 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       minAmount,
       maxAmount,
       searchTerm,
-      searchAmountOnly
+      searchAmountOnly,
+      status
     } = req.query;
 
     const offset = (Number(page) - 1) * Number(pageSize);
@@ -116,6 +125,11 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
     function buildWhere(baseIndex = 1) {
       const filters = [];
       const vals = [];
+      if (status) {
+        const s = String(status).toLowerCase()
+        if (s === 'pending') filters.push(`coalesce(matched,false) = false`)
+        else if (s === 'matched') filters.push(`coalesce(matched,false) = true`)
+      }
       const add = (builder, val) => { const idx = baseIndex + vals.length; filters.push(builder(idx)); vals.push(val); };
       if (startDate) add(i => `transaction_date >= $${i}`, startDate);
       if (endDate) add(i => `transaction_date <= $${i}`, endDate);
@@ -180,6 +194,12 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
         u.username AS "createdBy",
         to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(t.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
+        t.matched,
+        t.match_type AS "match_type",
+        t.match_target_id AS "match_target_id",
+        t.match_target_name AS "match_target_name",
+        mb.username AS "matchedBy",
+        to_char(t.matched_at, 'YYYY-MM-DD HH24:MI:SS') AS "matchedAt",
         a.account_name,
         b.code AS "bank_code",
         b.zh AS "bank_name",
@@ -188,6 +208,7 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
       FROM 
         transactions t
       LEFT JOIN users u ON t.created_by = u.id
+      LEFT JOIN users mb ON t.matched_by = mb.id
       LEFT JOIN receiving_accounts a ON t.account_number = a.bank_account
       LEFT JOIN banks b ON a.bank_id = b.id
       ${whereForData}
@@ -341,7 +362,8 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
       minAmount,
       maxAmount,
       searchTerm,
-      searchAmountOnly
+      searchAmountOnly,
+      status
     } = req.query;
 
     let params = [];
@@ -354,6 +376,12 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
     if (category) { whereConditions.push(`category = $${paramIndex++}`); params.push(category); }
     if (minAmount) { whereConditions.push(`(debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`); params.push(Number(minAmount)); paramIndex++; }
     if (maxAmount) { whereConditions.push(`(debit_amount <= $${paramIndex} OR credit_amount <= $${paramIndex})`); params.push(Number(maxAmount)); paramIndex++; }
+    if (status) {
+      const s = String(status).toLowerCase()
+      if (s === 'pending') { whereConditions.push(`coalesce(matched,false) = false`) }
+      else if (s === 'matched') { whereConditions.push(`coalesce(matched,false) = true`) }
+    }
+
     if (searchTerm) {
       const amountOnly = String(searchAmountOnly || '').toLowerCase() in { '1':1, 'true':1 };
       const numeric = Number(String(searchTerm).replace(/[,\s]/g, ''))
@@ -385,6 +413,11 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
         t.debit_amount,
         t.credit_amount,
           trim(regexp_replace(regexp_replace(coalesce(t.reference_1,'') || ' ' || coalesce(t.reference_2,'') || ' ' || coalesce(t.reference_3,''),'\\s+',' ','g'),'(?i)x{3,}','','g')) as reference,
+        t.matched,
+        t.match_type,
+        t.match_target_id,
+        t.match_target_name,
+        to_char(t.matched_at, 'YYYY-MM-DD HH24:MI:SS') AS matched_at,
         a.account_name,
         b.code AS "bank_code",
         b.zh AS "bank_name",
@@ -402,6 +435,30 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('view_transa
     res.status(500).json({ error: '导出交易失败', detail: e?.message });
   }
 });
+
+// 交易匹配：将一条交易与客户/供应商/费用对象建立关联并标记为 matched
+transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+  try {
+    await ensureTransactionsDDL()
+    const id = Number(req.params.id)
+    const { type, targetId, targetName } = req.body || {}
+    if (!id || !type) return res.status(400).json({ error: 'missing fields' })
+    const t = String(type).toLowerCase()
+    if (!['customer','supplier','expense'].includes(t)) return res.status(400).json({ error: 'invalid type' })
+    const matched_by = req.user?.id || null
+    const name = (targetName || '').toString().trim() || null
+    const tid = targetId ? Number(targetId) : null
+    const rs = await query(
+      `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now() where id=$5 returning id`,
+      [t, tid, name, matched_by, id]
+    )
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('match failed', e)
+    res.status(500).json({ error: 'match failed', detail: e.message })
+  }
+})
 
 // 下载导入模板（返回JSON样例，前端将转CSV）
 // 模板由前端自行定义/或另见导出模板接口
