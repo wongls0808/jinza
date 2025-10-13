@@ -70,6 +70,8 @@ function sanitizeReferenceText(s) {
   t = t.replace(/\s+/g, ' ')
   // 去除前后空白
   t = t.trim()
+  // 限制长度，避免超出 varchar(128)
+  if (t.length > 128) t = t.slice(0, 128)
   return t || null
 }
 
