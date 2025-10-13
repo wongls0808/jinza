@@ -149,6 +149,49 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
   const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const term = `%${q}%`
+  // 确保 FX 相关表存在（与 fx.js 同步，幂等）
+  try {
+    await query(`
+      create table if not exists fx_settlements(
+        id serial primary key,
+        customer_id int not null,
+        customer_name varchar(255),
+        settle_date date not null,
+        rate numeric(18,6) not null,
+        customer_tax_rate numeric(6,2) default 0,
+        total_base numeric(18,2) default 0,
+        total_settled numeric(18,2) default 0,
+        created_by int,
+        created_at timestamptz default now()
+      );
+      create table if not exists fx_settlement_items(
+        id serial primary key,
+        settlement_id int not null references fx_settlements(id) on delete cascade,
+        transaction_id int not null,
+        account_number varchar(64),
+        trn_date date,
+        amount_base numeric(18,2) default 0,
+        amount_settled numeric(18,2) default 0
+      );
+      create table if not exists fx_payments(
+        id serial primary key,
+        customer_id int not null,
+        customer_name varchar(255),
+        pay_date date not null,
+        created_by int,
+        created_at timestamptz default now()
+      );
+      create table if not exists fx_payment_items(
+        id serial primary key,
+        payment_id int not null references fx_payments(id) on delete cascade,
+        account_id int not null,
+        account_name varchar(255),
+        bank_account varchar(64),
+        currency_code varchar(8),
+        amount numeric(18,2) not null
+      );
+    `)
+  } catch {}
   // 统计总数
   const total = await query("select count(*) from customers where name ilike $1 or coalesce(abbr,'') ilike $1", [term])
 
@@ -169,13 +212,24 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
              sum(case when currency = 'CNY' then net else 0 end) as net_cny
       from tx_agg
       group by customer_id
+    ), fx_set as (
+      select customer_id, sum(total_base) as s_base, sum(total_settled) as s_set
+      from fx_settlements
+      group by customer_id
+    ), fx_pay as (
+      select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
+      from fx_payments p
+      join fx_payment_items i on i.payment_id = p.id
+      group by p.customer_id
     )
     select 
       c.*, 
-      coalesce(c.opening_myr,0) + coalesce(p.net_myr,0) as balance_myr,
-      coalesce(c.opening_cny,0) + coalesce(p.net_cny,0) as balance_cny
+      coalesce(c.opening_myr,0) + coalesce(p.net_myr,0) - coalesce(fs.s_base,0) as balance_myr,
+      coalesce(c.opening_cny,0) + coalesce(p.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0) as balance_cny
     from customers c
     left join tx_pivot p on p.customer_id = c.id
+    left join fx_set fs on fs.customer_id = c.id
+    left join fx_pay fp on fp.customer_id = c.id
     where c.name ilike $1 or coalesce(c.abbr,'') ilike $1
     order by ${sort} ${order === 'asc' ? 'asc' : 'desc'}
     offset $2 limit $3

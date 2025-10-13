@@ -1,6 +1,12 @@
 <template>
   <div class="fx-page">
-    <h1>{{ t('fx.title') }}</h1>
+    <div class="page-hd">
+      <h1>{{ t('fx.title') }}</h1>
+      <div class="hd-actions">
+        <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.settlementHistory') }}</el-button>
+        <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.paymentHistory') }}</el-button>
+      </div>
+    </div>
 
     <div class="fx-split">
       <el-card class="section left" shadow="never">
@@ -12,11 +18,12 @@
         </template>
         <div class="settle-filters">
           <el-date-picker v-model="settleDate" type="date" :placeholder="t('fx.settleDate')" value-format="YYYY-MM-DD" />
-          <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:260px" @change="loadMatched">
-            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
-          </el-select>
           <el-input-number v-model="rate" :precision="6" :step="0.01" :min="0" :placeholder="t('fx.rate')" />
           <el-input-number v-model="customerTaxRate" :precision="2" :step="0.5" :min="0" :max="100" :placeholder="t('fx.customerTaxRate')" />
+          <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
+            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
+          </el-select>
+          <span class="balance">MYR {{ money(myrBalance) }}</span>
           <el-button type="primary" :disabled="!canCreateSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
         </div>
         <div class="totals">
@@ -28,12 +35,13 @@
           <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" width="120" />
           <el-table-column prop="account_number" :label="t('transactions.accountNumber')" width="160" />
           <el-table-column prop="account_name" :label="t('transactions.accountName')" width="180" />
-          <el-table-column prop="reference" :label="t('transactions.reference')" />
+          <el-table-column :label="t('transactions.bankName')" width="80" align="center">
+            <template #default="{ row }">
+              <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
+            </template>
+          </el-table-column>
           <el-table-column prop="credit_amount" :label="t('transactions.creditAmount')" width="120" align="right">
             <template #default="{ row }">{{ money(row.credit_amount) }}</template>
-          </el-table-column>
-          <el-table-column prop="debit_amount" :label="t('transactions.debitAmount')" width="120" align="right">
-            <template #default="{ row }">{{ money(row.debit_amount) }}</template>
           </el-table-column>
         </el-table>
       </el-card>
@@ -46,10 +54,11 @@
           </div>
         </template>
         <div class="pay-filters">
-          <el-select v-model="payCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:260px" @change="loadAccounts">
+          <el-date-picker v-model="payDate" type="date" :placeholder="t('fx.payDate')" value-format="YYYY-MM-DD" />
+          <el-select v-model="payCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangePay">
             <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
           </el-select>
-          <el-date-picker v-model="payDate" type="date" :placeholder="t('fx.payDate')" value-format="YYYY-MM-DD" />
+          <span class="balance">CNY {{ money(cnyBalance) }}</span>
           <el-button type="primary" :disabled="!canCreatePayment" @click="createPayment">{{ t('fx.createPayment') }}</el-button>
         </div>
         <div class="totals">
@@ -58,6 +67,11 @@
   <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange">
           <el-table-column type="selection" width="48" />
           <el-table-column prop="account_name" :label="t('customers.accounts.accountName')" />
+          <el-table-column :label="t('banks.title')" width="80" align="center">
+            <template #default="{ row }">
+              <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
+            </template>
+          </el-table-column>
           <el-table-column prop="bank_account" :label="t('customers.accounts.bankAccount')" />
           <el-table-column prop="currency_code" :label="t('customers.accounts.currency')" width="120" />
           <el-table-column :label="t('fx.amount')" width="160">
@@ -99,6 +113,11 @@ const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (
 const selectedSettledTotal = computed(() => selectedBaseTotal.value * Number(rate.value || 0))
 const paymentTotal = computed(() => accounts.value.reduce((s, a) => s + (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0), 0))
 
+const selectedCustomer = computed(() => customers.value.find(c => c.id === customerId.value) || null)
+const myrBalance = computed(() => Number(selectedCustomer.value?.balance_myr || 0))
+const selectedPayCustomer = computed(() => customers.value.find(c => c.id === payCustomerId.value) || null)
+const cnyBalance = computed(() => Number(selectedPayCustomer.value?.balance_cny || 0))
+
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 
 async function loadCustomers(){
@@ -117,6 +136,21 @@ async function loadMatched(){
   // 读取客户税率
   const found = customers.value.find(c => c.id === customerId.value)
   customerTaxRate.value = Number(found?.tax_rate || 0)
+}
+
+function formatToday(){
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth()+1).padStart(2,'0')
+  const day = String(d.getDate()).padStart(2,'0')
+  return `${y}-${m}-${day}`
+}
+
+function onCustomerChangeSettle(){
+  loadMatched()
+}
+function onCustomerChangePay(){
+  loadAccounts()
 }
 
 async function createSettlement(){
@@ -140,10 +174,11 @@ async function createSettlement(){
   // 清空并刷新
   selMatched.value = []
   matchedRows.value = []
-  settleDate.value = ''
+  settleDate.value = formatToday()
   rate.value = null
   customerTaxRate.value = 0
   // 重新加载客户匹配交易（若仍保留客户）
+  await loadCustomers()
   if (customerId.value) await loadMatched()
 }
 
@@ -172,13 +207,18 @@ async function createPayment(){
   const n = accounts.value.filter(a => Number(a._amount) > 0).length
   ElMessage.success(t('fx.paymentCreated', { n, total: money(paymentTotal.value) }))
   // 清空并刷新
-  payDate.value = ''
+  payDate.value = formatToday()
   accounts.value = accounts.value.map(a => ({ ...a, _amount: 0 }))
   selAccounts.value = []
+  await loadCustomers()
   if (payCustomerId.value) await loadAccounts()
 }
 
-onMounted(loadCustomers)
+onMounted(() => {
+  settleDate.value = formatToday()
+  payDate.value = formatToday()
+  loadCustomers()
+})
 
 function onSelMatchedChange(val){
   selMatched.value = val || []
@@ -190,9 +230,13 @@ function onSelAccountsChange(val){
 
 <style scoped>
  .fx-page { padding: 8px; }
+ .page-hd { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px; }
+ .hd-actions { display:flex; gap: 8px; }
  .fx-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
  .section-hd { font-weight: 700; }
  .settle-filters, .pay-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }
   .totals { display:flex; gap:16px; margin: 4px 0 8px; color: var(--el-text-color-secondary); font-size: 13px; }
+  .balance { color: var(--el-text-color-regular); font-weight: 600; }
+  .bank-logo { width: 22px; height: 22px; object-fit: contain; display:inline-block; }
  @media (max-width: 1100px) { .fx-split { grid-template-columns: 1fr; } }
 </style>
