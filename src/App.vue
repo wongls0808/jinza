@@ -32,10 +32,6 @@
             <el-icon><Box /></el-icon>
             <span>{{ t('accounts.title') }}</span>
           </el-menu-item>
-          <el-menu-item index="receipts" :route="{name: 'receipts'}" v-if="has('view_accounts')">
-            <el-icon><Document /></el-icon>
-            <span>银行对账单</span>
-          </el-menu-item>
           <el-menu-item index="transactions" :route="{name: 'transactions'}" v-if="has('view_transactions')">
             <el-icon><Document /></el-icon>
             <span>{{ t('transactions.title') }}</span>
