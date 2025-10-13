@@ -90,30 +90,6 @@
         </el-col>
       </el-row>
       
-      <!-- 独立统计表（按月汇总） -->
-      <el-row :gutter="20" class="chart-row">
-        <el-col :span="24">
-          <el-card shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>{{ t('transactions.statsDetail') }}</span>
-              </div>
-            </template>
-            <el-table :data="monthlyTable" size="small" border style="width:100%">
-              <el-table-column :label="t('transactions.month')" prop="month" width="140" />
-              <el-table-column :label="t('transactions.debitTotal')" prop="debit" align="right" width="160">
-                <template #default="{ row }"><span class="negative">{{ formatCurrency(row.debit) }}</span></template>
-              </el-table-column>
-              <el-table-column :label="t('transactions.creditTotal')" prop="credit" align="right" width="160">
-                <template #default="{ row }"><span class="positive">{{ formatCurrency(row.credit) }}</span></template>
-              </el-table-column>
-              <el-table-column :label="t('transactions.net')" prop="net" align="right" width="160">
-                <template #default="{ row }"><span :class="row.net >= 0 ? 'positive' : 'negative'">{{ formatCurrency(row.net) }}</span></template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-        </el-col>
-      </el-row>
     </div>
     
     <!-- 过滤条件标签 -->
@@ -528,16 +504,6 @@ const sort = ref('transaction_date')
 const order = ref('desc')
 const showStats = ref(false)
 const stats = ref({ summary: {}, monthly: [], categories: [] })
-// 月度统计表数据（由后端 stats.monthly 转换得到）
-const monthlyTable = computed(() => {
-  const arr = Array.isArray(stats.value?.monthly) ? stats.value.monthly : []
-  return arr.map(it => ({
-    month: it.month,
-    debit: Number(it.debit) || 0,
-    credit: Number(it.credit) || 0,
-    net: (Number(it.credit) || 0) - (Number(it.debit) || 0)
-  }))
-})
 const filters = reactive({
   startDate: '',
   endDate: '',
