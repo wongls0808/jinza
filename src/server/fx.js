@@ -1339,30 +1339,86 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const amountBarH = 34
   doc.save()
   doc.roundedRect(left, amountBarY, contentWidth, amountBarH, 6).fill(LIGHT_ACCENT)
-  doc.fillColor('#455a64').font(fontBold).fontSize(8).text(t('amount'), left + 14, amountBarY + 8)
+  // 左侧：支付金额（标题）  右侧：CNY: 金额（大号）
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
-  doc.fontSize(19).fillColor(ACCENT).text(money(total), left + 14, amountBarY + 14)
+  const amountTitle = (lang==='zh'?'支付金额：':'Payment Amount:')
+  const currencyLabel = 'CNY: ' + money(total)
+  doc.fillColor('#455a64').font(fontBold).fontSize(9).text(amountTitle, left + 14, amountBarY + 8)
+  doc.font(fontBold).fontSize(16).fillColor(ACCENT).text(currencyLabel, left + 14, amountBarY + 14, { width: contentWidth - 28, align: 'right' })
   doc.restore()
   doc.y = amountBarY + amountBarH + 6
 
-  // ===== 2 列字段网格 =====
-  const gridStartY = doc.y
-  const labelW = 64
-  const colGap = 40
-  const colW = Math.floor((contentWidth - colGap) / 2)
-  const rowH = 16
-  const field = (row, col, label, value) => {
-    const x = left + col * (colW + colGap)
-    const y = gridStartY + row * rowH
-    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(label + ':', x, y, { width: labelW, continued: true })
-    doc.font(font).fontSize(9).fillColor('#111').text(value==null?'':String(value), { width: colW - labelW })
+  // ===== 收款人信息 =====
+  const sectionTitle = (zh,en)=> (lang==='zh'?zh:en)
+  const drawLabelValue = (label, value, yOffset=0) => {
+    const y = doc.y + yOffset
+    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(label, left, y, { continued: true })
+    doc.font(font).fontSize(10).fillColor('#111').text(value==null?'':String(value))
+    doc.moveDown(0.2)
   }
-  field(0,0, t('payee'), items.rows[0]?.account_name||'')
-  field(0,1, t('account'), items.rows[0]?.bank_account||'')
-  field(1,0, t('bank'), items.rows[0]?.bank_name||'')
-  field(1,1, t('date'), toDate(h.pay_date))
 
-  doc.y = gridStartY + rowH * 2 + 6
+  doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(sectionTitle('收款人信息：','Payee Info:'))
+  doc.moveDown(0.2)
+  drawLabelValue(sectionTitle('收款人：','Payee: '), items.rows[0]?.account_name||'')
+  drawLabelValue(sectionTitle('账户号码：','Account No: '), items.rows[0]?.bank_account||'')
+  // 银行名称：尝试渲染 Logo
+  {
+    const bankName = items.rows[0]?.bank_name || ''
+    const bankLabel = sectionTitle('银行名称：','Bank: ')
+    // 解析 bank logo 路径
+    let bankLogoPath = null
+    try {
+      const __filename2 = fileURLToPath(import.meta.url)
+      const __dirname2 = path.dirname(__filename2)
+      const banksDir = path.join(__dirname2, '..', '..', 'public', 'banks')
+      const lower = String(bankName).toLowerCase()
+      const map = [
+        { k: ['icbc','工商'], f: 'icbc.svg' },
+        { k: ['ccb','建设'], f: 'ccb.svg' },
+        { k: ['abc','农业'], f: 'abc.svg' },
+        { k: ['boc','中国银行'], f: 'boc.svg' },
+        { k: ['bcm','交通'], f: 'bcm.svg' },
+        { k: ['maybank'], f: 'maybank.svg' },
+        { k: ['public bank','public '], f: 'public.svg' },
+        { k: ['rhb'], f: 'rhb.svg' },
+        { k: ['cimb'], f: 'cimb.svg' },
+        { k: ['hlb','hong leong'], f: 'hlb.svg' }
+      ]
+      const hit = map.find(m => m.k.some(key => lower.includes(key)))
+      if (hit) {
+        const cand = path.join(banksDir, hit.f)
+        if (fs.existsSync(cand)) bankLogoPath = cand
+      }
+    } catch {}
+    // 绘制
+    const y = doc.y
+    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(bankLabel, left, y)
+    if (bankLogoPath) {
+      try {
+        const svg = fs.readFileSync(bankLogoPath, 'utf8')
+        // Logo 尺寸：高度约 14pt，宽度按比例
+        const logoW = 64
+        const logoX = left + 60
+        const logoY = y - 2
+        SVGtoPDF(doc, svg, logoX, logoY, { width: logoW, preserveAspectRatio: 'xMidYMid meet' })
+        doc.moveDown(1)
+      } catch {
+        drawLabelValue(bankLabel, bankName)
+      }
+    } else {
+      drawLabelValue(bankLabel, bankName)
+    }
+  }
+
+  // ===== 交易详情 =====
+  doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(sectionTitle('交易详情：','Transaction Details:'))
+  doc.moveDown(0.2)
+  drawLabelValue(sectionTitle('交易号：','Transaction No: '), (h.bill_no || ('Payment-'+h.id)))
+  const statusText2 = h.status==='completed' ? (lang==='zh'?'支付确认':'Completed') : (lang==='zh'?'待确认':'Pending')
+  drawLabelValue(sectionTitle('交易状态：','Status: '), statusText2)
+  drawLabelValue(sectionTitle('交易时间：','Time: '), toDate(h.pay_date))
+
+  // 多笔合并说明（若有）
   if (items.rows.length > 1) {
     doc.font(fontBold).fontSize(8).fillColor(ACCENT).text(lang==='zh'?'合并明细: 共 '+items.rows.length+' 条':'Merged Items: '+items.rows.length)
     doc.font(font).fontSize(7).fillColor('#555555').text(lang==='zh'?'仅展示首条，其余计入总金额。':'Only first item shown; others included in total.')
