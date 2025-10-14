@@ -53,8 +53,8 @@ const remember = ref(true)
 const submitting = ref(false)
 const passwordInput = ref(null)
 const { t, locale } = useI18n()
-// 记住我标签双语
-const rememberLabel = computed(()=> locale.value==='zh' ? '记住密码 Remember' : 'Remember Me 记住密码')
+// 记住我标签：中文界面仅中文，英文界面仅英文
+const rememberLabel = computed(()=> locale.value==='zh' ? '记住密码' : 'Remember Me')
 const { save } = useAuth()
 
 function setLang(value){
@@ -110,7 +110,7 @@ function onVideoError(){}
 .single-panel { position:relative; width:100%; padding:38px 36px 44px; border-radius:30px; background:rgba(255,255,255,0.065); backdrop-filter:blur(28px) saturate(1.9); -webkit-backdrop-filter:blur(28px) saturate(1.9); box-shadow:0 8px 42px -10px rgba(0,0,0,0.55), 0 2px 6px -2px rgba(0,0,0,0.4); overflow:hidden; }
 .single-panel:before { content:""; position:absolute; inset:0; background:linear-gradient(140deg,rgba(255,255,255,0.20),rgba(255,255,255,0.04) 60%,rgba(255,255,255,0.15)); pointer-events:none; }
 .single-panel:after { content:""; position:absolute; inset:0; border:1px solid rgba(255,255,255,0.25); border-radius:30px; pointer-events:none; mix-blend-mode:overlay; }
-.logo-mini { font-size:18px; font-weight:700; letter-spacing:.5px; color:#fff; opacity:.9; margin-bottom:6px; text-shadow:0 2px 6px rgba(0,0,0,0.4); }
+.logo-mini { font-size:18px; font-weight:700; letter-spacing:.5px; color:#fff; opacity:.92; margin-bottom:14px; text-shadow:0 2px 6px rgba(0,0,0,0.4); text-align:center; width:100%; }
 .login-header, .welcome-text, .login-subtext { display:none; }
 .login-form { display:flex; flex-direction:column; gap:18px; }
 .login-form :deep(.el-form-item__label){ color:#fff; font-weight:600; letter-spacing:.5px; font-size:13px; }
