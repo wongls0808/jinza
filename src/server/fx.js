@@ -1212,7 +1212,10 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const utf8Name = encodeURIComponent(`${fileBase}.pdf`)
   res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
 
-  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 20, left: 24, right: 24 } })
+  const ACCENT = '#2F4858' // 深色强调
+  const LIGHT_ACCENT = '#e4edf1'
+  const BRAND = process.env.BRAND_NAME || (lang==='zh' ? '公司收付系统' : 'Payment System')
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 28, left: 28, right: 28 } })
   doc.pipe(res)
   let hasCJK = false, hasCJKBold = false
   try {
@@ -1242,37 +1245,116 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
 
-  // 标题条
-  doc.rect(left-8, doc.page.margins.top-10, contentWidth+16, 24).fill('#dddddd')
-  doc.fillColor('#7a0a2a').font(fontBold).fontSize(14).text(t('title'), left, doc.page.margins.top-6, { align: 'center', width: contentWidth })
-  doc.fillColor('black')
+  // Header: 品牌 + 标题 + 单号
+  const h = head.rows[0]
+  const titleLine = t('title')
+  doc.save()
+  doc.fillColor(ACCENT)
+  doc.font(fontBold).fontSize(15).text(BRAND, left, doc.y, { continued: true })
+  doc.fontSize(11).text('  |  ' + titleLine)
+  doc.moveDown(0.2)
+  doc.font(font).fontSize(8).fillColor('#666666').text((lang==='zh'?'单号':'Bill No') + ': ' + (h.bill_no || ('Payment-'+h.id)))
+  doc.restore()
+  doc.moveDown(0.5)
+
+  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  const statusText = h.status==='completed' ? t('completed') : t('pending')
+
+  // 信息网格 (2列) : 客户 / 日期 / 状态 / 创建 / 审批
+  const infoPairs = [
+    [lang==='zh'?'客户':'Customer', h.customer_name||''],
+    [lang==='zh'?'日期':'Date', toDate(h.pay_date)],
+    [lang==='zh'?'状态':'Status', statusText],
+    [lang==='zh'?'创建人':'Created By', h.created_by_name||''],
+    [lang==='zh'?'创建时间':'Created At', toDate(h.created_at)],
+    [lang==='zh'?'审批人':'Approved By', h.approved_by_name||'']
+  ]
+  const gridLeftW = Math.floor(contentWidth * 0.55)
+  const gridColLabelW = 70
+  const startY = doc.y
+  doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(lang==='zh'?'付款信息':'Payment Info', left, doc.y)
+  doc.moveDown(0.4)
+  doc.font(font).fillColor('black').fontSize(8)
+  let gx = left, gy = doc.y
+  infoPairs.forEach((pair, idx) => {
+    const x = gx
+    const label = pair[0] + ':'
+    const val = pair[1] || ''
+    doc.fillColor('#555555').font(fontBold).text(label, x, gy, { width: gridColLabelW, continued: true })
+    doc.fillColor('black').font(font).text(val, { width: gridLeftW - gridColLabelW })
+    gy = doc.y
+    if ((idx % 3) === 2) { // 换到右半列
+      gx = left + gridLeftW + 16
+      gy = startY + 12 + Math.floor(idx/3)*32 - 4
+      doc.y = gy
+    }
+  })
+  doc.moveDown(0.6)
+
+  // 金额醒目 (右上角浮动)
+  const amtBoxW = 120
+  const curY = startY
+  doc.save()
+  doc.roundedRect(right - amtBoxW, curY, amtBoxW, 40, 6).fill(LIGHT_ACCENT)
+  doc.fillColor(ACCENT).font(fontBold).fontSize(8).text(lang==='zh'?'金额 (CNY)':'Amount (CNY)', right - amtBoxW + 10, curY + 6)
+  doc.font(fontBold).fontSize(16).text(money(total), right - amtBoxW + 10, curY + 16)
+  doc.restore()
   doc.moveDown(1)
 
-  const h = head.rows[0]
-  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  // 明细表 (全部 items)
+  const tableTopY = doc.y + 4
+  const colDefs = [
+    { k: '#', w: 24, align:'right' },
+    { k: lang==='zh'?'收款人':'Payee', w: 120 },
+    { k: lang==='zh'?'银行':'Bank', w: 90 },
+    { k: lang==='zh'?'账号':'Account', w: 120 },
+    { k: lang==='zh'?'币种':'Cur', w: 40, align:'center' },
+    { k: lang==='zh'?'金额':'Amount', w: 70, align:'right' }
+  ]
+  const totalTableWidth = colDefs.reduce((s,c)=>s+c.w,0)
+  // 适配：若内容区更宽，最后一列扩展
+  if (totalTableWidth < contentWidth) {
+    colDefs[colDefs.length-1].w += (contentWidth - totalTableWidth)
+  }
+  // 表头
+  let tx = left, ty = tableTopY
+  doc.font(fontBold).fontSize(8).fillColor(ACCENT)
+  colDefs.forEach(c => { doc.text(c.k, tx, ty, { width: c.w, align: c.align||'left' }); tx += c.w })
+  doc.moveTo(left, ty + 12).lineTo(right, ty + 12).strokeColor(ACCENT).stroke().strokeColor('black')
+  ty += 14
+  // 行
+  doc.font(font).fontSize(8).fillColor('black')
+  items.rows.forEach((r, idx) => {
+    let cx = left
+    const rowVals = [
+      idx+1,
+      r.account_name||'',
+      r.bank_name||'',
+      r.bank_account||'',
+      (r.currency_code||'CNY').toUpperCase(),
+      money(r.amount||0)
+    ]
+    colDefs.forEach((c,i)=>{
+      doc.text(String(rowVals[i]??''), cx, ty, { width: c.w, align: c.align||'left' })
+      cx += c.w
+    })
+    ty += 12
+    doc.moveTo(left, ty-2).lineTo(right, ty-2).strokeColor('#eeeeee').stroke().strokeColor('black')
+  })
+  // 合计行
+  doc.font(fontBold).fillColor(ACCENT)
+  const sumLabel = (lang==='zh'?'合计:':'Total:')
+  const sumVal = money(total)
+  const lastColsWidth = colDefs.slice(0,-1).reduce((s,c)=>s+c.w,0)
+  doc.text(sumLabel, left, ty+4, { width: lastColsWidth, align: 'right' })
+  doc.text(sumVal, left + lastColsWidth, ty+4, { width: colDefs[colDefs.length-1].w, align: 'right' })
 
-  // 金额区块（紧凑）
-  doc.rect(left-4, doc.y, contentWidth+8, 20).fill('#7a0a2a')
-  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('amount')}:`, left+6, doc.y + 4)
-  doc.fillColor('black')
-  doc.rect(left-4, doc.y + 18, contentWidth+8, 34).stroke('#7a0a2a')
-  doc.font(fontBold).fontSize(20).text(`${(lang==='zh'?'CNY：':'CNY: ')}${money(total)}`, left+10, doc.y + 22)
-  doc.moveDown(3)
-
-  // 收款人与交易信息（合并为一组，去色带，紧凑排列）
-  const first = items.rows[0] || {}
-  const statusText = h.status==='completed' ? t('completed') : t('pending')
-  doc.font(fontBold).fontSize(10).fillColor('#7a0a2a').text(`${t('payee')}`, left, doc.y)
-  doc.fillColor('black').font(font).fontSize(10)
-  doc.text(`${t('name')}：${first.account_name||''}`)
-  doc.text(`${t('account')}：${first.bank_account||''}`)
-  doc.text(`${t('bank')}：${first.bank_name||''}`)
-  doc.moveDown(0.4)
-  doc.font(fontBold).fontSize(10).fillColor('#7a0a2a').text(`${t('info')}`, left, doc.y)
-  doc.fillColor('black').font(font).fontSize(10)
-  doc.text(`${t('status')}：${statusText}`)
-  doc.text(`${t('billNo')}：${h.bill_no || `Payment-${h.id}`}`)
-  doc.text(`${t('date')}：${toDate(h.pay_date)}`)
+  // 签字区
+  const signY = ty + 26
+  doc.font(font).fontSize(8).fillColor('#555555')
+  doc.text(lang==='zh'?'财务审核: __________':'Finance Check: __________', left, signY)
+  doc.text(lang==='zh'?'出纳签字: __________':'Cashier: __________', left + 220, signY)
+  doc.text(lang==='zh'?'日期: __________':'Date: __________', left + 400, signY)
 
   doc.end()
 })
