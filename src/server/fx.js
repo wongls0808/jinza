@@ -1158,143 +1158,57 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     where i.payment_id=$1 order by i.id asc
   `, [id])
 
+  // 语言选择：单语模板，随语言切换
+  const pickLang = () => {
+    const q = String(req.query.lang||'').toLowerCase()
+    if (q) {
+      if (q.startsWith('zh')) return 'zh'
+      if (q.startsWith('en')) return 'en'
+    }
+    const al = String(req.headers['accept-language']||'').toLowerCase()
+    if (al.includes('zh')) return 'zh'
+    return 'en'
+  }
+  const lang = pickLang()
+  const I18N = {
+    en: {
+      title: 'Payment Receipt',
+      amount: 'Payment Amount',
+      payee: 'Payee Details',
+      name: 'Name',
+      account: 'Account No',
+      bank: 'Bank Name',
+      info: 'Transaction Information',
+      status: 'Status',
+      billNo: 'Bill No',
+      date: 'Date',
+      completed: 'Completed',
+      pending: 'Pending'
+    },
+    zh: {
+      title: '支付确认回单',
+      amount: '支付金额',
+      payee: '收款人信息',
+      name: '收款人',
+      account: '账号',
+      bank: '银行名称',
+      info: '交易详情',
+      status: '交易状态',
+      billNo: '单号',
+      date: '交易时间',
+      completed: '支付确认',
+      pending: '待确认'
+    }
+  }
+  const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k
+
   res.setHeader('Content-Type', 'application/pdf')
   const fileBase = (head.rows[0].bill_no ? String(head.rows[0].bill_no) : `Payment-${id}`)
   const asciiName = `${fileBase}.pdf`.replace(/[^\x20-\x7E]/g, '_')
   const utf8Name = encodeURIComponent(`${fileBase}.pdf`)
   res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
 
-  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 24, bottom: 24, left: 24, right: 24 } })
-  doc.pipe(res)
-  let hasCJK = false, hasCJKBold = false
-  try {
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const reg = [
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf'),
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.otf'),
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Regular.otf')
-    ]
-    const bold = [
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.ttf'),
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.otf'),
-      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Bold.otf')
-    ]
-    const fr = reg.find(p => fs.existsSync(p))
-    const fb = bold.find(p => fs.existsSync(p))
-    if (fr) { doc.registerFont('CJK', fr); hasCJK = true }
-    if (fb) { doc.registerFont('CJK-Bold', fb); hasCJKBold = true }
-  } catch {}
-  doc.font(hasCJK ? 'CJK' : 'Helvetica')
-  const t = (s) => s
-  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(14).text('Payment Voucher', { align: 'center' })
-  doc.moveDown(0.5)
-  const toDate = (v) => { try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
-  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
-  const left = doc.page.margins.left
-  const right = doc.page.width - doc.page.margins.right
-  const contentWidth = right - left
-  function textFit(txt, x, y, width, opts={}) {
-    const max = opts.maxSize ?? 9
-    const min = opts.minSize ?? 7
-    const noAdvanceY = opts.noAdvanceY === true
-    let size = max
-    while (size > min) {
-      doc.fontSize(size)
-      const w = doc.widthOfString(String(txt||''), { width, ...opts })
-      if (w <= width) break
-      size -= 0.5
-    }
-    const prevY = doc.y
-    doc.fontSize(size)
-    doc.text(String(txt||''), x, y, { width, lineBreak: false, ...opts })
-    if (noAdvanceY) doc.y = prevY
-  }
-  const h = head.rows[0]
-  const pairs = [
-    ['Bill No', h.bill_no || `Payment-${h.id}`],
-    ['Pay Date', toDate(h.pay_date)],
-    ['Customer', h.customer_name||''],
-    ['Status', (h.status === 'completed' ? 'Completed' : 'Pending')],
-    ['Created By', h.created_by_name||''],
-    ['Approved By', h.approved_by_name||'']
-  ]
-  doc.font(hasCJK ? 'CJK' : 'Helvetica').fontSize(9)
-  const hCol = Math.floor(contentWidth/2) - 8
-  for (let i=0;i<pairs.length;i+=2) {
-    const [k1,v1] = pairs[i]
-    const y = doc.y
-    textFit(`${k1}: ${v1}`, left, y, hCol)
-    if (i+1 < pairs.length) {
-      const [k2,v2] = pairs[i+1]
-      textFit(`${k2}: ${v2}`, left + hCol + 16, y, hCol)
-    }
-    doc.moveDown(0.6)
-  }
-  doc.moveDown(0.3)
-  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
-  doc.moveDown(0.5)
-  const colDefs = [
-    { key: 'Account Name', w: 6 },
-    { key: 'Bank', w: 4 },
-    { key: 'Bank Account', w: 5 },
-    { key: 'Currency', w: 3 },
-    { key: 'Amount', w: 3, align: 'right' }
-  ]
-  const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
-  const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
-  let rowH = 16
-  let y = doc.y
-  let x = left
-  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
-  cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left', noAdvanceY: true }); x += c.w })
-  doc.y = y + rowH
-  doc.font(hasCJK ? 'CJK' : 'Helvetica')
-  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
-  let sum = 0
-  for (const r of items.rows) {
-    const row = [r.account_name||'', r.bank_name||'', r.bank_account||'', (r.currency_code||'').toUpperCase(), money(r.amount||0)]
-    y = doc.y; x = left
-    doc.fontSize(9)
-    cols.forEach((c,i) => { const align=c.align||'left'; textFit(String(row[i]??''), x, y, c.w, { align, noAdvanceY: true }); x += c.w })
-    sum += Number(r.amount||0)
-    doc.y = y + rowH
-    doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
-  }
-  doc.moveDown(0.2)
-  let sx = left + cols.slice(0, cols.length-1).reduce((s,c)=>s+c.w,0)
-  textFit(money(sum), sx, doc.y, cols[cols.length-1].w, { align: 'right', noAdvanceY: true })
-  doc.end()
-})
-
-// 付款单：导出 PDF（回执单-非账单式模板）
-fxRouter.get('/payments/:id/receipt', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
-  await ensureDDL()
-  const id = Number(req.params.id)
-  if (!id) return res.status(400).json({ error: 'invalid id' })
-  const head = await query(`
-    select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.display_name, a.username) as approved_by_name
-    from fx_payments p
-    left join users u on u.id = p.created_by
-    left join users a on a.id = p.approved_by
-    where p.id=$1
-  `, [id])
-  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
-  const items = await query(`
-    select i.*, b.zh as bank_name
-    from fx_payment_items i
-    left join receiving_accounts ra on ra.bank_account = i.bank_account
-    left join banks b on b.id = ra.bank_id
-    where i.payment_id=$1 order by i.id asc
-  `, [id])
-
-  res.setHeader('Content-Type', 'application/pdf')
-  const fileBase = (head.rows[0].bill_no ? String(head.rows[0].bill_no) : `Payment-${id}`)
-  const asciiName = `${fileBase}-Receipt.pdf`.replace(/[^\x20-\x7E]/g, '_')
-  const utf8Name = encodeURIComponent(`${fileBase}-Receipt.pdf`)
-  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
-
-  const doc = new PDFDocument({ size: 'A5', layout: 'portrait', margins: { top: 28, bottom: 28, left: 28, right: 28 } })
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 20, left: 24, right: 24 } })
   doc.pipe(res)
   let hasCJK = false, hasCJKBold = false
   try {
@@ -1317,68 +1231,57 @@ fxRouter.get('/payments/:id/receipt', authMiddleware(true), requirePerm('view_fx
   } catch {}
   const font = hasCJK ? 'CJK' : 'Helvetica'
   const fontBold = hasCJKBold ? 'CJK-Bold' : (hasCJK ? 'CJK' : 'Helvetica-Bold')
-  doc.font(fontBold).fontSize(16).text('Payment Receipt', { align: 'center' })
-  doc.moveDown(0.5)
-  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
   const toDate = (v) => { try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
-  const h = head.rows[0]
-  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
+
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
-  const width = right - left
+  const contentWidth = right - left
 
-  function kv(k, v, yGap=6){
-    doc.font(fontBold).fontSize(10).text(`${k}:`, left, doc.y)
-    const kW = doc.widthOfString(`${k}:`)
-    doc.font(font).fontSize(10).text(String(v||''), left + kW + 6, doc.y - doc.currentLineHeight(), { width: width - kW - 6 })
-    doc.moveDown(yGap/12)
-  }
-  kv('Bill No', h.bill_no || `Payment-${h.id}`)
-  kv('Pay Date', toDate(h.pay_date))
-  kv('Customer', h.customer_name || '')
-  kv('Status', (h.status === 'completed' ? 'Completed' : 'Pending'))
-  doc.moveDown(0.5)
-  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#999').stroke().strokeColor('black')
-  doc.moveDown(0.8)
-
-  // 收款摘要
-  doc.font(fontBold).fontSize(12).text('Received Amount (CNY):', { align: 'left' })
-  doc.font(fontBold).fontSize(20).fillColor('#1a1a1a').text(money(total), { align: 'left' })
+  // 标题条
+  doc.rect(left-8, doc.page.margins.top-10, contentWidth+16, 24).fill('#dddddd')
+  doc.fillColor('#7a0a2a').font(fontBold).fontSize(14).text(t('title'), left, doc.page.margins.top-6, { align: 'center', width: contentWidth })
   doc.fillColor('black')
-  doc.moveDown(0.6)
-
-  // 明细概览（精简）
-  if (items.rows.length) {
-    doc.font(fontBold).fontSize(10).text('Details:', { align: 'left' })
-    doc.moveDown(0.2)
-    doc.font(font).fontSize(9)
-    const maxRows = 6
-    const show = items.rows.slice(0, maxRows)
-    show.forEach((r, idx) => {
-      const line = `${idx+1}. ${r.account_name || ''} · ${r.bank_name || ''} · ${r.bank_account || ''} · ${(r.currency_code||'').toUpperCase()} ${money(r.amount||0)}`
-      doc.text(line, { width })
-    })
-    if (items.rows.length > maxRows) {
-      doc.text(`... and ${items.rows.length - maxRows} more`, { width, oblique: true })
-    }
-  }
-
   doc.moveDown(1)
-  // 签字区
-  const yStart = doc.y
-  const colW = Math.floor(width/2) - 10
-  doc.font(font).fontSize(9).text('Received By:', left, yStart, { width: colW })
-  doc.moveDown(1.2)
-  doc.moveTo(left, doc.y).lineTo(left + colW, doc.y).stroke()
-  doc.moveDown(0.4)
-  doc.text('Date:', left, doc.y)
-  doc.moveDown(0.8)
-  doc.text('Authorized Signature:', left + colW + 20, yStart, { width: colW })
-  doc.moveDown(1.2)
-  doc.moveTo(left + colW + 20, doc.y).lineTo(left + colW + 20 + colW, doc.y).stroke()
+
+  const h = head.rows[0]
+  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+
+  // 金额区块
+  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
+  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('amount')}:`, left, doc.y + 6)
+  doc.fillColor('black')
+  doc.rect(left-4, doc.y + 20, contentWidth+8, 44).stroke('#7a0a2a')
+  doc.font(fontBold).fontSize(22).text(`${(lang==='zh'?'CNY：':'CNY: ')}${money(total)}`, left+8, doc.y + 26)
+  doc.moveDown(3.5)
+
+  // 收款人信息
+  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
+  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('payee')}:`, left, doc.y + 6)
+  doc.fillColor('black')
+  doc.rect(left-4, doc.y + 20, contentWidth+8, 50).stroke('#7a0a2a')
+  const first = items.rows[0] || {}
+  doc.font(font).fontSize(11)
+  doc.text(`${t('name')}：${first.account_name||''}`, left+8, doc.y + 26)
+  doc.text(`${t('account')}：${first.bank_account||''}`, left+8, doc.y + 42)
+  doc.text(`${t('bank')}：${first.bank_name||''}`, left+8, doc.y + 58)
+  doc.moveDown(4.4)
+
+  // 交易信息
+  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
+  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('info')}:`, left, doc.y + 6)
+  doc.fillColor('black')
+  doc.rect(left-4, doc.y + 20, contentWidth+8, 60).stroke('#7a0a2a')
+  doc.font(font).fontSize(11)
+  const statusText = h.status==='completed' ? t('completed') : t('pending')
+  doc.text(`${t('status')}：${statusText}`, left+8, doc.y + 26)
+  doc.text(`${t('billNo')}：${h.bill_no || `Payment-${h.id}`}`, left+8, doc.y + 42)
+  doc.text(`${t('date')}：${toDate(h.pay_date)}`, left+8, doc.y + 58)
 
   doc.end()
 })
+
+//（已合并回 /payments/:id/pdf）
 
 // 删除单据
 fxRouter.delete('/settlements/:id', authMiddleware(true), requirePerm('delete_fx'), async (req, res) => {

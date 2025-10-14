@@ -98,7 +98,6 @@
             <div class="cell actions" style="display:flex; gap:8px;">
               <el-button @click="downloadCsv(detail)">CSV</el-button>
               <el-button type="primary" v-if="detail.status==='completed'" @click="previewPdf(detail)">预览PDF</el-button>
-              <el-button type="success" v-if="detail.status==='completed'" @click="downloadReceipt(detail)">回执单</el-button>
             </div>
           </div>
         </div>
@@ -220,16 +219,7 @@ async function previewPdf(row){
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
-async function downloadReceipt(row){
-  const id = row.id
-  const blob = await api.fx.payments.exportReceiptPdf(id)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${row.bill_no || ('Payment-' + id)}-Receipt.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+// 回执已并入统一 PDF 模板
 async function removeBill(row){
   try {
     const id = row.payment_id || row.id

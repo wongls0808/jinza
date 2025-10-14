@@ -248,18 +248,7 @@ export const api = {
         if (!res.ok) throw new Error(await res.text())
         return res.blob()
       },
-      exportReceiptPdf: async (id) => {
-        const token = (function(){
-          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
-          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
-          return null
-        })()
-        const headers = { }
-        if (token) headers['Authorization'] = `Bearer ${token}`
-        const res = await fetch(`${API_BASE}/fx/payments/${id}/receipt`, { headers })
-        if (!res.ok) throw new Error(await res.text())
-        return res.blob()
-      },
+      // receipt unified to exportPdf
       create: (data) => request('/fx/payments', { method: 'POST', body: JSON.stringify(data) })
     }
   },
