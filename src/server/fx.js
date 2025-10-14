@@ -329,11 +329,12 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   // PDF 输出
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `attachment; filename=Settlement-${id}.pdf`)
-  const doc = new PDFDocument({ size: 'A4', margin: 36 })
+  // A5 横版，较小页面，减小边距以获得更大内容区
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 24, bottom: 24, left: 24, right: 24 } })
   doc.pipe(res)
 
   const title = 'Settlement Bill'
-  doc.fontSize(16).text(title, { align: 'center' })
+  doc.fontSize(14).text(title, { align: 'center' })
   doc.moveDown(0.5)
   const toStr = (v) => v==null? '' : String(v)
   const toDate = (v) => {
@@ -341,6 +342,23 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   }
   const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
   const money0 = (n) => Math.round(Number(n||0)).toLocaleString()
+  const left = doc.page.margins.left
+  const right = doc.page.width - doc.page.margins.right
+  const contentWidth = right - left
+  // 自动压缩文字到指定宽度（不换行）
+  function textFit(txt, x, y, width, opts={}) {
+    const max = opts.maxSize ?? 9
+    const min = opts.minSize ?? 7
+    let size = max
+    while (size > min) {
+      doc.fontSize(size)
+      const w = doc.widthOfString(String(txt||''), { width, ...opts })
+      if (w <= width) break
+      size -= 0.5
+    }
+    doc.fontSize(size)
+    doc.text(String(txt||''), x, y, { width, lineBreak: false, ...opts })
+  }
 
   const headerPairs = [
     ['Bill No', toStr(h.bill_no)],
@@ -355,37 +373,40 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     ['Created By', toStr(h.created_by_name||'')],
     ['Created At', toDate(h.created_at)]
   ]
-  doc.fontSize(10)
-  const colW = 260
+  doc.fontSize(9)
+  const hCol = Math.floor(contentWidth/2) - 8
   for (let i=0;i<headerPairs.length;i+=2) {
     const [k1,v1] = headerPairs[i]
     const [k2,v2] = headerPairs[i+1] || ['','']
     const y = doc.y
-    doc.text(`${k1}: ${v1}`, { width: colW })
-    doc.text(`${k2}: ${v2}`, 300, y, { width: colW })
+    textFit(`${k1}: ${v1}`, left, y, hCol)
+    textFit(`${k2}: ${v2}`, left + hCol + 16, y, hCol)
+    doc.moveDown(0.6)
   }
-  doc.moveDown(0.5)
-  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+  doc.moveDown(0.3)
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
   doc.moveDown(0.5)
 
   // 表头
-  const tableX = 36
-  const cols = [
-    { key: '#', w: 24 },
-    { key: 'Ref No', w: 70 },
-    { key: 'Date', w: 70 },
-    { key: 'Bank(EN)', w: 100 },
-    { key: 'Account Name', w: 140 },
-    { key: 'Account No', w: 90 },
-    { key: 'Base', w: 70, align: 'right' },
-    { key: 'Converted', w: 70, align: 'right' }
+  const tableX = left
+  const colDefs = [
+    { key: '#', w: 1 },
+    { key: 'Ref No', w: 3 },
+    { key: 'Date', w: 3 },
+    { key: 'Bank(EN)', w: 4 },
+    { key: 'Account Name', w: 6 },
+    { key: 'Account No', w: 4 },
+    { key: 'Base', w: 3, align: 'right' },
+    { key: 'Converted', w: 3, align: 'right' }
   ]
+  const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
+  const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
   let x = tableX
   doc.fontSize(9).font('Helvetica-Bold')
-  cols.forEach(c => { doc.text(c.key, x, doc.y, { width: c.w, align: c.align||'left' }); x += c.w })
+  cols.forEach(c => { textFit(c.key, x, doc.y, c.w, { align: c.align||'left' }); x += c.w })
   doc.moveDown(0.2)
   doc.font('Helvetica')
-  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
 
   // 行
   let idx = 1
@@ -404,20 +425,20 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     x = tableX
     cols.forEach((c,i) => {
       const align = c.align||'left'
-      doc.text(String(row[i]??''), x, doc.y, { width: c.w, align })
+      textFit(String(row[i]??''), x, doc.y, c.w, { align })
       x += c.w
     })
     sumBase += Number(r.amount_base||0)
     sumSettle += Number(r.amount_settled_calc||0)
     doc.moveDown(0.2)
   })
-  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
   doc.moveDown(0.2)
   // 合计
   x = tableX + cols.slice(0,6).reduce((s,c)=>s+c.w,0)
-  doc.text(money(sumBase), x, doc.y, { width: cols[6].w, align: 'right' })
+  textFit(money(sumBase), x, doc.y, cols[6].w, { align: 'right' })
   x += cols[6].w
-  doc.text(money0(sumSettle), x, doc.y, { width: cols[7].w, align: 'right' })
+  textFit(money0(sumSettle), x, doc.y, cols[7].w, { align: 'right' })
 
   doc.end()
 })
