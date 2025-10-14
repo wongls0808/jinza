@@ -219,10 +219,10 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   i.amount_base,
   case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
-       a.account_name,
-       b.zh as bank_name,
-       b.en as bank_name_en,
-       a.bank_code as bank_code,
+  a.account_name,
+  b.zh as bank_name,
+  b.en as bank_name_en,
+  b.code as bank_code,
        b.logo_url as bank_logo_url
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
@@ -377,10 +377,10 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        i.amount_base,
        case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
-       a.account_name,
-       b.zh as bank_name,
-       b.en as bank_name_en,
-       a.bank_code as bank_code,
+  a.account_name,
+  b.zh as bank_name,
+  b.en as bank_name_en,
+  b.code as bank_code,
        b.logo_url as bank_logo_url
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
