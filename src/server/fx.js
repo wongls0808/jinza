@@ -274,6 +274,62 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
+  // 语言选择：优先 query.lang，其次 Accept-Language；仅区分 zh / en
+  const pickLang = () => {
+    const q = String(req.query.lang||'').toLowerCase()
+    if (q.startsWith('zh')) return 'zh'
+    const al = String(req.headers['accept-language']||'').toLowerCase()
+    if (al.includes('zh')) return 'zh'
+    return 'en'
+  }
+  const lang = pickLang()
+  const I18N = {
+    en: {
+      title: 'Settlement Bill',
+      billNo: 'Bill No',
+      settleDate: 'Settle Date',
+      rate: 'Rate',
+      customerAbbr: 'Customer Abbr',
+      customerName: 'Customer Name',
+      customerTax: 'Customer Tax(%)',
+      preSettleBalance: 'Pre-Settle Balance',
+      selectedBase: 'Selected Base',
+      selectedConverted: 'Selected Converted',
+      createdBy: 'Created By',
+      createdAt: 'Created At',
+      thIndex: '#',
+      thRefNo: 'Ref No',
+      thDate: 'Date',
+      thBankEn: 'Bank(EN)',
+      thAccountName: 'Account Name',
+      thAccountNo: 'Account No',
+      thBase: 'Base',
+      thConverted: 'Converted'
+    },
+    zh: {
+      title: '结汇单',
+      billNo: '单号',
+      settleDate: '结汇日期',
+      rate: '汇率',
+      customerAbbr: '客户简称',
+      customerName: '客户名称',
+      customerTax: '客户税率(%)',
+      preSettleBalance: '期初余额',
+      selectedBase: '已选基币合计',
+      selectedConverted: '已选折算合计',
+      createdBy: '创建人',
+      createdAt: '创建时间',
+      thIndex: '序号',
+      thRefNo: '参考号',
+      thDate: '日期',
+      thBankEn: '银行(英)',
+      thAccountName: '账户名',
+      thAccountNo: '账号',
+      thBase: '基币',
+      thConverted: '折算'
+    }
+  }
+  const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k
   // 复用详情查询逻辑
   const head = await query(
     `with tx_agg as (
@@ -329,30 +385,51 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     [id]
   )
 
-  // PDF 输出
+  // PDF 输出：文件名为单号
   res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader('Content-Disposition', `attachment; filename=Settlement-${id}.pdf`)
+  const fileBase = (h.bill_no ? String(h.bill_no) : `Settlement-${id}`)
+  const asciiName = `${fileBase}.pdf`.replace(/[^\x20-\x7E]/g, '_')
+  const utf8Name = encodeURIComponent(`${fileBase}.pdf`)
+  // 同时提供 filename 与 filename* 以兼容各类客户端
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
   // A5 横版，较小页面，减小边距以获得更大内容区
   const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 24, bottom: 24, left: 24, right: 24 } })
   doc.pipe(res)
 
-  // 可选中文字体支持：若存在 public/fonts/NotoSansSC-Regular.ttf 则启用，以避免中文乱码
+  // 可选中文字体支持：优先尝试项目内 CJK 字体，统一整份 PDF 使用 CJK 避免中文乱码
+  let hasCJK = false
+  let hasCJKBold = false
   try {
     const __filename = fileURLToPath(import.meta.url)
     const __dirname = path.dirname(__filename)
-    const fontCandidate = path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf')
-    if (fs.existsSync(fontCandidate)) {
-      doc.registerFont('CJK', fontCandidate)
-      doc.font('CJK')
-    } else {
-      doc.font('Helvetica')
+    const candidatesRegular = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Regular.otf')
+    ]
+    const candidatesBold = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Bold.otf')
+    ]
+    const foundRegular = candidatesRegular.find(p => fs.existsSync(p))
+    const foundBold = candidatesBold.find(p => fs.existsSync(p))
+    if (foundRegular) {
+      doc.registerFont('CJK', foundRegular)
+      hasCJK = true
     }
-  } catch {
-    doc.font('Helvetica')
-  }
+    if (foundBold) {
+      doc.registerFont('CJK-Bold', foundBold)
+      hasCJKBold = true
+    }
+  } catch {/* noop */}
+  // 默认字体：若找到 CJK 则用之，否则回退 Helvetica
+  doc.font(hasCJK ? 'CJK' : 'Helvetica')
 
-  const title = 'Settlement Bill'
-  doc.fontSize(14).text(title, { align: 'center' })
+  const title = t('title')
+  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold')
+    .fontSize(14)
+    .text(title, { align: 'center' })
   doc.moveDown(0.5)
   const toStr = (v) => v==null? '' : String(v)
   const toDate = (v) => {
@@ -379,19 +456,20 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   }
 
   const headerPairs = [
-    ['Bill No', toStr(h.bill_no)],
-    ['Settle Date', toDate(h.settle_date)],
-    ['Rate', Number(h.rate||0).toFixed(4)],
-    ['Customer Abbr', toStr(h.customer_abbr||'')],
-    ['Customer Name', toStr(h.customer_name||'')],
-    ['Customer Tax(%)', Number(h.customer_tax_rate||0).toFixed(2)+'%'],
-    ['Pre-Settle Balance', money(pre_balance_myr)],
-    ['Selected Base', money(h.total_base)],
-    ['Selected Converted', money0(h.total_settled)],
-    ['Created By', toStr(h.created_by_name||'')],
-    ['Created At', toDate(h.created_at)]
+    [t('billNo'), toStr(h.bill_no)],
+    [t('settleDate'), toDate(h.settle_date)],
+    [t('rate'), Number(h.rate||0).toFixed(4)],
+    [t('customerAbbr'), toStr(h.customer_abbr||'')],
+    [t('customerName'), toStr(h.customer_name||'')],
+    [t('customerTax'), Number(h.customer_tax_rate||0).toFixed(2)+'%'],
+    [t('preSettleBalance'), money(pre_balance_myr)],
+    [t('selectedBase'), money(h.total_base)],
+    [t('selectedConverted'), money0(h.total_settled)],
+    [t('createdBy'), toStr(h.created_by_name||'')],
+    [t('createdAt'), toDate(h.created_at)]
   ]
-  doc.fontSize(9)
+  // 统一信息区字号
+  doc.font(hasCJK ? 'CJK' : 'Helvetica').fontSize(9)
   const hCol = Math.floor(contentWidth/2) - 8
   for (let i=0;i<headerPairs.length;i+=2) {
     const [k1,v1] = headerPairs[i]
@@ -410,14 +488,14 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   // 表头
   const tableX = left
   const colDefs = [
-    { key: '#', w: 1 },
-    { key: 'Ref No', w: 3 },
-    { key: 'Date', w: 3 },
-    { key: 'Bank(EN)', w: 4 },
-    { key: 'Account Name', w: 6 },
-    { key: 'Account No', w: 4 },
-    { key: 'Base', w: 3, align: 'right' },
-    { key: 'Converted', w: 3, align: 'right' }
+    { key: t('thIndex'), w: 1 },
+    { key: t('thRefNo'), w: 3 },
+    { key: t('thDate'), w: 3 },
+    { key: t('thBankEn'), w: 4 },
+    { key: t('thAccountName'), w: 6 },
+    { key: t('thAccountNo'), w: 4 },
+    { key: t('thBase'), w: 3, align: 'right' },
+    { key: t('thConverted'), w: 3, align: 'right' }
   ]
   const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
   const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
@@ -425,10 +503,12 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   let rowH = 14
   let y = doc.y
   let x = tableX
-  doc.fontSize(9).font((doc._font && doc._font.name==='CJK') ? 'CJK' : 'Helvetica-Bold')
+  // 表头统一字号；若有 CJK Bold 则加粗
+  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
   cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left' }); x += c.w })
   doc.y = y + rowH
-  doc.font('Helvetica')
+  // 行内容统一使用同一字体，避免混合导致测宽不准与字符重叠
+  doc.font(hasCJK ? 'CJK' : 'Helvetica')
   doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
 
   // 行
@@ -447,6 +527,8 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     ]
     y = doc.y
     x = tableX
+    // 行内容字号统一
+    doc.fontSize(9)
     cols.forEach((c,i) => {
       const align = c.align||'left'
       textFit(String(row[i]??''), x, y, c.w, { align })
