@@ -67,7 +67,7 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
   const createdAtIso = new Date().toISOString()
   // 例：2025-10-13T14:27:01.103Z -> 20251013T142701103Z
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
-  // 计算合计：基币金额（按 credit-debit）与结汇金额（基币*汇率）
+  // 计算合计：马币金额（按 credit-debit）与结汇金额（马币*汇率）
   const total_base = items.reduce((s, it) => s + Number(it.amount_base||0), 0)
   const total_settled = total_base * Number(rate)
   const ins = await query(
@@ -176,7 +176,7 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
-  // 详情头部：补充 customer_abbr 与 pre_balance_myr（同列表口径：期初 + 已匹配MYR净额 - 之前结汇基币合计）
+  // 详情头部：补充 customer_abbr 与 pre_balance_myr（同列表口径：期初 + 已匹配MYR净额 - 之前结汇马币合计）
   const head = await query(
     `with tx_agg as (
        select 
@@ -209,7 +209,7 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   if (!head.rows.length) return res.status(404).json({ error: 'not found' })
   const h = head.rows[0]
   const pre_balance_myr = Number(h.opening_myr || 0) + Number(h.net_myr || 0) - Number(h.prev_settle_base || 0)
-  // 明细：联表获取原始参考号、银行名称、账户名，并计算每行折算金额（若存量为0则用基币*汇率）
+  // 明细：联表获取原始参考号、银行名称、账户名，并计算每行折算金额（若存量为0则用马币*汇率）
   const items = await query(
     `select 
        i.id,
@@ -323,7 +323,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       customerName: '客户名称',
   customerTax: '客户税率',
       preSettleBalance: '期初余额',
-      selectedBase: '已选基币合计',
+      selectedBase: '已选马币合计',
       selectedConverted: '已选折算合计',
       createdBy: '创建人',
       createdAt: '创建时间',
@@ -333,7 +333,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   thBankEn: '银行',
       thAccountName: '账户名',
       thAccountNo: '账号',
-      thBase: '基币',
+      thBase: '马币',
       thConverted: '折算'
     }
   }
@@ -734,8 +734,13 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       if (curRow.length) rowsArr.push(curRow)
 
       const rows = rowsArr.length
-      const labelH = 12
-      const footH = 4 + 1 + 6 + labelH + rows * iconH + (rows > 1 ? (rows-1)*8 : 0)
+  // 调整“合作机构”区域的垂直留白，避免和 LOGO 视觉粘连
+  const labelH = 12
+  const labelToLogosGap = 8 // 标题与首行 LOGO 的间距稍作增加
+  const sectionTopGap = 6   // 分隔线和标题之间
+  const sectionBottomGap = 4 // LOGO 网格与页底之间
+  const rowGap = 8
+  const footH = sectionBottomGap + sectionTopGap + labelH + labelToLogosGap + rows * iconH + (rows > 1 ? (rows-1)*rowGap : 0)
       const yBase = doc.page.height - doc.page.margins.bottom - footH
       // 若当前内容过低，可能会覆盖页尾，直接新开一页
       if (doc.y > yBase - 8) {
@@ -750,9 +755,9 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       // 标题
       doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
       const label = (lang==='zh' ? '合作机构' : 'Partners')
-      doc.text(label, bLeft, baseY + 6, { continued: false })
+      doc.text(label, bLeft, baseY + sectionTopGap, { continued: false })
       // Logo 网格
-      let logoY = baseY + 6 + labelH
+      let logoY = baseY + sectionTopGap + labelH + labelToLogosGap
       for (const row of rowsArr) {
         let logoX = bLeft
         for (const it of row) {
@@ -785,7 +790,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
           } catch {}
           logoX += it.width + gap
         }
-        logoY += iconH + 8
+        logoY += iconH + rowGap
       }
       // 保持文档 y 不变（页尾绘制为浮动层）
     }

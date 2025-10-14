@@ -250,7 +250,7 @@ function fmtDate(v){
 function summaryMethod({ data }){
   const sumBase = data.reduce((s, r) => s + Number(r.amount_base||0), 0)
   const sumSettle = data.reduce((s, r) => s + Number(r.amount_settled_calc||0), 0)
-  // 列顺序：#，参考号，日期，银行，账户名，账号，基币，折算
+  // 列顺序：#，参考号，日期，银行，账户名，账号，马币，折算
   return [t('common.total') || '合计', '', '', '', '', '', money(sumBase), money0(sumSettle)]
 }
 </script>

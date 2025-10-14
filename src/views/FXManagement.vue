@@ -29,6 +29,7 @@
   <el-table ref="settleTableRef" :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
     <el-table-column type="selection" width="48" :selectable="isSettleSelectable" />
           <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
+          <el-table-column prop="cheque_ref_no" column-key="cheque_ref_no" :label="t('transactions.chequeRefNo')" :width="colWSettle('cheque_ref_no',140)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
           <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',100)" align="center">
