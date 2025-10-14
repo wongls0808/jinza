@@ -1267,6 +1267,119 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   doc.end()
 })
 
+// 付款单：导出 PDF（回执单-非账单式模板）
+fxRouter.get('/payments/:id/receipt', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`
+    select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.display_name, a.username) as approved_by_name
+    from fx_payments p
+    left join users u on u.id = p.created_by
+    left join users a on a.id = p.approved_by
+    where p.id=$1
+  `, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`
+    select i.*, b.zh as bank_name
+    from fx_payment_items i
+    left join receiving_accounts ra on ra.bank_account = i.bank_account
+    left join banks b on b.id = ra.bank_id
+    where i.payment_id=$1 order by i.id asc
+  `, [id])
+
+  res.setHeader('Content-Type', 'application/pdf')
+  const fileBase = (head.rows[0].bill_no ? String(head.rows[0].bill_no) : `Payment-${id}`)
+  const asciiName = `${fileBase}-Receipt.pdf`.replace(/[^\x20-\x7E]/g, '_')
+  const utf8Name = encodeURIComponent(`${fileBase}-Receipt.pdf`)
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
+
+  const doc = new PDFDocument({ size: 'A5', layout: 'portrait', margins: { top: 28, bottom: 28, left: 28, right: 28 } })
+  doc.pipe(res)
+  let hasCJK = false, hasCJKBold = false
+  try {
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = path.dirname(__filename)
+    const reg = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Regular.otf')
+    ]
+    const bold = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Bold.otf')
+    ]
+    const fr = reg.find(p => fs.existsSync(p))
+    const fb = bold.find(p => fs.existsSync(p))
+    if (fr) { doc.registerFont('CJK', fr); hasCJK = true }
+    if (fb) { doc.registerFont('CJK-Bold', fb); hasCJKBold = true }
+  } catch {}
+  const font = hasCJK ? 'CJK' : 'Helvetica'
+  const fontBold = hasCJKBold ? 'CJK-Bold' : (hasCJK ? 'CJK' : 'Helvetica-Bold')
+  doc.font(fontBold).fontSize(16).text('Payment Receipt', { align: 'center' })
+  doc.moveDown(0.5)
+  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
+  const toDate = (v) => { try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
+  const h = head.rows[0]
+  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  const left = doc.page.margins.left
+  const right = doc.page.width - doc.page.margins.right
+  const width = right - left
+
+  function kv(k, v, yGap=6){
+    doc.font(fontBold).fontSize(10).text(`${k}:`, left, doc.y)
+    const kW = doc.widthOfString(`${k}:`)
+    doc.font(font).fontSize(10).text(String(v||''), left + kW + 6, doc.y - doc.currentLineHeight(), { width: width - kW - 6 })
+    doc.moveDown(yGap/12)
+  }
+  kv('Bill No', h.bill_no || `Payment-${h.id}`)
+  kv('Pay Date', toDate(h.pay_date))
+  kv('Customer', h.customer_name || '')
+  kv('Status', (h.status === 'completed' ? 'Completed' : 'Pending'))
+  doc.moveDown(0.5)
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#999').stroke().strokeColor('black')
+  doc.moveDown(0.8)
+
+  // 收款摘要
+  doc.font(fontBold).fontSize(12).text('Received Amount (CNY):', { align: 'left' })
+  doc.font(fontBold).fontSize(20).fillColor('#1a1a1a').text(money(total), { align: 'left' })
+  doc.fillColor('black')
+  doc.moveDown(0.6)
+
+  // 明细概览（精简）
+  if (items.rows.length) {
+    doc.font(fontBold).fontSize(10).text('Details:', { align: 'left' })
+    doc.moveDown(0.2)
+    doc.font(font).fontSize(9)
+    const maxRows = 6
+    const show = items.rows.slice(0, maxRows)
+    show.forEach((r, idx) => {
+      const line = `${idx+1}. ${r.account_name || ''} · ${r.bank_name || ''} · ${r.bank_account || ''} · ${(r.currency_code||'').toUpperCase()} ${money(r.amount||0)}`
+      doc.text(line, { width })
+    })
+    if (items.rows.length > maxRows) {
+      doc.text(`... and ${items.rows.length - maxRows} more`, { width, oblique: true })
+    }
+  }
+
+  doc.moveDown(1)
+  // 签字区
+  const yStart = doc.y
+  const colW = Math.floor(width/2) - 10
+  doc.font(font).fontSize(9).text('Received By:', left, yStart, { width: colW })
+  doc.moveDown(1.2)
+  doc.moveTo(left, doc.y).lineTo(left + colW, doc.y).stroke()
+  doc.moveDown(0.4)
+  doc.text('Date:', left, doc.y)
+  doc.moveDown(0.8)
+  doc.text('Authorized Signature:', left + colW + 20, yStart, { width: colW })
+  doc.moveDown(1.2)
+  doc.moveTo(left + colW + 20, doc.y).lineTo(left + colW + 20 + colW, doc.y).stroke()
+
+  doc.end()
+})
+
 // 删除单据
 fxRouter.delete('/settlements/:id', authMiddleware(true), requirePerm('delete_fx'), async (req, res) => {
   await ensureDDL()
