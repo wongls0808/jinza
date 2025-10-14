@@ -1,5 +1,8 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { authMiddleware, requirePerm } from './auth.js'
 import { query } from './db.js'
 
@@ -333,6 +336,21 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 24, bottom: 24, left: 24, right: 24 } })
   doc.pipe(res)
 
+  // 可选中文字体支持：若存在 public/fonts/NotoSansSC-Regular.ttf 则启用，以避免中文乱码
+  try {
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = path.dirname(__filename)
+    const fontCandidate = path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf')
+    if (fs.existsSync(fontCandidate)) {
+      doc.registerFont('CJK', fontCandidate)
+      doc.font('CJK')
+    } else {
+      doc.font('Helvetica')
+    }
+  } catch {
+    doc.font('Helvetica')
+  }
+
   const title = 'Settlement Bill'
   doc.fontSize(14).text(title, { align: 'center' })
   doc.moveDown(0.5)
@@ -377,10 +395,12 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   const hCol = Math.floor(contentWidth/2) - 8
   for (let i=0;i<headerPairs.length;i+=2) {
     const [k1,v1] = headerPairs[i]
-    const [k2,v2] = headerPairs[i+1] || ['','']
     const y = doc.y
     textFit(`${k1}: ${v1}`, left, y, hCol)
-    textFit(`${k2}: ${v2}`, left + hCol + 16, y, hCol)
+    if (i+1 < headerPairs.length) {
+      const [k2,v2] = headerPairs[i+1]
+      textFit(`${k2}: ${v2}`, left + hCol + 16, y, hCol)
+    }
     doc.moveDown(0.6)
   }
   doc.moveDown(0.3)
@@ -401,10 +421,13 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   ]
   const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
   const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
+  // 表头行高与当前 y
+  let rowH = 14
+  let y = doc.y
   let x = tableX
-  doc.fontSize(9).font('Helvetica-Bold')
-  cols.forEach(c => { textFit(c.key, x, doc.y, c.w, { align: c.align||'left' }); x += c.w })
-  doc.moveDown(0.2)
+  doc.fontSize(9).font((doc._font && doc._font.name==='CJK') ? 'CJK' : 'Helvetica-Bold')
+  cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left' }); x += c.w })
+  doc.y = y + rowH
   doc.font('Helvetica')
   doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
 
@@ -422,17 +445,19 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       money(r.amount_base||0),
       money0(r.amount_settled_calc||0)
     ]
+    y = doc.y
     x = tableX
     cols.forEach((c,i) => {
       const align = c.align||'left'
-      textFit(String(row[i]??''), x, doc.y, c.w, { align })
+      textFit(String(row[i]??''), x, y, c.w, { align })
       x += c.w
     })
     sumBase += Number(r.amount_base||0)
     sumSettle += Number(r.amount_settled_calc||0)
-    doc.moveDown(0.2)
+    // 固定行高换行，绘制行分隔
+    doc.y = y + rowH
+    doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
   })
-  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
   doc.moveDown(0.2)
   // 合计
   x = tableX + cols.slice(0,6).reduce((s,c)=>s+c.w,0)

@@ -85,19 +85,27 @@
           </div>
         </div>
 
-        <el-table :data="detail.items || []" border size="small" height="60vh" show-summary :summary-method="summaryMethod">
-          <el-table-column type="index" :label="t('common.no')" width="60" />
-          <el-table-column prop="ref_no" :label="t('transactions.chequeRefNo')" width="150" />
-          <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" width="130">
+        <el-table 
+          :data="detail.items || []" 
+          border 
+          size="small" 
+          height="60vh" 
+          show-summary 
+          :summary-method="summaryMethod"
+          @header-dragend="memDetail.onColResize"
+        >
+          <el-table-column type="index" column-key="idx" :label="t('common.no')" :width="memDetail.colW('idx', 60)" />
+          <el-table-column prop="ref_no" column-key="ref_no" :label="t('transactions.chequeRefNo')" :width="memDetail.colW('ref_no', 150)" />
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="memDetail.colW('trn_date', 130)">
             <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
           </el-table-column>
-          <el-table-column prop="bank_name_en" :label="t('banks.title')" width="140" />
-          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" width="200" />
-          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" />
-          <el-table-column prop="amount_base" :label="t('fx.baseAmount')" width="140" align="right">
+          <el-table-column prop="bank_name_en" column-key="bank_name_en" :label="t('banks.title')" :width="memDetail.colW('bank_name_en', 160)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="memDetail.colW('account_name', 220)" />
+          <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="memDetail.colW('account_number', 160)" />
+          <el-table-column prop="amount_base" column-key="amount_base" :label="t('fx.baseAmount')" :width="memDetail.colW('amount_base', 120)" align="right">
             <template #default="{ row }">{{ money(row.amount_base) }}</template>
           </el-table-column>
-          <el-table-column prop="amount_settled_calc" :label="t('fx.settledAmount')" width="160" align="right">
+          <el-table-column prop="amount_settled_calc" column-key="amount_settled_calc" :label="t('fx.settledAmount')" :width="memDetail.colW('amount_settled_calc', 140)" align="right">
             <template #default="{ row }">{{ money0(row.amount_settled_calc) }}</template>
           </el-table-column>
         </el-table>
@@ -123,6 +131,17 @@ const customers = ref([])
 const qCustomerId = ref(null)
 const qRange = ref([])
 const { colW, onColResize } = useTableMemory('fx-settlements')
+// 详情表格使用独立的列宽记忆，带上单据ID避免与不同单据冲突
+let memDetailInst = useTableMemory('fx-settle-detail')
+const memDetail = {
+  setId(id){
+    const key = `fx-settle-detail:${id || '0'}`
+    memDetailInst = useTableMemory(key)
+  },
+  colW(col, def){ return memDetailInst.colW(col, def) },
+  onColResize(newW, oldW, col, evt){ return memDetailInst.onColResize(newW, oldW, col, evt) },
+  reset(){ return memDetailInst.reset() }
+}
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 function money0(v){ return Math.round(Number(v||0)).toLocaleString() }
 async function loadCustomers(){ const res = await api.customers.list({ pageSize: 1000 }); customers.value = res.items || [] }
@@ -165,6 +184,8 @@ async function openDetail(row){
   try {
     const d = await api.fx.settlements.detail(row.id)
     detail.value = d
+    // 切换列宽记忆命名空间为该单据
+    memDetail.setId && memDetail.setId(d.id)
   } catch (e) {
     ElMessage.error(e?.message || 'Failed to load')
     drawerVisible.value = false
