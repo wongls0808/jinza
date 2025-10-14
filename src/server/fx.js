@@ -1,5 +1,7 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
+import QRCode from 'qrcode'
+import crypto from 'crypto'
 import SVGtoPDF from 'svg-to-pdfkit'
 import fs from 'fs'
 import path from 'path'
@@ -1215,7 +1217,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const ACCENT = '#2F4858' // 深色强调
   const LIGHT_ACCENT = '#e4edf1'
   const BRAND = process.env.BRAND_NAME || (lang==='zh' ? '公司收付系统' : 'Payment System')
-  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 40, left: 28, right: 28 } })
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 56, left: 28, right: 28 } })
   doc.pipe(res)
   // 页脚 logo 资源路径
   let footerLogoPath = null
@@ -1225,13 +1227,46 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     const cand = path.join(__dirname, '..', '..', 'public', 'pdf-assets', 'footer-logo.png')
     if (fs.existsSync(cand)) footerLogoPath = cand
   } catch {}
+  // 生成二维码 payload（选取关键信息 + hash）
+  const h = head.rows[0]
+  const qrDataCore = {
+    id: h.id,
+    bill_no: h.bill_no || ('Payment-'+h.id),
+    customer: h.customer_name||'',
+    status: h.status,
+    total: items.rows.reduce((s,r)=> s + Number(r.amount||0), 0),
+    item_count: items.rows.length,
+    ts: Date.now()
+  }
+  const hash = crypto.createHash('sha256')
+    .update(JSON.stringify(qrDataCore))
+    .digest('hex')
+    .slice(0,20) // 截取前20位
+  const qrPayload = { v:1, ...qrDataCore, sig: hash }
+  let qrDataUrl = null
+  try { qrDataUrl = await QRCode.toDataURL(JSON.stringify(qrPayload), { errorCorrectionLevel:'M', margin:0, scale:4 }) } catch {}
+
   const drawFooter = () => {
-    if (!footerLogoPath) return
-    const imgW = 260 // 目标显示宽度
     const pageWidth = doc.page.width
-    const y = doc.page.height - doc.page.margins.bottom + 4
-    const x = (pageWidth - imgW) / 2
-    try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
+    // Logo 居中
+    if (footerLogoPath) {
+      const imgW = 240
+      const y = doc.page.height - 42
+      const x = (pageWidth - imgW) / 2
+      try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
+    }
+    // 右下角二维码 (若生成成功)
+    if (qrDataUrl) {
+      const qrSize = 72
+      const qrX = pageWidth - doc.page.margins.right - qrSize
+      const qrY = doc.page.height - qrSize - 6
+      try {
+        const base64 = qrDataUrl.split(',')[1]
+        const buf = Buffer.from(base64, 'base64')
+        doc.image(buf, qrX, qrY, { width: qrSize, height: qrSize })
+        doc.fontSize(6).fillColor('#555555').text('Verify QR', qrX, qrY - 8, { width: qrSize, align:'center' })
+      } catch {}
+    }
   }
   // 首页与后续页面都绘制
   doc.on('pageAdded', drawFooter)
@@ -1264,7 +1299,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const contentWidth = right - left
 
   // Header: 品牌 + 标题 + 单号
-  const h = head.rows[0]
+  // (h 已在上方定义)
   const titleLine = t('title')
   doc.save()
   doc.fillColor(ACCENT)
