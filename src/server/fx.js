@@ -937,41 +937,42 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
     const rows = await query(
       `with agg as (
          select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
-       ),
-       tx_agg as (
-         select 
-           t.match_target_id as customer_id,
-           upper(a.currency_code) as currency,
-           sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
-         from transactions t
-         left join receiving_accounts a on a.bank_account = t.account_number
-         where coalesce(t.matched,false) = true and t.match_type = 'customer'
-         group by t.match_target_id, upper(a.currency_code)
-       ), tx_pivot as (
-         select customer_id,
-                sum(case when currency = 'MYR' then net else 0 end) as net_myr,
-                sum(case when currency = 'CNY' then net else 0 end) as net_cny
-         from tx_agg
-         group by customer_id
-       ), fx_set as (
-         select customer_id, sum(total_base) as s_base, sum(total_settled) as s_set
-         from fx_settlements
-         group by customer_id
-       ), fx_pay as (
-         select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
-         from fx_payments p
-         join fx_payment_items i on i.payment_id = p.id
-         group by p.customer_id
        )
-       select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.total_amount,0) as total_amount,
-              (coalesce(c.opening_cny,0) + coalesce(tp.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0)) as balance_cny
+       select 
+         p.*, 
+         coalesce(u.display_name, u.username) as created_by_name, 
+         coalesce(a.total_amount,0) as total_amount,
+         (
+           coalesce(c.opening_cny,0)
+           + coalesce((
+               select sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0))
+               from transactions t
+               left join receiving_accounts ra on ra.bank_account = t.account_number
+               where coalesce(t.matched,false) = true 
+                 and t.match_type = 'customer'
+                 and t.match_target_id = p.customer_id
+                 and upper(ra.currency_code) = 'CNY'
+                 and t.transaction_date <= p.pay_date
+             ), 0)
+           + coalesce((
+               select sum(s2.total_settled)
+               from fx_settlements s2
+               where s2.customer_id = p.customer_id
+                 and s2.settle_date <= p.pay_date
+             ), 0)
+           - coalesce((
+               select sum(i2.amount)
+               from fx_payments p2
+               join fx_payment_items i2 on i2.payment_id = p2.id
+               where p2.customer_id = p.customer_id
+                 and upper(i2.currency_code) = 'CNY'
+                 and (p2.pay_date < p.pay_date or (p2.pay_date = p.pay_date and p2.id < p.id))
+             ), 0)
+         ) as balance_cny
        from fx_payments p
        left join users u on u.id = p.created_by
        left join agg a on a.payment_id = p.id
        left join customers c on c.id = p.customer_id
-       left join tx_pivot tp on tp.customer_id = p.customer_id
-       left join fx_set fs on fs.customer_id = p.customer_id
-       left join fx_pay fp on fp.customer_id = p.customer_id
        ${whereSql}
        order by p.id desc offset $${idx++} limit $${idx++}`,
       [...params, offset, Number(pageSize)]
@@ -987,32 +988,7 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
     params
   )
   const rows = await query(
-    `with tx_agg as (
-       select 
-         t.match_target_id as customer_id,
-         upper(a.currency_code) as currency,
-         sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
-       from transactions t
-       left join receiving_accounts a on a.bank_account = t.account_number
-       where coalesce(t.matched,false) = true and t.match_type = 'customer'
-       group by t.match_target_id, upper(a.currency_code)
-     ), tx_pivot as (
-       select customer_id,
-              sum(case when currency = 'MYR' then net else 0 end) as net_myr,
-              sum(case when currency = 'CNY' then net else 0 end) as net_cny
-       from tx_agg
-       group by customer_id
-     ), fx_set as (
-       select customer_id, sum(total_base) as s_base, sum(total_settled) as s_set
-       from fx_settlements
-       group by customer_id
-     ), fx_pay as (
-       select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
-       from fx_payments p
-       join fx_payment_items i on i.payment_id = p.id
-       group by p.customer_id
-     )
-     select 
+    `select 
        p.id as payment_id,
        p.bill_no,
        p.customer_id,
@@ -1020,7 +996,33 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
        p.pay_date,
        p.status,
        coalesce(u.display_name, u.username) as created_by_name,
-       (coalesce(c.opening_cny,0) + coalesce(tp.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0)) as balance_cny,
+       (
+         coalesce(c.opening_cny,0)
+         + coalesce((
+             select sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0))
+             from transactions t
+             left join receiving_accounts ra on ra.bank_account = t.account_number
+             where coalesce(t.matched,false) = true 
+               and t.match_type = 'customer'
+               and t.match_target_id = p.customer_id
+               and upper(ra.currency_code) = 'CNY'
+               and t.transaction_date <= p.pay_date
+           ), 0)
+         + coalesce((
+             select sum(s2.total_settled)
+             from fx_settlements s2
+             where s2.customer_id = p.customer_id
+               and s2.settle_date <= p.pay_date
+           ), 0)
+         - coalesce((
+             select sum(i2.amount)
+             from fx_payments p2
+             join fx_payment_items i2 on i2.payment_id = p2.id
+             where p2.customer_id = p.customer_id
+               and upper(i2.currency_code) = 'CNY'
+               and (p2.pay_date < p.pay_date or (p2.pay_date = p.pay_date and p2.id < p.id))
+           ), 0)
+       ) as balance_cny,
        i.id as item_id,
        i.account_name,
        i.bank_account,
@@ -1033,9 +1035,6 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
      join fx_payment_items i on i.payment_id = p.id
      left join users u on u.id = p.created_by
      left join customers c on c.id = p.customer_id
-     left join tx_pivot tp on tp.customer_id = p.customer_id
-     left join fx_set fs on fs.customer_id = p.customer_id
-     left join fx_pay fp on fp.customer_id = p.customer_id
      left join receiving_accounts a on a.bank_account = i.bank_account
      left join banks b on b.id = a.bank_id
      ${whereSql}

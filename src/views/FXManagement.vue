@@ -64,8 +64,9 @@
         </div>
         <div class="totals">
           <span>{{ t('fx.paymentTotal') }}: {{ money(paymentTotal) }}</span>
+          <span v-if="overBudget" style="color: var(--el-color-danger);">{{ t('fx.errExceedBalance') }}</span>
         </div>
-  <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
+  <el-table ref="payTableRef" :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
           <el-table-column type="selection" width="48" />
           <!-- 提交日期（使用右侧筛选的 payDate 展示） -->
           <el-table-column column-key="pay_date" :label="t('fx.payDate')" :width="colWPay('pay_date',140)">
@@ -92,7 +93,7 @@
           <!-- 金额（默认空，不显示0.00） -->
           <el-table-column column-key="amount" :label="t('fx.amount')" :width="colWPay('amount',160)">
             <template #default="{ row }">
-              <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" :placeholder="t('common.input')" style="width:140px" />
+              <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" :placeholder="t('common.input')" style="width:140px" @change="() => onAmountChange(row)" />
             </template>
           </el-table-column>
         </el-table>
@@ -126,9 +127,11 @@ const selAccounts = ref([])
 
 const { colW: colWSettle, onColResize: onColResizeSettle } = useTableMemory('fx-mgmt-settlement')
 const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('fx-mgmt-payment')
+const payTableRef = ref(null)
 
 const canCreateSettlement = computed(() => !!(settleDate.value && customerId.value && rate.value && selMatched.value.length))
-const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0)))
+const overBudget = computed(() => paymentTotal.value > Number(cnyBalance.value || 0))
+const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0) && !overBudget.value))
 
 const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (Number(r.credit_amount || 0) - Number(r.debit_amount || 0)), 0))
 // 百分比(0-100) -> 系数(0-1)，兼容传入即为系数(<=1)的情况
@@ -251,6 +254,10 @@ async function loadAccounts(){
 
 async function createPayment(){
   const found = customers.value.find(c => c.id === payCustomerId.value)
+  if (paymentTotal.value > Number(cnyBalance.value || 0)) {
+    ElMessage.error(t('fx.errExceedBalance'))
+    return
+  }
   const resp = await api.fx.payments.create({
     customer_id: payCustomerId.value,
     customer_name: found?.name || null,
@@ -295,16 +302,30 @@ function onSelMatchedChange(val){
   selMatched.value = val.filter(r => !toUnselect.includes(r)).slice(0, MAX)
   ElMessage.warning(t('fx.maxSelectionTip', { n: MAX }))
 }
+function isRowSelected(row){
+  return (selAccounts.value || []).some(r => r.id === row.id)
+}
+function toggleRowSelection(row, selected){
+  if (!payTableRef.value || typeof payTableRef.value.toggleRowSelection !== 'function') return
+  payTableRef.value.toggleRowSelection(row, selected)
+}
 function onSelAccountsChange(val){
   const prev = new Set((selAccounts.value || []).map(r => r.id))
   selAccounts.value = val || []
-  const now = new Set((selAccounts.value || []).map(r => r.id))
-  // 找到新增勾选的行，自动填充付款余额（CNY余额）
+  // 单选时自动填充余额
   const added = (selAccounts.value || []).filter(r => !prev.has(r.id))
-  if (added.length) {
+  if ((selAccounts.value || []).length === 1 && added.length === 1) {
+    const row = added[0]
     const bal = Number(cnyBalance.value || 0)
-    // 仅在当前行未填或为0时填充，避免覆盖用户已经输入
-    added.forEach(r => { if (!r._amount || Number(r._amount) === 0) r._amount = Math.max(0, Math.round(bal * 100) / 100) })
+    if (!row._amount || Number(row._amount) === 0) row._amount = Math.max(0, Math.round(bal * 100) / 100)
+  }
+}
+function onAmountChange(row){
+  const n = Number(row._amount || 0)
+  if (n > 0) {
+    if (!isRowSelected(row)) toggleRowSelection(row, true)
+  } else {
+    if (isRowSelected(row)) toggleRowSelection(row, false)
   }
 }
 
