@@ -17,7 +17,7 @@
           <el-input-number v-model="rate" :precision="6" :step="0.01" :min="0" :placeholder="t('fx.rate')" />
           <el-input-number v-model="customerTaxRate" :precision="2" :step="0.5" :min="0" :max="100" :placeholder="t('fx.customerTaxRate')" />
           <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
-            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
+            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">MYR {{ money(myrBalance) }}</span>
           <el-button type="primary" :disabled="!canCreateSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
@@ -52,7 +52,7 @@
         <div class="pay-filters">
           <el-date-picker v-model="payDate" type="date" :placeholder="t('fx.payDate')" value-format="YYYY-MM-DD" />
           <el-select v-model="payCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangePay">
-            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
+            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">CNY {{ money(cnyBalance) }}</span>
           <el-button type="primary" :disabled="!canCreatePayment" @click="createPayment">{{ t('fx.createPayment') }}</el-button>

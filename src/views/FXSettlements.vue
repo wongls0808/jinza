@@ -3,7 +3,7 @@
     <h1>{{ t('fx.settlementHistory') }}</h1>
     <div class="filters">
       <el-select v-model="qCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px">
-        <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.name" />
+        <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
       </el-select>
       <el-date-picker v-model="qRange" type="daterange" range-separator="-" start-placeholder="Start" end-placeholder="End" value-format="YYYY-MM-DD" />
       <el-button type="primary" @click="reload(1)">{{ t('common.search') }}</el-button>
