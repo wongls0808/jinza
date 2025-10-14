@@ -13,20 +13,26 @@
       <el-button type="primary" @click="exportCsv('all')">{{ t('common.export') }} ({{ t('common.filtered') }})</el-button>
     </div>
     <el-table :data="rows" border size="small" @header-dragend="onColResize">
-      <el-table-column :label="t('common.no')" width="70">
-        <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
+      <el-table-column prop="settle_date" column-key="settle_date" :label="t('fx.settleDate')" :width="colW('settle_date', 120)" />
+      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 180)" />
+      <el-table-column column-key="customer_abbr" :label="t('customers.fields.abbr')" :width="colW('customer_abbr', 120)">
+        <template #default="{ row }">{{ abbrById(row.customer_id) }}</template>
       </el-table-column>
-      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
       <el-table-column prop="customer_name" column-key="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
-      <el-table-column prop="settle_date" column-key="settle_date" :label="t('fx.settleDate')" :width="colW('settle_date', 130)" />
-      <el-table-column prop="rate" column-key="rate" :label="t('fx.rate')" :width="colW('rate', 120)" align="right" />
-      <el-table-column prop="total_base" column-key="total_base" :label="t('fx.selectedBase')" :width="colW('total_base', 160)" align="right">
+      <el-table-column column-key="customer_balance" :label="t('accounts.fields.balance')" :width="colW('customer_balance', 140)" align="right">
+        <template #default="{ row }">{{ money(balanceById(row.customer_id)) }}</template>
+      </el-table-column>
+      <el-table-column prop="total_base" column-key="total_base" :label="t('fx.selectedBase')" :width="colW('total_base', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_base) }}</template>
       </el-table-column>
-      <el-table-column prop="total_settled" column-key="total_settled" :label="t('fx.selectedSettled')" :width="colW('total_settled', 160)" align="right">
+      <el-table-column prop="rate" column-key="rate" :label="t('fx.rate')" :width="colW('rate', 110)" align="right" />
+      <el-table-column prop="customer_tax_rate" column-key="customer_tax_rate" :label="t('fx.customerTaxRate')" :width="colW('customer_tax_rate', 130)" align="right">
+        <template #default="{ row }">{{ Number(row.customer_tax_rate||0).toFixed(2) }}%</template>
+      </el-table-column>
+      <el-table-column prop="total_settled" column-key="total_settled" :label="t('fx.selectedSettled')" :width="colW('total_settled', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_settled) }}</template>
       </el-table-column>
-      <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
+      <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 120)" />
       <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
@@ -146,6 +152,16 @@ async function downloadCsv(row){
 async function removeBill(row){
   await api.request(`/fx/settlements/${row.id}`, { method: 'DELETE' })
   reload()
+}
+
+// 辅助：根据 customer_id 获取客户简称与余额（MYR）
+function abbrById(id){
+  const c = customers.value.find(x => x.id === id)
+  return c?.abbr || ''
+}
+function balanceById(id){
+  const c = customers.value.find(x => x.id === id)
+  return Number(c?.balance_myr || 0)
 }
 </script>
 
