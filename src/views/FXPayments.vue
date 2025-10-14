@@ -52,7 +52,12 @@
       <el-table-column :label="t('common.actions')" width="180" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
-          <el-button size="small" type="success" v-if="row.status==='completed'" @click="downloadPdf(row)">PDF</el-button>
+          <el-button 
+            size="small"
+            :type="row.status==='completed' ? 'success' : 'default'"
+            :disabled="row.status!=='completed'"
+            @click="downloadPdf(row)"
+          >PDF</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>

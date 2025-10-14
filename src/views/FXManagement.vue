@@ -131,7 +131,7 @@ const payTableRef = ref(null)
 
 const canCreateSettlement = computed(() => !!(settleDate.value && customerId.value && rate.value && selMatched.value.length))
 const overBudget = computed(() => paymentTotal.value > Number(cnyBalance.value || 0))
-const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0) && !overBudget.value))
+const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => Number(a._amount) > 0) && !overBudget.value))
 
 const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (Number(r.credit_amount || 0) - Number(r.debit_amount || 0)), 0))
 // 百分比(0-100) -> 系数(0-1)，兼容传入即为系数(<=1)的情况
@@ -248,7 +248,7 @@ async function loadAccounts(){
   accounts.value = []
   if (!payCustomerId.value) return
   const list = await api.customerAccounts.list(payCustomerId.value)
-  accounts.value = (list || []).map(it => ({ ...it, _amount: 0 }))
+  accounts.value = (list || []).map(it => ({ ...it, _amount: null }))
   selAccounts.value = []
 }
 
@@ -275,7 +275,7 @@ async function createPayment(){
   ElMessage.success(t('fx.paymentCreated', { n, total: money(paymentTotal.value) }))
   // 清空并刷新
   payDate.value = formatToday()
-  accounts.value = accounts.value.map(a => ({ ...a, _amount: 0 }))
+  accounts.value = accounts.value.map(a => ({ ...a, _amount: null }))
   selAccounts.value = []
   await loadCustomers()
   if (payCustomerId.value) await loadAccounts()
@@ -312,12 +312,20 @@ function toggleRowSelection(row, selected){
 function onSelAccountsChange(val){
   const prev = new Set((selAccounts.value || []).map(r => r.id))
   selAccounts.value = val || []
-  // 单选时自动填充余额
+  const now = new Set((selAccounts.value || []).map(r => r.id))
+  // 取消勾选的行：清空金额
+  const removedIds = [...prev].filter(id => !now.has(id))
+  if (removedIds.length) {
+    accounts.value.forEach(a => { if (removedIds.includes(a.id)) a._amount = null })
+  }
+  // 单选时自动填充余额（仅当余额>0，且该行未填）
   const added = (selAccounts.value || []).filter(r => !prev.has(r.id))
   if ((selAccounts.value || []).length === 1 && added.length === 1) {
     const row = added[0]
     const bal = Number(cnyBalance.value || 0)
-    if (!row._amount || Number(row._amount) === 0) row._amount = Math.max(0, Math.round(bal * 100) / 100)
+    if (bal > 0 && (!row._amount || Number(row._amount) === 0)) {
+      row._amount = Math.max(0, Math.round(bal * 100) / 100)
+    }
   }
 }
 function onAmountChange(row){
@@ -325,6 +333,8 @@ function onAmountChange(row){
   if (n > 0) {
     if (!isRowSelected(row)) toggleRowSelection(row, true)
   } else {
+    // 金额为 0 或空：清空并取消勾选
+    row._amount = null
     if (isRowSelected(row)) toggleRowSelection(row, false)
   }
 }
