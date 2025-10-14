@@ -37,11 +37,13 @@
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button size="small" type="primary" @click="downloadCsv(row)">CSV</el-button>
-          <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
-            <template #reference>
-              <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
-            </template>
-          </el-popconfirm>
+          <template v-if="has('delete_fx')">
+            <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
+              <template #reference>
+                <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -90,10 +92,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useAuth } from '@/composables/useAuth'
 const { t } = useI18n()
+const { has } = useAuth()
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -150,8 +155,13 @@ async function downloadCsv(row){
   URL.revokeObjectURL(url)
 }
 async function removeBill(row){
-  await api.request(`/fx/settlements/${row.id}`, { method: 'DELETE' })
-  reload()
+  try {
+    await api.request(`/fx/settlements/${row.id}`, { method: 'DELETE' })
+    ElMessage.success(t('common.ok'))
+    reload()
+  } catch (e) {
+    ElMessage.error(e?.message || 'Delete failed')
+  }
 }
 
 // 辅助：根据 customer_id 获取客户简称与余额（MYR）

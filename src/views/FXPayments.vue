@@ -27,11 +27,13 @@
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button size="small" type="primary" @click="downloadCsv(row)">CSV</el-button>
-          <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
-            <template #reference>
-              <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
-            </template>
-          </el-popconfirm>
+          <template v-if="has('delete_fx')">
+            <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
+              <template #reference>
+                <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
         </template>
       </el-table-column>
     </el-table>
