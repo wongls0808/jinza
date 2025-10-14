@@ -31,9 +31,12 @@
           <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
-          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',80)" align="center">
+          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',100)" align="center">
             <template #default="{ row }">
-              <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
+              <div class="bank-cell">
+                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || row.bank_name_en || row.bank_name || '').toUpperCase().slice(0,6) }}</span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column prop="credit_amount" column-key="credit_amount" :label="t('transactions.creditAmount')" :width="colWSettle('credit_amount',120)" align="right">
@@ -63,9 +66,12 @@
   <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
           <el-table-column type="selection" width="48" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
-          <el-table-column column-key="bank_logo" :label="t('banks.title')" :width="colWPay('bank_logo',80)" align="center">
+          <el-table-column column-key="bank_logo" :label="t('banks.title')" :width="colWPay('bank_logo',100)" align="center">
             <template #default="{ row }">
-              <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
+              <div class="bank-cell">
+                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column prop="bank_account" column-key="bank_account" :label="t('customers.accounts.bankAccount')" :width="colWPay('bank_account',200)" />
@@ -239,6 +245,34 @@ function onSelMatchedChange(val){
 function onSelAccountsChange(val){
   selAccounts.value = val || []
 }
+
+// ---- 银行 logo 前端回退解析：DB 优先，失败回退到静态 /banks/<code>.(svg|png|jpg) ----
+const logoFail = ref({})
+const aliasMap = {
+  pbb: 'public', public: 'public',
+  maybank: 'maybank', mbb: 'maybank', mayb: 'maybank',
+  hlb: 'hlb', hongleong: 'hlb',
+  cimb: 'cimb', rhb: 'rhb', icbc: 'icbc', abc: 'abc', boc: 'boc', ccb: 'ccb', bcm: 'bcm',
+  abmb: 'alliance'
+}
+function logoKey(row){ return (row.bank_code || row.bank_name_en || row.bank_name || 'unknown').toLowerCase() }
+function resolveLogo(row){
+  const key = logoKey(row)
+  if (logoFail.value[key]) return ''
+  const db = row.bank_logo || row.logo_url || ''
+  if (db) return db
+  const code = (row.bank_code || '').toLowerCase()
+  const mapped = aliasMap[code] || code
+  return `/banks/${mapped}.svg`
+}
+function onLogoError(evt, row){
+  const key = logoKey(row)
+  const cur = evt?.target?.getAttribute('src') || ''
+  // 依次尝试 svg -> png -> jpg
+  if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
+  else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
+  else logoFail.value[key] = true
+}
 </script>
 
 <style scoped>
@@ -249,6 +283,8 @@ function onSelAccountsChange(val){
  .settle-filters, .pay-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }
   .totals { display:flex; gap:16px; margin: 4px 0 8px; color: var(--el-text-color-secondary); font-size: 13px; }
   .balance { color: var(--el-text-color-regular); font-weight: 600; }
-  .bank-logo { width: 22px; height: 22px; object-fit: contain; display:inline-block; }
+  .bank-cell { display:flex; align-items:center; justify-content:center; height: 24px; }
+  .bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
+  .bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
  @media (max-width: 1100px) { .fx-split { grid-template-columns: 1fr; } }
 </style>
