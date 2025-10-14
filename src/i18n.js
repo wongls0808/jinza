@@ -17,6 +17,7 @@ const messages = {
       createdBy: '创建人',
       billNo: '单号',
       no: '序号',
+      details: '详情',
       search: '搜索',
       currentPage: '当前页',
       filtered: '筛选结果',
@@ -50,6 +51,7 @@ const messages = {
       confirmDelete: '确定删除？',
       cancel: '取消',
       ok: '确定',
+      total: '合计',
     },
     customers: {
       title: '客户管理',
@@ -307,6 +309,8 @@ const messages = {
       paymentTotal: '付款金额合计',
       settlementCreated: '已生成结汇单：{n} 笔，基币 {base}，折算 {settled}',
       paymentCreated: '已生成付款单：{n} 笔，总额 {total}',
+      baseAmount: '基币金额',
+      settledAmount: '折算后金额',
       preBalance: '结汇前余额'
     },
   },
@@ -335,6 +339,8 @@ const messages = {
       paymentTotal: 'Payment Total',
       settlementCreated: 'Settlement created: {n} items, base {base}, converted {settled}',
       paymentCreated: 'Payment created: {n} items, total {total}',
+      baseAmount: 'Base Amount',
+      settledAmount: 'Converted Amount',
       preBalance: 'Pre-Settle Balance'
     },
     common: {
@@ -348,6 +354,7 @@ const messages = {
       createdBy: 'Created By',
       billNo: 'Bill No',
       no: '#',
+      details: 'Details',
       search: 'Search',
       import: 'Import',
       export: 'Export',
