@@ -22,9 +22,6 @@
       <el-table-column prop="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_amount) }}</template>
       </el-table-column>
-      <el-table-column prop="created_at" :label="t('common.createdAt')" :width="colW('created_at', 140)">
-        <template #default="{ row }">{{ (row.created_at||'').toString().slice(0,10) }}</template>
-      </el-table-column>
       <el-table-column prop="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
       <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
