@@ -23,8 +23,7 @@
             <span class="en text-clip">{{ b.en }}</span>
           </div>
           <div class="ops" @dblclick.stop>
-            <el-button link @click="openEdit(b)">{{ $t('banks.replaceLogo') }}</el-button>
-            <el-button type="danger" link @click="remove(b.code)">{{ $t('common.delete') }}</el-button>
+            <!-- 列表操作移除，改为双击整卡进入编辑；保留空容器保持布局 -->
           </div>
         </div>
       </div>
@@ -32,13 +31,13 @@
 
     <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" width="520px">
       <el-form :model="dlg.form" label-width="140px" size="small" class="form">
-        <el-form-item :label="$t('banks.labels.code')" v-if="dlg.mode==='add'">
-          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" />
+        <el-form-item :label="$t('banks.labels.code')">
+          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" :disabled="dlg.mode==='edit' && !!dlg.form.id" />
         </el-form-item>
-        <el-form-item :label="$t('banks.labels.zh')" v-if="dlg.mode==='add'">
+        <el-form-item :label="$t('banks.labels.zh')">
           <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" @input="dlg.form.zh = (dlg.form.zh || '').toUpperCase()" />
         </el-form-item>
-        <el-form-item :label="$t('banks.labels.en')" v-if="dlg.mode==='add'">
+        <el-form-item :label="$t('banks.labels.en')">
           <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
         <el-form-item :label="$t('banks.labels.logoUrl')">
@@ -51,6 +50,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button v-if="dlg.mode==='edit'" type="danger" :loading="dlg.loading" @click="removeInDialog">{{ $t('common.delete') }}</el-button>
         <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
@@ -121,7 +121,11 @@ async function submit() {
         logo_data_url: f.logo_data_url || undefined
       })
     } else {
-  const body = {}
+  const body = {
+    // 允许在编辑时更新名称、logo
+    zh: (f.zh || '').trim().toUpperCase(),
+    en: (f.en || '').trim().toUpperCase()
+  }
   if (f.logo_data_url) body.logo_data_url = f.logo_data_url
   if (f.logo_url && !f.logo_data_url) body.logo_url = f.logo_url
   await api.updateBank(f.id, body)
@@ -134,6 +138,22 @@ async function submit() {
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
     ElMessage.error('保存失败：' + msg)
   } finally {
+    dlg.value.loading = false
+  }
+}
+
+async function removeInDialog() {
+  try {
+    const f = dlg.value.form
+    const b = banks.value.find(x => x.id === f.id)
+    if (!b) return
+    await ElMessageBox.confirm(`确认删除【${b.zh}】?`, '提示', { type: 'warning' })
+    dlg.value.loading = true
+    await api.deleteBank(b.id)
+    dlg.value.visible = false
+    await load()
+    ElMessage.success('已删除')
+  } catch {} finally {
     dlg.value.loading = false
   }
 }
