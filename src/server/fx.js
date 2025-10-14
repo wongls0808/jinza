@@ -967,7 +967,9 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
        i.bank_account,
        upper(i.currency_code) as currency_code,
        i.amount,
-       b.zh as bank_name
+       b.zh as bank_name,
+       b.code as bank_code,
+       b.logo_url as bank_logo_url
      from fx_payments p
      join fx_payment_items i on i.payment_id = p.id
      left join users u on u.id = p.created_by

@@ -29,7 +29,14 @@
         <template #default="{ row }">{{ money(row.balance_cny) }}</template>
       </el-table-column>
       <el-table-column prop="account_name" column-key="account_name" label="账户名称" :width="colW('account_name', 200)" />
-      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 140)" />
+      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 180)">
+        <template #default="{ row }">
+          <div class="bank-cell">
+            <img v-if="row.bank_logo_url" :src="row.bank_logo_url" alt="logo" class="bank-logo" />
+            <span>{{ row.bank_name || row.bank_code }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="bank_account" column-key="bank_account" label="银行账户" :width="colW('bank_account', 180)" />
       <el-table-column prop="currency_code" column-key="currency_code" label="币种" :width="colW('currency_code', 100)" />
       <el-table-column prop="amount" column-key="amount" label="金额" :width="colW('amount', 140)" align="right">
@@ -41,12 +48,11 @@
           <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="280" align="center">
+      <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button size="small" @click="downloadCsv(row)">CSV</el-button>
           <el-button size="small" type="success" v-if="row.status==='completed'" @click="downloadPdf(row)">PDF</el-button>
-          <el-button size="small" type="primary" v-if="row.status!=='completed' && has('manage_fx')" @click="approve(row)">审核通过</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
