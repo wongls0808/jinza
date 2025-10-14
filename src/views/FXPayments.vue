@@ -17,7 +17,7 @@
       <el-button type="primary" @click="exportCsv('all')">{{ t('common.export') }} ({{ t('common.filtered') }})</el-button>
     </div>
     <el-table :data="rows" border size="small" @header-dragend="onColResize">
-      <el-table-column :label="t('common.no')" width="60">
+      <el-table-column column-key="idx" :label="t('common.no')" :width="colW('idx', 60)">
         <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
       </el-table-column>
       <el-table-column prop="pay_date" column-key="pay_date" label="付款日期" :width="colW('pay_date', 120)">
@@ -49,7 +49,7 @@
           <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="180" align="center">
+      <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 180)" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button 
