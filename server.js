@@ -22,6 +22,7 @@ const uploadsPath = path.join(dataDir, 'uploads')
 if (!fs.existsSync(uploadsPath)) {
   try { fs.mkdirSync(uploadsPath, { recursive: true }) } catch {}
 }
+console.log('[static] DATA_DIR=', dataDir, 'uploadsPath=', uploadsPath)
 app.use('/uploads', express.static(uploadsPath))
 
 // Health check
