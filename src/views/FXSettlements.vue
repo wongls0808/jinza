@@ -121,7 +121,7 @@ import { useI18n } from 'vue-i18n'
 import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 import { useAuth } from '@/composables/useAuth'
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { has } = useAuth()
 const rows = ref([])
 const total = ref(0)
@@ -212,13 +212,15 @@ async function downloadPdf(row){
     })()
     const headers = { }
     if (token) headers['Authorization'] = `Bearer ${token}`
-    const res = await fetch(`${location.origin}/api/fx/settlements/${row.id}/pdf`, { headers })
+    const lang = encodeURIComponent(String(locale?.value || ''))
+    const urlReq = `${location.origin}/api/fx/settlements/${row.id}/pdf?lang=${lang}`
+    const res = await fetch(urlReq, { headers })
     if (!res.ok) throw new Error(await res.text())
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Settlement-${row.id}.pdf`
+    a.download = `${row.bill_no || ('Settlement-' + row.id)}.pdf`
     a.click()
     URL.revokeObjectURL(url)
   } catch(e) {

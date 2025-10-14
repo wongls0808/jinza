@@ -444,6 +444,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   function textFit(txt, x, y, width, opts={}) {
     const max = opts.maxSize ?? 9
     const min = opts.minSize ?? 7
+    const noAdvanceY = opts.noAdvanceY === true
     let size = max
     while (size > min) {
       doc.fontSize(size)
@@ -451,8 +452,10 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       if (w <= width) break
       size -= 0.5
     }
+    const prevY = doc.y
     doc.fontSize(size)
     doc.text(String(txt||''), x, y, { width, lineBreak: false, ...opts })
+    if (noAdvanceY) doc.y = prevY
   }
 
   const headerPairs = [
@@ -487,11 +490,11 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
 
   // 表头
   const tableX = left
+  // 去除序号列，为银行/账户名留出更多空间
   const colDefs = [
-    { key: t('thIndex'), w: 1 },
     { key: t('thRefNo'), w: 3 },
     { key: t('thDate'), w: 3 },
-    { key: t('thBankEn'), w: 4 },
+    { key: t('thBankEn'), w: 5 },
     { key: t('thAccountName'), w: 6 },
     { key: t('thAccountNo'), w: 4 },
     { key: t('thBase'), w: 3, align: 'right' },
@@ -500,23 +503,22 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
   const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
   // 表头行高与当前 y
-  let rowH = 14
+  // 增大行高，避免行间过密导致视觉重叠
+  let rowH = 16
   let y = doc.y
   let x = tableX
   // 表头统一字号；若有 CJK Bold 则加粗
   doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
-  cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left' }); x += c.w })
+  cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left', noAdvanceY: true }); x += c.w })
   doc.y = y + rowH
   // 行内容统一使用同一字体，避免混合导致测宽不准与字符重叠
   doc.font(hasCJK ? 'CJK' : 'Helvetica')
   doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
 
   // 行
-  let idx = 1
   let sumBase = 0, sumSettle = 0
   items.rows.forEach(r => {
     const row = [
-      idx++,
       toStr(r.ref_no||''),
       toDate(r.trn_date),
       toStr(r.bank_name_en||''),
@@ -531,7 +533,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     doc.fontSize(9)
     cols.forEach((c,i) => {
       const align = c.align||'left'
-      textFit(String(row[i]??''), x, y, c.w, { align })
+      textFit(String(row[i]??''), x, y, c.w, { align, noAdvanceY: true })
       x += c.w
     })
     sumBase += Number(r.amount_base||0)
@@ -542,10 +544,11 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   })
   doc.moveDown(0.2)
   // 合计
-  x = tableX + cols.slice(0,6).reduce((s,c)=>s+c.w,0)
-  textFit(money(sumBase), x, doc.y, cols[6].w, { align: 'right' })
-  x += cols[6].w
-  textFit(money0(sumSettle), x, doc.y, cols[7].w, { align: 'right' })
+  let sumY = doc.y
+  x = tableX + cols.slice(0, cols.length-2).reduce((s,c)=>s+c.w,0)
+  textFit(money(sumBase), x, sumY, cols[cols.length-2].w, { align: 'right', noAdvanceY: true })
+  x += cols[cols.length-2].w
+  textFit(money0(sumSettle), x, sumY, cols[cols.length-1].w, { align: 'right', noAdvanceY: true })
 
   doc.end()
 })
