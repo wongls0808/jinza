@@ -98,11 +98,33 @@ fxRouter.get('/settlements', authMiddleware(true), requirePerm('view_fx'), async
   const total = await query(`select count(*) from fx_settlements s ${whereSql}`, params)
   const offset = (Number(page)-1) * Number(pageSize)
   const rows = await query(
-    `select s.*, coalesce(u.display_name, u.username) as created_by_name
-     from fx_settlements s
-     left join users u on u.id = s.created_by
-     ${whereSql}
-     order by s.id desc offset $${idx++} limit $${idx++}`,
+    `with tx_agg as (
+       select 
+         t.match_target_id as customer_id,
+         sum(case when upper(a.currency_code)='MYR' then coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0) else 0 end) as net_myr
+       from transactions t
+       left join receiving_accounts a on a.bank_account = t.account_number
+       where coalesce(t.matched,false) = true and t.match_type = 'customer'
+       group by t.match_target_id
+     ), b as (
+       select 
+         s.*, 
+         c.abbr as customer_abbr,
+         coalesce(c.opening_myr,0) as opening_myr,
+         coalesce(tx.net_myr,0) as net_myr,
+         sum(s.total_base) over (partition by s.customer_id order by s.settle_date, s.id rows between unbounded preceding and 1 preceding) as prev_settle_base
+       from fx_settlements s
+       left join customers c on c.id = s.customer_id
+       left join tx_agg tx on tx.customer_id = s.customer_id
+       ${whereSql}
+     )
+     select 
+       b.*,
+       (b.opening_myr + b.net_myr - coalesce(b.prev_settle_base,0)) as pre_balance_myr,
+       coalesce(u.display_name, u.username) as created_by_name
+     from b
+     left join users u on u.id = b.created_by
+     order by b.id desc offset $${idx++} limit $${idx++}`,
     [...params, offset, Number(pageSize)]
   )
   res.json({ total: Number(total.rows[0].count || 0), items: rows.rows })

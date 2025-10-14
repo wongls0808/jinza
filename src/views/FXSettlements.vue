@@ -13,14 +13,14 @@
       <el-button type="primary" @click="exportCsv('all')">{{ t('common.export') }} ({{ t('common.filtered') }})</el-button>
     </div>
     <el-table :data="rows" border size="small" @header-dragend="onColResize">
-      <el-table-column prop="settle_date" column-key="settle_date" :label="t('fx.settleDate')" :width="colW('settle_date', 120)" />
-      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 180)" />
-      <el-table-column column-key="customer_abbr" :label="t('customers.fields.abbr')" :width="colW('customer_abbr', 120)">
-        <template #default="{ row }">{{ abbrById(row.customer_id) }}</template>
+      <el-table-column prop="settle_date" column-key="settle_date" :label="t('fx.settleDate')" :width="colW('settle_date', 120)">
+        <template #default="{ row }">{{ fmtDate(row.settle_date) }}</template>
       </el-table-column>
+      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 180)" />
+      <el-table-column prop="customer_abbr" column-key="customer_abbr" :label="t('customers.fields.abbr')" :width="colW('customer_abbr', 120)" />
       <el-table-column prop="customer_name" column-key="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
-      <el-table-column column-key="customer_balance" :label="t('accounts.fields.balance')" :width="colW('customer_balance', 140)" align="right">
-        <template #default="{ row }">{{ money(balanceById(row.customer_id)) }}</template>
+      <el-table-column prop="pre_balance_myr" column-key="pre_balance_myr" :label="t('accounts.fields.balance')" :width="colW('pre_balance_myr', 140)" align="right">
+        <template #default="{ row }">{{ money(row.pre_balance_myr) }}</template>
       </el-table-column>
       <el-table-column prop="total_base" column-key="total_base" :label="t('fx.selectedBase')" :width="colW('total_base', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_base) }}</template>
@@ -164,14 +164,14 @@ async function removeBill(row){
   }
 }
 
-// 辅助：根据 customer_id 获取客户简称与余额（MYR）
-function abbrById(id){
-  const c = customers.value.find(x => x.id === id)
-  return c?.abbr || ''
-}
-function balanceById(id){
-  const c = customers.value.find(x => x.id === id)
-  return Number(c?.balance_myr || 0)
+function fmtDate(v){
+  if (!v) return ''
+  // 支持 Date 或字符串，统一输出 YYYY-MM-DD
+  try {
+    if (typeof v === 'string') return v.slice(0,10)
+    if (v.toISOString) return v.toISOString().slice(0,10)
+    return String(v).slice(0,10)
+  } catch { return String(v).slice(0,10) }
 }
 </script>
 
