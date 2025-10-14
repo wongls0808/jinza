@@ -1,5 +1,21 @@
 <template>
   <div class="login-page">
+    <!-- 背景视频容器 -->
+    <div class="video-bg" v-if="enableVideo">
+      <video
+        ref="bgVideo"
+        class="bg-video"
+        :src="videoSrc"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="auto"
+        @canplay="onVideoReady"
+        @error="onVideoError"
+      ></video>
+      <div class="video-overlay"></div>
+    </div>
     <div class="login-container">
       <div class="left-panel">
         <div class="brand-container">
@@ -207,17 +223,21 @@ const onSubmit = async () => {
 onMounted(() => {
   // 这里可以添加页面加载动画效果
 })
+// 背景视频逻辑
+const videoSrc = 'https://cdn.marmot-cloud.com/storage/intl_website/2025/07/03/EW8bvlo/globe.mp4'
+const bgVideo = ref(null)
+const enableVideo = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+function onVideoReady(){ /* 可加入首帧淡入动画 */ }
+function onVideoError(){ /* 失败时可记录或替换静态背景 */ }
 </script>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--el-color-primary-light-7) 0%, var(--el-color-primary-light-9) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
+.video-bg { position: fixed; inset:0; overflow:hidden; z-index:0; }
+.bg-video { width:100%; height:100%; object-fit:cover; filter:brightness(0.55) saturate(1.1); }
+.video-overlay { position:absolute; inset:0; background:radial-gradient(circle at 30% 40%, rgba(255,255,255,0.15), rgba(0,0,0,0.65)); backdrop-filter: blur(2px); }
+.login-page { position:relative; z-index:1; }
+.login-container { position:relative; z-index:2; }
+.login-page { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
 
 .login-container {
   display: flex;
