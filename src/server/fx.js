@@ -219,10 +219,11 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   i.amount_base,
   case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
-  a.account_name,
-  b.zh as bank_name,
-  b.en as bank_name_en,
-  a.bank_code as bank_code
+       a.account_name,
+       b.zh as bank_name,
+       b.en as bank_name_en,
+       a.bank_code as bank_code,
+       b.logo_url as bank_logo_url
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
      left join transactions t on t.id = i.transaction_id
@@ -376,10 +377,11 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        i.amount_base,
        case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
-  a.account_name,
-  b.zh as bank_name,
-  b.en as bank_name_en,
-  a.bank_code as bank_code
+       a.account_name,
+       b.zh as bank_name,
+       b.en as bank_name_en,
+       a.bank_code as bank_code,
+       b.logo_url as bank_logo_url
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
      left join transactions t on t.id = i.transaction_id
@@ -557,17 +559,33 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
 
   // 页尾：合作机构（银行 logo 并排）
   try {
-    const codes = Array.from(new Set(items.rows.map(r => String(r.bank_code||'').trim().toLowerCase()).filter(Boolean)))
-    if (codes.length) {
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = path.dirname(__filename)
+    const publicBanksDir = path.join(__dirname, '..', '..', 'public', 'banks')
+    const uploadsDir = path.join(__dirname, '..', '..', 'uploads')
+    // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.svg
+    const logoFiles = []
+    const seen = new Set()
+    for (const r of items.rows) {
+      let p = ''
+      const code = String(r.bank_code||'').trim().toLowerCase()
+      const url = String(r.bank_logo_url||'').trim()
+      if (url.startsWith('/banks/')) {
+        p = path.join(publicBanksDir, url.replace('/banks/',''))
+      } else if (url.startsWith('/uploads/')) {
+        p = path.join(uploadsDir, url.replace('/uploads/',''))
+      } else if (code) {
+        p = path.join(publicBanksDir, `${code}.svg`)
+      }
+      if (p && fs.existsSync(p) && !seen.has(p)) { seen.add(p); logoFiles.push(p) }
+    }
+    if (logoFiles.length) {
       doc.moveDown(0.8)
       doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
       doc.moveDown(0.4)
       doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
       const label = (lang==='zh' ? '合作机构' : 'Partners')
       doc.text(label, left, doc.y, { continued: false })
-      const __filename = fileURLToPath(import.meta.url)
-      const __dirname = path.dirname(__filename)
-      const logosDir = path.join(__dirname, '..', '..', 'public', 'banks')
       const gap = 10
       const iconH = 16
       const iconW = 32
@@ -577,11 +595,18 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       let logoX = left
       let logoY = doc.y + 2
       doc.font(hasCJK ? 'CJK' : 'Helvetica')
-      for (const code of codes) {
-        const svgPath = path.join(logosDir, `${code}.svg`)
-        if (!fs.existsSync(svgPath)) continue
-        const svg = fs.readFileSync(svgPath, 'utf-8')
-        SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
+      for (const file of logoFiles) {
+        const lower = file.toLowerCase()
+        try {
+          if (lower.endsWith('.svg')) {
+            const svg = fs.readFileSync(file, 'utf-8')
+            SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
+          } else if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+            doc.image(file, logoX, logoY, { width: iconW, height: iconH })
+          } else {
+            continue
+          }
+        } catch {}
         colIdx++
         if (colIdx >= maxPerRow) {
           colIdx = 0
