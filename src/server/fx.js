@@ -61,21 +61,51 @@ async function ensureDDL() {
 // 创建结汇单
 fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
   await ensureDDL()
-  const { customer_id, customer_name, settle_date, rate, customer_tax_rate = 0, items = [] } = req.body || {}
+  const { customer_id, customer_name, settle_date, rate, items = [] } = req.body || {}
   if (!customer_id || !settle_date || !rate || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'invalid payload' })
   const created_by = req.user?.id || null
   // 生成单号：基于 created_at ISO 字符串去除冒号与连字符，保留 T
   const createdAtIso = new Date().toISOString()
   // 例：2025-10-13T14:27:01.103Z -> 20251013T142701103Z
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
+  // 查询客户最新税率（百分比p，0-100），计算实际系数 factor = 1 - p/100；
+  // 兼容历史：若存量值<=1，则视为已是系数。
+  let taxFactor = 0
+  let taxPercent = 0
+  try {
+    const crs = await query('select tax_rate from customers where id=$1', [Number(customer_id)])
+    if (crs.rowCount) {
+      const raw = Number(crs.rows[0].tax_rate || 0)
+      let p = isFinite(raw) ? raw : 0
+      if (p < 0) p = 0
+      // 计算实际系数
+      let f = 0
+      if (p <= 1) {
+        // 存量按系数的情况（如 0.985）
+        f = p
+        p = (1 - f) * 100
+      } else {
+        // 常规百分比（如 1.5 表示 1.5%）
+        f = 1 - p / 100
+      }
+      // 边界修正
+      if (f < 0) f = 0
+      if (f > 1) f = 1
+      f = Math.round(f * 1000) / 1000
+      p = Math.round(p * 1000) / 1000
+      taxFactor = f
+      taxPercent = p
+    }
+  } catch {}
+
   // 计算合计：马币金额（按 credit-debit）与结汇金额（基数×税率×汇率）
   const total_base = items.reduce((s, it) => s + Number(it.amount_base||0), 0)
-  const tax = Number(customer_tax_rate || 0)
-  const total_settled = items.reduce((s, it) => s + Math.round(Number(it.amount_base||0) * Number(rate||0) * tax), 0)
+  const total_settled = items.reduce((s, it) => s + Math.round(Number(it.amount_base||0) * Number(rate||0) * taxFactor), 0)
   const ins = await query(
     `insert into fx_settlements(bill_no, customer_id, customer_name, settle_date, rate, customer_tax_rate, total_base, total_settled, created_by)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-    [bill_no, Number(customer_id), customer_name || null, settle_date, Number(rate), Number(customer_tax_rate)||0, total_base, total_settled, created_by]
+    // 头部 customer_tax_rate 存储百分比 p，便于展示和导出
+    [bill_no, Number(customer_id), customer_name || null, settle_date, Number(rate), taxPercent, total_base, total_settled, created_by]
   )
   const sid = ins.rows[0].id
   // 批量写入明细
@@ -84,8 +114,10 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
     const params = []
     let idx = 1
     for (const it of items) {
+      const base = Number(it.amount_base) || 0
+      const settled = Math.round(base * Number(rate || 0) * taxFactor)
       values.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`)
-      params.push(sid, Number(it.transaction_id), it.account_number || null, it.trn_date || null, Number(it.amount_base)||0, Number(it.amount_settled)||0)
+      params.push(sid, Number(it.transaction_id), it.account_number || null, it.trn_date || null, base, settled)
     }
     await query(`insert into fx_settlement_items(settlement_id, transaction_id, account_number, trn_date, amount_base, amount_settled) values ${values.join(',')}`, params)
   }
@@ -219,7 +251,9 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
        i.account_number,
        i.trn_date,
   i.amount_base,
-  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * coalesce(s.customer_tax_rate,0), 0) else i.amount_settled end as amount_settled_calc,
+  case when coalesce(i.amount_settled,0) = 0 then round(
+    i.amount_base * s.rate * (case when coalesce(s.customer_tax_rate,0) <= 1 then coalesce(s.customer_tax_rate,0) else (1 - coalesce(s.customer_tax_rate,0)/100) end)
+  , 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,
@@ -380,7 +414,9 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        i.account_number,
        i.trn_date,
   i.amount_base,
-  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * coalesce(s.customer_tax_rate,0), 0) else i.amount_settled end as amount_settled_calc,
+  case when coalesce(i.amount_settled,0) = 0 then round(
+    i.amount_base * s.rate * (case when coalesce(s.customer_tax_rate,0) <= 1 then coalesce(s.customer_tax_rate,0) else (1 - coalesce(s.customer_tax_rate,0)/100) end)
+  , 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,

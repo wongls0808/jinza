@@ -15,7 +15,8 @@
         <div class="settle-filters">
           <el-date-picker v-model="settleDate" type="date" :placeholder="t('fx.settleDate')" value-format="YYYY-MM-DD" />
           <el-input-number v-model="rate" :precision="6" :step="0.01" :min="0" :placeholder="t('fx.rate')" />
-          <el-input-number v-model="customerTaxRate" :precision="3" :step="0.001" :min="0" :max="1" :placeholder="t('fx.customerTaxRate')" />
+          <!-- 税率只读：来自客户管理，按百分比(0-100)显示；计算时转换为系数 -->
+          <el-input-number v-model="customerTaxRate" :precision="3" :step="0.001" :min="0" :max="100" :placeholder="t('fx.customerTaxRate')" :controls="false" disabled />
           <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
             <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
@@ -100,6 +101,7 @@ const { t } = useI18n()
 const customers = ref([])
 const settleDate = ref('')
 const customerId = ref(null)
+// 税率（百分比0-100），只读：从客户管理读取
 const customerTaxRate = ref(0)
 const rate = ref(null)
 const matchedRows = ref([])
@@ -117,10 +119,18 @@ const canCreateSettlement = computed(() => !!(settleDate.value && customerId.val
 const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => a._amount > 0)))
 
 const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (Number(r.credit_amount || 0) - Number(r.debit_amount || 0)), 0))
-// 折算总计 = 勾选金额 × (税率/100) × 汇率，四舍五入到元
+// 百分比(0-100) -> 系数(0-1)，兼容传入即为系数(<=1)的情况
+function percentToFactor(p){
+  const n = Number(p || 0)
+  if (!isFinite(n) || n < 0) return 0
+  if (n <= 1) return Math.max(0, Math.min(1, n))
+  const f = 1 - n / 100
+  return Math.max(0, Math.min(1, Math.round(f * 1000) / 1000))
+}
+// 折算总计 = 勾选金额 × 系数 × 汇率，四舍五入到元
 const selectedSettledTotal = computed(() => {
   const base = selectedBaseTotal.value
-  const taxFactor = Number(customerTaxRate.value || 0)
+  const taxFactor = percentToFactor(customerTaxRate.value)
   const r = Number(rate.value || 0)
   return Math.round(base * taxFactor * r)
 })
@@ -138,6 +148,15 @@ async function loadCustomers(){
   customers.value = res.items || []
 }
 
+function normalizePercent(v){
+  let n = Number(v || 0)
+  if (!isFinite(n) || n < 0) n = 0
+  // 兼容：若原值是系数(<=1)，转为百分比
+  if (n <= 1) n = (1 - n) * 100
+  if (n > 100) n = 100
+  return Math.round(n * 1000) / 1000
+}
+
 async function loadMatched(){
   matchedRows.value = []
   customerTaxRate.value = 0
@@ -148,7 +167,7 @@ async function loadMatched(){
   selMatched.value = []
   // 读取客户税率
   const found = customers.value.find(c => c.id === customerId.value)
-  customerTaxRate.value = Number(found?.tax_rate || 0)
+  customerTaxRate.value = normalizePercent(found?.tax_rate)
 }
 
 function formatToday(){
@@ -167,6 +186,10 @@ function onCustomerChangePay(){
 }
 
 async function createSettlement(){
+  // 创建前刷新客户列表，确保拿到最新税率（修改后稍等推送）
+  await loadCustomers()
+  const latest = customers.value.find(c => c.id === customerId.value)
+  customerTaxRate.value = normalizePercent(latest?.tax_rate)
   if (!selMatched.value.length) return
   const baseSum = selectedBaseTotal.value
   // 校验余额：按所选明细全额
@@ -177,7 +200,7 @@ async function createSettlement(){
   if (!r || r <= 0) { ElMessage.error(t('fx.errRateRequired')); return }
 
   // 全额：按所选明细全额，各自折算四舍五入到元
-  const taxFactor = Number(customerTaxRate.value || 0)
+  const taxFactor = percentToFactor(customerTaxRate.value)
   const items = selMatched.value.map(row => {
     const base = Number(row.credit_amount||0) - Number(row.debit_amount||0)
     return {
@@ -194,7 +217,7 @@ async function createSettlement(){
     customer_name: found?.name || null,
     settle_date: settleDate.value,
     rate: rate.value,
-    customer_tax_rate: customerTaxRate.value,
+    // 税率由后端根据 customer_id 查询，前端不再传递
     items
   })
   ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))

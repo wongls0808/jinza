@@ -158,7 +158,7 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
         customer_name varchar(255),
         settle_date date not null,
         rate numeric(18,6) not null,
-        customer_tax_rate numeric(6,2) default 0,
+  customer_tax_rate numeric(6,3) default 0,
         total_base numeric(18,2) default 0,
         total_settled numeric(18,2) default 0,
         created_by int,
