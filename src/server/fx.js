@@ -1035,8 +1035,10 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
      join fx_payment_items i on i.payment_id = p.id
      left join users u on u.id = p.created_by
      left join customers c on c.id = p.customer_id
-     left join receiving_accounts a on a.bank_account = i.bank_account
-     left join banks b on b.id = a.bank_id
+     -- 银行信息优先取客户专属账户（CRA，付款区来源），否则回退到通用账户
+     left join receiving_accounts ra on ra.bank_account = i.bank_account
+     left join customer_receiving_accounts cra on cra.bank_account = i.bank_account and cra.customer_id = p.customer_id
+     left join banks b on b.id = coalesce(cra.bank_id, ra.bank_id)
      ${whereSql}
      order by p.id desc, i.id desc offset $${idx++} limit $${idx++}`,
     [...params, offset, Number(pageSize)]
