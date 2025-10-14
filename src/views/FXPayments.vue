@@ -16,13 +16,13 @@
       <el-table-column :label="t('common.no')" width="70">
         <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
       </el-table-column>
-      <el-table-column prop="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
-      <el-table-column prop="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
-      <el-table-column prop="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)" />
-      <el-table-column prop="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
+      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
+      <el-table-column prop="customer_name" column-key="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
+      <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)" />
+      <el-table-column prop="total_amount" column-key="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_amount) }}</template>
       </el-table-column>
-      <el-table-column prop="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
+      <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
       <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>

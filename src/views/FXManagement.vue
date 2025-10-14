@@ -28,15 +28,15 @@
         </div>
   <el-table :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
-          <el-table-column prop="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
-          <el-table-column prop="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
-          <el-table-column :label="t('transactions.bankName')" :width="colWSettle('bank_logo',80)" align="center">
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
+          <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
+          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',80)" align="center">
             <template #default="{ row }">
               <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" :label="t('transactions.creditAmount')" :width="colWSettle('credit_amount',120)" align="right">
+          <el-table-column prop="credit_amount" column-key="credit_amount" :label="t('transactions.creditAmount')" :width="colWSettle('credit_amount',120)" align="right">
             <template #default="{ row }">{{ money(row.credit_amount) }}</template>
           </el-table-column>
         </el-table>
@@ -62,15 +62,15 @@
         </div>
   <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
           <el-table-column type="selection" width="48" />
-          <el-table-column prop="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
-          <el-table-column :label="t('banks.title')" :width="colWPay('bank_logo',80)" align="center">
+          <el-table-column prop="account_name" column-key="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
+          <el-table-column column-key="bank_logo" :label="t('banks.title')" :width="colWPay('bank_logo',80)" align="center">
             <template #default="{ row }">
               <img v-if="row.bank_logo" :src="row.bank_logo" alt="bank" class="bank-logo" />
             </template>
           </el-table-column>
-          <el-table-column prop="bank_account" :label="t('customers.accounts.bankAccount')" :width="colWPay('bank_account',200)" />
-          <el-table-column prop="currency_code" :label="t('customers.accounts.currency')" :width="colWPay('currency_code',120)" />
-          <el-table-column :label="t('fx.amount')" :width="colWPay('amount',160)">
+          <el-table-column prop="bank_account" column-key="bank_account" :label="t('customers.accounts.bankAccount')" :width="colWPay('bank_account',200)" />
+          <el-table-column prop="currency_code" column-key="currency_code" :label="t('customers.accounts.currency')" :width="colWPay('currency_code',120)" />
+          <el-table-column column-key="amount" :label="t('fx.amount')" :width="colWPay('amount',160)">
             <template #default="{ row }">
               <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" style="width:140px" />
             </template>
