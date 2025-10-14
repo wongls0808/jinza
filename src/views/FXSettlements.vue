@@ -59,29 +59,42 @@
       />
     </div>
 
-    <el-drawer v-model="drawerVisible" :title="t('common.details')" size="50%">
-      <div v-if="detail">
-        <div class="head">
-          <div><b>ID</b>: {{ detail.id }}</div>
-          <div><b>{{ t('customers.fields.name') }}</b>: {{ detail.customer_name }}</div>
-          <div><b>{{ t('fx.settleDate') }}</b>: {{ detail.settle_date }}</div>
-          <div><b>{{ t('fx.rate') }}</b>: {{ detail.rate }}</div>
-          <div><b>{{ t('fx.selectedBase') }}</b>: {{ money(detail.total_base) }}</div>
-          <div><b>{{ t('fx.selectedSettled') }}</b>: {{ money0(detail.total_settled) }}</div>
-          <div><b>{{ t('common.createdAt') }}</b>: {{ detail.created_at }}</div>
-          <div><b>{{ t('common.createdBy') }}</b>: {{ detail.created_by_name }}</div>
+    <el-drawer v-model="drawerVisible" :title="t('common.details')" size="60%">
+      <div v-if="detail" class="bill">
+        <div class="bill-head">
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('common.billNo') }}</span><span class="v">{{ detail.bill_no }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.settleDate') }}</span><span class="v">{{ fmtDate(detail.settle_date) }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.rate') }}</span><span class="v">{{ Number(detail.rate||0).toFixed(4) }}</span></div>
+          </div>
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('customers.fields.abbr') }}</span><span class="v">{{ detail.customer_abbr || '-' }}</span></div>
+            <div class="cell"><span class="k">{{ t('customers.fields.name') }}</span><span class="v">{{ detail.customer_name }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.customerTaxRate') }}</span><span class="v">{{ Number(detail.customer_tax_rate||0).toFixed(2) }}%</span></div>
+          </div>
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('fx.preBalance') }}</span><span class="v">{{ money(detail.pre_balance_myr) }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.selectedBase') }}</span><span class="v">{{ money(detail.total_base) }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.selectedSettled') }}</span><span class="v">{{ money0(detail.total_settled) }}</span></div>
+          </div>
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('common.createdBy') }}</span><span class="v">{{ detail.created_by_name }}</span></div>
+            <div class="cell"><span class="k">{{ t('common.createdAt') }}</span><span class="v">{{ fmtDate(detail.created_at) }}</span></div>
+            <div class="cell actions"><el-button type="primary" @click="downloadCsv(detail)">CSV</el-button></div>
+          </div>
         </div>
-        <div style="margin:8px 0;">
-          <el-button type="primary" @click="downloadCsv(detail)">CSV</el-button>
-        </div>
-        <el-table :data="detail.items || []" border size="small" height="60vh">
+
+        <el-table :data="detail.items || []" border size="small" height="60vh" show-summary :summary-method="summaryMethod">
+          <el-table-column type="index" :label="t('common.no')" width="60" />
           <el-table-column prop="transaction_id" label="TX ID" width="100"/>
-          <el-table-column prop="trn_date" :label="t('transactions.fields.date')" width="140"/>
+          <el-table-column prop="trn_date" :label="t('transactions.fields.date')" width="130">
+            <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
+          </el-table-column>
           <el-table-column prop="account_number" :label="t('accounts.fields.number')" />
           <el-table-column prop="amount_base" :label="t('fx.baseAmount')" width="140" align="right">
             <template #default="{ row }">{{ money(row.amount_base) }}</template>
           </el-table-column>
-          <el-table-column prop="amount_settled" :label="t('fx.settledAmount')" width="140" align="right">
+          <el-table-column prop="amount_settled" :label="t('fx.settledAmount')" width="160" align="right">
             <template #default="{ row }">{{ money0(row.amount_settled) }}</template>
           </el-table-column>
         </el-table>
@@ -174,6 +187,13 @@ function fmtDate(v){
     return String(v).slice(0,10)
   } catch { return String(v).slice(0,10) }
 }
+
+function summaryMethod({ data }){
+  const sumBase = data.reduce((s, r) => s + Number(r.amount_base||0), 0)
+  const sumSettle = data.reduce((s, r) => s + Number(r.amount_settled||0), 0)
+  // 返回与列对齐的数组：序号空，TX ID 空，日期空，账号空，基币合计，折算合计
+  return [t('common.total') || '合计', '', '', '', money(sumBase), money0(sumSettle)]
+}
 </script>
 
 <style scoped>
@@ -181,4 +201,10 @@ function fmtDate(v){
 .filters { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .pager { display:flex; justify-content:flex-end; margin-top:8px; }
 .head { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+.bill { padding-right: 8px; }
+.bill-head { display:flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.bill-head .row { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bill-head .cell { display:flex; gap:6px; align-items:center; min-height:28px; }
+.bill-head .cell .k { color:#666; min-width:110px; }
+.bill-head .cell .v { font-weight: 600; }
 </style>

@@ -306,7 +306,8 @@ const messages = {
       selectedSettled: '已选折算合计',
       paymentTotal: '付款金额合计',
       settlementCreated: '已生成结汇单：{n} 笔，基币 {base}，折算 {settled}',
-      paymentCreated: '已生成付款单：{n} 笔，总额 {total}'
+      paymentCreated: '已生成付款单：{n} 笔，总额 {total}',
+      preBalance: '结汇前余额'
     },
   },
   en: {
@@ -333,7 +334,8 @@ const messages = {
       selectedSettled: 'Selected Total (Converted)',
       paymentTotal: 'Payment Total',
       settlementCreated: 'Settlement created: {n} items, base {base}, converted {settled}',
-      paymentCreated: 'Payment created: {n} items, total {total}'
+      paymentCreated: 'Payment created: {n} items, total {total}',
+      preBalance: 'Pre-Settle Balance'
     },
     common: {
       backHome: 'Back to Home',
@@ -364,6 +366,7 @@ const messages = {
       confirmDelete: 'Confirm delete?',
       cancel: 'Cancel',
       ok: 'OK',
+      total: 'Total',
     },
     customers: {
       title: 'Customers',

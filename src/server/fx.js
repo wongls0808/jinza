@@ -171,10 +171,42 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
-  const head = await query(`select s.*, coalesce(u.display_name, u.username) as created_by_name from fx_settlements s left join users u on u.id=s.created_by where s.id=$1`, [id])
+  // 详情头部：补充 customer_abbr 与 pre_balance_myr（同列表口径：期初 + 已匹配MYR净额 - 之前结汇基币合计）
+  const head = await query(
+    `with tx_agg as (
+       select 
+         t.match_target_id as customer_id,
+         sum(case when upper(a.currency_code)='MYR' then coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0) else 0 end) as net_myr
+       from transactions t
+       left join receiving_accounts a on a.bank_account = t.account_number
+       where coalesce(t.matched,false) = true and t.match_type = 'customer'
+       group by t.match_target_id
+     )
+     select 
+       s.*,
+       c.abbr as customer_abbr,
+       coalesce(c.opening_myr,0) as opening_myr,
+       coalesce(tx.net_myr,0) as net_myr,
+       (
+         select sum(s2.total_base) 
+         from fx_settlements s2 
+         where s2.customer_id = s.customer_id 
+           and (s2.settle_date < s.settle_date or (s2.settle_date = s.settle_date and s2.id < s.id))
+       ) as prev_settle_base,
+       coalesce(u.display_name, u.username) as created_by_name
+     from fx_settlements s
+     left join customers c on c.id = s.customer_id
+     left join tx_agg tx on tx.customer_id = s.customer_id
+     left join users u on u.id = s.created_by
+     where s.id = $1`,
+    [id]
+  )
   if (!head.rows.length) return res.status(404).json({ error: 'not found' })
-  const items = await query(`select * from fx_settlement_items where settlement_id=$1 order by id desc`, [id])
-  res.json({ ...head.rows[0], items: items.rows })
+  const h = head.rows[0]
+  const pre_balance_myr = Number(h.opening_myr || 0) + Number(h.net_myr || 0) - Number(h.prev_settle_base || 0)
+  // 明细按交易日期升序、更便于“账单”阅读
+  const items = await query(`select * from fx_settlement_items where settlement_id=$1 order by trn_date asc nulls last, id asc`, [id])
+  res.json({ ...h, pre_balance_myr, items: items.rows })
 })
 
 // 结汇单：导出 CSV
