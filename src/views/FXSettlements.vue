@@ -30,7 +30,7 @@
         <template #default="{ row }">{{ Number(row.customer_tax_rate||0).toFixed(2) }}%</template>
       </el-table-column>
       <el-table-column prop="total_settled" column-key="total_settled" :label="t('fx.selectedSettled')" :width="colW('total_settled', 140)" align="right">
-        <template #default="{ row }">{{ money(row.total_settled) }}</template>
+        <template #default="{ row }">{{ money0(row.total_settled) }}</template>
       </el-table-column>
       <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 120)" />
       <el-table-column :label="t('common.actions')" width="220" align="center">
@@ -67,7 +67,7 @@
           <div><b>{{ t('fx.settleDate') }}</b>: {{ detail.settle_date }}</div>
           <div><b>{{ t('fx.rate') }}</b>: {{ detail.rate }}</div>
           <div><b>{{ t('fx.selectedBase') }}</b>: {{ money(detail.total_base) }}</div>
-          <div><b>{{ t('fx.selectedSettled') }}</b>: {{ money(detail.total_settled) }}</div>
+          <div><b>{{ t('fx.selectedSettled') }}</b>: {{ money0(detail.total_settled) }}</div>
           <div><b>{{ t('common.createdAt') }}</b>: {{ detail.created_at }}</div>
           <div><b>{{ t('common.createdBy') }}</b>: {{ detail.created_by_name }}</div>
         </div>
@@ -82,7 +82,7 @@
             <template #default="{ row }">{{ money(row.amount_base) }}</template>
           </el-table-column>
           <el-table-column prop="amount_settled" :label="t('fx.settledAmount')" width="140" align="right">
-            <template #default="{ row }">{{ money(row.amount_settled) }}</template>
+            <template #default="{ row }">{{ money0(row.amount_settled) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -108,6 +108,7 @@ const qCustomerId = ref(null)
 const qRange = ref([])
 const { colW, onColResize } = useTableMemory('fx-settlements')
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
+function money0(v){ return Math.round(Number(v||0)).toLocaleString() }
 async function loadCustomers(){ const res = await api.customers.list({ pageSize: 1000 }); customers.value = res.items || [] }
 async function reload(p){
   if (p) page.value = p
