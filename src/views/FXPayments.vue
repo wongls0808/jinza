@@ -29,11 +29,12 @@
         <template #default="{ row }">{{ money(row.balance_cny) }}</template>
       </el-table-column>
       <el-table-column prop="account_name" column-key="account_name" label="账户名称" :width="colW('account_name', 200)" />
-      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 180)">
+      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 200)">
         <template #default="{ row }">
           <div class="bank-cell">
-            <img v-if="row.bank_logo_url" :src="row.bank_logo_url" alt="logo" class="bank-logo" />
-            <span>{{ row.bank_name || row.bank_code }}</span>
+            <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
+            <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
+            <span class="bank-name">{{ row.bank_name || row.bank_code }}</span>
           </div>
         </template>
       </el-table-column>
@@ -48,10 +49,9 @@
           <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="220" align="center">
+      <el-table-column :label="t('common.actions')" width="180" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
-          <el-button size="small" @click="downloadCsv(row)">CSV</el-button>
           <el-button size="small" type="success" v-if="row.status==='completed'" @click="downloadPdf(row)">PDF</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
@@ -258,6 +258,33 @@ function summaryMethod({ data }){
   // 列顺序：#，账户名，账号，币种，金额
   return [t('common.total') || '合计', '', '', '', money(sum)]
 }
+
+// ---- 银行 logo 前端回退解析：DB 优先，失败回退到静态 /banks/<code>.(svg|png|jpg) ----
+const logoFail = ref({})
+const aliasMap = {
+  pbb: 'public', public: 'public',
+  maybank: 'maybank', mbb: 'maybank', mayb: 'maybank',
+  hlb: 'hlb', hongleong: 'hlb',
+  cimb: 'cimb', rhb: 'rhb', icbc: 'icbc', abc: 'abc', boc: 'boc', ccb: 'ccb', bcm: 'bcm',
+  abmb: 'alliance'
+}
+function logoKey(row){ return (row.bank_code || '').toLowerCase() }
+function resolveLogo(row){
+  const key = logoKey(row)
+  if (!key) return row.bank_logo_url || ''
+  if (logoFail.value[key]) return ''
+  const db = row.bank_logo_url || row.logo_url || ''
+  if (db) return db
+  const mapped = aliasMap[key] || key
+  return `/banks/${mapped}.svg`
+}
+function onLogoError(evt, row){
+  const key = logoKey(row)
+  const cur = evt?.target?.getAttribute('src') || ''
+  if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
+  else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
+  else logoFail.value[key] = true
+}
 </script>
 
 <style scoped>
@@ -271,4 +298,8 @@ function summaryMethod({ data }){
 .bill-head .cell { display:flex; gap:6px; align-items:center; min-height:28px; }
 .bill-head .cell .k { color:#666; min-width:110px; }
 .bill-head .cell .v { font-weight: 600; }
+.bank-cell { display:flex; align-items:center; gap:8px; height: 24px; }
+.bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
+.bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
+.bank-name { font-weight: 600; }
 </style>

@@ -251,10 +251,11 @@ async function loadAccounts(){
 
 async function createPayment(){
   const found = customers.value.find(c => c.id === payCustomerId.value)
-  await api.fx.payments.create({
+  const resp = await api.fx.payments.create({
     customer_id: payCustomerId.value,
     customer_name: found?.name || null,
     pay_date: payDate.value,
+    split: true,
     items: accounts.value.filter(a => Number(a._amount) > 0).map(a => ({
       account_id: a.id,
       account_name: a.account_name,
@@ -263,7 +264,7 @@ async function createPayment(){
       amount: a._amount
     }))
   })
-  const n = accounts.value.filter(a => Number(a._amount) > 0).length
+  const n = Array.isArray(resp?.ids) ? resp.ids.length : accounts.value.filter(a => Number(a._amount) > 0).length
   ElMessage.success(t('fx.paymentCreated', { n, total: money(paymentTotal.value) }))
   // 清空并刷新
   payDate.value = formatToday()

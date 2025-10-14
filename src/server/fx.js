@@ -843,22 +843,81 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
 // 创建付款单
 fxRouter.post('/payments', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
   await ensureDDL()
-  const { customer_id, customer_name, pay_date, items = [] } = req.body || {}
+  const { customer_id, customer_name, pay_date, items = [], split = true } = req.body || {}
   if (!customer_id || !pay_date || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'invalid payload' })
   const created_by = req.user?.id || null
-  const createdAtIso = new Date().toISOString()
-  const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
-  const ins = await query(`insert into fx_payments(bill_no, customer_id, customer_name, pay_date, status, created_by) values($1,$2,$3,$4,'pending',$5) returning id`, [bill_no, Number(customer_id), customer_name || null, pay_date, created_by])
-  const pid = ins.rows[0].id
-  const values = []
-  const params = []
-  let idx = 1
-  for (const it of items) {
-    values.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`)
-    params.push(pid, Number(it.account_id), it.account_name || null, it.bank_account || null, (it.currency_code || '').toUpperCase(), Number(it.amount)||0)
+
+  // 读取客户当前 CNY 余额，用于金额截断（余额不足时自动按顺序分配）
+  let balanceCny = 0
+  try {
+    const rs = await query(`
+      with tx_agg as (
+        select 
+          t.match_target_id as customer_id,
+          upper(a.currency_code) as currency,
+          sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
+        from transactions t
+        left join receiving_accounts a on a.bank_account = t.account_number
+        where coalesce(t.matched,false) = true and t.match_type = 'customer'
+        group by t.match_target_id, upper(a.currency_code)
+      ), tx_pivot as (
+        select customer_id,
+               sum(case when currency = 'CNY' then net else 0 end) as net_cny
+        from tx_agg group by customer_id
+      ), fx_set as (
+        select customer_id, sum(total_settled) as s_set from fx_settlements group by customer_id
+      ), fx_pay as (
+        select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
+        from fx_payments p join fx_payment_items i on i.payment_id=p.id
+        group by p.customer_id
+      )
+      select (coalesce(c.opening_cny,0) + coalesce(p.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0)) as balance_cny
+      from customers c
+      left join tx_pivot p on p.customer_id = c.id
+      left join fx_set fs on fs.customer_id = c.id
+      left join fx_pay fp on fp.customer_id = c.id
+      where c.id = $1
+    `, [Number(customer_id)])
+    if (rs.rowCount) balanceCny = Number(rs.rows[0].balance_cny || 0)
+  } catch {}
+
+  const createdIds = []
+  // 若 split=true，则每个账户生成一个单据；否则保留为单个单据（原有逻辑）
+  if (!split) {
+    const createdAtIso = new Date().toISOString()
+    const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
+    const ins = await query(`insert into fx_payments(bill_no, customer_id, customer_name, pay_date, status, created_by) values($1,$2,$3,$4,'pending',$5) returning id`, [bill_no, Number(customer_id), customer_name || null, pay_date, created_by])
+    const pid = ins.rows[0].id
+    const values = []
+    const params = []
+    let idx = 1
+    for (const it of items) {
+      const amt = Math.max(0, Number(it.amount)||0)
+      values.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`)
+      params.push(pid, Number(it.account_id), it.account_name || null, it.bank_account || null, (it.currency_code || '').toUpperCase(), amt)
+    }
+    if (values.length) await query(`insert into fx_payment_items(payment_id, account_id, account_name, bank_account, currency_code, amount) values ${values.join(',')}`, params)
+    createdIds.push(pid)
+  } else {
+    // 多单拆分：按传入顺序逐个账户生成单据；余额不足时自动截断到余额，余额归零后不再生成
+    let rest = Number(balanceCny || 0)
+    for (const it of items) {
+      let amt = Math.max(0, Number(it.amount)||0)
+      if (rest <= 0) break
+      if (amt <= 0) continue
+      if (amt > rest) amt = rest
+      // 生成单据头
+      const createdAtIso = new Date().toISOString()
+      const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
+      const ins = await query(`insert into fx_payments(bill_no, customer_id, customer_name, pay_date, status, created_by) values($1,$2,$3,$4,'pending',$5) returning id`, [bill_no, Number(customer_id), customer_name || null, pay_date, created_by])
+      const pid = ins.rows[0].id
+      await query(`insert into fx_payment_items(payment_id, account_id, account_name, bank_account, currency_code, amount) values ($1,$2,$3,$4,$5,$6)`,
+        [pid, Number(it.account_id), it.account_name || null, it.bank_account || null, (it.currency_code || '').toUpperCase(), amt])
+      createdIds.push(pid)
+      rest -= amt
+    }
   }
-  await query(`insert into fx_payment_items(payment_id, account_id, account_name, bank_account, currency_code, amount) values ${values.join(',')}`, params)
-  res.json({ id: pid })
+  res.json({ ids: createdIds })
 })
 
 fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
