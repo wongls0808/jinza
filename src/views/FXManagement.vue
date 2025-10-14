@@ -26,8 +26,8 @@
           <span>{{ t('fx.selectedBase') }}: {{ money(selectedBaseTotal) }}</span>
           <span>{{ t('fx.selectedSettled') }}: {{ money(selectedSettledTotal) }}</span>
         </div>
-  <el-table :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
-          <el-table-column type="selection" width="48" />
+  <el-table ref="settleTableRef" :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
+    <el-table-column type="selection" width="48" :selectable="isSettleSelectable" />
           <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
@@ -240,7 +240,19 @@ onMounted(() => {
 })
 
 function onSelMatchedChange(val){
-  selMatched.value = val || []
+  const MAX = 8
+  if (!Array.isArray(val)) { selMatched.value = []; return }
+  if (val.length <= MAX) { selMatched.value = val; return }
+  // 超限：撤销新增加的条目（或多余的尾部）
+  const prevIds = new Set((selMatched.value || []).map(r => r.id))
+  const added = val.filter(r => !prevIds.has(r.id))
+  const overflow = val.length - MAX
+  const toUnselect = (added.length ? added.slice(-overflow) : val.slice(MAX))
+  if (settleTableRef.value && typeof settleTableRef.value.toggleRowSelection === 'function') {
+    toUnselect.forEach(r => settleTableRef.value.toggleRowSelection(r, false))
+  }
+  selMatched.value = val.filter(r => !toUnselect.includes(r)).slice(0, MAX)
+  ElMessage.warning(t('fx.maxSelectionTip', { n: MAX }))
 }
 function onSelAccountsChange(val){
   selAccounts.value = val || []
@@ -272,6 +284,14 @@ function onLogoError(evt, row){
   if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
   else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
   else logoFail.value[key] = true
+}
+
+// 结汇区选择上限：未达上限时可选，达到上限后仅允许取消已选项
+const settleTableRef = ref(null)
+function isSettleSelectable(row){
+  const MAX = 8
+  const selected = selMatched.value || []
+  return selected.length < MAX || selected.some(r => r.id === row.id)
 }
 </script>
 

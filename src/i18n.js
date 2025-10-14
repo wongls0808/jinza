@@ -311,7 +311,8 @@ const messages = {
       paymentCreated: '已生成付款单：{n} 笔，总额 {total}',
       baseAmount: '基币金额',
       settledAmount: '折算后金额',
-      preBalance: '结汇前余额'
+      preBalance: '结汇前余额',
+      maxSelectionTip: '单次最多选择 {n} 条'
     },
   },
   en: {
@@ -341,7 +342,8 @@ const messages = {
       paymentCreated: 'Payment created: {n} items, total {total}',
       baseAmount: 'Base Amount',
       settledAmount: 'Converted Amount',
-      preBalance: 'Pre-Settle Balance'
+      preBalance: 'Pre-Settle Balance',
+      maxSelectionTip: 'Select up to {n} items per operation'
     },
     common: {
       backHome: 'Back to Home',
