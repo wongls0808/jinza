@@ -94,7 +94,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { api } from '@/api'
+import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 import { useAuth } from '@/composables/useAuth'
 const { t } = useI18n()
@@ -156,7 +156,7 @@ async function downloadCsv(row){
 }
 async function removeBill(row){
   try {
-    await api.request(`/fx/settlements/${row.id}`, { method: 'DELETE' })
+  await httpRequest(`/fx/settlements/${row.id}`, { method: 'DELETE' })
     ElMessage.success(t('common.ok'))
     reload()
   } catch (e) {

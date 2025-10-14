@@ -78,7 +78,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api } from '@/api'
+import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 const { t } = useI18n()
 const rows = ref([])
@@ -134,8 +134,13 @@ async function downloadCsv(row){
   URL.revokeObjectURL(url)
 }
 async function removeBill(row){
-  await api.request(`/fx/payments/${row.id}`, { method: 'DELETE' })
-  reload()
+  try {
+    await httpRequest(`/fx/payments/${row.id}`, { method: 'DELETE' })
+    ElMessage.success(t('common.ok'))
+    reload()
+  } catch (e) {
+    ElMessage.error(e?.message || 'Delete failed')
+  }
 }
 </script>
 
