@@ -6,6 +6,10 @@
         <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
       </el-select>
       <el-date-picker v-model="qRange" type="daterange" range-separator="-" start-placeholder="Start" end-placeholder="End" value-format="YYYY-MM-DD" />
+      <el-select v-model="qStatus" clearable placeholder="状态" style="width:140px">
+        <el-option :value="'pending'" label="审核中" />
+        <el-option :value="'completed'" label="已完成" />
+      </el-select>
       <el-button type="primary" @click="reload(1)">{{ t('common.search') }}</el-button>
       <el-button @click="resetFilters">{{ t('common.reset') }}</el-button>
       <div style="flex:1"></div>
@@ -13,22 +17,36 @@
       <el-button type="primary" @click="exportCsv('all')">{{ t('common.export') }} ({{ t('common.filtered') }})</el-button>
     </div>
     <el-table :data="rows" border size="small" @header-dragend="onColResize">
-      <el-table-column :label="t('common.no')" width="70">
+      <el-table-column :label="t('common.no')" width="60">
         <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
       </el-table-column>
-      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
-      <el-table-column prop="customer_name" column-key="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
-      <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)">
+      <el-table-column prop="pay_date" column-key="pay_date" label="付款日期" :width="colW('pay_date', 120)">
         <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
       </el-table-column>
-      <el-table-column prop="total_amount" column-key="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
-        <template #default="{ row }">{{ money(row.total_amount) }}</template>
+      <el-table-column prop="bill_no" column-key="bill_no" label="单号" :width="colW('bill_no', 180)" />
+      <el-table-column prop="customer_name" column-key="customer_name" label="客户" :width="colW('customer_name', 200)" />
+      <el-table-column prop="balance_cny" column-key="balance_cny" label="余额(CNY)" :width="colW('balance_cny', 140)" align="right">
+        <template #default="{ row }">{{ money(row.balance_cny) }}</template>
       </el-table-column>
-      <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 140)" />
-      <el-table-column :label="t('common.actions')" width="220" align="center">
+      <el-table-column prop="account_name" column-key="account_name" label="账户名称" :width="colW('account_name', 200)" />
+      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 140)" />
+      <el-table-column prop="bank_account" column-key="bank_account" label="银行账户" :width="colW('bank_account', 180)" />
+      <el-table-column prop="currency_code" column-key="currency_code" label="币种" :width="colW('currency_code', 100)" />
+      <el-table-column prop="amount" column-key="amount" label="金额" :width="colW('amount', 140)" align="right">
+        <template #default="{ row }">{{ money(row.amount) }}</template>
+      </el-table-column>
+      <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 120)" />
+      <el-table-column prop="status" column-key="status" label="状态" :width="colW('status', 110)">
+        <template #default="{ row }">
+          <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column :label="t('common.actions')" width="280" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
-          <el-button size="small" type="primary" @click="downloadCsv(row)">CSV</el-button>
+          <el-button size="small" @click="downloadCsv(row)">CSV</el-button>
+          <el-button size="small" type="success" v-if="row.status==='completed'" @click="downloadPdf(row)">PDF</el-button>
+          <el-button size="small" type="primary" v-if="row.status!=='completed' && has('manage_fx')" @click="approve(row)">审核通过</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
@@ -108,6 +126,7 @@ let pageSize = 20
 const customers = ref([])
 const qCustomerId = ref(null)
 const qRange = ref([])
+const qStatus = ref('')
 const { colW, onColResize } = useTableMemory('fx-payments')
 // 详情表格使用独立列宽记忆，按单据ID区分
 let memDetailInst = useTableMemory('fx-pay-detail')
@@ -123,14 +142,15 @@ const memDetail = {
 async function loadCustomers(){ const res = await api.customers.list({ pageSize: 1000 }); customers.value = res.items || [] }
 async function reload(p){
   if (p) page.value = p
-  const params = { page: page.value, pageSize }
+  const params = { page: page.value, pageSize, view: 'item' }
   if (qCustomerId.value) params.customerId = qCustomerId.value
   if (Array.isArray(qRange.value) && qRange.value.length === 2) { params.startDate = qRange.value[0]; params.endDate = qRange.value[1] }
+  if (qStatus.value) params.status = qStatus.value
   const res = await api.fx.payments.list(params)
   if (Array.isArray(res)) { rows.value = res; total.value = res.length }
   else { rows.value = res.items || []; total.value = Number(res.total||0) }
 }
-function resetFilters(){ qCustomerId.value = null; qRange.value = []; reload(1) }
+function resetFilters(){ qCustomerId.value = null; qRange.value = []; qStatus.value = ''; reload(1) }
 async function exportCsv(scope){
   const params = {}
   if (scope === 'page') { params.page = page.value; params.pageSize = pageSize; params.scope = 'page' }
@@ -156,7 +176,8 @@ async function openDetail(row){
   detailLoading.value = true
   detail.value = null
   try {
-    const d = await api.fx.payments.detail(row.id)
+    const id = row.payment_id || row.id
+    const d = await api.fx.payments.detail(id)
     detail.value = d
     memDetail.setId && memDetail.setId(d.id)
   } catch (e) {
@@ -167,23 +188,49 @@ async function openDetail(row){
   }
 }
 async function downloadCsv(row){
-  const csv = await api.fx.payments.exportCsv(row.id)
+  const id = row.payment_id || row.id
+  const csv = await api.fx.payments.exportCsv(id)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `Payment-${row.id}.csv`
+  a.download = `Payment-${id}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
 async function removeBill(row){
   try {
-    await httpRequest(`/fx/payments/${row.id}`, { method: 'DELETE' })
+    const id = row.payment_id || row.id
+    await httpRequest(`/fx/payments/${id}`, { method: 'DELETE' })
     ElMessage.success(t('common.ok'))
     reload()
   } catch (e) {
     ElMessage.error(e?.message || 'Delete failed')
   }
+}
+
+async function approve(row){
+  try {
+    const id = row.payment_id || row.id
+    await api.fx.payments.approve(id)
+    ElMessage.success('审核完成')
+    // 审核通过后自动下载 PDF
+    try { await downloadPdf(row) } catch {}
+    reload()
+  } catch(e) {
+    ElMessage.error(e?.message || '审批失败')
+  }
+}
+
+async function downloadPdf(row){
+  const id = row.payment_id || row.id
+  const blob = await api.fx.payments.exportPdf(id)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${row.bill_no || ('Payment-' + id)}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function fmtDate(v){

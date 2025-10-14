@@ -39,6 +39,9 @@ async function ensureDDL() {
       customer_id int not null,
       customer_name varchar(255),
       pay_date date not null,
+      status varchar(20) default 'pending',
+      approved_by int,
+      approved_at timestamptz,
       created_by int,
       created_at timestamptz default now()
     );
@@ -55,6 +58,9 @@ async function ensureDDL() {
   // 向后兼容：老表补充 bill_no 列
   await query(`alter table fx_settlements add column if not exists bill_no varchar(40)`)
   await query(`alter table fx_payments add column if not exists bill_no varchar(40)`)
+  await query(`alter table fx_payments add column if not exists status varchar(20) default 'pending'`)
+  await query(`alter table fx_payments add column if not exists approved_by int`)
+  await query(`alter table fx_payments add column if not exists approved_at timestamptz`)
   try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
 }
 
@@ -842,7 +848,7 @@ fxRouter.post('/payments', authMiddleware(true), requirePerm('manage_fx'), async
   const created_by = req.user?.id || null
   const createdAtIso = new Date().toISOString()
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
-  const ins = await query(`insert into fx_payments(bill_no, customer_id, customer_name, pay_date, created_by) values($1,$2,$3,$4,$5) returning id`, [bill_no, Number(customer_id), customer_name || null, pay_date, created_by])
+  const ins = await query(`insert into fx_payments(bill_no, customer_id, customer_name, pay_date, status, created_by) values($1,$2,$3,$4,'pending',$5) returning id`, [bill_no, Number(customer_id), customer_name || null, pay_date, created_by])
   const pid = ins.rows[0].id
   const values = []
   const params = []
@@ -857,26 +863,122 @@ fxRouter.post('/payments', authMiddleware(true), requirePerm('manage_fx'), async
 
 fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
   await ensureDDL()
-  const { customerId, startDate, endDate, page = 1, pageSize = 20 } = req.query
+  const { customerId, startDate, endDate, page = 1, pageSize = 20, status, view = 'item' } = req.query
   const where = []
   const params = []
   let idx = 1
   if (customerId) { where.push(`p.customer_id = $${idx++}`); params.push(Number(customerId)) }
   if (startDate) { where.push(`p.pay_date >= $${idx++}`); params.push(startDate) }
   if (endDate)   { where.push(`p.pay_date <= $${idx++}`); params.push(endDate) }
+  if (status)    { where.push(`p.status = $${idx++}`); params.push(String(status)) }
   const whereSql = where.length ? `where ${where.join(' and ')}` : ''
-  const total = await query(`select count(*) from fx_payments p ${whereSql}`, params)
   const offset = (Number(page)-1) * Number(pageSize)
-  const rows = await query(
-    `with agg as (
-       select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
-     )
-     select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.total_amount,0) as total_amount
+  if (String(view) === 'head') {
+    const total = await query(`select count(*) from fx_payments p ${whereSql}`, params)
+    const rows = await query(
+      `with agg as (
+         select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
+       ),
+       tx_agg as (
+         select 
+           t.match_target_id as customer_id,
+           upper(a.currency_code) as currency,
+           sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
+         from transactions t
+         left join receiving_accounts a on a.bank_account = t.account_number
+         where coalesce(t.matched,false) = true and t.match_type = 'customer'
+         group by t.match_target_id, upper(a.currency_code)
+       ), tx_pivot as (
+         select customer_id,
+                sum(case when currency = 'MYR' then net else 0 end) as net_myr,
+                sum(case when currency = 'CNY' then net else 0 end) as net_cny
+         from tx_agg
+         group by customer_id
+       ), fx_set as (
+         select customer_id, sum(total_base) as s_base, sum(total_settled) as s_set
+         from fx_settlements
+         group by customer_id
+       ), fx_pay as (
+         select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
+         from fx_payments p
+         join fx_payment_items i on i.payment_id = p.id
+         group by p.customer_id
+       )
+       select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.total_amount,0) as total_amount,
+              (coalesce(c.opening_cny,0) + coalesce(tp.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0)) as balance_cny
+       from fx_payments p
+       left join users u on u.id = p.created_by
+       left join agg a on a.payment_id = p.id
+       left join customers c on c.id = p.customer_id
+       left join tx_pivot tp on tp.customer_id = p.customer_id
+       left join fx_set fs on fs.customer_id = p.customer_id
+       left join fx_pay fp on fp.customer_id = p.customer_id
+       ${whereSql}
+       order by p.id desc offset $${idx++} limit $${idx++}`,
+      [...params, offset, Number(pageSize)]
+    )
+    return res.json({ total: Number(total.rows[0].count || 0), items: rows.rows })
+  }
+  // view = item（扁平到明细行）
+  const total = await query(
+    `select count(*)
      from fx_payments p
+     join fx_payment_items i on i.payment_id = p.id
+     ${whereSql}`,
+    params
+  )
+  const rows = await query(
+    `with tx_agg as (
+       select 
+         t.match_target_id as customer_id,
+         upper(a.currency_code) as currency,
+         sum(coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0)) as net
+       from transactions t
+       left join receiving_accounts a on a.bank_account = t.account_number
+       where coalesce(t.matched,false) = true and t.match_type = 'customer'
+       group by t.match_target_id, upper(a.currency_code)
+     ), tx_pivot as (
+       select customer_id,
+              sum(case when currency = 'MYR' then net else 0 end) as net_myr,
+              sum(case when currency = 'CNY' then net else 0 end) as net_cny
+       from tx_agg
+       group by customer_id
+     ), fx_set as (
+       select customer_id, sum(total_base) as s_base, sum(total_settled) as s_set
+       from fx_settlements
+       group by customer_id
+     ), fx_pay as (
+       select p.customer_id, sum(case when upper(i.currency_code)='CNY' then i.amount else 0 end) as pay_cny
+       from fx_payments p
+       join fx_payment_items i on i.payment_id = p.id
+       group by p.customer_id
+     )
+     select 
+       p.id as payment_id,
+       p.bill_no,
+       p.customer_id,
+       p.customer_name,
+       p.pay_date,
+       p.status,
+       coalesce(u.display_name, u.username) as created_by_name,
+       (coalesce(c.opening_cny,0) + coalesce(tp.net_cny,0) + coalesce(fs.s_set,0) - coalesce(fp.pay_cny,0)) as balance_cny,
+       i.id as item_id,
+       i.account_name,
+       i.bank_account,
+       upper(i.currency_code) as currency_code,
+       i.amount,
+       b.zh as bank_name
+     from fx_payments p
+     join fx_payment_items i on i.payment_id = p.id
      left join users u on u.id = p.created_by
-     left join agg a on a.payment_id = p.id
+     left join customers c on c.id = p.customer_id
+     left join tx_pivot tp on tp.customer_id = p.customer_id
+     left join fx_set fs on fs.customer_id = p.customer_id
+     left join fx_pay fp on fp.customer_id = p.customer_id
+     left join receiving_accounts a on a.bank_account = i.bank_account
+     left join banks b on b.id = a.bank_id
      ${whereSql}
-     order by p.id desc offset $${idx++} limit $${idx++}`,
+     order by p.id desc, i.id desc offset $${idx++} limit $${idx++}`,
     [...params, offset, Number(pageSize)]
   )
   res.json({ total: Number(total.rows[0].count || 0), items: rows.rows })
@@ -962,6 +1064,147 @@ fxRouter.get('/payments/:id/export', authMiddleware(true), requirePerm('view_fx'
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', `attachment; filename=Payment-${id}.csv`)
   res.send('\uFEFF' + csv)
+})
+
+// 付款单：审批通过
+fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const uid = req.user?.id || null
+  const rs = await query(`update fx_payments set status='completed', approved_by=$1, approved_at=now() where id=$2 returning *`, [uid, id])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+  res.json({ ok: true })
+})
+
+// 付款单：导出 PDF（凭证）
+fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const head = await query(`
+    select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.display_name, a.username) as approved_by_name
+    from fx_payments p
+    left join users u on u.id = p.created_by
+    left join users a on a.id = p.approved_by
+    where p.id=$1
+  `, [id])
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const items = await query(`
+    select i.*, b.zh as bank_name
+    from fx_payment_items i
+    left join receiving_accounts ra on ra.bank_account = i.bank_account
+    left join banks b on b.id = ra.bank_id
+    where i.payment_id=$1 order by i.id asc
+  `, [id])
+
+  res.setHeader('Content-Type', 'application/pdf')
+  const fileBase = (head.rows[0].bill_no ? String(head.rows[0].bill_no) : `Payment-${id}`)
+  const asciiName = `${fileBase}.pdf`.replace(/[^\x20-\x7E]/g, '_')
+  const utf8Name = encodeURIComponent(`${fileBase}.pdf`)
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
+
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 24, bottom: 24, left: 24, right: 24 } })
+  doc.pipe(res)
+  let hasCJK = false, hasCJKBold = false
+  try {
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = path.dirname(__filename)
+    const reg = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Regular.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Regular.otf')
+    ]
+    const bold = [
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.ttf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansSC-Bold.otf'),
+      path.join(__dirname, '..', '..', 'public', 'fonts', 'NotoSansCJKsc-Bold.otf')
+    ]
+    const fr = reg.find(p => fs.existsSync(p))
+    const fb = bold.find(p => fs.existsSync(p))
+    if (fr) { doc.registerFont('CJK', fr); hasCJK = true }
+    if (fb) { doc.registerFont('CJK-Bold', fb); hasCJKBold = true }
+  } catch {}
+  doc.font(hasCJK ? 'CJK' : 'Helvetica')
+  const t = (s) => s
+  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(14).text('Payment Voucher', { align: 'center' })
+  doc.moveDown(0.5)
+  const toDate = (v) => { try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
+  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
+  const left = doc.page.margins.left
+  const right = doc.page.width - doc.page.margins.right
+  const contentWidth = right - left
+  function textFit(txt, x, y, width, opts={}) {
+    const max = opts.maxSize ?? 9
+    const min = opts.minSize ?? 7
+    const noAdvanceY = opts.noAdvanceY === true
+    let size = max
+    while (size > min) {
+      doc.fontSize(size)
+      const w = doc.widthOfString(String(txt||''), { width, ...opts })
+      if (w <= width) break
+      size -= 0.5
+    }
+    const prevY = doc.y
+    doc.fontSize(size)
+    doc.text(String(txt||''), x, y, { width, lineBreak: false, ...opts })
+    if (noAdvanceY) doc.y = prevY
+  }
+  const h = head.rows[0]
+  const pairs = [
+    ['Bill No', h.bill_no || `Payment-${h.id}`],
+    ['Pay Date', toDate(h.pay_date)],
+    ['Customer', h.customer_name||''],
+    ['Status', (h.status === 'completed' ? 'Completed' : 'Pending')],
+    ['Created By', h.created_by_name||''],
+    ['Approved By', h.approved_by_name||'']
+  ]
+  doc.font(hasCJK ? 'CJK' : 'Helvetica').fontSize(9)
+  const hCol = Math.floor(contentWidth/2) - 8
+  for (let i=0;i<pairs.length;i+=2) {
+    const [k1,v1] = pairs[i]
+    const y = doc.y
+    textFit(`${k1}: ${v1}`, left, y, hCol)
+    if (i+1 < pairs.length) {
+      const [k2,v2] = pairs[i+1]
+      textFit(`${k2}: ${v2}`, left + hCol + 16, y, hCol)
+    }
+    doc.moveDown(0.6)
+  }
+  doc.moveDown(0.3)
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
+  doc.moveDown(0.5)
+  const colDefs = [
+    { key: 'Account Name', w: 6 },
+    { key: 'Bank', w: 4 },
+    { key: 'Bank Account', w: 5 },
+    { key: 'Currency', w: 3 },
+    { key: 'Amount', w: 3, align: 'right' }
+  ]
+  const weightSum = colDefs.reduce((s,c)=>s+c.w,0)
+  const cols = colDefs.map(c => ({ ...c, w: Math.floor(c.w/weightSum * contentWidth) }))
+  let rowH = 16
+  let y = doc.y
+  let x = left
+  doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
+  cols.forEach(c => { textFit(c.key, x, y, c.w, { align: c.align||'left', noAdvanceY: true }); x += c.w })
+  doc.y = y + rowH
+  doc.font(hasCJK ? 'CJK' : 'Helvetica')
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
+  let sum = 0
+  for (const r of items.rows) {
+    const row = [r.account_name||'', r.bank_name||'', r.bank_account||'', (r.currency_code||'').toUpperCase(), money(r.amount||0)]
+    y = doc.y; x = left
+    doc.fontSize(9)
+    cols.forEach((c,i) => { const align=c.align||'left'; textFit(String(row[i]??''), x, y, c.w, { align, noAdvanceY: true }); x += c.w })
+    sum += Number(r.amount||0)
+    doc.y = y + rowH
+    doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
+  }
+  doc.moveDown(0.2)
+  let sx = left + cols.slice(0, cols.length-1).reduce((s,c)=>s+c.w,0)
+  textFit(money(sum), sx, doc.y, cols[cols.length-1].w, { align: 'right', noAdvanceY: true })
+  doc.end()
 })
 
 // 删除单据
