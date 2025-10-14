@@ -1260,7 +1260,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
       // 估算图片高度（假设横向长图，高宽比 ~5:1，便于垂直居中）
       const estImgH = imgW / 5
   // 需求: 再下移 1.5 个字符高度；按 12pt 基准字体估算 ≈ 18pt
-  const y = footerTop + (spaceHeight - estImgH) / 2 + 18
+  // 再次微调: 追加下移 0.5 个字符 ≈ 6pt
+  const y = footerTop + (spaceHeight - estImgH) / 2 + 24
       const x = (pageWidth - imgW) / 2
       try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
     }
