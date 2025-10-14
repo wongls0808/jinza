@@ -9,6 +9,7 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.settlementArea') }}</span>
+            <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="settle-filters">
@@ -45,6 +46,7 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.paymentArea') }}</span>
+            <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="pay-filters">
