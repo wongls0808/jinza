@@ -143,6 +143,10 @@ export async function ensureSchema() {
   await query(`alter table users add column if not exists password_updated_at timestamptz`)
   // 升级已存在列的精度（若之前为 numeric 或其他数值类型）
   try { await query(`alter table customers alter column tax_rate type numeric(6,3) using round(coalesce(tax_rate,0)::numeric, 3)`) } catch {}
+  // 迁移：若历史数据以系数(0..1)存储，则转换为百分比 p=(1 - f)*100；保证幂等：仅转换 0<=tax_rate<=1 的行
+  try {
+    await query(`update customers set tax_rate = round((1 - coalesce(tax_rate,0)) * 100, 3) where coalesce(tax_rate,0) >= 0 and coalesce(tax_rate,0) <= 1`)
+  } catch {}
 }
 
 export async function seedInitialAdmin() {

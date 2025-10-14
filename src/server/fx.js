@@ -69,7 +69,7 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
   // 例：2025-10-13T14:27:01.103Z -> 20251013T142701103Z
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
   // 查询客户最新税率（百分比p，0-100），计算实际系数 factor = 1 - p/100；
-  // 兼容历史：若存量值<=1，则视为已是系数。
+  // 兼容历史：仅当 0<raw<1 时将其视为系数 f，换算 p=(1-f)*100；raw=0 或 raw=1 视为 0%/1% 的百分比。
   let taxFactor = 0
   let taxPercent = 0
   try {
@@ -78,16 +78,12 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
       const raw = Number(crs.rows[0].tax_rate || 0)
       let p = isFinite(raw) ? raw : 0
       if (p < 0) p = 0
-      // 计算实际系数
-      let f = 0
-      if (p <= 1) {
-        // 存量按系数的情况（如 0.985）
-        f = p
-        p = (1 - f) * 100
-      } else {
-        // 常规百分比（如 1.5 表示 1.5%）
-        f = 1 - p / 100
+      // 仅在 0<raw<1 时将其视为系数，其他 0 或 >=1 都按百分比处理
+      if (p > 0 && p < 1) {
+        p = (1 - p) * 100
       }
+      // 计算实际系数
+      let f = 1 - p / 100
       // 边界修正
       if (f < 0) f = 0
       if (f > 1) f = 1

@@ -123,7 +123,6 @@ const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (
 function percentToFactor(p){
   const n = Number(p || 0)
   if (!isFinite(n) || n < 0) return 0
-  if (n <= 1) return Math.max(0, Math.min(1, n))
   const f = 1 - n / 100
   return Math.max(0, Math.min(1, Math.round(f * 1000) / 1000))
 }
@@ -151,8 +150,6 @@ async function loadCustomers(){
 function normalizePercent(v){
   let n = Number(v || 0)
   if (!isFinite(n) || n < 0) n = 0
-  // 兼容：若原值是系数(<=1)，转为百分比
-  if (n <= 1) n = (1 - n) * 100
   if (n > 100) n = 100
   return Math.round(n * 1000) / 1000
 }
