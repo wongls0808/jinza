@@ -93,7 +93,7 @@ export async function ensureSchema() {
       id serial primary key,
       abbr text,
       name text not null,
-      tax_rate numeric default 0,
+      tax_rate numeric(6,3) default 0,
       opening_myr numeric default 0,
       opening_cny numeric default 0,
       submitter text,
@@ -141,6 +141,8 @@ export async function ensureSchema() {
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
   await query(`alter table users add column if not exists password_updated_at timestamptz`)
+  // 升级已存在列的精度（若之前为 numeric 或其他数值类型）
+  try { await query(`alter table customers alter column tax_rate type numeric(6,3) using round(coalesce(tax_rate,0)::numeric, 3)`) } catch {}
 }
 
 export async function seedInitialAdmin() {

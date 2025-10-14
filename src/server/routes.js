@@ -250,7 +250,38 @@ router.post('/customers', authMiddleware(true), requirePerm('view_customers'), a
   res.json(nr.rows[0])
 })
 
+// Update customer (abbr/name/tax_rate)
+router.put('/customers/:id', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const id = Number(req.params.id)
+  const { abbr, name, tax_rate } = req.body || {}
+  const fields = []
+  const values = []
+  let idx = 1
+  if (abbr !== undefined) { fields.push(`abbr=$${idx++}`); values.push(abbr || null) }
+  if (name !== undefined) { if (!name) return res.status(400).json({ error: '客户名必填' }); fields.push(`name=$${idx++}`); values.push(name) }
+  if (tax_rate !== undefined) {
+    const n = Number(tax_rate)
+    if (isNaN(n) || n < 0 || n > 100) return res.status(400).json({ error: '税率应在 0-100 之间' })
+    // 统一三位小数精度
+    const r3 = Math.round(n * 1000) / 1000
+    fields.push(`tax_rate=$${idx++}`); values.push(r3)
+  }
+  if (!fields.length) return res.status(400).json({ error: 'no changes' })
+  values.push(id)
+  const rs = await query(`update customers set ${fields.join(', ')} where id=$${idx} returning *`, values)
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  res.json(rs.rows[0])
+})
+
 router.delete('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+  const { ids } = req.body || {}
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
+  await query('delete from customers where id = any($1::int[])', [ids])
+  res.json({ ok: true })
+})
+
+// Alternative batch delete (POST) to avoid issues with DELETE body in some proxies
+router.post('/customers/batch-delete', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const { ids } = req.body || {}
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
   await query('delete from customers where id = any($1::int[])', [ids])
@@ -439,7 +470,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
 
 router.get('/customers/export', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
   const rs = await query('select abbr,name,tax_rate,opening_myr,opening_cny,submitter from customers order by id desc')
-  const lines = rs.rows.map(r => [r.abbr||'', r.name||'', r.tax_rate||0, r.opening_myr||0, r.opening_cny||0, r.submitter||''].join(','))
+  const lines = rs.rows.map(r => [r.abbr||'', r.name||'', Number(r.tax_rate||0).toFixed(3), r.opening_myr||0, r.opening_cny||0, r.submitter||''].join(','))
   const csv = lines.join('\n')
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"')

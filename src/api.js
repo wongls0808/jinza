@@ -65,7 +65,15 @@ export const api = {
   customers: {
     list: (params={}) => request(`/customers?${new URLSearchParams(params).toString()}`),
     create: (data) => request('/customers', { method: 'POST', body: JSON.stringify(data) }),
-    removeBatch: (ids) => request('/customers', { method: 'DELETE', body: JSON.stringify({ ids }) }),
+    update: (id, data) => request(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    removeBatch: async (ids) => {
+      try {
+        return await request('/customers/batch-delete', { method: 'POST', body: JSON.stringify({ ids }) })
+      } catch (e) {
+        // 回退：部分旧服务端可能没有该端点
+        return await request('/customers', { method: 'DELETE', body: JSON.stringify({ ids }) })
+      }
+    },
     importRows: (rows) => request('/customers/import', { method: 'POST', body: JSON.stringify({ rows }) }),
     importCsv: (text) => request('/customers/import-csv', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: text }),
     exportCsv: () => request('/customers/export'),

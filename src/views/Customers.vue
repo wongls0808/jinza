@@ -37,6 +37,7 @@
         @selection-change="(val)=> selection.value = val"
         @sort-change="onSort"
         @header-dragend="onColResize"
+        @row-dblclick="openEdit"
       >
         <el-table-column type="selection" column-key="__sel" :width="colW('__sel', 50)" />
         <el-table-column :label="$t('customers.fields.index')" type="index" column-key="__idx" :width="colW('__idx', 70)" />
@@ -88,7 +89,7 @@
           <el-input v-model.trim="addDlg.form.name" placeholder="" />
         </el-form-item>
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
-          <el-input-number v-model="addDlg.form.tax_rate" :precision="2" :min="0" :max="100" :step="1" controls-position="right" placeholder="0-100" style="width:100%" />
+          <el-input-number v-model="addDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" placeholder="0-100" style="width:100%" />
         </el-form-item>
         <div class="grid2">
           <el-form-item :label="$t('customers.form.openingMYR')">
@@ -123,6 +124,25 @@
       <template #footer>
         <el-button @click="addDlg.visible=false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" :loading="addDlg.loading" @click="doAdd">{{ $t('common.ok') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑客户对话框 -->
+    <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="560px">
+      <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="90px" class="form">
+        <el-form-item :label="$t('customers.form.abbr')">
+          <el-input v-model.trim="editDlg.form.abbr" placeholder="例如：HZ" />
+        </el-form-item>
+        <el-form-item :label="$t('customers.form.name')" prop="name">
+          <el-input v-model.trim="editDlg.form.name" />
+        </el-form-item>
+        <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
+          <el-input-number v-model="editDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" placeholder="0-100" style="width:100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDlg.visible=false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="editDlg.loading" @click="doEdit">{{ $t('common.save') || $t('common.ok') }}</el-button>
       </template>
     </el-dialog>
 
@@ -218,7 +238,9 @@ const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
 const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null } })
+const editDlg = ref({ visible: false, loading: false, id: null, form: { abbr: '', name: '', tax_rate: null } })
 const addFormRef = ref()
+const editFormRef = ref()
 const addRules = {
   name: [{ required: true, message: '请填写客户名', trigger: 'blur' }],
   tax_rate: [
@@ -482,7 +504,7 @@ function formatMoney(v) {
   return Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function formatPercent(v) {
-  return Number(v || 0).toFixed(2)
+  return Number(v || 0).toFixed(3)
 }
 
 // InputNumber 千分位展示与两位小数解析
@@ -509,6 +531,43 @@ function onPageSizeChange(ps) {
 function onPageChange(p) {
   page.value = p
   reload()
+}
+
+// 打开编辑
+function openEdit(row) {
+  if (!row || !row.id) return
+  editDlg.value.visible = true
+  editDlg.value.id = row.id
+  // 仅编辑常规字段，期初金额不在此处编辑，避免误触
+  editDlg.value.form = {
+    abbr: row.abbr || '',
+    name: row.name || '',
+    tax_rate: row.tax_rate == null ? null : Number(row.tax_rate)
+  }
+}
+
+function round3(n) {
+  const x = Number(n)
+  if (isNaN(x)) return 0
+  return Math.round(x * 1000) / 1000
+}
+
+async function doEdit() {
+  if (!editDlg.value.id) return
+  try {
+    if (editFormRef.value) await editFormRef.value.validate()
+    editDlg.value.loading = true
+    const f = { ...editDlg.value.form }
+    if (f.tax_rate != null) f.tax_rate = round3(f.tax_rate)
+    await api.customers.update(editDlg.value.id, f)
+    editDlg.value.visible = false
+    await reload()
+    ElMessage.success('已保存')
+  } catch (e) {
+    ElMessage.error(e?.message || '保存失败')
+  } finally {
+    editDlg.value.loading = false
+  }
 }
 
 // 客户绑定的收款账户 Drawer
