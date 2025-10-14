@@ -60,7 +60,8 @@
     </div>
 
     <el-drawer v-model="drawerVisible" :title="t('common.details')" size="60%">
-      <div v-if="detail" class="bill">
+      <el-skeleton v-if="detailLoading" :rows="4" animated style="padding:8px" />
+      <div v-else-if="detail" class="bill">
         <div class="bill-head">
           <div class="row">
             <div class="cell"><span class="k">{{ t('common.billNo') }}</span><span class="v">{{ detail.bill_no }}</span></div>
@@ -155,10 +156,21 @@ async function exportCsv(scope){
 onMounted(() => { loadCustomers(); reload(1) })
 
 const drawerVisible = ref(false)
+const detailLoading = ref(false)
 const detail = ref(null)
 async function openDetail(row){
-  detail.value = await api.fx.settlements.detail(row.id)
   drawerVisible.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    const d = await api.fx.settlements.detail(row.id)
+    detail.value = d
+  } catch (e) {
+    ElMessage.error(e?.message || 'Failed to load')
+    drawerVisible.value = false
+  } finally {
+    detailLoading.value = false
+  }
 }
 async function downloadCsv(row){
   const csv = await api.fx.settlements.exportCsv(row.id)
