@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page">
+  <div class="login-page" :class="{ 'with-video': enableVideo }">
     <!-- 背景视频容器 -->
     <div class="video-bg" v-if="enableVideo">
       <video
@@ -259,6 +259,14 @@ function onVideoError(){ /* 失败时可记录或替换静态背景 */ }
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  transition: background 0.8s ease;
+}
+.with-video .left-panel {
+  background: rgba(255,255,255,0.10);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-right: 1px solid rgba(255,255,255,0.25);
+  color: #fff;
 }
 
 .brand-container {
@@ -320,6 +328,13 @@ function onVideoError(){ /* 失败时可记录或替换静态背景 */ }
   flex-direction: column;
   justify-content: center;
   background: var(--el-bg-color);
+  transition: background 0.8s ease;
+}
+.with-video .right-panel {
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  border-left: 1px solid rgba(255,255,255,0.25);
 }
 
 .login-header {
@@ -342,8 +357,24 @@ function onVideoError(){ /* 失败时可记录或替换静态背景 */ }
 
 .login-form-card {
   border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05) !important;
-  background-color: var(--el-bg-color-overlay);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  transition: background 0.6s ease;
+}
+.with-video .login-form-card {
+  background: rgba(255,255,255,0.38);
+}
+.with-video .feature-item { background: rgba(255,255,255,0.20); }
+.with-video .feature-item:hover { background: rgba(255,255,255,0.32); }
+
+/* 动画 */
+.with-video .login-container { animation: fadeSlideIn 0.9s ease both; }
+@keyframes fadeSlideIn {
+  0% { opacity:0; transform: translateY(30px) scale(0.985); }
+  60% { opacity:1; transform: translateY(0) scale(1.0); }
+  100% { opacity:1; }
 }
 
 .login-form {
