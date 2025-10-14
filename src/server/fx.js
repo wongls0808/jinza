@@ -628,14 +628,70 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     }
     if (logos.length) {
       const gap = 10
-      const iconH = 16
-      const iconW = 32
+      const iconH = 16 // 统一高度；宽度按比例自适应，实现“看起来是实际大小”
       // 页尺寸数据（可能新开页，需要取当前页面）
       const pLeft = doc.page.margins.left
       const pRight = doc.page.width - doc.page.margins.right
       const pWidth = pRight - pLeft
-      const maxPerRow = Math.max(1, Math.floor((pWidth + gap) / (iconW + gap)))
-  const rows = Math.ceil(logos.length / maxPerRow)
+
+      // 计算每个元素的展示宽度
+      function getAspect(file) {
+        try {
+          const lower = file.toLowerCase()
+          if (lower.endsWith('.svg')) {
+            const svg = fs.readFileSync(file, 'utf8')
+            let m = svg.match(/viewBox=["']\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*["']/i)
+            if (m) {
+              const w = parseFloat(m[3]); const h = parseFloat(m[4]); if (w>0 && h>0) return w/h
+            }
+            m = svg.match(/width=["']\s*([\d.]+)\s*(px|pt|mm|cm)?\s*["']/i)
+            const m2 = svg.match(/height=["']\s*([\d.]+)\s*(px|pt|mm|cm)?\s*["']/i)
+            if (m && m2) { const w = parseFloat(m[1]); const h = parseFloat(m2[1]); if (w>0 && h>0) return w/h }
+            return 2
+          }
+          if (lower.endsWith('.png')) {
+            const buf = fs.readFileSync(file)
+            if (buf.length >= 24 && buf[0]===0x89 && buf[1]===0x50) {
+              const w = buf.readUInt32BE(16); const h = buf.readUInt32BE(20); if (w>0 && h>0) return w/h
+            }
+            return 2
+          }
+          if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+            // 简化：不解析 SOF，使用近似比例
+            return 2
+          }
+        } catch {}
+        return 2
+      }
+      // 先设置字体，供占位符测宽
+      const phFont = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
+      doc.font(phFont).fontSize(7)
+      const visuals = logos.map(it => {
+        if (it.type === 'image') {
+          const ratio = Math.max(0.5, Math.min(6, getAspect(it.path))) // 限制极端比例
+          const width = Math.max(24, Math.min(iconH * ratio, 96))
+          return { ...it, width }
+        } else {
+          const txt = (it.code || '').slice(0,4)
+          const w = Math.max(28, Math.min(doc.widthOfString(txt) + 10, 96))
+          return { ...it, width: w, txt }
+        }
+      })
+
+      // 依据自适应宽度进行自动换行排版
+      const rowsArr = []
+      let curRow = []
+      let curWidth = 0
+      for (const v of visuals) {
+        const need = (curRow.length ? gap : 0) + v.width
+        if (curRow.length && (curWidth + need > pWidth)) {
+          rowsArr.push(curRow); curRow = []; curWidth = 0
+        }
+        curRow.push(v); curWidth += (curRow.length>1 ? gap : 0) + v.width
+      }
+      if (curRow.length) rowsArr.push(curRow)
+
+      const rows = rowsArr.length
       const labelH = 12
       const footH = 4 + 1 + 6 + labelH + rows * iconH + (rows > 1 ? (rows-1)*8 : 0)
       const yBase = doc.page.height - doc.page.margins.bottom - footH
@@ -654,45 +710,38 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       const label = (lang==='zh' ? '合作机构' : 'Partners')
       doc.text(label, bLeft, baseY + 6, { continued: false })
       // Logo 网格
-      let colIdx = 0
-      let logoX = bLeft
       let logoY = baseY + 6 + labelH
-      doc.font(hasCJK ? 'CJK' : 'Helvetica')
-      for (const it of logos) {
-        try {
-          if (it.type === 'image') {
-            const file = it.path
-            const lower = file.toLowerCase()
-            if (lower.endsWith('.svg')) {
-              const svg = fs.readFileSync(file, 'utf-8')
-              SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
-            } else {
-              doc.image(file, logoX, logoY, { width: iconW, height: iconH })
+      for (const row of rowsArr) {
+        let logoX = bLeft
+        for (const it of row) {
+          try {
+            if (it.type === 'image') {
+              const file = it.path
+              const lower = file.toLowerCase()
+              if (lower.endsWith('.svg')) {
+                const svg = fs.readFileSync(file, 'utf-8')
+                SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: it.width, height: iconH })
+              } else {
+                doc.image(file, logoX, logoY, { width: it.width, height: iconH })
+              }
+            } else if (it.type === 'placeholder') {
+              doc.save()
+              doc.roundedRect(logoX+0.5, logoY+0.5, it.width-1, iconH-1, 2).stroke('#cccccc')
+              const txt = it.txt || (it.code||'').slice(0,4)
+              const fontName = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
+              doc.font(fontName).fontSize(7)
+              const w = Math.min(doc.widthOfString(txt), it.width-10)
+              const h = doc.currentLineHeight()
+              const tx = logoX + (it.width - w) / 2
+              const ty = logoY + (iconH - h) / 2 - 1
+              doc.fillColor('#666666').text(txt, tx, ty, { width: w, height: h })
+              doc.fillColor('black')
+              doc.restore()
             }
-          } else if (it.type === 'placeholder') {
-            // 占位绘制：灰色边框方框 + 银行简称
-            doc.save()
-            doc.roundedRect(logoX+0.5, logoY+0.5, iconW-1, iconH-1, 2).stroke('#cccccc')
-            const txt = (it.code || '').slice(0,4)
-            const fontName = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
-            doc.font(fontName).fontSize(7)
-            const w = doc.widthOfString(txt)
-            const h = doc.currentLineHeight()
-            const tx = logoX + (iconW - w) / 2
-            const ty = logoY + (iconH - h) / 2 - 1
-            doc.fillColor('#666666').text(txt, tx, ty, { width: w, height: h })
-            doc.fillColor('black')
-            doc.restore()
-          }
-        } catch {}
-        colIdx++
-        if (colIdx >= maxPerRow) {
-          colIdx = 0
-          logoX = bLeft
-          logoY += iconH + 8
-        } else {
-          logoX += iconW + gap
+          } catch {}
+          logoX += it.width + gap
         }
+        logoY += iconH + 8
       }
       // 保持文档 y 不变（页尾绘制为浮动层）
     }
