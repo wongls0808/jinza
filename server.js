@@ -16,8 +16,9 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
-// Serve runtime uploads (e.g., bank logos)
-const uploadsPath = path.join(__dirname, 'uploads')
+// Serve runtime uploads (e.g., bank logos) — use persistent DATA_DIR when available
+const dataDir = process.env.DATA_DIR || path.join(__dirname)
+const uploadsPath = path.join(dataDir, 'uploads')
 if (!fs.existsSync(uploadsPath)) {
   try { fs.mkdirSync(uploadsPath, { recursive: true }) } catch {}
 }

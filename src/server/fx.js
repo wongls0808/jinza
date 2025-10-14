@@ -569,6 +569,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       path.join(process.cwd?.() || '', 'public', 'banks')
     ].filter(Boolean)
     const uploadsDirs = [
+      path.join(process.env.DATA_DIR || '', 'uploads'),
       path.join(__dirname, '..', '..', 'uploads'),
       path.join(process.cwd?.() || '', 'uploads')
     ].filter(Boolean)

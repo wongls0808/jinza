@@ -613,7 +613,8 @@ router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.j
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
       const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
-      const uploads = path.join(__dirname, '../../uploads')
+      const dataDir = process.env.DATA_DIR || path.join(__dirname, '../../')
+      const uploads = path.join(dataDir, 'uploads')
       if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
       const file = path.join(uploads, `bank_${code}.${ext}`)
       fs.writeFileSync(file, buf)
@@ -649,7 +650,8 @@ router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), expres
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
       const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
-      const uploads = path.join(__dirname, '../../uploads')
+      const dataDir = process.env.DATA_DIR || path.join(__dirname, '../../')
+      const uploads = path.join(dataDir, 'uploads')
       if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
       const file = path.join(uploads, `bank_${code || 'id'+id}.${ext}`)
       fs.writeFileSync(file, buf)
