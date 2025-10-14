@@ -15,7 +15,7 @@
         <div class="settle-filters">
           <el-date-picker v-model="settleDate" type="date" :placeholder="t('fx.settleDate')" value-format="YYYY-MM-DD" />
           <el-input-number v-model="rate" :precision="6" :step="0.01" :min="0" :placeholder="t('fx.rate')" />
-          <el-input-number v-model="customerTaxRate" :precision="3" :step="0.001" :min="0" :max="100" :placeholder="t('fx.customerTaxRate')" />
+          <el-input-number v-model="customerTaxRate" :precision="3" :step="0.001" :min="0" :max="1" :placeholder="t('fx.customerTaxRate')" />
           <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
             <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
@@ -120,9 +120,9 @@ const selectedBaseTotal = computed(() => selMatched.value.reduce((s, r) => s + (
 // 折算总计 = 勾选金额 × (税率/100) × 汇率，四舍五入到元
 const selectedSettledTotal = computed(() => {
   const base = selectedBaseTotal.value
-  const tax = Number(customerTaxRate.value || 0) / 100
+  const taxFactor = Number(customerTaxRate.value || 0)
   const r = Number(rate.value || 0)
-  return Math.round(base * tax * r)
+  return Math.round(base * taxFactor * r)
 })
 const paymentTotal = computed(() => accounts.value.reduce((s, a) => s + (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0), 0))
 
@@ -177,7 +177,7 @@ async function createSettlement(){
   if (!r || r <= 0) { ElMessage.error(t('fx.errRateRequired')); return }
 
   // 全额：按所选明细全额，各自折算四舍五入到元
-  const tax = Number(customerTaxRate.value || 0) / 100
+  const taxFactor = Number(customerTaxRate.value || 0)
   const items = selMatched.value.map(row => {
     const base = Number(row.credit_amount||0) - Number(row.debit_amount||0)
     return {
@@ -185,7 +185,7 @@ async function createSettlement(){
       account_number: row.account_number,
       trn_date: row.trn_date || row.transaction_date,
       amount_base: base,
-      amount_settled: Math.round(base * tax * r)
+      amount_settled: Math.round(base * taxFactor * r)
     }
   })
   const found = customers.value.find(c => c.id === customerId.value)

@@ -70,7 +70,7 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
   // 计算合计：马币金额（按 credit-debit）与结汇金额（基数×税率×汇率）
   const total_base = items.reduce((s, it) => s + Number(it.amount_base||0), 0)
-  const tax = Number(customer_tax_rate || 0) / 100
+  const tax = Number(customer_tax_rate || 0)
   const total_settled = items.reduce((s, it) => s + Math.round(Number(it.amount_base||0) * Number(rate||0) * tax), 0)
   const ins = await query(
     `insert into fx_settlements(bill_no, customer_id, customer_name, settle_date, rate, customer_tax_rate, total_base, total_settled, created_by)
@@ -219,7 +219,7 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
        i.account_number,
        i.trn_date,
   i.amount_base,
-  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * (coalesce(s.customer_tax_rate,0)/100.0), 0) else i.amount_settled end as amount_settled_calc,
+  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * coalesce(s.customer_tax_rate,0), 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,
@@ -380,7 +380,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        i.account_number,
        i.trn_date,
   i.amount_base,
-  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * (coalesce(s.customer_tax_rate,0)/100.0), 0) else i.amount_settled end as amount_settled_calc,
+  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * coalesce(s.customer_tax_rate,0), 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,
