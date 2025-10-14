@@ -564,8 +564,21 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   try {
     const __filename = fileURLToPath(import.meta.url)
     const __dirname = path.dirname(__filename)
-    const publicBanksDir = path.join(__dirname, '..', '..', 'public', 'banks')
-    const uploadsDir = path.join(__dirname, '..', '..', 'uploads')
+    const publicBanksDirs = [
+      path.join(__dirname, '..', '..', 'public', 'banks'),
+      path.join(process.cwd?.() || '', 'public', 'banks')
+    ].filter(Boolean)
+    const uploadsDirs = [
+      path.join(__dirname, '..', '..', 'uploads'),
+      path.join(process.cwd?.() || '', 'uploads')
+    ].filter(Boolean)
+    const resolveIn = (dirs, rel) => {
+      for (const d of dirs) {
+        const p = path.join(d, rel)
+        if (fs.existsSync(p)) return p
+      }
+      return ''
+    }
   // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.(svg|png|jpg)
   // 若仍不可用，则添加占位符（以银行代码绘制小方框），保证布局完整
   const logos = [] // { type:'image', path } | { type:'placeholder', code }
@@ -573,7 +586,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     const aliasMap = {
       // Malaysia common aliases
       pbb: 'public', public: 'public',
-      maybank: 'maybank', mbb: 'maybank',
+      maybank: 'maybank', mbb: 'maybank', mayb: 'maybank',
       hlb: 'hlb', hongleong: 'hlb',
       cimb: 'cimb',
       rhb: 'rhb',
@@ -594,29 +607,24 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       // 解析 DB 的 logo_url
       if (url) {
         if (url.startsWith('/banks/')) {
-          p = path.join(publicBanksDir, url.replace('/banks/',''))
+          p = resolveIn(publicBanksDirs, url.replace('/banks/',''))
         } else if (url.startsWith('/uploads/')) {
-          p = path.join(uploadsDir, url.replace('/uploads/',''))
+          p = resolveIn(uploadsDirs, url.replace('/uploads/',''))
         } else if (/^https?:\/\//i.test(url)) {
           // 不请求远程资源，保持安全；改用占位符
           p = ''
         } else {
           // 视为相对文件名：优先 public/banks，其次 uploads
-          const tryBanks = path.join(publicBanksDir, url)
-          const tryUploads = path.join(uploadsDir, url)
-          if (fs.existsSync(tryBanks)) p = tryBanks
-          else if (fs.existsSync(tryUploads)) p = tryUploads
+          p = resolveIn(publicBanksDirs, url) || resolveIn(uploadsDirs, url)
         }
       }
-      // 回退：按 bank_code 映射静态资源（尝试 svg/png/jpg）
-      if (!p && code) {
+      // 回退：按 bank_code 映射静态资源（尝试 svg/png/jpg）；
+      // 注意：若 p 已解析但文件不存在，也执行回退
+      if ((!p || (p && !fs.existsSync(p))) && code) {
         const mapped = aliasMap[code] || code
-        const svgPath = path.join(publicBanksDir, `${mapped}.svg`)
-        const pngPath = path.join(publicBanksDir, `${mapped}.png`)
-        const jpgPath = path.join(publicBanksDir, `${mapped}.jpg`)
-        if (fs.existsSync(svgPath)) p = svgPath
-        else if (fs.existsSync(pngPath)) p = pngPath
-        else if (fs.existsSync(jpgPath)) p = jpgPath
+        p = resolveIn(publicBanksDirs, `${mapped}.svg`) ||
+            resolveIn(publicBanksDirs, `${mapped}.png`) ||
+            resolveIn(publicBanksDirs, `${mapped}.jpg`)
       }
       if (p && fs.existsSync(p)) {
         const key = `image:${p}`
