@@ -18,7 +18,7 @@ async function ensureDDL() {
       customer_name varchar(255),
       settle_date date not null,
       rate numeric(18,6) not null,
-      customer_tax_rate numeric(6,2) default 0,
+  customer_tax_rate numeric(6,3) default 0,
       total_base numeric(18,2) default 0,
       total_settled numeric(18,2) default 0,
       created_by int,
@@ -55,6 +55,7 @@ async function ensureDDL() {
   // 向后兼容：老表补充 bill_no 列
   await query(`alter table fx_settlements add column if not exists bill_no varchar(40)`)
   await query(`alter table fx_payments add column if not exists bill_no varchar(40)`)
+  try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
 }
 
 // 创建结汇单
@@ -67,9 +68,10 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
   const createdAtIso = new Date().toISOString()
   // 例：2025-10-13T14:27:01.103Z -> 20251013T142701103Z
   const bill_no = createdAtIso.replaceAll('-', '').replaceAll(':', '').replace('.', '')
-  // 计算合计：马币金额（按 credit-debit）与结汇金额（马币*汇率）
+  // 计算合计：马币金额（按 credit-debit）与结汇金额（基数×税率×汇率）
   const total_base = items.reduce((s, it) => s + Number(it.amount_base||0), 0)
-  const total_settled = total_base * Number(rate)
+  const tax = Number(customer_tax_rate || 0) / 100
+  const total_settled = items.reduce((s, it) => s + Math.round(Number(it.amount_base||0) * Number(rate||0) * tax), 0)
   const ins = await query(
     `insert into fx_settlements(bill_no, customer_id, customer_name, settle_date, rate, customer_tax_rate, total_base, total_settled, created_by)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
@@ -217,7 +219,7 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
        i.account_number,
        i.trn_date,
   i.amount_base,
-  case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
+  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * (coalesce(s.customer_tax_rate,0)/100.0), 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,
@@ -252,7 +254,7 @@ fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('view_
     ['Customer Name', h.customer_name||''],
     ['Settle Date', h.settle_date?.toISOString?.().slice(0,10) || h.settle_date || ''],
     ['Rate', h.rate],
-    ['Customer Tax Rate', h.customer_tax_rate],
+  ['Customer Tax Rate', Number(h.customer_tax_rate||0).toFixed(3)],
     ['Total Base', h.total_base],
     ['Total Settled', h.total_settled],
     ['Created By', h.created_by||''],
@@ -377,8 +379,8 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        i.transaction_id,
        i.account_number,
        i.trn_date,
-       i.amount_base,
-       case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
+  i.amount_base,
+  case when coalesce(i.amount_settled,0) = 0 then round(i.amount_base * s.rate * (coalesce(s.customer_tax_rate,0)/100.0), 0) else i.amount_settled end as amount_settled_calc,
        t.cheque_ref_no as ref_no,
   a.account_name,
   b.zh as bank_name,
@@ -474,7 +476,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     [t('rate'), Number(h.rate||0).toFixed(4)],
     [t('customerAbbr'), toStr(h.customer_abbr||'')],
     [t('customerName'), toStr(h.customer_name||'')],
-    [t('customerTax'), Number(h.customer_tax_rate||0).toFixed(2)+'%'],
+  [t('customerTax'), Number(h.customer_tax_rate||0).toFixed(3)+'%'],
     [t('preSettleBalance'), money(pre_balance_myr)],
     [t('selectedBase'), money(h.total_base)],
     [t('selectedConverted'), money0(h.total_settled)],
