@@ -1244,18 +1244,25 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
 
   const drawFooter = () => {
     const pageWidth = doc.page.width
-    // Logo 居中
+    const leftX = doc.page.margins.left
+    const rightX = pageWidth - doc.page.margins.right
+    const footerTop = doc.page.height - 78
+    // 分隔线
+    doc.save()
+    doc.moveTo(leftX, footerTop).lineTo(rightX, footerTop).strokeColor('#d8e2e8').lineWidth(1).stroke()
+    doc.restore()
+    // Logo 居中 (缩小以避免空白感)
     if (footerLogoPath) {
-      const imgW = 240
-      const y = doc.page.height - 42
+      const imgW = 210
+      const y = footerTop + 10
       const x = (pageWidth - imgW) / 2
       try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
     }
-    // 右下角二维码 (若生成成功)
+    // 右下角二维码 (更紧凑)
     if (qrDataUrl) {
-      const qrSize = 72
+      const qrSize = 64
       const qrX = pageWidth - doc.page.margins.right - qrSize
-      const qrY = doc.page.height - qrSize - 6
+      const qrY = doc.page.height - qrSize - 8
       try {
         const base64 = qrDataUrl.split(',')[1]
         const buf = Buffer.from(base64, 'base64')
@@ -1294,64 +1301,65 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
 
-  // Header: 品牌 + 标题 + 单号
-  // (h 已在上方定义)
+  // ===== 紧凑头部 =====
   const titleLine = t('title')
+  const headerY = doc.y
+  const headerHeight = 22
   doc.save()
-  doc.fillColor(ACCENT)
-  doc.font(fontBold).fontSize(15).text(BRAND, left, doc.y, { continued: true })
-  doc.fontSize(11).text('  |  ' + titleLine)
-  doc.moveDown(0.2)
-  doc.font(font).fontSize(8).fillColor('#666666').text((lang==='zh'?'单号':'Bill No') + ': ' + (h.bill_no || ('Payment-'+h.id)))
-  doc.restore()
-  doc.moveDown(0.5)
-
-  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  doc.font(fontBold).fontSize(12).fillColor(ACCENT).text(BRAND, left, headerY, { continued: true })
+  doc.font(font).fontSize(11).fillColor('#30424f').text('  |  ' + titleLine)
+  // 状态徽章 (右侧)
   const statusText = h.status==='completed' ? t('completed') : t('pending')
-
-  // 指定字段：金额、收款人、账户号码、银行名称、交易状态、交易号、交易时间
-  // 上方主信息条 (金额突出 + 交易号 + 状态徽标)
-  const barY = doc.y
-  const barH = 46
-  doc.save()
-  doc.roundedRect(left, barY, contentWidth, barH, 8).fill(LIGHT_ACCENT)
-  doc.fillColor(ACCENT).font(fontBold).fontSize(10).text(t('billNo') + ': ' + (h.bill_no || ('Payment-'+h.id)), left + 16, barY + 10, { width: contentWidth - 180 })
-  // 状态
-  const statusBadgeW = 90
-  const statusBadgeX = right - statusBadgeW - 16
-  doc.roundedRect(statusBadgeX, barY + 10, statusBadgeW, 20, 6).fill(statusText===t('completed') ? '#4caf50' : '#f0ad4e')
-  doc.fillColor('#ffffff').font(fontBold).fontSize(9).text(statusText, statusBadgeX, barY + 14, { width: statusBadgeW, align: 'center' })
-  // 金额右上角大字
-  doc.fillColor(ACCENT).font(fontBold).fontSize(9).text(t('amount'), right - 160, barY + 10)
-  doc.fontSize(18).text(money(total), right - 160, barY + 20)
+  const badgeW = 74
+  const badgeH = 16
+  const badgeX = right - badgeW
+  const badgeY = headerY + 2
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 6)
+    .fill(statusText===t('completed') ? '#d9f2de' : '#fff3cd')
+  doc.fillColor(statusText===t('completed') ? '#2b6d32' : '#856404').font(fontBold).fontSize(8)
+    .text(statusText, badgeX, badgeY + 4, { width: badgeW, align: 'center' })
+  // 交易号
+  doc.font(font).fontSize(7).fillColor('#6b6f74').text(
+    (lang==='zh'?'交易号':'Transaction No') + ': ' + (h.bill_no || ('Payment-'+h.id)),
+    left,
+    headerY + headerHeight - 4
+  )
   doc.restore()
-  doc.moveDown(3)
+  doc.moveDown(0.1)
 
-  // 下方 3 列网格：收款人 / 账户号码 / 银行名称 / 交易时间
+  // ===== 金额条 =====
+  const amountBarY = doc.y
+  const amountBarH = 34
+  doc.save()
+  doc.roundedRect(left, amountBarY, contentWidth, amountBarH, 6).fill(LIGHT_ACCENT)
+  doc.fillColor('#455a64').font(fontBold).fontSize(8).text(t('amount'), left + 14, amountBarY + 8)
+  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  doc.fontSize(19).fillColor(ACCENT).text(money(total), left + 14, amountBarY + 14)
+  doc.restore()
+  doc.y = amountBarY + amountBarH + 6
+
+  // ===== 2 列字段网格 =====
   const gridStartY = doc.y
-  const labelStyle = () => doc.font(fontBold).fontSize(8).fillColor('#555555')
-  const valueStyle = () => doc.font(font).fontSize(10).fillColor('#000000')
-  const colW = Math.floor(contentWidth / 3)
-  const rowGap = 18
-  const drawField = (col, row, label, value) => {
-    const x = left + col * colW
-    const y = gridStartY + row * rowGap
-    labelStyle().text(label, x, y)
-    valueStyle().text(value || '', x, y + 10, { width: colW - 12 })
+  const labelW = 64
+  const colGap = 40
+  const colW = Math.floor((contentWidth - colGap) / 2)
+  const rowH = 16
+  const field = (row, col, label, value) => {
+    const x = left + col * (colW + colGap)
+    const y = gridStartY + row * rowH
+    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(label + ':', x, y, { width: labelW, continued: true })
+    doc.font(font).fontSize(9).fillColor('#111').text(value==null?'':String(value), { width: colW - labelW })
   }
-  drawField(0, 0, t('payee'), (items.rows[0]?.account_name)||'')
-  drawField(1, 0, t('account'), (items.rows[0]?.bank_account)||'')
-  drawField(2, 0, t('bank'), (items.rows[0]?.bank_name)||'')
-  drawField(0, 1, t('date'), toDate(h.pay_date))
+  field(0,0, t('payee'), items.rows[0]?.account_name||'')
+  field(0,1, t('account'), items.rows[0]?.bank_account||'')
+  field(1,0, t('bank'), items.rows[0]?.bank_name||'')
+  field(1,1, t('date'), toDate(h.pay_date))
 
-  doc.y = gridStartY + rowGap * 2 + 4
-  doc.moveDown(0.5)
-  // 若有多条明细，追加简表（仅金额汇总按现有 total，明细省略）
+  doc.y = gridStartY + rowH * 2 + 6
   if (items.rows.length > 1) {
-    doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(lang==='zh'?'多笔合并明细共 ' + items.rows.length + ' 条':'Merged Items: '+items.rows.length)
-    doc.moveDown(0.3)
-    doc.font(font).fontSize(7).fillColor('#555555').text(lang==='zh'?'仅展示首条收款信息，其余已合并入总金额。':'Only first payee shown; others merged into total amount.')
-    doc.moveDown(0.6)
+    doc.font(fontBold).fontSize(8).fillColor(ACCENT).text(lang==='zh'?'合并明细: 共 '+items.rows.length+' 条':'Merged Items: '+items.rows.length)
+    doc.font(font).fontSize(7).fillColor('#555555').text(lang==='zh'?'仅展示首条，其余计入总金额。':'Only first item shown; others included in total.')
+    doc.moveDown(0.4)
   }
 
   drawFooter()
