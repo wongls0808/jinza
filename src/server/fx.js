@@ -220,8 +220,8 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
      left join transactions t on t.id = i.transaction_id
-     left join receiving_accounts a on a.bank_account = i.account_number
-     left join banks b on b.code = a.bank
+  left join receiving_accounts a on a.bank_account = i.account_number
+  left join banks b on b.id = a.bank_id
      where i.settlement_id = $1
      order by i.trn_date asc nulls last, i.id asc`,
     [id]
