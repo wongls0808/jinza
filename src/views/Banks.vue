@@ -15,14 +15,14 @@
       </template>
 
       <div class="cards">
-        <div class="bank-card" v-for="(b,i) in banks" :key="b.id">
+  <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" title="双击编辑/替换 Logo">
           <div class="idx">{{ i + 1 }}</div>
           <img class="logo" :src="b.logo_url || ('/banks/' + ((b.code || 'public').toLowerCase()) + '.svg')" @error="onImgErr" />
           <div class="names">
             <span class="zh text-clip">{{ b.zh }}</span>
             <span class="en text-clip">{{ b.en }}</span>
           </div>
-          <div class="ops">
+          <div class="ops" @dblclick.stop>
             <el-button link @click="openEdit(b)">{{ $t('banks.replaceLogo') }}</el-button>
             <el-button type="danger" link @click="remove(b.code)">{{ $t('common.delete') }}</el-button>
           </div>
