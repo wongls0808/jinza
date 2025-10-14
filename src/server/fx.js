@@ -280,7 +280,10 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   // 语言选择：优先 query.lang，其次 Accept-Language；仅区分 zh / en
   const pickLang = () => {
     const q = String(req.query.lang||'').toLowerCase()
-    if (q.startsWith('zh')) return 'zh'
+    if (q) {
+      if (q.startsWith('zh')) return 'zh'
+      if (q.startsWith('en')) return 'en'
+    }
     const al = String(req.headers['accept-language']||'').toLowerCase()
     if (al.includes('zh')) return 'zh'
     return 'en'
@@ -557,7 +560,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   x += cols[cols.length-2].w
   textFit(money0(sumSettle), x, sumY, cols[cols.length-1].w, { align: 'right', noAdvanceY: true })
 
-  // 页尾：合作机构（银行 logo 并排）
+  // 页尾：合作机构（银行 logo 并排，固定页尾位置）
   try {
     const __filename = fileURLToPath(import.meta.url)
     const __dirname = path.dirname(__filename)
@@ -566,6 +569,22 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.svg
     const logoFiles = []
     const seen = new Set()
+    const aliasMap = {
+      // Malaysia common aliases
+      pbb: 'public', public: 'public',
+      maybank: 'maybank', mbb: 'maybank',
+      hlb: 'hlb', hongleong: 'hlb',
+      cimb: 'cimb',
+      rhb: 'rhb',
+      // China big five
+      icbc: 'icbc',
+      abc: 'abc',
+      boc: 'boc',
+      ccb: 'ccb',
+      bcm: 'bcm',
+      // Alliance (if provided in future as alliance.svg)
+      abmb: 'alliance'
+    }
     for (const r of items.rows) {
       let p = ''
       const code = String(r.bank_code||'').trim().toLowerCase()
@@ -575,25 +594,42 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       } else if (url.startsWith('/uploads/')) {
         p = path.join(uploadsDir, url.replace('/uploads/',''))
       } else if (code) {
-        p = path.join(publicBanksDir, `${code}.svg`)
+        const mapped = aliasMap[code] || code
+        p = path.join(publicBanksDir, `${mapped}.svg`)
       }
       if (p && fs.existsSync(p) && !seen.has(p)) { seen.add(p); logoFiles.push(p) }
     }
     if (logoFiles.length) {
-      doc.moveDown(0.8)
-      doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
-      doc.moveDown(0.4)
-      doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
-      const label = (lang==='zh' ? '合作机构' : 'Partners')
-      doc.text(label, left, doc.y, { continued: false })
       const gap = 10
       const iconH = 16
       const iconW = 32
-      const usable = contentWidth
-      const maxPerRow = Math.max(1, Math.floor((usable + gap) / (iconW + gap)))
+      // 页尺寸数据（可能新开页，需要取当前页面）
+      const pLeft = doc.page.margins.left
+      const pRight = doc.page.width - doc.page.margins.right
+      const pWidth = pRight - pLeft
+      const maxPerRow = Math.max(1, Math.floor((pWidth + gap) / (iconW + gap)))
+      const rows = Math.ceil(logoFiles.length / maxPerRow)
+      const labelH = 12
+      const footH = 4 + 1 + 6 + labelH + rows * iconH + (rows > 1 ? (rows-1)*8 : 0)
+      const yBase = doc.page.height - doc.page.margins.bottom - footH
+      // 若当前内容过低，可能会覆盖页尾，直接新开一页
+      if (doc.y > yBase - 8) {
+        doc.addPage()
+      }
+      const bLeft = doc.page.margins.left
+      const bRight = doc.page.width - doc.page.margins.right
+      const bWidth = bRight - bLeft
+      const baseY = doc.page.height - doc.page.margins.bottom - footH
+      // 页尾上方分隔线
+      doc.moveTo(bLeft, baseY).lineTo(bRight, baseY).strokeColor('#cccccc').stroke().strokeColor('black')
+      // 标题
+      doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
+      const label = (lang==='zh' ? '合作机构' : 'Partners')
+      doc.text(label, bLeft, baseY + 6, { continued: false })
+      // Logo 网格
       let colIdx = 0
-      let logoX = left
-      let logoY = doc.y + 2
+      let logoX = bLeft
+      let logoY = baseY + 6 + labelH
       doc.font(hasCJK ? 'CJK' : 'Helvetica')
       for (const file of logoFiles) {
         const lower = file.toLowerCase()
@@ -610,13 +646,13 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
         colIdx++
         if (colIdx >= maxPerRow) {
           colIdx = 0
-          logoX = left
+          logoX = bLeft
           logoY += iconH + 8
         } else {
           logoX += iconW + gap
         }
       }
-      doc.y = Math.max(doc.y, logoY + iconH + 4)
+      // 保持文档 y 不变（页尾绘制为浮动层）
     }
   } catch {}
 
