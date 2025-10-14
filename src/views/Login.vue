@@ -7,11 +7,12 @@
     </div>
     <div class="login-container">
       <div class="single-panel">
-        <div class="logo-mini">{{ t('app.title') }}</div>
-        <div class="login-header">
-          <h2 class="welcome-text">{{ t('login.welcome') }}</h2>
-          <p class="login-subtext">{{ t('login.title') }} {{ t('login.continueText') }}</p>
+        <div class="lang-toggle" aria-label="language switch">
+          <span :class="{active: locale.value==='zh'}" @click="setLang('zh')">CN</span>
+          <span class="sep">|</span>
+          <span :class="{active: locale.value==='en'}" @click="setLang('en')">EN</span>
         </div>
+        <div class="logo-mini">{{ t('app.title') }}</div>
         <el-form @submit.prevent="onSubmit" class="login-form" label-position="top">
           <el-form-item :label="t('login.username')">
             <el-input v-model.trim="form.username" :placeholder="t('login.username')" size="large" autofocus @keyup.enter="focusPassword">
@@ -24,31 +25,19 @@
             </el-input>
           </el-form-item>
           <div class="login-options">
-            <el-checkbox v-model="remember">{{ t('login.rememberMe') }}</el-checkbox>
+            <el-checkbox v-model="remember">{{ rememberLabel }}</el-checkbox>
           </div>
           <el-button type="primary" :loading="submitting" @click="onSubmit" class="login-button" size="large" round>
             {{ t('login.submit') }}
           </el-button>
         </el-form>
-        <div class="login-footer">
-          <div class="lang-selector">
-            <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
-              <el-option label="中文" value="zh" />
-              <el-option label="English" value="en" />
-            </el-select>
-          </div>
-          <div class="system-info">
-            <span>{{ t('login.systemVersion') }} v1.0.0</span>
-            <span>© {{ new Date().getFullYear() }} {{ t('login.systemName') }}</span>
-          </div>
-        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
 import { useAuth } from '@/composables/useAuth'
@@ -64,10 +53,12 @@ const remember = ref(true)
 const submitting = ref(false)
 const passwordInput = ref(null)
 const { t, locale } = useI18n()
-const lang = ref(locale.value)
+// 记住我标签双语
+const rememberLabel = computed(()=> locale.value==='zh' ? '记住密码 Remember' : 'Remember Me 记住密码')
 const { save } = useAuth()
 
-function onLangChange(value){
+function setLang(value){
+  if(locale.value===value) return
   locale.value = value
   sessionStorage.setItem('lang', value)
   localStorage.setItem('lang', value)
@@ -120,9 +111,7 @@ function onVideoError(){}
 .single-panel:before { content:""; position:absolute; inset:0; background:linear-gradient(140deg,rgba(255,255,255,0.20),rgba(255,255,255,0.04) 60%,rgba(255,255,255,0.15)); pointer-events:none; }
 .single-panel:after { content:""; position:absolute; inset:0; border:1px solid rgba(255,255,255,0.25); border-radius:30px; pointer-events:none; mix-blend-mode:overlay; }
 .logo-mini { font-size:18px; font-weight:700; letter-spacing:.5px; color:#fff; opacity:.9; margin-bottom:6px; text-shadow:0 2px 6px rgba(0,0,0,0.4); }
-.login-header { text-align:center; margin:0 0 26px; }
-.welcome-text { font-size:30px; font-weight:700; margin:0; letter-spacing:1px; background:linear-gradient(90deg,#fff,#ddecff 50%,#ffffff); background-clip:text; -webkit-background-clip:text; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.45); }
-.login-subtext { font-size:14px; margin:12px 0 0; color:rgba(255,255,255,0.72); font-weight:500; letter-spacing:.5px; }
+.login-header, .welcome-text, .login-subtext { display:none; }
 .login-form { display:flex; flex-direction:column; gap:18px; }
 .login-form :deep(.el-form-item__label){ color:#fff; font-weight:600; letter-spacing:.5px; font-size:13px; }
 .login-form :deep(.el-input__wrapper){ background:rgba(255,255,255,0.22) !important; box-shadow:0 0 0 1px rgba(255,255,255,0.30) inset, 0 2px 4px -1px rgba(0,0,0,0.35); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:14px; transition:box-shadow .25s, background .25s; }
@@ -135,9 +124,11 @@ function onVideoError(){}
 .login-button { width:100%; height:48px; margin-top:4px; font-size:15px; font-weight:700; letter-spacing:1px; background:linear-gradient(135deg,var(--el-color-primary), var(--el-color-primary-dark-2)); border:none; box-shadow:0 6px 18px -4px rgba(0,0,0,0.55), 0 2px 6px -2px rgba(0,0,0,0.4); transition:transform .2s, filter .2s; }
 .login-button:hover { filter:brightness(1.08); }
 .login-button:active { transform:translateY(1px); }
-.login-footer { margin-top:30px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px; }
-.system-info { display:flex; flex-direction:column; gap:4px; color:rgba(255,255,255,0.55); font-size:11px; font-weight:500; letter-spacing:.5px; }
-.lang-selector { margin-bottom:4px; }
+.login-footer, .system-info, .lang-selector { display:none !important; }
+.lang-toggle { position:absolute; top:14px; right:18px; font-size:12px; font-weight:600; letter-spacing:.5px; color:rgba(255,255,255,0.55); user-select:none; display:flex; align-items:center; gap:6px; }
+.lang-toggle span { cursor:pointer; transition:color .25s, text-shadow .25s; }
+.lang-toggle span.active { color:#fff; text-shadow:0 0 6px rgba(255,255,255,0.6); }
+.lang-toggle .sep { opacity:.4; cursor:default; }
 .with-video .single-panel { animation: panelFadeIn .9s cubic-bezier(.22,.98,.34,1.02) both; }
 @keyframes panelFadeIn { 0% { opacity:0; transform:translateY(34px) scale(.97); } 55% { opacity:1; transform:translateY(0) scale(1.01);} 100% { opacity:1; transform:translateY(0) scale(1);} }
 @media (max-width:600px){ .single-panel { padding:34px 28px 40px; border-radius:26px; } .welcome-text{ font-size:26px; } }
