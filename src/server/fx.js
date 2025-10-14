@@ -636,7 +636,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     }
     if (logos.length) {
       const gap = 10
-      const iconH = 16 // 统一高度；宽度按比例自适应，实现“看起来是实际大小”
+  const iconH = 18 // 统一高度；宽度按比例自适应，实现“看起来是实际大小”
       // 页尺寸数据（可能新开页，需要取当前页面）
       const pLeft = doc.page.margins.left
       const pRight = doc.page.width - doc.page.margins.right
