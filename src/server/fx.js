@@ -1215,8 +1215,26 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const ACCENT = '#2F4858' // 深色强调
   const LIGHT_ACCENT = '#e4edf1'
   const BRAND = process.env.BRAND_NAME || (lang==='zh' ? '公司收付系统' : 'Payment System')
-  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 28, left: 28, right: 28 } })
+  const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 40, left: 28, right: 28 } })
   doc.pipe(res)
+  // 页脚 logo 资源路径
+  let footerLogoPath = null
+  try {
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = path.dirname(__filename)
+    const cand = path.join(__dirname, '..', '..', 'public', 'pdf-assets', 'footer-logo.png')
+    if (fs.existsSync(cand)) footerLogoPath = cand
+  } catch {}
+  const drawFooter = () => {
+    if (!footerLogoPath) return
+    const imgW = 260 // 目标显示宽度
+    const pageWidth = doc.page.width
+    const y = doc.page.height - doc.page.margins.bottom + 4
+    const x = (pageWidth - imgW) / 2
+    try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
+  }
+  // 首页与后续页面都绘制
+  doc.on('pageAdded', drawFooter)
   let hasCJK = false, hasCJKBold = false
   try {
     const __filename = fileURLToPath(import.meta.url)
@@ -1356,6 +1374,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   doc.text(lang==='zh'?'出纳签字: __________':'Cashier: __________', left + 220, signY)
   doc.text(lang==='zh'?'日期: __________':'Date: __________', left + 400, signY)
 
+  drawFooter()
   doc.end()
 })
 
