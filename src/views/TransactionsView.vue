@@ -318,37 +318,49 @@
       </template>
     </el-dialog>
     
-    <!-- 匹配对话框（仅客户） -->
-    <el-dialog
-      v-model="matchDialogVisible"
-      :title="t('transactions.matchTransactions')"
-      width="520px">
-      <el-form label-width="120px">
-        <el-form-item :label="t('transactions.selectCustomer')">
-          <el-select
-            v-model="matchForm.customerId"
-            filterable
-            remote
-            :remote-method="searchCustomers"
-            :loading="customersLoading"
-            :placeholder="t('transactions.searchCustomerPlaceholder')"
-            style="width: 100%">
-            <el-option
-              v-for="c in customerOptions"
-              :key="c.id"
-              :label="c.name"
-              :value="c.id" />
-          </el-select>
-        </el-form-item>
-        <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="matchDialogVisible=false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="matching" @click="confirmMatch">{{ t('common.ok') }}</el-button>
-        </span>
+    <!-- 匹配抽屉（类型：结汇/购汇/调拨/费用；当前实现结汇，其它占位） -->
+    <el-drawer v-model="matchDrawerVisible" :title="t('transactions.matchTransactions')" size="520px">
+      <template #default>
+        <el-tabs v-model="matchType" type="border-card">
+          <el-tab-pane :label="t('transactions.matchTypeSettle')" name="settle">
+            <el-form label-width="100px">
+              <el-form-item :label="t('transactions.selectCustomer')">
+                <el-select
+                  v-model="matchForm.customerId"
+                  filterable
+                  remote
+                  :remote-method="searchCustomers"
+                  :loading="customersLoading"
+                  :placeholder="t('transactions.searchCustomerAbbrPlaceholder')"
+                  style="width: 100%">
+                  <el-option
+                    v-for="c in customerOptions"
+                    :key="c.id"
+                    :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name"
+                    :value="c.id" />
+                </el-select>
+              </el-form-item>
+              <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
+            </el-form>
+          </el-tab-pane>
+          <el-tab-pane :label="t('transactions.matchTypeBuyFx')" name="buyfx">
+            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+          </el-tab-pane>
+          <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
+            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+          </el-tab-pane>
+          <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
+            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+          </el-tab-pane>
+        </el-tabs>
       </template>
-    </el-dialog>
+      <template #footer>
+        <div style="flex:1; display:flex; justify-content:flex-end; gap:8px;">
+          <el-button @click="matchDrawerVisible=false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="matching" @click="confirmMatch">{{ t('common.ok') }}</el-button>
+        </div>
+      </template>
+    </el-drawer>
 
     <!-- 高级筛选对话框 -->
     <el-dialog
@@ -893,18 +905,20 @@ const handleBatchDelete = async () => {
 }
 
 // 匹配功能（行操作）
-// 匹配（客户）弹窗
-const matchDialogVisible = ref(false)
+// 匹配抽屉
+const matchDrawerVisible = ref(false)
 const matching = ref(false)
 const customersLoading = ref(false)
 const customerOptions = ref([])
 const matchForm = reactive({ id: null, customerId: null })
+const matchType = ref('settle') // settle | buyfx | transfer | expense
 
 const handleMatchRow = (row) => {
   matchForm.id = row?.id || null
   matchForm.customerId = null
   customerOptions.value = []
-  matchDialogVisible.value = true
+  matchType.value = 'settle'
+  matchDrawerVisible.value = true
 }
 
 const searchCustomers = async (q) => {
@@ -918,24 +932,27 @@ const searchCustomers = async (q) => {
 }
 
 const confirmMatch = async () => {
-  if (!matchForm.id || !matchForm.customerId) {
-    ElMessage.warning(t('transactions.selectCustomerFirst'))
-    return
-  }
-  try {
-    matching.value = true
-    const c = customerOptions.value.find(x => x.id === matchForm.customerId)
-    const name = c?.name || ''
-    await api.transactions.match(matchForm.id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
-    matchDialogVisible.value = false
-    ElMessage.success(t('transactions.matchSuccess'))
-    // 刷新（未匹配列表将自动剔除此条）
-    fetchTransactions()
-  } catch (e) {
-    console.error('match failed', e)
-    ElMessage.error(t('transactions.matchFailed'))
-  } finally {
-    matching.value = false
+  if (matchType.value === 'settle') {
+    if (!matchForm.id || !matchForm.customerId) {
+      ElMessage.warning(t('transactions.selectCustomerFirst'))
+      return
+    }
+    try {
+      matching.value = true
+      const c = customerOptions.value.find(x => x.id === matchForm.customerId)
+      const name = c?.name || ''
+      await api.transactions.match(matchForm.id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
+      matchDrawerVisible.value = false
+      ElMessage.success(t('transactions.matchSuccess'))
+      fetchTransactions()
+    } catch (e) {
+      console.error('match failed', e)
+      ElMessage.error(t('transactions.matchFailed'))
+    } finally {
+      matching.value = false
+    }
+  } else {
+    ElMessage.info(t('transactions.todoPlaceholder'))
   }
 }
 
