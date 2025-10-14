@@ -1251,14 +1251,19 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     doc.save()
     doc.moveTo(leftX, footerTop).lineTo(rightX, footerTop).strokeColor('#d8e2e8').lineWidth(1).stroke()
     doc.restore()
-    // Logo 居中 (缩小以避免空白感)
+    // Logo 放大 1 倍并在分隔线与页面底边之间垂直居中
     if (footerLogoPath) {
-      const imgW = 210
-      const y = footerTop + 10
+      const contentWidthFooter = rightX - leftX
+      const baseW = 210
+      const imgW = Math.min(contentWidthFooter, baseW * 2) // 放大一倍且不超过内容宽
+      const spaceHeight = doc.page.height - footerTop
+      // 估算图片高度（假设横向长图，高宽比 ~5:1，便于垂直居中）
+      const estImgH = imgW / 5
+      const y = footerTop + (spaceHeight - estImgH) / 2
       const x = (pageWidth - imgW) / 2
       try { doc.image(footerLogoPath, x, y, { width: imgW }) } catch {}
     }
-    // 右下角二维码 (更紧凑)
+    // 右下角二维码 (位置保持靠近底部右侧)
     if (qrDataUrl) {
       const qrSize = 64
       const qrX = pageWidth - doc.page.margins.right - qrSize
