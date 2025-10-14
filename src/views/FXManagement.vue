@@ -67,20 +67,32 @@
         </div>
   <el-table :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
           <el-table-column type="selection" width="48" />
+          <!-- 提交日期（使用右侧筛选的 payDate 展示） -->
+          <el-table-column column-key="pay_date" :label="t('fx.payDate')" :width="colWPay('pay_date',140)">
+            <template #default>
+              <span>{{ payDate }}</span>
+            </template>
+          </el-table-column>
+          <!-- 账户名称 -->
           <el-table-column prop="account_name" column-key="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
-          <el-table-column column-key="bank_logo" :label="t('banks.title')" :width="colWPay('bank_logo',100)" align="center">
+          <!-- 银行名称（中文）+ Logo 同列显示 -->
+          <el-table-column column-key="bank" :label="t('customers.accounts.bank')" :width="colWPay('bank',220)">
             <template #default="{ row }">
-              <div class="bank-cell">
+              <div class="bank-cell" style="justify-content:flex-start; gap:8px;">
                 <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
                 <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
+                <span style="font-weight:600;">{{ row.bank_zh || row.bank_name || '' }}</span>
               </div>
             </template>
           </el-table-column>
+          <!-- 银行账户 -->
           <el-table-column prop="bank_account" column-key="bank_account" :label="t('customers.accounts.bankAccount')" :width="colWPay('bank_account',200)" />
+          <!-- 币种 -->
           <el-table-column prop="currency_code" column-key="currency_code" :label="t('customers.accounts.currency')" :width="colWPay('currency_code',120)" />
+          <!-- 金额（默认空，不显示0.00） -->
           <el-table-column column-key="amount" :label="t('fx.amount')" :width="colWPay('amount',160)">
             <template #default="{ row }">
-              <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" style="width:140px" />
+              <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" :placeholder="t('common.input')" style="width:140px" />
             </template>
           </el-table-column>
         </el-table>
@@ -283,7 +295,16 @@ function onSelMatchedChange(val){
   ElMessage.warning(t('fx.maxSelectionTip', { n: MAX }))
 }
 function onSelAccountsChange(val){
+  const prev = new Set((selAccounts.value || []).map(r => r.id))
   selAccounts.value = val || []
+  const now = new Set((selAccounts.value || []).map(r => r.id))
+  // 找到新增勾选的行，自动填充付款余额（CNY余额）
+  const added = (selAccounts.value || []).filter(r => !prev.has(r.id))
+  if (added.length) {
+    const bal = Number(cnyBalance.value || 0)
+    // 仅在当前行未填或为0时填充，避免覆盖用户已经输入
+    added.forEach(r => { if (!r._amount || Number(r._amount) === 0) r._amount = Math.max(0, Math.round(bal * 100) / 100) })
+  }
 }
 
 // ---- 银行 logo 前端回退解析：DB 优先，失败回退到静态 /banks/<code>.(svg|png|jpg) ----

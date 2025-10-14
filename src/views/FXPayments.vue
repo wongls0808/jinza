@@ -18,7 +18,9 @@
       </el-table-column>
       <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 200)" />
       <el-table-column prop="customer_name" column-key="customer_name" :label="t('customers.fields.name')" :width="colW('customer_name', 200)" />
-      <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)" />
+      <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 130)">
+        <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
+      </el-table-column>
       <el-table-column prop="total_amount" column-key="total_amount" :label="t('common.amount')" :width="colW('total_amount', 140)" align="right">
         <template #default="{ row }">{{ money(row.total_amount) }}</template>
       </el-table-column>
@@ -49,24 +51,39 @@
       />
     </div>
 
-    <el-drawer v-model="drawerVisible" :title="t('common.details')" size="50%">
-      <div v-if="detail">
-        <div class="head">
-          <div><b>ID</b>: {{ detail.id }}</div>
-          <div><b>{{ t('customers.fields.name') }}</b>: {{ detail.customer_name }}</div>
-          <div><b>{{ t('fx.payDate') }}</b>: {{ detail.pay_date }}</div>
-          <div><b>{{ t('common.createdAt') }}</b>: {{ detail.created_at }}</div>
-          <div><b>{{ t('common.createdBy') }}</b>: {{ detail.created_by_name }}</div>
+    <el-drawer v-model="drawerVisible" :title="t('common.details')" size="60%">
+      <el-skeleton v-if="detailLoading" :rows="4" animated style="padding:8px" />
+      <div v-else-if="detail" class="bill">
+        <div class="bill-head">
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('common.billNo') }}</span><span class="v">{{ detail.bill_no || ('Payment-' + detail.id) }}</span></div>
+            <div class="cell"><span class="k">{{ t('fx.payDate') }}</span><span class="v">{{ fmtDate(detail.pay_date) }}</span></div>
+            <div class="cell"><span class="k">{{ t('common.amount') }}</span><span class="v">{{ money(detailTotal) }}</span></div>
+          </div>
+          <div class="row">
+            <div class="cell"><span class="k">{{ t('customers.fields.name') }}</span><span class="v">{{ detail.customer_name }}</span></div>
+            <div class="cell"><span class="k">{{ t('common.createdBy') }}</span><span class="v">{{ detail.created_by_name }}</span></div>
+            <div class="cell"><span class="k">{{ t('common.createdAt') }}</span><span class="v">{{ fmtDate(detail.created_at) }}</span></div>
+          </div>
+          <div class="row">
+            <div class="cell actions"><el-button type="primary" @click="downloadCsv(detail)">CSV</el-button></div>
+          </div>
         </div>
-        <div style="margin:8px 0;">
-          <el-button type="primary" @click="downloadCsv(detail)">CSV</el-button>
-        </div>
-        <el-table :data="detail.items || []" border size="small" height="60vh">
-          <el-table-column prop="account_id" label="Account ID" width="120"/>
-          <el-table-column prop="account_name" :label="t('accounts.fields.name')" />
-          <el-table-column prop="bank_account" :label="t('accounts.fields.number')" />
-          <el-table-column prop="currency_code" :label="t('currencies.code')" width="120"/>
-          <el-table-column prop="amount" :label="t('common.amount')" width="140" align="right">
+
+        <el-table 
+          :data="detail.items || []" 
+          border 
+          size="small" 
+          height="60vh" 
+          show-summary 
+          :summary-method="summaryMethod"
+          @header-dragend="memDetail.onColResize"
+        >
+          <el-table-column type="index" column-key="idx" :label="t('common.no')" :width="memDetail.colW('idx', 60)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="memDetail.colW('account_name', 220)" />
+          <el-table-column prop="bank_account" column-key="bank_account" :label="t('accounts.fields.bankAccount')" :width="memDetail.colW('bank_account', 200)" />
+          <el-table-column prop="currency_code" column-key="currency_code" :label="t('currencies.code')" :width="memDetail.colW('currency_code', 120)" />
+          <el-table-column prop="amount" column-key="amount" :label="t('common.amount')" :width="memDetail.colW('amount', 140)" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
         </el-table>
@@ -76,11 +93,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useAuth } from '@/composables/useAuth'
 const { t } = useI18n()
+const { has } = useAuth()
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -89,6 +109,17 @@ const customers = ref([])
 const qCustomerId = ref(null)
 const qRange = ref([])
 const { colW, onColResize } = useTableMemory('fx-payments')
+// 详情表格使用独立列宽记忆，按单据ID区分
+let memDetailInst = useTableMemory('fx-pay-detail')
+const memDetail = {
+  setId(id){
+    const key = `fx-pay-detail:${id || '0'}`
+    memDetailInst = useTableMemory(key)
+  },
+  colW(col, def){ return memDetailInst.colW(col, def) },
+  onColResize(newW, oldW, col, evt){ return memDetailInst.onColResize(newW, oldW, col, evt) },
+  reset(){ return memDetailInst.reset() }
+}
 async function loadCustomers(){ const res = await api.customers.list({ pageSize: 1000 }); customers.value = res.items || [] }
 async function reload(p){
   if (p) page.value = p
@@ -118,10 +149,22 @@ onMounted(() => { loadCustomers(); reload(1) })
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 const drawerVisible = ref(false)
+const detailLoading = ref(false)
 const detail = ref(null)
 async function openDetail(row){
-  detail.value = await api.fx.payments.detail(row.id)
   drawerVisible.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    const d = await api.fx.payments.detail(row.id)
+    detail.value = d
+    memDetail.setId && memDetail.setId(d.id)
+  } catch (e) {
+    ElMessage.error(e?.message || 'Failed to load')
+    drawerVisible.value = false
+  } finally {
+    detailLoading.value = false
+  }
 }
 async function downloadCsv(row){
   const csv = await api.fx.payments.exportCsv(row.id)
@@ -142,6 +185,26 @@ async function removeBill(row){
     ElMessage.error(e?.message || 'Delete failed')
   }
 }
+
+function fmtDate(v){
+  if (!v) return ''
+  try {
+    if (typeof v === 'string') return v.slice(0,10)
+    if (v.toISOString) return v.toISOString().slice(0,10)
+    return String(v).slice(0,10)
+  } catch { return String(v).slice(0,10) }
+}
+
+const detailTotal = computed(() => {
+  const items = detail.value?.items || []
+  return items.reduce((s, r) => s + Number(r.amount||0), 0)
+})
+
+function summaryMethod({ data }){
+  const sum = data.reduce((s, r) => s + Number(r.amount||0), 0)
+  // 列顺序：#，账户名，账号，币种，金额
+  return [t('common.total') || '合计', '', '', '', money(sum)]
+}
 </script>
 
 <style scoped>
@@ -149,4 +212,10 @@ async function removeBill(row){
 .filters { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .pager { display:flex; justify-content:flex-end; margin-top:8px; }
 .head { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+.bill { padding-right: 8px; }
+.bill-head { display:flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.bill-head .row { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bill-head .cell { display:flex; gap:6px; align-items:center; min-height:28px; }
+.bill-head .cell .k { color:#666; min-width:110px; }
+.bill-head .cell .v { font-weight: 600; }
 </style>
