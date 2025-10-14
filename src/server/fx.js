@@ -642,7 +642,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       const pRight = doc.page.width - doc.page.margins.right
       const pWidth = pRight - pLeft
 
-      // 计算每个元素的展示宽度
+      // 计算每个元素的自然尺寸与宽高比（单位以 pt 近似）
       function getAspect(file) {
         try {
           const lower = file.toLowerCase()
@@ -671,18 +671,52 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
         } catch {}
         return 2
       }
+      function getNaturalSize(file) {
+        try {
+          const lower = file.toLowerCase()
+          if (lower.endsWith('.png')) {
+            const buf = fs.readFileSync(file)
+            if (buf.length >= 24 && buf[0]===0x89 && buf[1]===0x50) {
+              const w = buf.readUInt32BE(16); const h = buf.readUInt32BE(20)
+              if (w>0 && h>0) return { w, h }
+            }
+          } else if (lower.endsWith('.svg')) {
+            const svg = fs.readFileSync(file, 'utf8')
+            const mw = svg.match(/width=["']\s*([\d.]+)\s*(px|pt)?\s*["']/i)
+            const mh = svg.match(/height=["']\s*([\d.]+)\s*(px|pt)?\s*["']/i)
+            if (mw && mh) {
+              const w = parseFloat(mw[1]); const h = parseFloat(mh[1])
+              if (w>0 && h>0) return { w, h }
+            }
+          } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+            // 省略复杂 JPEG 解析：返回 undefined 以走比例推断
+          }
+        } catch {}
+        return undefined
+      }
       // 先设置字体，供占位符测宽
       const phFont = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
       doc.font(phFont).fontSize(7)
       const visuals = logos.map(it => {
         if (it.type === 'image') {
-          const ratio = Math.max(0.5, Math.min(6, getAspect(it.path))) // 限制极端比例
-          const width = Math.max(24, Math.min(iconH * ratio, 96))
-          return { ...it, width }
+          const nat = getNaturalSize(it.path)
+          if (nat && nat.h > 0) {
+            // 只在超过高度上限时缩小；不放大
+            const scale = Math.min(1, iconH / nat.h)
+            const drawW = Math.max(1, nat.w * scale)
+            const drawH = Math.max(1, nat.h * scale)
+            return { ...it, width: drawW, height: drawH, preserve: true }
+          } else {
+            // 无法获得自然尺寸时，按比例推断宽度，以高度上限为尺度
+            const ratio = Math.max(0.3, Math.min(6, getAspect(it.path)))
+            const drawW = Math.max(1, iconH * ratio)
+            const drawH = iconH
+            return { ...it, width: drawW, height: drawH, preserve: true }
+          }
         } else {
           const txt = (it.code || '').slice(0,4)
-          const w = Math.max(28, Math.min(doc.widthOfString(txt) + 10, 96))
-          return { ...it, width: w, txt }
+          const w = Math.max(28, Math.min(doc.widthOfString(txt) + 10, 120))
+          return { ...it, width: w, height: iconH, txt }
         }
       })
 
@@ -728,20 +762,22 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
               const lower = file.toLowerCase()
               if (lower.endsWith('.svg')) {
                 const svg = fs.readFileSync(file, 'utf-8')
-                SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: it.width, height: iconH })
+                // 传入匹配的宽高，并设置 preserveAspectRatio，避免拉伸
+                SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: it.width, height: it.height, preserveAspectRatio: 'xMidYMid meet' })
               } else {
-                doc.image(file, logoX, logoY, { width: it.width, height: iconH })
+                // 栅格图：仅缩小，不放大；宽高与自然比例一致
+                doc.image(file, logoX, logoY, { width: it.width, height: it.height })
               }
             } else if (it.type === 'placeholder') {
               doc.save()
-              doc.roundedRect(logoX+0.5, logoY+0.5, it.width-1, iconH-1, 2).stroke('#cccccc')
+              doc.roundedRect(logoX+0.5, logoY+0.5, it.width-1, it.height-1, 2).stroke('#cccccc')
               const txt = it.txt || (it.code||'').slice(0,4)
               const fontName = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
               doc.font(fontName).fontSize(7)
               const w = Math.min(doc.widthOfString(txt), it.width-10)
               const h = doc.currentLineHeight()
               const tx = logoX + (it.width - w) / 2
-              const ty = logoY + (iconH - h) / 2 - 1
+              const ty = logoY + (it.height - h) / 2 - 1
               doc.fillColor('#666666').text(txt, tx, ty, { width: w, height: h })
               doc.fillColor('black')
               doc.restore()
