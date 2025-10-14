@@ -86,16 +86,18 @@
 
         <el-table :data="detail.items || []" border size="small" height="60vh" show-summary :summary-method="summaryMethod">
           <el-table-column type="index" :label="t('common.no')" width="60" />
-          <el-table-column prop="transaction_id" label="TX ID" width="100"/>
-          <el-table-column prop="trn_date" :label="t('transactions.fields.date')" width="130">
+          <el-table-column prop="ref_no" :label="t('transactions.chequeRefNo')" width="150" />
+          <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" width="130">
             <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
           </el-table-column>
-          <el-table-column prop="account_number" :label="t('accounts.fields.number')" />
+          <el-table-column prop="bank_name" :label="t('banks.title')" width="140" />
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" width="200" />
+          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" />
           <el-table-column prop="amount_base" :label="t('fx.baseAmount')" width="140" align="right">
             <template #default="{ row }">{{ money(row.amount_base) }}</template>
           </el-table-column>
-          <el-table-column prop="amount_settled" :label="t('fx.settledAmount')" width="160" align="right">
-            <template #default="{ row }">{{ money0(row.amount_settled) }}</template>
+          <el-table-column prop="amount_settled_calc" :label="t('fx.settledAmount')" width="160" align="right">
+            <template #default="{ row }">{{ money0(row.amount_settled_calc) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -190,9 +192,9 @@ function fmtDate(v){
 
 function summaryMethod({ data }){
   const sumBase = data.reduce((s, r) => s + Number(r.amount_base||0), 0)
-  const sumSettle = data.reduce((s, r) => s + Number(r.amount_settled||0), 0)
-  // 返回与列对齐的数组：序号空，TX ID 空，日期空，账号空，基币合计，折算合计
-  return [t('common.total') || '合计', '', '', '', money(sumBase), money0(sumSettle)]
+  const sumSettle = data.reduce((s, r) => s + Number(r.amount_settled_calc||0), 0)
+  // 列顺序：#，参考号，日期，银行，账户名，账号，基币，折算
+  return [t('common.total') || '合计', '', '', '', '', '', money(sumBase), money0(sumSettle)]
 }
 </script>
 

@@ -204,8 +204,28 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
   if (!head.rows.length) return res.status(404).json({ error: 'not found' })
   const h = head.rows[0]
   const pre_balance_myr = Number(h.opening_myr || 0) + Number(h.net_myr || 0) - Number(h.prev_settle_base || 0)
-  // 明细按交易日期升序、更便于“账单”阅读
-  const items = await query(`select * from fx_settlement_items where settlement_id=$1 order by trn_date asc nulls last, id asc`, [id])
+  // 明细：联表获取原始参考号、银行名称、账户名，并计算每行折算金额（若存量为0则用基币*汇率）
+  const items = await query(
+    `select 
+       i.id,
+       i.transaction_id,
+       i.account_number,
+       i.trn_date,
+       i.amount_base,
+       coalesce(i.amount_settled, i.amount_base * s.rate) as amount_settled_calc,
+       t.cheque_ref_no as ref_no,
+       a.account_name,
+       b.zh as bank_name,
+       b.en as bank_name_en
+     from fx_settlement_items i
+     left join fx_settlements s on s.id = i.settlement_id
+     left join transactions t on t.id = i.transaction_id
+     left join receiving_accounts a on a.bank_account = i.account_number
+     left join banks b on b.code = a.bank
+     where i.settlement_id = $1
+     order by i.trn_date asc nulls last, i.id asc`,
+    [id]
+  )
   res.json({ ...h, pre_balance_myr, items: items.rows })
 })
 
