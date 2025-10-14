@@ -1,5 +1,6 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
+import SVGtoPDF from 'svg-to-pdfkit'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -220,7 +221,8 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
        t.cheque_ref_no as ref_no,
        a.account_name,
        b.zh as bank_name,
-       b.en as bank_name_en
+       b.en as bank_name_en,
+       coalesce(a.bank_code, b.code) as bank_code
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
      left join transactions t on t.id = i.transaction_id
@@ -286,6 +288,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   const I18N = {
     en: {
       title: 'Settlement Bill',
+      partners: 'Partners',
       billNo: 'Bill No',
       settleDate: 'Settle Date',
       rate: 'Rate',
@@ -308,6 +311,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     },
     zh: {
       title: '结汇单',
+      partners: '合作机构',
       billNo: '单号',
       settleDate: '结汇日期',
       rate: '汇率',
@@ -374,7 +378,8 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
        t.cheque_ref_no as ref_no,
        a.account_name,
        b.zh as bank_name,
-       b.en as bank_name_en
+       b.en as bank_name_en,
+       coalesce(a.bank_code, b.code) as bank_code
      from fx_settlement_items i
      left join fx_settlements s on s.id = i.settlement_id
      left join transactions t on t.id = i.transaction_id
@@ -494,7 +499,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   const colDefs = [
     { key: t('thRefNo'), w: 3 },
     { key: t('thDate'), w: 3 },
-    { key: t('thBankEn'), w: 5 },
+    { key: t('thBankEn'), w: 4 },
     { key: t('thAccountName'), w: 6 },
     { key: t('thAccountNo'), w: 4 },
     { key: t('thBase'), w: 3, align: 'right' },
@@ -521,7 +526,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     const row = [
       toStr(r.ref_no||''),
       toDate(r.trn_date),
-      toStr(r.bank_name_en||''),
+      toStr(String(r.bank_code||'').toUpperCase()),
       toStr(r.account_name||''),
       toStr(r.account_number||''),
       money(r.amount_base||0),
@@ -549,6 +554,46 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
   textFit(money(sumBase), x, sumY, cols[cols.length-2].w, { align: 'right', noAdvanceY: true })
   x += cols[cols.length-2].w
   textFit(money0(sumSettle), x, sumY, cols[cols.length-1].w, { align: 'right', noAdvanceY: true })
+
+  // 页尾：合作机构（银行 logo 并排）
+  try {
+    const codes = Array.from(new Set(items.rows.map(r => String(r.bank_code||'').trim().toLowerCase()).filter(Boolean)))
+    if (codes.length) {
+      doc.moveDown(0.8)
+      doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#cccccc').stroke().strokeColor('black')
+      doc.moveDown(0.4)
+      doc.font(hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold').fontSize(9)
+      const label = (lang==='zh' ? '合作机构' : 'Partners')
+      doc.text(label, left, doc.y, { continued: false })
+      const __filename = fileURLToPath(import.meta.url)
+      const __dirname = path.dirname(__filename)
+      const logosDir = path.join(__dirname, '..', '..', 'public', 'banks')
+      const gap = 10
+      const iconH = 16
+      const iconW = 32
+      const usable = contentWidth
+      const maxPerRow = Math.max(1, Math.floor((usable + gap) / (iconW + gap)))
+      let colIdx = 0
+      let logoX = left
+      let logoY = doc.y + 2
+      doc.font(hasCJK ? 'CJK' : 'Helvetica')
+      for (const code of codes) {
+        const svgPath = path.join(logosDir, `${code}.svg`)
+        if (!fs.existsSync(svgPath)) continue
+        const svg = fs.readFileSync(svgPath, 'utf-8')
+        SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
+        colIdx++
+        if (colIdx >= maxPerRow) {
+          colIdx = 0
+          logoX = left
+          logoY += iconH + 8
+        } else {
+          logoX += iconW + gap
+        }
+      }
+      doc.y = Math.max(doc.y, logoY + iconH + 4)
+    }
+  } catch {}
 
   doc.end()
 })
