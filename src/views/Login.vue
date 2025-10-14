@@ -1,106 +1,47 @@
 <template>
-  <div class="login-page" :class="{ 'with-video': enableVideo }">
-    <!-- 背景视频容器 -->
+  <div class="login-page compact" :class="{ 'with-video': enableVideo }">
     <div class="video-bg" v-if="enableVideo">
-      <video
-        ref="bgVideo"
-        class="bg-video"
-        :src="videoSrc"
-        autoplay
-        muted
-        loop
-        playsinline
-        preload="auto"
-        @canplay="onVideoReady"
-        @error="onVideoError"
-      ></video>
+      <video ref="bgVideo" class="bg-video" :src="videoSrc" autoplay muted loop playsinline preload="auto"
+             @canplay="onVideoReady" @error="onVideoError"></video>
       <div class="video-overlay"></div>
     </div>
     <div class="login-container">
-      <div class="left-panel">
-        <div class="brand-container">
-          <h1 class="brand-name">{{ t('app.title') }}</h1>
-          <p class="brand-tagline">{{ t('login.tagline') }}</p>
-        </div>
-        <img class="login-illustration" src="/illustrations/login-hero.svg" alt="login-illustration" />
-        <div class="features-list">
-          <div class="feature-item">
-            <el-icon><Document /></el-icon>
-            <span>{{ t('login.feature1') }}</span>
-          </div>
-          <div class="feature-item">
-            <el-icon><Setting /></el-icon>
-            <span>{{ t('login.feature2') }}</span>
-          </div>
-          <div class="feature-item">
-            <el-icon><UserFilled /></el-icon>
-            <span>{{ t('login.feature3') }}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="right-panel">
+      <div class="single-panel">
+        <div class="logo-mini">{{ t('app.title') }}</div>
         <div class="login-header">
           <h2 class="welcome-text">{{ t('login.welcome') }}</h2>
           <p class="login-subtext">{{ t('login.title') }} {{ t('login.continueText') }}</p>
         </div>
-        
-        <el-card class="login-form-card" shadow="hover" :body-style="{padding: '30px'}">
-          <el-form @submit.prevent="onSubmit" class="login-form" label-position="top">
-            <el-form-item :label="t('login.username')">
-              <el-input 
-                v-model.trim="form.username" 
-                :placeholder="t('login.username')"
-                size="large"
-                autofocus
-                @keyup.enter="focusPassword">
-                <template #prefix><el-icon><User /></el-icon></template>
-              </el-input>
-            </el-form-item>
-            
-            <el-form-item :label="t('login.password')">
-              <el-input 
-                ref="passwordInput"
-                v-model.trim="form.password" 
-                type="password" 
-                show-password 
-                size="large"
-                :placeholder="t('login.password')"
-                @keyup.enter="onSubmit">
-                <template #prefix><el-icon><Lock /></el-icon></template>
-              </el-input>
-            </el-form-item>
-            
-            <div class="login-options">
-              <el-checkbox v-model="remember">{{ t('login.rememberMe') }}</el-checkbox>
-            </div>
-            
-            <el-button 
-              type="primary" 
-              :loading="submitting" 
-              @click="onSubmit" 
-              class="login-button"
-              size="large"
-              round>
-              {{ t('login.submit') }}
-            </el-button>
-          </el-form>
-          
-          <div class="login-footer">
-            <!-- 语言切换组件 -->
-            <div class="lang-selector">
-              <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
-                <el-option label="中文" value="zh" />
-                <el-option label="English" value="en" />
-              </el-select>
-            </div>
-            
-            <div class="system-info">
-              <span>{{ t('login.systemVersion') }} v1.0.0</span>
-              <span>© {{ new Date().getFullYear() }} {{ t('login.systemName') }}</span>
-            </div>
+        <el-form @submit.prevent="onSubmit" class="login-form" label-position="top">
+          <el-form-item :label="t('login.username')">
+            <el-input v-model.trim="form.username" :placeholder="t('login.username')" size="large" autofocus @keyup.enter="focusPassword">
+              <template #prefix><el-icon><User /></el-icon></template>
+            </el-input>
+          </el-form-item>
+          <el-form-item :label="t('login.password')">
+            <el-input ref="passwordInput" v-model.trim="form.password" type="password" show-password size="large" :placeholder="t('login.password')" @keyup.enter="onSubmit">
+              <template #prefix><el-icon><Lock /></el-icon></template>
+            </el-input>
+          </el-form-item>
+          <div class="login-options">
+            <el-checkbox v-model="remember">{{ t('login.rememberMe') }}</el-checkbox>
           </div>
-        </el-card>
+          <el-button type="primary" :loading="submitting" @click="onSubmit" class="login-button" size="large" round>
+            {{ t('login.submit') }}
+          </el-button>
+        </el-form>
+        <div class="login-footer">
+          <div class="lang-selector">
+            <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
+              <el-option label="中文" value="zh" />
+              <el-option label="English" value="en" />
+            </el-select>
+          </div>
+          <div class="system-info">
+            <span>{{ t('login.systemVersion') }} v1.0.0</span>
+            <span>© {{ new Date().getFullYear() }} {{ t('login.systemName') }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -113,13 +54,7 @@ import { api } from '@/api'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { 
-  User, 
-  Lock, 
-  Document, 
-  Setting, 
-  UserFilled
-} from '@element-plus/icons-vue'
+import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -130,340 +65,81 @@ const submitting = ref(false)
 const passwordInput = ref(null)
 const { t, locale } = useI18n()
 const lang = ref(locale.value)
-
 const { save } = useAuth()
 
-// 语言切换处理函数
-function onLangChange(value) {
+function onLangChange(value){
   locale.value = value
   sessionStorage.setItem('lang', value)
-  localStorage.setItem('lang', value) // 也存储在localStorage中保持兼容性
+  localStorage.setItem('lang', value)
 }
 
-// 在用户名输入后按回车键，聚焦到密码输入框
-const focusPassword = () => {
-  if (passwordInput.value) {
-    passwordInput.value.focus()
-  }
-}
+const focusPassword = () => { passwordInput.value && passwordInput.value.focus() }
 
 const onSubmit = async () => {
-  if (!form.value.username || !form.value.password) {
-    ElMessage({
-      message: t('login.username') + '/' + t('login.password') + ' 不能为空',
-      type: 'warning',
-      duration: 2000
-    })
+  if(!form.value.username || !form.value.password){
+    ElMessage({ message: t('login.username') + '/' + t('login.password') + ' 不能为空', type:'warning', duration:2000 })
     return
   }
-  
   submitting.value = true
-  
   try {
     const res = await api.login(form.value.username, form.value.password)
-    
-    // 保存登录信息，传递"记住我"选项
-    save({ 
-      token: res.token, 
-      user: res.user, 
-      perms: res.perms, 
-      must_change_password: !!res.must_change_password 
-    }, remember.value)
-    
-    // 记录会话状态
-    if (remember.value) {
-      // 记住登录状态
-      localStorage.setItem('remember_auth', '1')
-      sessionStorage.removeItem('auth_session')
+    save({ token:res.token, user:res.user, perms:res.perms, must_change_password:!!res.must_change_password }, remember.value)
+    if(remember.value){
+      localStorage.setItem('remember_auth','1'); sessionStorage.removeItem('auth_session')
     } else {
-      // 会话模式：关闭浏览器即失效
-      localStorage.removeItem('remember_auth')
-      sessionStorage.setItem('auth_session', '1')
+      localStorage.removeItem('remember_auth'); sessionStorage.setItem('auth_session','1')
     }
-    
-    // 处理重定向
-    const redirect = res.must_change_password 
-      ? '/change-password' 
-      : (route.query.redirect || '/')
-    
-    // 登录成功动画和提示
-    ElMessage({
-      message: '登录成功，正在进入系统...',
-      type: 'success',
-      duration: 1500
-    })
-    
-    // 延迟跳转以显示成功消息
-    setTimeout(() => {
-      // 使用路由跳转到主页，并重新加载页面以确保菜单正确显示
-      window.location.href = redirect === '/' ? '/' : String(redirect)
-    }, 500)
-    
-  } catch (e) {
+    const redirect = res.must_change_password ? '/change-password' : (route.query.redirect || '/')
+    ElMessage({ message:'登录成功，正在进入系统...', type:'success', duration:1500 })
+    setTimeout(()=>{ window.location.href = redirect === '/' ? '/' : String(redirect) }, 500)
+  } catch(e){
     try {
       const data = JSON.parse(e.message)
-      ElMessage({
-        message: '登录失败：' + (data.error || ''),
-        type: 'error',
-        duration: 3000
-      })
+      ElMessage({ message:'登录失败：' + (data.error || ''), type:'error', duration:3000 })
     } catch {
-      ElMessage({
-        message: '登录失败：' + (e.message || '服务器连接错误'),
-        type: 'error',
-        duration: 3000
-      })
+      ElMessage({ message:'登录失败：' + (e.message || '服务器连接错误'), type:'error', duration:3000 })
     }
-  } finally {
-    submitting.value = false
-  }
+  } finally { submitting.value = false }
 }
 
-// 页面加载完成后自动聚焦用户名输入框
-onMounted(() => {
-  // 这里可以添加页面加载动画效果
-})
-// 背景视频逻辑
+onMounted(()=>{})
 const videoSrc = 'https://cdn.marmot-cloud.com/storage/intl_website/2025/07/03/EW8bvlo/globe.mp4'
 const bgVideo = ref(null)
 const enableVideo = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-function onVideoReady(){ /* 可加入首帧淡入动画 */ }
-function onVideoError(){ /* 失败时可记录或替换静态背景 */ }
+function onVideoReady(){}
+function onVideoError(){}
 </script>
 
 <style scoped>
-.video-bg { position: fixed; inset:0; overflow:hidden; z-index:0; }
-.bg-video { width:100%; height:100%; object-fit:cover; filter:brightness(0.55) saturate(1.1); }
-.video-overlay { position:absolute; inset:0; background:radial-gradient(circle at 30% 40%, rgba(255,255,255,0.15), rgba(0,0,0,0.65)); backdrop-filter: blur(2px); }
-.login-page { position:relative; z-index:1; }
-.login-container { position:relative; z-index:2; }
-.login-page { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-
-.login-container {
-  display: flex;
-  width: 100%;
-  max-width: 1200px;
-  min-height: 600px;
-  background: var(--el-bg-color);
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-}
-
-.left-panel {
-  flex: 1;
-  background: linear-gradient(135deg, var(--el-color-primary) 0%, var(--el-color-primary-dark-2) 100%);
-  color: white;
-  padding: 40px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  transition: background 0.8s ease;
-}
-.with-video .left-panel {
-  background: rgba(255,255,255,0.10);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  border-right: 1px solid rgba(255,255,255,0.25);
-  color: #fff;
-}
-
-.brand-container {
-  position: relative;
-  z-index: 2;
-}
-
-.brand-name {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.brand-tagline {
-  margin: 8px 0 0;
-  font-size: 16px;
-  opacity: 0.8;
-}
-
-.login-illustration {
-  width: 90%;
-  max-width: 500px;
-  margin: 30px auto;
-  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.15));
-  position: relative;
-  z-index: 2;
-}
-
-.features-list {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  position: relative;
-  z-index: 2;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-  font-size: 16px;
-  transition: transform 0.3s, background 0.3s;
-}
-
-.feature-item:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-3px);
-}
-
-.right-panel {
-  flex: 1;
-  padding: 40px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: var(--el-bg-color);
-  transition: background 0.8s ease;
-}
-.with-video .right-panel {
-  background: rgba(255,255,255,0.18);
-  backdrop-filter: blur(22px) saturate(1.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
-  border-left: 1px solid rgba(255,255,255,0.25);
-}
-
-.login-header {
-  margin-bottom: 30px;
-  text-align: center;
-}
-
-.welcome-text {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--el-text-color-primary);
-}
-
-.login-subtext {
-  font-size: 16px;
-  color: var(--el-text-color-secondary);
-  margin: 8px 0 0;
-}
-
-.login-form-card {
-  border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
-  background: rgba(255,255,255,0.55);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
-  transition: background 0.6s ease;
-}
-.with-video .login-form-card {
-  background: rgba(255,255,255,0.38);
-}
-.with-video .feature-item { background: rgba(255,255,255,0.20); }
-.with-video .feature-item:hover { background: rgba(255,255,255,0.32); }
-
-/* 动画 */
-.with-video .login-container { animation: fadeSlideIn 0.9s ease both; }
-@keyframes fadeSlideIn {
-  0% { opacity:0; transform: translateY(30px) scale(0.985); }
-  60% { opacity:1; transform: translateY(0) scale(1.0); }
-  100% { opacity:1; }
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.login-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 5px 0;
-}
-
-.login-button {
-  width: 100%;
-  height: 48px;
-  margin-top: 10px;
-  font-size: 16px;
-  letter-spacing: 1px;
-}
-
-.login-footer {
-  margin-top: 30px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-}
-
-.lang-selector {
-  margin-bottom: 10px;
-}
-
-.system-info {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-/* 响应式调整 */
-@media (max-width: 992px) {
-  .login-container {
-    flex-direction: column;
-    max-width: 500px;
-  }
-  
-  .left-panel {
-    padding: 30px;
-  }
-  
-  .login-illustration {
-    width: 70%;
-    margin: 20px auto;
-  }
-  
-  .features-list {
-    display: none;
-  }
-  
-  .right-panel {
-    padding: 30px;
-  }
-}
-
-@media (max-width: 576px) {
-  .login-page {
-    padding: 10px;
-  }
-  
-  .login-container {
-    box-shadow: none;
-    border-radius: 0;
-  }
-  
-  .left-panel {
-    padding: 20px;
-  }
-  
-  .right-panel {
-    padding: 20px;
-  }
-  
-  .login-form-card {
-    box-shadow: none !important;
-  }
-}
+.video-bg { position:fixed; inset:0; overflow:hidden; z-index:0; }
+.bg-video { width:100%; height:100%; object-fit:cover; filter:brightness(.52) saturate(1.15); }
+.video-overlay { position:absolute; inset:0; background:radial-gradient(circle at 35% 40%, rgba(255,255,255,0.15), rgba(0,0,0,0.70)); backdrop-filter: blur(2px); }
+.login-page { position:relative; z-index:1; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px 20px; }
+.login-container { position:relative; z-index:2; width:100%; max-width:480px; }
+.single-panel { position:relative; width:100%; padding:38px 36px 44px; border-radius:30px; background:rgba(255,255,255,0.065); backdrop-filter:blur(28px) saturate(1.9); -webkit-backdrop-filter:blur(28px) saturate(1.9); box-shadow:0 8px 42px -10px rgba(0,0,0,0.55), 0 2px 6px -2px rgba(0,0,0,0.4); overflow:hidden; }
+.single-panel:before { content:""; position:absolute; inset:0; background:linear-gradient(140deg,rgba(255,255,255,0.20),rgba(255,255,255,0.04) 60%,rgba(255,255,255,0.15)); pointer-events:none; }
+.single-panel:after { content:""; position:absolute; inset:0; border:1px solid rgba(255,255,255,0.25); border-radius:30px; pointer-events:none; mix-blend-mode:overlay; }
+.logo-mini { font-size:18px; font-weight:700; letter-spacing:.5px; color:#fff; opacity:.9; margin-bottom:6px; text-shadow:0 2px 6px rgba(0,0,0,0.4); }
+.login-header { text-align:center; margin:0 0 26px; }
+.welcome-text { font-size:30px; font-weight:700; margin:0; letter-spacing:1px; background:linear-gradient(90deg,#fff,#ddecff 50%,#ffffff); background-clip:text; -webkit-background-clip:text; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,0.45); }
+.login-subtext { font-size:14px; margin:12px 0 0; color:rgba(255,255,255,0.72); font-weight:500; letter-spacing:.5px; }
+.login-form { display:flex; flex-direction:column; gap:18px; }
+.login-form :deep(.el-form-item__label){ color:#fff; font-weight:600; letter-spacing:.5px; font-size:13px; }
+.login-form :deep(.el-input__wrapper){ background:rgba(255,255,255,0.22) !important; box-shadow:0 0 0 1px rgba(255,255,255,0.30) inset, 0 2px 4px -1px rgba(0,0,0,0.35); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border-radius:14px; transition:box-shadow .25s, background .25s; }
+.login-form :deep(.el-input__wrapper:hover){ box-shadow:0 0 0 1px rgba(255,255,255,0.55) inset, 0 2px 6px -1px rgba(0,0,0,0.45); }
+.login-form :deep(.is-focus.el-input__wrapper){ box-shadow:0 0 0 2px rgba(var(--el-color-primary-rgb),.85) inset, 0 3px 10px -2px rgba(var(--el-color-primary-rgb),.55); background:rgba(255,255,255,0.30) !important; }
+.login-form :deep(.el-input__inner){ color:#fff; font-weight:600; letter-spacing:.5px; }
+.login-form :deep(.el-input__prefix){ color:#fff; }
+.login-form :deep(.el-checkbox__label){ color:#fff; font-weight:500; }
+.login-options { display:flex; justify-content:space-between; align-items:center; margin:0; }
+.login-button { width:100%; height:48px; margin-top:4px; font-size:15px; font-weight:700; letter-spacing:1px; background:linear-gradient(135deg,var(--el-color-primary), var(--el-color-primary-dark-2)); border:none; box-shadow:0 6px 18px -4px rgba(0,0,0,0.55), 0 2px 6px -2px rgba(0,0,0,0.4); transition:transform .2s, filter .2s; }
+.login-button:hover { filter:brightness(1.08); }
+.login-button:active { transform:translateY(1px); }
+.login-footer { margin-top:30px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px; }
+.system-info { display:flex; flex-direction:column; gap:4px; color:rgba(255,255,255,0.55); font-size:11px; font-weight:500; letter-spacing:.5px; }
+.lang-selector { margin-bottom:4px; }
+.with-video .single-panel { animation: panelFadeIn .9s cubic-bezier(.22,.98,.34,1.02) both; }
+@keyframes panelFadeIn { 0% { opacity:0; transform:translateY(34px) scale(.97); } 55% { opacity:1; transform:translateY(0) scale(1.01);} 100% { opacity:1; transform:translateY(0) scale(1);} }
+@media (max-width:600px){ .single-panel { padding:34px 28px 40px; border-radius:26px; } .welcome-text{ font-size:26px; } }
+@media (max-width:420px){ .single-panel { padding:30px 22px 36px; } .welcome-text{ font-size:24px; } }
 </style>
