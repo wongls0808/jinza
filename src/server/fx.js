@@ -1153,8 +1153,10 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const items = await query(`
     select i.*, b.zh as bank_name
     from fx_payment_items i
+    join fx_payments p2 on p2.id = i.payment_id
     left join receiving_accounts ra on ra.bank_account = i.bank_account
-    left join banks b on b.id = ra.bank_id
+    left join customer_receiving_accounts cra on cra.bank_account = i.bank_account and cra.customer_id = p2.customer_id
+    left join banks b on b.id = coalesce(ra.bank_id, cra.bank_id)
     where i.payment_id=$1 order by i.id asc
   `, [id])
 
@@ -1247,36 +1249,28 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const h = head.rows[0]
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
 
-  // 金额区块
-  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
-  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('amount')}:`, left, doc.y + 6)
+  // 金额区块（紧凑）
+  doc.rect(left-4, doc.y, contentWidth+8, 20).fill('#7a0a2a')
+  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('amount')}:`, left+6, doc.y + 4)
   doc.fillColor('black')
-  doc.rect(left-4, doc.y + 20, contentWidth+8, 44).stroke('#7a0a2a')
-  doc.font(fontBold).fontSize(22).text(`${(lang==='zh'?'CNY：':'CNY: ')}${money(total)}`, left+8, doc.y + 26)
-  doc.moveDown(3.5)
+  doc.rect(left-4, doc.y + 18, contentWidth+8, 34).stroke('#7a0a2a')
+  doc.font(fontBold).fontSize(20).text(`${(lang==='zh'?'CNY：':'CNY: ')}${money(total)}`, left+10, doc.y + 22)
+  doc.moveDown(3)
 
-  // 收款人信息
-  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
-  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('payee')}:`, left, doc.y + 6)
-  doc.fillColor('black')
-  doc.rect(left-4, doc.y + 20, contentWidth+8, 50).stroke('#7a0a2a')
+  // 收款人与交易信息（合并为一组，去色带，紧凑排列）
   const first = items.rows[0] || {}
-  doc.font(font).fontSize(11)
-  doc.text(`${t('name')}：${first.account_name||''}`, left+8, doc.y + 26)
-  doc.text(`${t('account')}：${first.bank_account||''}`, left+8, doc.y + 42)
-  doc.text(`${t('bank')}：${first.bank_name||''}`, left+8, doc.y + 58)
-  doc.moveDown(4.4)
-
-  // 交易信息
-  doc.rect(left-4, doc.y, contentWidth+8, 24).fill('#7a0a2a')
-  doc.fillColor('white').font(fontBold).fontSize(10).text(`${t('info')}:`, left, doc.y + 6)
-  doc.fillColor('black')
-  doc.rect(left-4, doc.y + 20, contentWidth+8, 60).stroke('#7a0a2a')
-  doc.font(font).fontSize(11)
   const statusText = h.status==='completed' ? t('completed') : t('pending')
-  doc.text(`${t('status')}：${statusText}`, left+8, doc.y + 26)
-  doc.text(`${t('billNo')}：${h.bill_no || `Payment-${h.id}`}`, left+8, doc.y + 42)
-  doc.text(`${t('date')}：${toDate(h.pay_date)}`, left+8, doc.y + 58)
+  doc.font(fontBold).fontSize(10).fillColor('#7a0a2a').text(`${t('payee')}`, left, doc.y)
+  doc.fillColor('black').font(font).fontSize(10)
+  doc.text(`${t('name')}：${first.account_name||''}`)
+  doc.text(`${t('account')}：${first.bank_account||''}`)
+  doc.text(`${t('bank')}：${first.bank_name||''}`)
+  doc.moveDown(0.4)
+  doc.font(fontBold).fontSize(10).fillColor('#7a0a2a').text(`${t('info')}`, left, doc.y)
+  doc.fillColor('black').font(font).fontSize(10)
+  doc.text(`${t('status')}：${statusText}`)
+  doc.text(`${t('billNo')}：${h.bill_no || `Payment-${h.id}`}`)
+  doc.text(`${t('date')}：${toDate(h.pay_date)}`)
 
   doc.end()
 })
