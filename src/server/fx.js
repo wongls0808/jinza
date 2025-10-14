@@ -566,9 +566,10 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     const __dirname = path.dirname(__filename)
     const publicBanksDir = path.join(__dirname, '..', '..', 'public', 'banks')
     const uploadsDir = path.join(__dirname, '..', '..', 'uploads')
-    // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.svg
-    const logoFiles = []
-    const seen = new Set()
+  // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.(svg|png|jpg)
+  // 若仍不可用，则添加占位符（以银行代码绘制小方框），保证布局完整
+  const logos = [] // { type:'image', path } | { type:'placeholder', code }
+  const seen = new Set() // 去重：image:<absPath> / placeholder:<CODE>
     const aliasMap = {
       // Malaysia common aliases
       pbb: 'public', public: 'public',
@@ -587,19 +588,45 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
     }
     for (const r of items.rows) {
       let p = ''
-      const code = String(r.bank_code||'').trim().toLowerCase()
+      const codeRaw = String(r.bank_code||'').trim()
+      const code = codeRaw.toLowerCase()
       const url = String(r.bank_logo_url||'').trim()
-      if (url.startsWith('/banks/')) {
-        p = path.join(publicBanksDir, url.replace('/banks/',''))
-      } else if (url.startsWith('/uploads/')) {
-        p = path.join(uploadsDir, url.replace('/uploads/',''))
-      } else if (code) {
-        const mapped = aliasMap[code] || code
-        p = path.join(publicBanksDir, `${mapped}.svg`)
+      // 解析 DB 的 logo_url
+      if (url) {
+        if (url.startsWith('/banks/')) {
+          p = path.join(publicBanksDir, url.replace('/banks/',''))
+        } else if (url.startsWith('/uploads/')) {
+          p = path.join(uploadsDir, url.replace('/uploads/',''))
+        } else if (/^https?:\/\//i.test(url)) {
+          // 不请求远程资源，保持安全；改用占位符
+          p = ''
+        } else {
+          // 视为相对文件名：优先 public/banks，其次 uploads
+          const tryBanks = path.join(publicBanksDir, url)
+          const tryUploads = path.join(uploadsDir, url)
+          if (fs.existsSync(tryBanks)) p = tryBanks
+          else if (fs.existsSync(tryUploads)) p = tryUploads
+        }
       }
-      if (p && fs.existsSync(p) && !seen.has(p)) { seen.add(p); logoFiles.push(p) }
+      // 回退：按 bank_code 映射静态资源（尝试 svg/png/jpg）
+      if (!p && code) {
+        const mapped = aliasMap[code] || code
+        const svgPath = path.join(publicBanksDir, `${mapped}.svg`)
+        const pngPath = path.join(publicBanksDir, `${mapped}.png`)
+        const jpgPath = path.join(publicBanksDir, `${mapped}.jpg`)
+        if (fs.existsSync(svgPath)) p = svgPath
+        else if (fs.existsSync(pngPath)) p = pngPath
+        else if (fs.existsSync(jpgPath)) p = jpgPath
+      }
+      if (p && fs.existsSync(p)) {
+        const key = `image:${p}`
+        if (!seen.has(key)) { seen.add(key); logos.push({ type: 'image', path: p }) }
+      } else if (codeRaw) {
+        const key = `placeholder:${codeRaw.toUpperCase()}`
+        if (!seen.has(key)) { seen.add(key); logos.push({ type: 'placeholder', code: codeRaw.toUpperCase() }) }
+      }
     }
-    if (logoFiles.length) {
+    if (logos.length) {
       const gap = 10
       const iconH = 16
       const iconW = 32
@@ -608,7 +635,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       const pRight = doc.page.width - doc.page.margins.right
       const pWidth = pRight - pLeft
       const maxPerRow = Math.max(1, Math.floor((pWidth + gap) / (iconW + gap)))
-      const rows = Math.ceil(logoFiles.length / maxPerRow)
+  const rows = Math.ceil(logos.length / maxPerRow)
       const labelH = 12
       const footH = 4 + 1 + 6 + labelH + rows * iconH + (rows > 1 ? (rows-1)*8 : 0)
       const yBase = doc.page.height - doc.page.margins.bottom - footH
@@ -631,16 +658,31 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
       let logoX = bLeft
       let logoY = baseY + 6 + labelH
       doc.font(hasCJK ? 'CJK' : 'Helvetica')
-      for (const file of logoFiles) {
-        const lower = file.toLowerCase()
+      for (const it of logos) {
         try {
-          if (lower.endsWith('.svg')) {
-            const svg = fs.readFileSync(file, 'utf-8')
-            SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
-          } else if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-            doc.image(file, logoX, logoY, { width: iconW, height: iconH })
-          } else {
-            continue
+          if (it.type === 'image') {
+            const file = it.path
+            const lower = file.toLowerCase()
+            if (lower.endsWith('.svg')) {
+              const svg = fs.readFileSync(file, 'utf-8')
+              SVGtoPDF(doc, svg, logoX, logoY, { assumePt: true, width: iconW, height: iconH })
+            } else {
+              doc.image(file, logoX, logoY, { width: iconW, height: iconH })
+            }
+          } else if (it.type === 'placeholder') {
+            // 占位绘制：灰色边框方框 + 银行简称
+            doc.save()
+            doc.roundedRect(logoX+0.5, logoY+0.5, iconW-1, iconH-1, 2).stroke('#cccccc')
+            const txt = (it.code || '').slice(0,4)
+            const fontName = hasCJKBold ? 'CJK-Bold' : hasCJK ? 'CJK' : 'Helvetica-Bold'
+            doc.font(fontName).fontSize(7)
+            const w = doc.widthOfString(txt)
+            const h = doc.currentLineHeight()
+            const tx = logoX + (iconW - w) / 2
+            const ty = logoY + (iconH - h) / 2 - 1
+            doc.fillColor('#666666').text(txt, tx, ty, { width: w, height: h })
+            doc.fillColor('black')
+            doc.restore()
           }
         } catch {}
         colIdx++
