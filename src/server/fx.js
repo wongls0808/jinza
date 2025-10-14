@@ -1,4 +1,5 @@
 import express from 'express'
+import PDFDocument from 'pdfkit'
 import { authMiddleware, requirePerm } from './auth.js'
 import { query } from './db.js'
 
@@ -263,6 +264,162 @@ fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('view_
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', `attachment; filename=Settlement-${id}.csv`)
   res.send('\uFEFF' + csv)
+})
+
+// 结汇单：导出 PDF（账单预览）
+fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  // 复用详情查询逻辑
+  const head = await query(
+    `with tx_agg as (
+       select 
+         t.match_target_id as customer_id,
+         sum(case when upper(a.currency_code)='MYR' then coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0) else 0 end) as net_myr
+       from transactions t
+       left join receiving_accounts a on a.bank_account = t.account_number
+       where coalesce(t.matched,false) = true and t.match_type = 'customer'
+       group by t.match_target_id
+     )
+     select 
+       s.*,
+       c.abbr as customer_abbr,
+       coalesce(c.opening_myr,0) as opening_myr,
+       coalesce(tx.net_myr,0) as net_myr,
+       (
+         select sum(s2.total_base) 
+         from fx_settlements s2 
+         where s2.customer_id = s.customer_id 
+           and (s2.settle_date < s.settle_date or (s2.settle_date = s.settle_date and s2.id < s.id))
+       ) as prev_settle_base,
+       coalesce(u.display_name, u.username) as created_by_name
+     from fx_settlements s
+     left join customers c on c.id = s.customer_id
+     left join tx_agg tx on tx.customer_id = s.customer_id
+     left join users u on u.id = s.created_by
+     where s.id = $1`,
+    [id]
+  )
+  if (!head.rows.length) return res.status(404).json({ error: 'not found' })
+  const h = head.rows[0]
+  const pre_balance_myr = Number(h.opening_myr || 0) + Number(h.net_myr || 0) - Number(h.prev_settle_base || 0)
+  const items = await query(
+    `select 
+       i.id,
+       i.transaction_id,
+       i.account_number,
+       i.trn_date,
+       i.amount_base,
+       case when coalesce(i.amount_settled,0) = 0 then (i.amount_base * s.rate) else i.amount_settled end as amount_settled_calc,
+       t.cheque_ref_no as ref_no,
+       a.account_name,
+       b.zh as bank_name,
+       b.en as bank_name_en
+     from fx_settlement_items i
+     left join fx_settlements s on s.id = i.settlement_id
+     left join transactions t on t.id = i.transaction_id
+     left join receiving_accounts a on a.bank_account = i.account_number
+     left join banks b on b.id = a.bank_id
+     where i.settlement_id = $1
+     order by i.trn_date asc nulls last, i.id asc`,
+    [id]
+  )
+
+  // PDF 输出
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename=Settlement-${id}.pdf`)
+  const doc = new PDFDocument({ size: 'A4', margin: 36 })
+  doc.pipe(res)
+
+  const title = 'Settlement Bill'
+  doc.fontSize(16).text(title, { align: 'center' })
+  doc.moveDown(0.5)
+  const toStr = (v) => v==null? '' : String(v)
+  const toDate = (v) => {
+    try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) }
+  }
+  const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
+  const money0 = (n) => Math.round(Number(n||0)).toLocaleString()
+
+  const headerPairs = [
+    ['Bill No', toStr(h.bill_no)],
+    ['Settle Date', toDate(h.settle_date)],
+    ['Rate', Number(h.rate||0).toFixed(4)],
+    ['Customer Abbr', toStr(h.customer_abbr||'')],
+    ['Customer Name', toStr(h.customer_name||'')],
+    ['Customer Tax(%)', Number(h.customer_tax_rate||0).toFixed(2)+'%'],
+    ['Pre-Settle Balance', money(pre_balance_myr)],
+    ['Selected Base', money(h.total_base)],
+    ['Selected Converted', money0(h.total_settled)],
+    ['Created By', toStr(h.created_by_name||'')],
+    ['Created At', toDate(h.created_at)]
+  ]
+  doc.fontSize(10)
+  const colW = 260
+  for (let i=0;i<headerPairs.length;i+=2) {
+    const [k1,v1] = headerPairs[i]
+    const [k2,v2] = headerPairs[i+1] || ['','']
+    const y = doc.y
+    doc.text(`${k1}: ${v1}`, { width: colW })
+    doc.text(`${k2}: ${v2}`, 300, y, { width: colW })
+  }
+  doc.moveDown(0.5)
+  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+  doc.moveDown(0.5)
+
+  // 表头
+  const tableX = 36
+  const cols = [
+    { key: '#', w: 24 },
+    { key: 'Ref No', w: 70 },
+    { key: 'Date', w: 70 },
+    { key: 'Bank(EN)', w: 100 },
+    { key: 'Account Name', w: 140 },
+    { key: 'Account No', w: 90 },
+    { key: 'Base', w: 70, align: 'right' },
+    { key: 'Converted', w: 70, align: 'right' }
+  ]
+  let x = tableX
+  doc.fontSize(9).font('Helvetica-Bold')
+  cols.forEach(c => { doc.text(c.key, x, doc.y, { width: c.w, align: c.align||'left' }); x += c.w })
+  doc.moveDown(0.2)
+  doc.font('Helvetica')
+  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+
+  // 行
+  let idx = 1
+  let sumBase = 0, sumSettle = 0
+  items.rows.forEach(r => {
+    const row = [
+      idx++,
+      toStr(r.ref_no||''),
+      toDate(r.trn_date),
+      toStr(r.bank_name_en||''),
+      toStr(r.account_name||''),
+      toStr(r.account_number||''),
+      money(r.amount_base||0),
+      money0(r.amount_settled_calc||0)
+    ]
+    x = tableX
+    cols.forEach((c,i) => {
+      const align = c.align||'left'
+      doc.text(String(row[i]??''), x, doc.y, { width: c.w, align })
+      x += c.w
+    })
+    sumBase += Number(r.amount_base||0)
+    sumSettle += Number(r.amount_settled_calc||0)
+    doc.moveDown(0.2)
+  })
+  doc.moveTo(36, doc.y).lineTo(559, doc.y).stroke()
+  doc.moveDown(0.2)
+  // 合计
+  x = tableX + cols.slice(0,6).reduce((s,c)=>s+c.w,0)
+  doc.text(money(sumBase), x, doc.y, { width: cols[6].w, align: 'right' })
+  x += cols[6].w
+  doc.text(money0(sumSettle), x, doc.y, { width: cols[7].w, align: 'right' })
+
+  doc.end()
 })
 
 // 创建付款单

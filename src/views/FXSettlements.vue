@@ -81,7 +81,7 @@
           <div class="row">
             <div class="cell"><span class="k">{{ t('common.createdBy') }}</span><span class="v">{{ detail.created_by_name }}</span></div>
             <div class="cell"><span class="k">{{ t('common.createdAt') }}</span><span class="v">{{ fmtDate(detail.created_at) }}</span></div>
-            <div class="cell actions"><el-button type="primary" @click="downloadCsv(detail)">CSV</el-button></div>
+            <div class="cell actions"><el-button type="primary" @click="downloadPdf(detail)">PDF</el-button></div>
           </div>
         </div>
 
@@ -91,7 +91,7 @@
           <el-table-column prop="trn_date" :label="t('transactions.transactionDate')" width="130">
             <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
           </el-table-column>
-          <el-table-column prop="bank_name" :label="t('banks.title')" width="140" />
+          <el-table-column prop="bank_name_en" :label="t('banks.title')" width="140" />
           <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" width="200" />
           <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" />
           <el-table-column prop="amount_base" :label="t('fx.baseAmount')" width="140" align="right">
@@ -181,6 +181,28 @@ async function downloadCsv(row){
   a.download = `Settlement-${row.id}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+async function downloadPdf(row){
+  try {
+    const token = (function(){
+      try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+      try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+      return null
+    })()
+    const headers = { }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`${location.origin}/api/fx/settlements/${row.id}/pdf`, { headers })
+    if (!res.ok) throw new Error(await res.text())
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Settlement-${row.id}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch(e) {
+    ElMessage.error(e?.message || 'Failed to export PDF')
+  }
 }
 async function removeBill(row){
   try {
