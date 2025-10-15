@@ -238,6 +238,7 @@ export const api = {
   approve: (id, data) => request(`/fx/payments/${id}/approve`, { method: 'POST', body: JSON.stringify(data||{}) }),
   unapprove: (id) => request(`/fx/payments/${id}/unapprove`, { method: 'POST' }),
   audits: (id) => request(`/fx/payments/${id}/audits`),
+  batchApprove: (ids, platform_id) => request(`/fx/payments/batch-approve`, { method: 'POST', body: JSON.stringify({ ids, platform_id }) }),
       exportPdf: async (id) => {
         const token = (function(){
           try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}

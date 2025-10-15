@@ -8,7 +8,15 @@
     <div class="todo" style="margin-top:16px;">
       <el-card>
         <div class="todo-title">待办事项</div>
-        <el-table :data="todos" size="small" border>
+        <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
+          <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:220px" filterable>
+            <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent? `（手续费 ${p.fee_percent}%）` : '')" />
+          </el-select>
+          <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
+          <span v-if="batch.platform_id" style="color: var(--el-text-color-secondary); font-size:12px;">将按所选平台的手续费比例扣减。</span>
+        </div>
+        <el-table :data="todos" size="small" border @selection-change="(rows)=> multipleSelection = rows">
+          <el-table-column type="selection" width="46" />
           <el-table-column label="#" width="60">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
@@ -50,7 +58,7 @@
       </div>
     </el-drawer>
 
-    <!-- 审核弹窗：选择平台与手续费% -->
+    <!-- 审核弹窗：选择平台（手续费按平台配置） -->
     <el-dialog v-model="approveDialog.visible" title="审核付款单" width="420px">
       <el-form label-width="100px">
         <el-form-item label="平台商">
@@ -58,11 +66,8 @@
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
           </el-select>
         </el-form-item>
-        <el-form-item label="手续费%">
-          <el-input v-model.number="approveDialog.fee_percent" type="number" placeholder="0" />
-        </el-form-item>
         <el-alert v-if="approveDialog.platform_id" type="info" :closable="false" show-icon>
-          审核后将按明细币种分别从该平台余额扣减 金额+手续费。
+          将按平台商配置的手续费比例进行扣减。
         </el-alert>
       </el-form>
       <template #footer>
@@ -137,13 +142,14 @@ async function approve(row){
 
 async function loadPlatforms(){ const res = await api.buyfx.listPlatforms(); platforms.value = res.items || [] }
 
-const approveDialog = ref({ visible: false, loading: false, id: null, platform_id: null, fee_percent: 0 })
-function openApprove(row){ approveDialog.value = { visible: true, loading: false, id: row.id, platform_id: null, fee_percent: 0 } }
+const approveDialog = ref({ visible: false, loading: false, id: null, platform_id: null })
+function openApprove(row){ approveDialog.value = { visible: true, loading: false, id: row.id, platform_id: null } }
 async function confirmApprove(){
-  const { id, platform_id, fee_percent } = approveDialog.value
+  const { id, platform_id } = approveDialog.value
+  if (!platform_id) return
   approveDialog.value.loading = true
   try {
-    await api.fx.payments.approve(id, { platform_id, fee_percent })
+    await api.fx.payments.approve(id, { platform_id })
     approveDialog.value.visible = false
     todoDrawer.value = false
     todoDetail.value = null
@@ -162,6 +168,18 @@ async function openAudits(row){
   auditDrawer.value.visible = true
   const list = await api.fx.payments.audits(row.id)
   auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
+}
+
+// 批量审批
+let multipleSelection = []
+const batch = ref({ platform_id: null })
+async function doBatchApprove(){
+  if (!batch.value.platform_id || !multipleSelection.length) return
+  const ids = multipleSelection.map(r => r.id)
+  await api.fx.payments.batchApprove(ids, batch.value.platform_id)
+  multipleSelection = []
+  batch.value.platform_id = null
+  await loadTodos()
 }
 </script>
 

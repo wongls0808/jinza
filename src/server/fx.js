@@ -1720,10 +1720,10 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
-  const { platform_id, fee_percent } = req.body || {}
+  const { platform_id } = req.body || {}
   const pid = Number(platform_id)
-  const feePct = Math.max(0, Number(fee_percent||0))
-  if (!pid && feePct > 0) return res.status(400).json({ error: 'platform required when fee set' })
+  // 手续费采用平台商后台设置
+  let feePct = 0
   const uid = req.user?.id || null
 
   try {
@@ -1739,14 +1739,15 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
     // 没有明细视为错误
     if (!items.rowCount) { await query('rollback'); return res.status(400).json({ error: 'empty items' }) }
 
-    // 如指定平台，则校验并扣减余额
-  let feeTotal = 0
-  const deltas = {}
+    // 如指定平台，则按平台设置的手续费校验并扣减余额
+    let feeTotal = 0
+    const deltas = {}
     if (pid) {
-      // 锁平台行
-      const pr = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [pid])
+      // 锁平台行并获取手续费配置
+      const pr = await query(`select id, balance_usd, balance_myr, balance_cny, fee_percent from fx_platforms where id=$1 for update`, [pid])
       if (!pr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
       const p = pr.rows[0]
+      feePct = Math.max(0, Number(p.fee_percent||0))
 
       // 逐币种计算应扣余额与手续费
       for (const r of items.rows) {
@@ -1787,6 +1788,95 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
     await query('rollback')
     console.error('approve payment failed', e)
     return res.status(500).json({ error: 'approve failed', detail: e.message })
+  }
+})
+
+// 付款单：批量审批（原子）
+fxRouter.post('/payments/batch-approve', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const { ids, platform_id } = req.body || {}
+  const list = Array.isArray(ids) ? ids.map(Number).filter(n => n > 0) : []
+  const pid = Number(platform_id)
+  if (!list.length) return res.status(400).json({ error: 'ids required' })
+  if (!pid) return res.status(400).json({ error: 'platform required' })
+  const uid = req.user?.id || null
+
+  try {
+    await query('begin')
+    // 锁平台，获取余额与手续费
+    const pr = await query(`select id, balance_usd, balance_myr, balance_cny, fee_percent from fx_platforms where id=$1 for update`, [pid])
+    if (!pr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+    const p = pr.rows[0]
+    const feePct = Math.max(0, Number(p.fee_percent||0))
+
+    // 准备数据结构
+    const perPayment = new Map() // id -> { items: [{currency, amt}], deltas, feeTotal }
+    const grandTotals = { USD: 0, MYR: 0, CNY: 0 }
+
+    // 锁并校验每张单据，汇总数据
+    for (const id of list) {
+      const h = await query(`select * from fx_payments where id=$1 for update`, [id])
+      if (!h.rowCount) { await query('rollback'); return res.status(404).json({ error: `payment ${id} not found` }) }
+      const head = h.rows[0]
+      if (String(head.status) !== 'pending') { await query('rollback'); return res.status(400).json({ error: `payment ${id} not pending` }) }
+
+      const items = await query(`select upper(currency_code) as currency, sum(amount) as total from fx_payment_items where payment_id=$1 group by upper(currency_code)`, [id])
+      if (!items.rowCount) { await query('rollback'); return res.status(400).json({ error: `payment ${id} has no items` }) }
+
+      const deltas = {}
+      let feeTotal = 0
+      for (const r of items.rows) {
+        const cur = String(r.currency||'').toUpperCase()
+        const amt = Math.round(Number(r.total||0) * 100) / 100
+        if (!(amt > 0)) continue
+        const fee = Math.round((amt * feePct / 100) * 100) / 100
+        const need = Math.round((amt + fee) * 100) / 100
+        deltas[cur] = { amount: amt, fee, total: need }
+        feeTotal += fee
+        if (cur === 'USD' || cur === 'MYR' || cur === 'CNY') grandTotals[cur] = Math.round((grandTotals[cur] + need) * 100) / 100
+        else { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
+      }
+      perPayment.set(id, { deltas, feeTotal })
+    }
+
+    // 校验平台余额是否充足（按总量）
+    const before = { USD: Number(p.balance_usd||0), MYR: Number(p.balance_myr||0), CNY: Number(p.balance_cny||0) }
+    for (const cur of ['USD','MYR','CNY']) {
+      const need = Number(grandTotals[cur]||0)
+      if (need > 0 && before[cur] < need) {
+        await query('rollback')
+        return res.status(400).json({ error: 'insufficient platform balance', detail: { currency: cur, required: need, current: before[cur] } })
+      }
+    }
+
+    // 扣减平台余额（一次性）
+    const after = {
+      USD: Math.round((before.USD - grandTotals.USD) * 100) / 100,
+      MYR: Math.round((before.MYR - grandTotals.MYR) * 100) / 100,
+      CNY: Math.round((before.CNY - grandTotals.CNY) * 100) / 100
+    }
+    await query(`update fx_platforms set balance_usd=$1, balance_myr=$2, balance_cny=$3 where id=$4`, [after.USD, after.MYR, after.CNY, pid])
+
+    // 更新每张单据状态并写审计
+    for (const id of list) {
+      const { deltas, feeTotal } = perPayment.get(id)
+      await query(`
+        update fx_payments
+           set status='completed', approved_by=$1, approved_at=now(),
+               platform_id=$2, platform_fee_percent=$3, platform_fee_amount=$4
+         where id=$5
+      `, [uid, pid, feePct, Math.round(feeTotal*100)/100, id])
+
+      await query(`insert into fx_payment_audits(payment_id, action, platform_id, fee_percent, fee_amount, deltas, acted_by) values($1,$2,$3,$4,$5,$6,$7)`,
+        [id, 'approve', pid, feePct, Math.round(feeTotal*100)/100, JSON.stringify(deltas), uid])
+    }
+
+    await query('commit')
+    return res.json({ ok: true, count: list.length })
+  } catch (e) {
+    await query('rollback')
+    console.error('batch approve failed', e)
+    return res.status(500).json({ error: 'batch approve failed', detail: e.message })
   }
 })
 
