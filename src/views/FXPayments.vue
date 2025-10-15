@@ -318,17 +318,17 @@ function onLogoError(evt, row){
 }
 async function viewPdf(row){
   const id = row.payment_id || row.id
-  // 若未完成，仍可查看详情抽屉；完成则直接打开在线预览（带水印，禁止下载）
   if (row.status !== 'completed') {
     return openDetail(row)
   }
   try {
     const lang = (navigator.language || '').toLowerCase().includes('zh') ? 'zh' : 'en'
-    const url = `${location.origin}/api/fx/payments/${id}/pdf?preview=1&lang=${lang}`
-    // 使用内联预览（服务端 Content-Disposition inline），不触发下载；新标签打开
+    const { blob } = await api.fx.payments.exportPdfPreview(id, { lang })
+    const url = URL.createObjectURL(blob)
     window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
   } catch (e) {
-    try { await openDetail(row) } catch {}
+    ElMessage.error(e?.message || 'Preview failed')
   }
 }
 </script>
