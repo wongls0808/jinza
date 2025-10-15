@@ -106,11 +106,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const platforms = ref([])
 const rate = ref(null)
@@ -161,9 +163,8 @@ function percent(v){
 }
 
 function goBuyOrderHistory(){
-  // 跳转到“购汇单历史”，目前复用 FX 管理页的支付/结汇历史或单独新页（占位）
-  // 如已有路由可替换为具体路径
-  try { window.location.hash = '#/fx/buy' } catch {}
+  // 跳转到“购汇单历史”页面
+  try { router.push({ name: 'fx-buy-history' }) } catch {}
 }
 
 const platformDialog = ref({ visible:false, loading:false, model: { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 } })

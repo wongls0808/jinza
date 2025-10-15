@@ -17,6 +17,7 @@ const FXManagement = () => import('@/views/FXManagement.vue')
 const FXSettlements = () => import('@/views/FXSettlements.vue')
 const FXPayments = () => import('@/views/FXPayments.vue')
 const BuyFX = () => import('@/views/BuyFX.vue')
+const BuyFXHistory = () => import('@/views/BuyFXHistory.vue')
 
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -32,6 +33,7 @@ export const routes = [
   { path: '/fx/settlements', name: 'fx-settlements', component: FXSettlements, meta: { perm: 'view_fx' } },
   { path: '/fx/payments', name: 'fx-payments', component: FXPayments, meta: { perm: 'view_fx' } },
   { path: '/fx/buy', name: 'fx-buy', component: BuyFX, meta: { perm: 'view_fx' } },
+  { path: '/fx/buy/history', name: 'fx-buy-history', component: BuyFXHistory, meta: { perm: 'view_fx' } },
   { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
