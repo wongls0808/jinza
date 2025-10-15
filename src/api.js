@@ -246,7 +246,20 @@ export const api = {
         if (token) headers['Authorization'] = `Bearer ${token}`
         const res = await fetch(`${API_BASE}/fx/payments/${id}/pdf`, { headers })
         if (!res.ok) throw new Error(await res.text())
-        return res.blob()
+        const blob = await res.blob()
+        // 从 Content-Disposition 获取服务端文件名（UTF-8）
+        const cd = res.headers.get('Content-Disposition') || ''
+        let serverFileName = null
+        // 解析 filename*=UTF-8''xxx 或 filename="xxx"
+        try {
+          const mUtf8 = cd.match(/filename\*=UTF-8''([^;]+)/i)
+          if (mUtf8) serverFileName = decodeURIComponent(mUtf8[1])
+          else {
+            const m = cd.match(/filename="?([^";]+)"?/i)
+            if (m) serverFileName = m[1]
+          }
+        } catch {}
+        return { blob, filename: serverFileName }
       },
       // receipt unified to exportPdf
       create: (data) => request('/fx/payments', { method: 'POST', body: JSON.stringify(data) })

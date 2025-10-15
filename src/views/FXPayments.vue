@@ -246,11 +246,26 @@ async function approve(row){
 
 async function downloadPdf(row){
   const id = row.payment_id || row.id
-  const blob = await api.fx.payments.exportPdf(id)
+  const { blob, filename } = await api.fx.payments.exportPdf(id)
+  const clientName = filename || `${row.bill_no || ('Payment-' + id)}.pdf`
+  // 优先尝试文件保存对话框（受浏览器支持与跨域策略影响）
+  try {
+    if ('showSaveFilePicker' in window) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: clientName,
+        types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return
+    }
+  } catch {}
+  // 回退：使用 a.download 触发浏览器保存
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${row.bill_no || ('Payment-' + id)}.pdf`
+  a.download = clientName
   a.click()
   URL.revokeObjectURL(url)
 }

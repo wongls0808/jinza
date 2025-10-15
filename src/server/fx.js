@@ -1207,10 +1207,10 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   res.setHeader('Content-Type', 'application/pdf')
   // 文件名：付款日期 + 账户名 + 金额 + 银行代码
   const h0 = head.rows[0]
-  const payDate = (() => { try { const v = h0.pay_date; if (typeof v === 'string') return v.slice(0,10); if (v && v.toISOString) return v.toISOString().slice(0,10); return String(v||'').slice(0,10) } catch { return '' } })()
+  const payDate = (() => { try { const v = h0.pay_date; let s=''; if (typeof v === 'string') s = v.slice(0,10); else if (v && v.toISOString) s = v.toISOString().slice(0,10); else s = String(v||'').slice(0,10); return s.replace(/-/g,'') } catch { return '' } })()
   const acctName0 = (items.rows[0]?.account_name) || h0.customer_name || 'Account'
   const totalAmt0 = items.rows.reduce((s,r)=> s + Number(r.amount||0), 0)
-  const amountStr = Number(totalAmt0||0).toFixed(2)
+  const amountStr = String(Math.round(Number(totalAmt0||0)))
   const bankRaw0 = (items.rows[0]?.bank_name || '')
   const bankLower0 = String(bankRaw0).toLowerCase()
   const bankMap0 = [
@@ -1228,7 +1228,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const bankHit0 = bankMap0.find(x => x.m.some(k => bankLower0.includes(k)))
   const bankCode0 = bankHit0 ? bankHit0.code : 'OTHER'
   const sanitize = (s) => String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
-  const baseName = `${payDate}_${sanitize(acctName0)}_${amountStr}_${bankCode0}`
+  const baseName = `${payDate}+${sanitize(acctName0)}+${amountStr}+${bankCode0}`
   const asciiName = `${baseName}.pdf`.replace(/[^\x20-\x7E]/g, '_')
   const utf8Name = encodeURIComponent(`${baseName}.pdf`)
   res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
