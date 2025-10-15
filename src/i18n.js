@@ -97,7 +97,8 @@ const messages = {
       fee: '手续费',
       amountTo: '到账金额',
       converted: '互换成功',
-      convertFailed: '互换失败'
+      convertFailed: '互换失败',
+      viewOrders: '查看购汇历史'
     },
     customers: {
       title: '客户管理',
@@ -476,7 +477,8 @@ const messages = {
       fee: 'Fee',
       amountTo: 'To Amount',
       converted: 'Converted',
-      convertFailed: 'Convert failed'
+      convertFailed: 'Convert failed',
+      viewOrders: 'View Buy Orders'
     },
     customers: {
       title: 'Customers',

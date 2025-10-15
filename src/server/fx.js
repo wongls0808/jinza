@@ -248,9 +248,10 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
   const pr = await query('select id, fee_percent, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1', [id])
   if (!pr.rowCount) return res.status(404).json({ error: 'platform not found' })
   const p = pr.rows[0]
-  const feePercent = Number(p.fee_percent||0)
-  const fee = Math.round((amt * feePercent / 100) * 1e6) / 1e6
-  const debitTotal = amt + fee
+  // 根据最新需求：购汇不计手续费
+  const feePercent = 0
+  const fee = 0
+  const debitTotal = amt
   const creditTo = Math.round((amt * r) * 1e6) / 1e6
   const srcField = from === 'USD' ? 'balance_usd' : (from === 'MYR' ? 'balance_myr' : 'balance_cny')
   const dstField = to === 'USD' ? 'balance_usd' : (to === 'MYR' ? 'balance_myr' : 'balance_cny')
@@ -272,7 +273,7 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
     )
     const updated = await query('select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1', [id])
     await query('commit')
-    res.json({ ok: true, balances: updated.rows[0], fee_amount: fee, amount_to: creditTo })
+  res.json({ ok: true, balances: updated.rows[0], fee_amount: fee, amount_to: creditTo })
   } catch (e) {
     await query('rollback')
     console.error('platform convert failed', e)

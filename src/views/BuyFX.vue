@@ -77,16 +77,9 @@
           <div class="convert-hint" v-if="convertSummary">
             <el-alert type="info" :title="convertSummary" show-icon :closable="false" />
           </div>
-          <el-table :data="orders" size="small" border height="38vh" style="margin-top:10px;">
-            <el-table-column type="index" label="#" width="60" />
-            <el-table-column prop="order_no" :label="t('buyfx.orderNo')" width="200" />
-            <el-table-column prop="platform_name" :label="t('buyfx.platform')" />
-            <el-table-column prop="amount_pay" :label="t('buyfx.amountCny')" width="140" align="right">
-              <template #default="{ row }">{{ money(row.amount_pay) }}</template>
-            </el-table-column>
-            <el-table-column prop="expected_rate" :label="t('buyfx.expectedRate')" width="120" align="right" />
-            <el-table-column prop="created_at" :label="t('buyfx.createdAt')" width="160" />
-          </el-table>
+          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            <el-button type="primary" link @click="goBuyOrderHistory">{{ t('buyfx.viewOrders') }}</el-button>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -120,9 +113,8 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 
 const platforms = ref([])
-const orders = ref([])
 const rate = ref(null)
-const pair = ref('MYR/CNY')
+const pair = ref('MYR/CNY') // 默认：卖出 MYR 买入 CNY
 const bocRate = ref(null)
 let timer = null
 
@@ -132,10 +124,6 @@ const bocRateText = computed(() => bocRate.value==null ? '—' : Number(bocRate.
 async function loadPlatforms(){
   const res = await api.buyfx.listPlatforms()
   platforms.value = Array.isArray(res?.items) ? res.items : []
-}
-async function loadOrders(){
-  const res = await api.buyfx.listOrders()
-  orders.value = Array.isArray(res?.items) ? res.items : []
 }
 async function refreshRate(){
   const r = await api.buyfx.getRate('CNY/MYR')
@@ -153,8 +141,18 @@ async function fetchBocRate(){
 function onPairChange(){ fetchBocRate() }
 watch(pair, () => { /* 冗余保障 */ fetchBocRate() })
 
-const form = ref({ platform_id: null, customer_name: '', amount_pay: null, expected_rate: null })
-const canSubmit = computed(() => Number(form.value.amount_pay||0) > 0 && !!form.value.platform_id)
+// 卖出金额默认对应币种余额（可手动修改）
+watch(() => convert.value.platform_id, (pid) => {
+  const p = platforms.value.find(x=>x.id===pid)
+  if (!p) return
+  // 以卖出币种余额作为默认金额
+  const from = convert.value.from
+  let bal = 0
+  if (from==='USD') bal = Number(p.balance_usd||0)
+  else if (from==='MYR') bal = Number(p.balance_myr||0)
+  else if (from==='CNY') bal = Number(p.balance_cny||0)
+  if (!convert.value.amount) convert.value.amount = Math.max(0, bal)
+})
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 function percent(v){
   const n = Number(v||0)
@@ -162,21 +160,10 @@ function percent(v){
   return `${n.toFixed(3)}%`
 }
 
-async function submitOrder(){
-  try {
-    const payload = {
-      platform_id: form.value.platform_id,
-      customer_name: form.value.customer_name||null,
-      amount_pay: Number(form.value.amount_pay||0),
-      expected_rate: form.value.expected_rate==null? null : Number(form.value.expected_rate)
-    }
-    await api.buyfx.createOrder(payload)
-    ElMessage.success(t('buyfx.buySubmitted'))
-    form.value = { platform_id: null, customer_name: '', amount_pay: null, expected_rate: null }
-    await loadOrders()
-  } catch (e) {
-    ElMessage.error(e?.message || t('buyfx.submitFailed'))
-  }
+function goBuyOrderHistory(){
+  // 跳转到“购汇单历史”，目前复用 FX 管理页的支付/结汇历史或单独新页（占位）
+  // 如已有路由可替换为具体路径
+  try { window.location.hash = '#/fx/buy' } catch {}
 }
 
 const platformDialog = ref({ visible:false, loading:false, model: { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 } })
@@ -232,7 +219,7 @@ async function removePlatform(row){
   }
 }
 
-onMounted(async () => { await loadPlatforms(); await loadOrders(); await refreshRate(); startPolling(); await fetchBocRate() })
+onMounted(async () => { await loadPlatforms(); await fetchBocRate() })
 onBeforeUnmount(stopPolling)
 
 // 转换（平台内互换）
