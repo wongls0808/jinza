@@ -47,17 +47,13 @@
             </div>
           </template>
           <div class="rate-bar">
-            <span>{{ t('buyfx.liveRate') }}</span>
-            <el-tag type="info">{{ liveRateText }}</el-tag>
-          </div>
-          <div class="buy-form">
-            <el-select v-model="form.platform_id" filterable :placeholder="t('buyfx.placePlatform')">
-              <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
-            </el-select>
-            <el-input v-model="form.customer_name" :placeholder="t('buyfx.customerName')" />
-            <el-input-number v-model="form.amount_pay" :min="0" :step="1000" :precision="2" :placeholder="t('buyfx.amountPayCny')" />
-            <el-input-number v-model="form.expected_rate" :min="0" :step="0.001" :precision="6" :placeholder="t('buyfx.expectedRate')" />
-            <el-button type="primary" :disabled="!canSubmit" @click="submitOrder">{{ t('buyfx.submitBuy') }}</el-button>
+            <el-radio-group v-model="pair" size="small" @change="onPairChange">
+              <el-radio-button label="MYR/USD">MYR = USD</el-radio-button>
+              <el-radio-button label="MYR/CNY">MYR = CNY</el-radio-button>
+              <el-radio-button label="USD/CNY">USD = CNY</el-radio-button>
+            </el-radio-group>
+            <el-tag type="info" effect="light">{{ bocRateText }}</el-tag>
+            <el-button size="small" type="primary" text @click="fetchBocRate">{{ t('buyfx.refresh') }}</el-button>
           </div>
           <el-divider />
           <div class="convert-form">
@@ -116,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useI18n } from 'vue-i18n'
@@ -126,9 +122,12 @@ const { t } = useI18n()
 const platforms = ref([])
 const orders = ref([])
 const rate = ref(null)
+const pair = ref('MYR/CNY')
+const bocRate = ref(null)
 let timer = null
 
 const liveRateText = computed(() => rate.value==null ? '—' : Number(rate.value||0).toFixed(6))
+const bocRateText = computed(() => bocRate.value==null ? '—' : Number(bocRate.value||0).toFixed(6))
 
 async function loadPlatforms(){
   const res = await api.buyfx.listPlatforms()
@@ -147,6 +146,12 @@ function startPolling(){
   timer = setInterval(refreshRate, 5000)
 }
 function stopPolling(){ if (timer) { clearInterval(timer); timer=null } }
+
+async function fetchBocRate(){
+  try{ const r = await api.buyfx.getBocRate(pair.value); bocRate.value = r?.rate ?? null } catch(e) { bocRate.value = null }
+}
+function onPairChange(){ fetchBocRate() }
+watch(pair, () => { /* 冗余保障 */ fetchBocRate() })
 
 const form = ref({ platform_id: null, customer_name: '', amount_pay: null, expected_rate: null })
 const canSubmit = computed(() => Number(form.value.amount_pay||0) > 0 && !!form.value.platform_id)
@@ -227,7 +232,7 @@ async function removePlatform(row){
   }
 }
 
-onMounted(async () => { await loadPlatforms(); await loadOrders(); await refreshRate(); startPolling() })
+onMounted(async () => { await loadPlatforms(); await loadOrders(); await refreshRate(); startPolling(); await fetchBocRate() })
 onBeforeUnmount(stopPolling)
 
 // 转换（平台内互换）

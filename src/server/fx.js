@@ -10,6 +10,8 @@ import { authMiddleware, requirePerm } from './auth.js'
 import { query } from './db.js'
 
 export const fxRouter = express.Router()
+// 简易内存缓存（BOC抓取）
+const _bocCache = { data: null, time: 0, ttl: 60 * 1000 }
 
 async function ensureDDL() {
   await query(`
@@ -275,6 +277,92 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
     await query('rollback')
     console.error('platform convert failed', e)
     res.status(500).json({ error: 'convert failed', detail: e.message })
+  }
+})
+
+// ---------- 中国银行挂牌价（银行买入价） ----------
+// 支持 pair: USD/CNY, MYR/CNY, MYR/USD（或使用连字符）
+fxRouter.get('/rates/boc', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  const raw = String(req.query.pair || '').toUpperCase().replace('-', '/')
+  const allowed = new Set(['USD/CNY','MYR/CNY','MYR/USD','USD/MYR'])
+  if (!allowed.has(raw)) return res.status(400).json({ error: 'invalid pair' })
+
+  try {
+    const now = Date.now()
+    if (!_bocCache.data || (now - _bocCache.time) > _bocCache.ttl) {
+      // 抓取英文页，失败则回退中文页
+      const fetchHtml = async (url) => {
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return await r.text()
+      }
+      let html = ''
+      try {
+        html = await fetchHtml('https://www.boc.cn/sourcedb/whpj/enindex.html')
+      } catch {
+        html = await fetchHtml('https://www.boc.cn/sourcedb/whpj/')
+      }
+      // 解析表格，抽取 USD 与 MYR 行的 Buying Rate 与单位
+      const clean = (s) => String(s||'').replace(/\r|\n|\t/g,' ').replace(/\s{2,}/g,' ').trim()
+      const getEnglishRow = (codeOrName) => {
+        const rx = new RegExp(`<tr[^>]*>\\s*<td[^>]*>(?:${codeOrName})<\\/td>[\\s\\S]*?<\\/tr>`, 'i')
+        const m = rx.exec(html)
+        return m ? m[0] : ''
+      }
+      const getChineseRow = (zhName) => {
+        const rx = new RegExp(`<tr[^>]*>[\\s\\S]*?${zhName}[\\s\\S]*?<\\/tr>`, 'i')
+        const m = rx.exec(html)
+        return m ? m[0] : ''
+      }
+      const pickCellNumbers = (rowHtml) => {
+        // 依次提取单元格文本
+        const cells = Array.from(rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map(x=>clean(x[1]))
+        return cells
+      }
+      let rowUSD = getEnglishRow('US\\s*Dollar') || getChineseRow('美元')
+      let rowMYR = getEnglishRow('Malaysian\\s*Ringgit') || getChineseRow('马来西亚林吉特')
+      // 兼容英文页可能只出现代码
+      if (!rowUSD) rowUSD = getEnglishRow('USD')
+      if (!rowMYR) rowMYR = getEnglishRow('MYR')
+      const cellsUSD = rowUSD ? pickCellNumbers(rowUSD) : []
+      const cellsMYR = rowMYR ? pickCellNumbers(rowMYR) : []
+      // 买入价与单位的列位置：英文页常见列顺序 [Currency, Buying Rate, Cash Buying, Selling Rate, Middle Rate, Pub Time, Unit]
+      const parseRateUnit = (cells) => {
+        if (!cells.length) return null
+        // 尝试在 cells 找到数字最大的可能为 Buying Rate；再找 Unit
+        // 更稳妥：优先按已知列位取值
+        // 英文页：Buying Rate 可能在 index 1，Unit 在最后一列
+        let unit = Number(cells[cells.length-1].replace(/[^0-9.]/g,'')) || 1
+        let rate = Number(cells[1]?.replace(/[^0-9.]/g,''))
+        if (!isFinite(rate)) {
+          // 中文页：列顺序一般为 [货币名称, 现汇买入价, 现钞买入价, 现汇卖出价, 现钞卖出价, 中行折算价, 发布时间]
+          rate = Number(cells[1]?.replace(/[^0-9.]/g,''))
+          unit = 1
+        }
+        if (!isFinite(rate) || rate<=0) return null
+        if (!isFinite(unit) || unit<=0) unit = 1
+        return { rate, unit }
+      }
+      const ruUSD = parseRateUnit(cellsUSD)
+      const ruMYR = parseRateUnit(cellsMYR)
+      if (!ruUSD || !ruMYR) throw new Error('parse boc failed')
+      // 标准化为“每 1 单位外币 = X CNY”的买入价
+      const usd_cny = ruUSD.rate / ruUSD.unit
+      const myr_cny = ruMYR.rate / ruMYR.unit
+      _bocCache.data = { 'USD/CNY': usd_cny, 'MYR/CNY': myr_cny }
+      _bocCache.time = now
+    }
+    const usd_cny = _bocCache.data['USD/CNY']
+    const myr_cny = _bocCache.data['MYR/CNY']
+    let out = null
+    if (raw === 'USD/CNY') out = usd_cny
+    else if (raw === 'MYR/CNY') out = myr_cny
+    else if (raw === 'MYR/USD') out = myr_cny / usd_cny
+    else if (raw === 'USD/MYR') out = usd_cny / myr_cny
+    res.json({ pair: raw, rate: Number(out) })
+  } catch (e) {
+    console.error('boc rate failed', e)
+    res.status(500).json({ error: 'boc rate failed', detail: e.message })
   }
 })
 
