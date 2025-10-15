@@ -51,7 +51,7 @@
       </el-table-column>
       <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 180)" align="center">
         <template #default="{ row }">
-          <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
+          <el-button size="small" @click="viewPdf(row)">{{ t('common.view') }}</el-button>
           <el-button 
             size="small"
             :type="row.status==='completed' ? 'success' : 'default'"
@@ -315,6 +315,21 @@ function onLogoError(evt, row){
   if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
   else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
   else logoFail.value[key] = true
+}
+async function viewPdf(row){
+  const id = row.payment_id || row.id
+  // 若未完成，仍可查看详情抽屉；完成则直接打开在线预览（带水印，禁止下载）
+  if (row.status !== 'completed') {
+    return openDetail(row)
+  }
+  try {
+    const lang = (navigator.language || '').toLowerCase().includes('zh') ? 'zh' : 'en'
+    const url = `${location.origin}/api/fx/payments/${id}/pdf?preview=1&lang=${lang}`
+    // 使用内联预览（服务端 Content-Disposition inline），不触发下载；新标签打开
+    window.open(url, '_blank', 'noopener')
+  } catch (e) {
+    try { await openDetail(row) } catch {}
+  }
 }
 </script>
 
