@@ -39,7 +39,7 @@
         <el-table-column prop="created_by_name" :label="t('common.createdBy')" width="140"/>
         <el-table-column :label="t('common.actions')" width="160">
           <template #default="{ row }">
-            <el-button size="small" text type="primary" @click="editNote(row)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" text type="primary" @click="openEdit(row)">{{ t('common.edit') }}</el-button>
             <el-popconfirm :title="t('buyfx.confirmDelete')" @confirm="onDelete(row)">
               <template #reference>
                 <el-button size="small" text type="danger">{{ t('common.delete') }}</el-button>
@@ -51,6 +51,18 @@
 
       <div v-if="!loading && rows.length===0" class="empty">{{ t('common.empty') }}</div>
     </el-card>
+
+    <el-dialog v-model="editDialog.visible" :title="t('common.edit')" width="420px">
+      <el-form label-width="80px">
+        <el-form-item :label="t('common.details')">
+          <el-input v-model="editDialog.note" type="textarea" :rows="4" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialog.visible=false" :disabled="editDialog.loading">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveEdit" :loading="editDialog.loading">{{ t('common.ok') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -79,11 +91,11 @@ async function loadOrders(){
   }
 }
 
-async function editNote(row){
-  const note = prompt(t('common.details'), row.note || '')
-  if (note === null) return
-  await api.buyfx.updateOrderNote(row.id, note)
-  await loadOrders()
+const editDialog = ref({ visible: false, loading: false, id: null, note: '' })
+function openEdit(row){ editDialog.value = { visible: true, loading: false, id: row.id, note: row.note || '' } }
+async function saveEdit(){
+  editDialog.value.loading = true
+  try { await api.buyfx.updateOrderNote(editDialog.value.id, editDialog.value.note); editDialog.value.visible = false; await loadOrders() } finally { editDialog.value.loading = false }
 }
 async function onDelete(row){
   await api.buyfx.deleteOrder(row.id)
@@ -92,6 +104,7 @@ async function onDelete(row){
 
 onMounted(loadOrders)
 </script>
+
 
 <style scoped>
 .fx-buy-history { padding: 8px; }

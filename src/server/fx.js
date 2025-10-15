@@ -432,9 +432,22 @@ fxRouter.delete('/transfers/:id', authMiddleware(true), requirePerm('manage_fx')
   const dstField = row.to_currency === 'USD' ? 'balance_usd' : (row.to_currency === 'MYR' ? 'balance_myr' : 'balance_cny')
   try {
     await query('begin')
-    const addBack = Math.round(Number(row.amount_from||0) * 100) / 100
-    const minusBack = Math.round(Number(row.amount_to||0) * 100) / 100
-    await query(`update fx_platforms set ${srcField} = round(coalesce(${srcField},0) + $1, 2), ${dstField} = round(coalesce(${dstField},0) - $2, 2) where id=$3`, [addBack, minusBack, Number(row.platform_id)])
+    const hasSnap = row.balance_src_before != null && row.balance_dst_before != null && row.balance_src_after != null && row.balance_dst_after != null
+    if (hasSnap) {
+      const deltaSrc = Number(row.balance_src_after) - Number(row.balance_src_before) // 负数
+      const deltaDst = Number(row.balance_dst_after) - Number(row.balance_dst_before) // 正数
+      await query(
+        `update fx_platforms set ${srcField} = round(coalesce(${srcField},0) - $1, 2), ${dstField} = round(coalesce(${dstField},0) - $2, 2) where id=$3`,
+        [deltaSrc, deltaDst, Number(row.platform_id)]
+      )
+    } else {
+      const addBack = Math.round(Number(row.amount_from||0) * 100) / 100
+      const minusBack = Math.round(Number(row.amount_to||0) * 100) / 100
+      await query(
+        `update fx_platforms set ${srcField} = round(coalesce(${srcField},0) + $1, 2), ${dstField} = round(coalesce(${dstField},0) - $2, 2) where id=$3`,
+        [addBack, minusBack, Number(row.platform_id)]
+      )
+    }
     await query(`delete from fx_platform_fx_transfers where id=$1`, [id])
     await query('commit')
     res.json({ ok: true })
