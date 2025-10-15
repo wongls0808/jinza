@@ -1316,21 +1316,17 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   doc.font(fontBold).fontSize(12).fillColor(ACCENT).text(BRAND, left, headerY, { continued: true })
   doc.font(font).fontSize(11).fillColor('#30424f').text('  |  ' + titleLine)
   // 状态徽章 (右侧)
-  const statusText = h.status==='completed' ? t('completed') : t('pending')
-  const badgeW = 74
+  const statusZh = h.status==='completed' ? '支付确认' : '待确认'
+  const statusEn = h.status==='completed' ? 'Completed' : 'Pending'
+  const statusText = `${statusZh} | ${statusEn}`
+  const badgeW = 110
   const badgeH = 16
   const badgeX = right - badgeW
   const badgeY = headerY + 2
   doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 6)
-    .fill(statusText===t('completed') ? '#d9f2de' : '#fff3cd')
-  doc.fillColor(statusText===t('completed') ? '#2b6d32' : '#856404').font(fontBold).fontSize(8)
+    .fill(h.status==='completed' ? '#d9f2de' : '#fff3cd')
+  doc.fillColor(h.status==='completed' ? '#2b6d32' : '#856404').font(fontBold).fontSize(7)
     .text(statusText, badgeX, badgeY + 4, { width: badgeW, align: 'center' })
-  // 交易号
-  doc.font(font).fontSize(7).fillColor('#6b6f74').text(
-    (lang==='zh'?'交易号':'Transaction No') + ': ' + (h.bill_no || ('Payment-'+h.id)),
-    left,
-    headerY + headerHeight - 4
-  )
   doc.restore()
   doc.moveDown(0.1)
 
@@ -1339,32 +1335,42 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const amountBarH = 34
   doc.save()
   doc.roundedRect(left, amountBarY, contentWidth, amountBarH, 6).fill(LIGHT_ACCENT)
-  // 左侧：支付金额（标题）  右侧：CNY: 金额（大号）
+  // 左侧：支付金额 Payment Amount ；右侧：CNY: 金额（大号）
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
-  const amountTitle = (lang==='zh'?'支付金额：':'Payment Amount:')
+  const amountTitleBi = '支付金额 Payment Amount'
   const currencyLabel = 'CNY: ' + money(total)
-  doc.fillColor('#455a64').font(fontBold).fontSize(9).text(amountTitle, left + 14, amountBarY + 8)
+  doc.fillColor('#455a64').font(fontBold).fontSize(9).text(amountTitleBi, left + 14, amountBarY + 8)
   doc.font(fontBold).fontSize(16).fillColor(ACCENT).text(currencyLabel, left + 14, amountBarY + 14, { width: contentWidth - 28, align: 'right' })
   doc.restore()
   doc.y = amountBarY + amountBarH + 6
 
-  // ===== 收款人信息 =====
-  const sectionTitle = (zh,en)=> (lang==='zh'?zh:en)
-  const drawLabelValue = (label, value, yOffset=0) => {
-    const y = doc.y + yOffset
+  // 工具：分节彩条 + 双语标题
+  const sectionBar = (zh, en) => {
+    const y = doc.y
+    const hBar = 20
+    doc.save()
+    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#eaf3f7')
+    doc.fillColor(ACCENT).font(fontBold).fontSize(9).text(`${zh} / ${en}`, left + 12, y + 5)
+    doc.restore()
+    doc.y = y + hBar + 4
+  }
+  // 工具：双语标签-值
+  const drawLabelValue = (zh, en, value) => {
+    const label = `${zh} / ${en}: `
+    const y = doc.y
     doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(label, left, y, { continued: true })
     doc.font(font).fontSize(10).fillColor('#111').text(value==null?'':String(value))
     doc.moveDown(0.2)
   }
 
-  doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(sectionTitle('收款人信息：','Payee Info:'))
-  doc.moveDown(0.2)
-  drawLabelValue(sectionTitle('收款人：','Payee: '), items.rows[0]?.account_name||'')
-  drawLabelValue(sectionTitle('账户号码：','Account No: '), items.rows[0]?.bank_account||'')
+  // ===== 收款人信息 / Payee Info =====
+  sectionBar('收款人信息', 'Payee Info')
+  drawLabelValue('收款人', 'Payee', items.rows[0]?.account_name||'')
+  drawLabelValue('账户号码', 'Account No', items.rows[0]?.bank_account||'')
   // 银行名称：尝试渲染 Logo
   {
     const bankName = items.rows[0]?.bank_name || ''
-    const bankLabel = sectionTitle('银行名称：','Bank: ')
+    const bankLabelBi = '银行名称 / Bank:'
     // 解析 bank logo 路径
     let bankLogoPath = null
     try {
@@ -1392,7 +1398,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     } catch {}
     // 绘制
     const y = doc.y
-    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(bankLabel, left, y)
+    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(bankLabelBi, left, y)
     if (bankLogoPath) {
       try {
         const svg = fs.readFileSync(bankLogoPath, 'utf8')
@@ -1403,25 +1409,23 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
         SVGtoPDF(doc, svg, logoX, logoY, { width: logoW, preserveAspectRatio: 'xMidYMid meet' })
         doc.moveDown(1)
       } catch {
-        drawLabelValue(bankLabel, bankName)
+        drawLabelValue('银行名称', 'Bank', bankName)
       }
     } else {
-      drawLabelValue(bankLabel, bankName)
+      drawLabelValue('银行名称', 'Bank', bankName)
     }
   }
 
-  // ===== 交易详情 =====
-  doc.font(fontBold).fontSize(9).fillColor(ACCENT).text(sectionTitle('交易详情：','Transaction Details:'))
-  doc.moveDown(0.2)
-  drawLabelValue(sectionTitle('交易号：','Transaction No: '), (h.bill_no || ('Payment-'+h.id)))
-  const statusText2 = h.status==='completed' ? (lang==='zh'?'支付确认':'Completed') : (lang==='zh'?'待确认':'Pending')
-  drawLabelValue(sectionTitle('交易状态：','Status: '), statusText2)
-  drawLabelValue(sectionTitle('交易时间：','Time: '), toDate(h.pay_date))
+  // ===== 交易详情 / Transaction Details =====
+  sectionBar('交易详情', 'Transaction Details')
+  drawLabelValue('交易号', 'Transaction No', (h.bill_no || ('Payment-'+h.id)))
+  drawLabelValue('交易状态', 'Status', h.status==='completed' ? '支付确认 / Completed' : '待确认 / Pending')
+  drawLabelValue('交易时间', 'Transaction Time', toDate(h.pay_date))
 
   // 多笔合并说明（若有）
   if (items.rows.length > 1) {
-    doc.font(fontBold).fontSize(8).fillColor(ACCENT).text(lang==='zh'?'合并明细: 共 '+items.rows.length+' 条':'Merged Items: '+items.rows.length)
-    doc.font(font).fontSize(7).fillColor('#555555').text(lang==='zh'?'仅展示首条，其余计入总金额。':'Only first item shown; others included in total.')
+    doc.font(fontBold).fontSize(8).fillColor(ACCENT).text(`合并明细 / Merged Items: 共 ${items.rows.length} 条 / ${items.rows.length} items`)
+    doc.font(font).fontSize(7).fillColor('#555555').text('仅展示首条，其余计入总金额。/ Only first item shown; others included in total.')
     doc.moveDown(0.4)
   }
 
