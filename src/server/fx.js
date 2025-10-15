@@ -1205,9 +1205,32 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k
 
   res.setHeader('Content-Type', 'application/pdf')
-  const fileBase = (head.rows[0].bill_no ? String(head.rows[0].bill_no) : `Payment-${id}`)
-  const asciiName = `${fileBase}.pdf`.replace(/[^\x20-\x7E]/g, '_')
-  const utf8Name = encodeURIComponent(`${fileBase}.pdf`)
+  // 文件名：付款日期 + 账户名 + 金额 + 银行代码
+  const h0 = head.rows[0]
+  const payDate = (() => { try { const v = h0.pay_date; if (typeof v === 'string') return v.slice(0,10); if (v && v.toISOString) return v.toISOString().slice(0,10); return String(v||'').slice(0,10) } catch { return '' } })()
+  const acctName0 = (items.rows[0]?.account_name) || h0.customer_name || 'Account'
+  const totalAmt0 = items.rows.reduce((s,r)=> s + Number(r.amount||0), 0)
+  const amountStr = Number(totalAmt0||0).toFixed(2)
+  const bankRaw0 = (items.rows[0]?.bank_name || '')
+  const bankLower0 = String(bankRaw0).toLowerCase()
+  const bankMap0 = [
+    { code:'ICBC',  m:['icbc','工商'] },
+    { code:'CCB',   m:['ccb','建设'] },
+    { code:'ABC',   m:['abc','农业'] },
+    { code:'BOC',   m:['boc','中国银行'] },
+    { code:'BCM',   m:['bcm','交通'] },
+    { code:'MBB',   m:['maybank'] },
+    { code:'PBB',   m:['public bank','public '] },
+    { code:'RHB',   m:['rhb'] },
+    { code:'CIMB',  m:['cimb'] },
+    { code:'HLB',   m:['hlb','hong leong'] }
+  ]
+  const bankHit0 = bankMap0.find(x => x.m.some(k => bankLower0.includes(k)))
+  const bankCode0 = bankHit0 ? bankHit0.code : 'OTHER'
+  const sanitize = (s) => String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
+  const baseName = `${payDate}_${sanitize(acctName0)}_${amountStr}_${bankCode0}`
+  const asciiName = `${baseName}.pdf`.replace(/[^\x20-\x7E]/g, '_')
+  const utf8Name = encodeURIComponent(`${baseName}.pdf`)
   res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
 
   const ACCENT = '#2F4858' // 深色强调
