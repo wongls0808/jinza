@@ -1155,12 +1155,17 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   `, [id])
   if (!head.rows.length) return res.status(404).json({ error: 'not found' })
   const items = await query(`
-    select i.*, b.zh as bank_name
+    select 
+      i.*, 
+      b.code as bank_code,
+      b.zh   as bank_name_zh,
+      b.en   as bank_name_en
     from fx_payment_items i
     join fx_payments p2 on p2.id = i.payment_id
     left join receiving_accounts ra on ra.bank_account = i.bank_account
     left join customer_receiving_accounts cra on cra.bank_account = i.bank_account and cra.customer_id = p2.customer_id
-    left join banks b on b.id = coalesce(ra.bank_id, cra.bank_id)
+    -- 银行信息优先取客户专属账户（CRA），否则回退到通用账户（RA）
+    left join banks b on b.id = coalesce(cra.bank_id, ra.bank_id)
     where i.payment_id=$1 order by i.id asc
   `, [id])
 
@@ -1211,22 +1216,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const acctName0 = (items.rows[0]?.account_name) || h0.customer_name || 'Account'
   const totalAmt0 = items.rows.reduce((s,r)=> s + Number(r.amount||0), 0)
   const amountStr = String(Math.round(Number(totalAmt0||0)))
-  const bankRaw0 = (items.rows[0]?.bank_name || '')
-  const bankLower0 = String(bankRaw0).toLowerCase()
-  const bankMap0 = [
-    { code:'ICBC',  m:['icbc','工商'] },
-    { code:'CCB',   m:['ccb','建设'] },
-    { code:'ABC',   m:['abc','农业'] },
-    { code:'BOC',   m:['boc','中国银行'] },
-    { code:'BCM',   m:['bcm','交通'] },
-    { code:'MBB',   m:['maybank'] },
-    { code:'PBB',   m:['public bank','public '] },
-    { code:'RHB',   m:['rhb'] },
-    { code:'CIMB',  m:['cimb'] },
-    { code:'HLB',   m:['hlb','hong leong'] }
-  ]
-  const bankHit0 = bankMap0.find(x => x.m.some(k => bankLower0.includes(k)))
-  const bankCode0 = bankHit0 ? bankHit0.code : 'OTHER'
+  const bankCode0 = (String(items.rows[0]?.bank_code || '').toUpperCase()) || 'OTHER'
   const sanitize = (s) => String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
   const baseName = `${payDate}+${sanitize(acctName0)}+${amountStr}+${bankCode0}`
   const asciiName = `${baseName}.pdf`.replace(/[^\x20-\x7E]/g, '_')
@@ -1249,25 +1239,10 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   // 生成二维码 ASCII 查询串（更整洁，避免中文乱码）
   const h = head.rows[0]
   const totalAmt = items.rows.reduce((s,r)=> s + Number(r.amount||0), 0)
-  const bankRaw = (items.rows[0]?.bank_name || '')
+  const bankCodeFromRow = (String(items.rows[0]?.bank_code || '').toUpperCase()) || 'OTHER'
   const acct = (items.rows[0]?.bank_account || '')
   const acct4 = acct ? String(acct).replace(/\D/g,'').slice(-4) : ''
-  // 银行代码与中英文映射（供 QR 使用代码）
-  const bankLower = bankRaw.toLowerCase()
-  const bankMap = [
-    { code:'ICBC', m:['icbc','工商'] },
-    { code:'CCB',  m:['ccb','建设'] },
-    { code:'ABC',  m:['abc','农业'] },
-    { code:'BOC',  m:['boc','中国银行'] },
-    { code:'BCM',  m:['bcm','交通'] },
-    { code:'MBB',  m:['maybank'] },
-    { code:'PBB',  m:['public bank','public '] },
-    { code:'RHB',  m:['rhb'] },
-    { code:'CIMB', m:['cimb'] },
-    { code:'HLB',  m:['hlb','hong leong'] }
-  ]
-  const bankHit = bankMap.find(x => x.m.some(k => bankLower.includes(k)))
-  const bankCode = bankHit ? bankHit.code : 'OTHER'
+  const bankCode = bankCodeFromRow
   const v = 1
   const idStr = String(h.id)
   const no = encodeURIComponent(h.bill_no || ('Payment-'+h.id))
@@ -1405,29 +1380,12 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   sectionBar('收款人信息', 'Payee Info')
   drawLabelValue('收款人', 'Payee', items.rows[0]?.account_name||'')
   drawLabelValue('账户号码', 'Account No', items.rows[0]?.bank_account||'')
-  // 银行名称：中文 + 英文（不再渲染 Logo）
+  // 银行名称：直接使用数据库字段（中文/英文），不再做手动映射
   {
-    const bankRawName = items.rows[0]?.bank_name || ''
-    // 映射中英文
-    let cn = bankRawName
-    let en = bankRawName
-    const lower = bankRawName.toLowerCase()
-    if (lower.includes('icbc') || bankRawName.includes('工商')) { cn='中国工商银行'; en='Industrial and Commercial Bank of China (ICBC)' }
-    else if (lower.includes('ccb') || bankRawName.includes('建设')) { cn='中国建设银行'; en='China Construction Bank (CCB)' }
-    else if (lower.includes('abc') || bankRawName.includes('农业')) { cn='中国农业银行'; en='Agricultural Bank of China (ABC)' }
-    else if (lower.includes('boc') || bankRawName.includes('中国银行')) { cn='中国银行'; en='Bank of China (BOC)' }
-    else if (lower.includes('bcm') || bankRawName.includes('交通')) { cn='交通银行'; en='Bank of Communications (BCM)' }
-    else if (lower.includes('maybank')) { cn='马来亚银行'; en='Malayan Banking Berhad (Maybank)' }
-    else if (lower.includes('public ')) { cn='大众银行'; en='Public Bank Berhad' }
-    else if (lower.includes('rhb')) { cn='兴业银行（马来西亚）'; en='RHB Bank' }
-    else if (lower.includes('cimb')) { cn='联昌国际银行'; en='CIMB Bank' }
-    else if (lower.includes('hong leong') || lower.includes('hlb')) { cn='丰隆银行'; en='Hong Leong Bank' }
-
-    const label = '银行名称 / Bank: '
-    const y = doc.y
-    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, padX, y, { continued: true })
-    doc.font(font).fontSize(12).fillColor('#111').text(`${cn} / ${en}`)
-    doc.moveDown(0.8)
+    const cn = items.rows[0]?.bank_name_zh || ''
+    const en = items.rows[0]?.bank_name_en || ''
+    const display = [cn, en].filter(Boolean).join(' / ')
+    drawLabelValue('银行名称', 'Bank', display)
   }
 
   // ===== 交易详情 / Transaction Details =====
