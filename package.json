@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
+    "seed:perms": "node scripts/seed-permissions.mjs",
+    "seed:perms:reset": "node scripts/seed-permissions.mjs --reset",
     "start:dev": "set NODE_ENV=development && node server.js",
     "build:with-sha": "npm run build"
   },

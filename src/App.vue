@@ -57,10 +57,11 @@
       
       <!-- 语言切换移至最右侧 -->
       <div class="right">
-        <el-select v-model="lang" size="small" @change="onLangChange" style="width:110px">
-          <el-option label="中文" value="zh" />
-          <el-option label="English" value="en" />
-        </el-select>
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button type="button" class="lang" :class="{ active: lang === 'zh' }" @click="setLang('zh')">中文</button>
+          <span class="sep">|</span>
+          <button type="button" class="lang" :class="{ active: lang === 'en' }" @click="setLang('en')">English</button>
+        </div>
       </div>
     </el-header>
     <el-main class="view">
@@ -111,6 +112,8 @@ const validateSession = () => {
 // 在组件挂载时验证会话
 onMounted(() => {
   validateSession()
+  // 初始化 html lang，确保与当前语言一致
+  try { document.documentElement.lang = locale.value === 'zh' ? 'zh-CN' : 'en' } catch {}
 })
 
 const { locale, t } = useI18n()
@@ -121,6 +124,10 @@ function onLangChange(v) {
   localStorage.setItem('lang', v);
   locale.value = v;
   try { document.documentElement.lang = v === 'zh' ? 'zh-CN' : 'en' } catch {}
+}
+// 供按钮使用的封装方法，避免重复切换
+function setLang(v) {
+  if (v !== lang.value) onLangChange(v)
 }
 watch(locale, (v) => {
   lang.value = v
@@ -165,7 +172,7 @@ function handleSelect(key) {
   display: flex; 
   gap: 12px; 
   align-items: center;
-  flex: 0 0 120px; /* 右侧只保留语言切换，宽度减小 */
+  flex: 0 0 auto; /* 根据内容自适应宽度 */
   justify-content: flex-end; /* 确保右对齐 */
 }
 .view { padding: 20px; }
@@ -192,4 +199,18 @@ function handleSelect(key) {
   background-color: rgba(255, 255, 255, 0.15);
   border-bottom: 2px solid white;
 }
+
+/* 语言切换样式 */
+.lang-switch { display: inline-flex; align-items: center; user-select: none; }
+.lang-switch .sep { margin: 0 8px; color: rgba(255,255,255,0.6); }
+.lang-switch .lang {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  color: rgba(255,255,255,0.85);
+  cursor: pointer;
+  font-weight: 600;
+}
+.lang-switch .lang:hover { color: #fff; text-decoration: underline; }
+.lang-switch .lang.active { color: #fff; font-weight: 800; }
 </style>

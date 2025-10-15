@@ -10,6 +10,7 @@ import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
 import { fxRouter } from './fx.js'
+import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes } from './permissions.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -115,6 +116,22 @@ router.post('/users/:id/reset-password', authMiddleware(true), requirePerm('mana
 router.get('/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
   const rs = await query('select id, code, name from permissions order by id')
   res.json(rs.rows)
+})
+
+// 新：获取系统权限树（用于前端展示分组）
+router.get('/permissions/tree', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+  res.json({ tree: PERMISSION_TREE, flat: flattenPermissionCodes(PERMISSION_TREE) })
+})
+
+// 新：重建/重写入权限树（可选 reset=true 清理不在清单中的旧权限）
+router.post('/permissions/reseed', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+  const { reset = false } = req.body || {}
+  try {
+    const result = await reseedPermissions({ reset: !!reset })
+    res.json({ ok: true, ...result })
+  } catch (e) {
+    res.status(500).json({ error: 'reseed failed', detail: e?.message })
+  }
 })
 
 router.get('/users/:id/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {

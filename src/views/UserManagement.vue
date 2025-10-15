@@ -9,6 +9,7 @@
         <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />
         <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:180px" size="small" />
   <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
+        <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">重建权限树</el-button>
       </div>
     </div>
 
@@ -27,7 +28,25 @@
             </div>
           </div>
         </template>
-        <div class="perms" v-if="perms.length">
+        <div class="perms" v-if="permTree && permTree.length">
+          <div class="perm-group" v-for="group in permTree" :key="group.module">
+            <div class="perm-group-title">{{ group.name }}</div>
+            <div class="perm-group-items">
+              <el-tag
+                v-for="p in group.items"
+                :key="p.code"
+                :type="userHas(u, p.code) ? 'success' : 'info'"
+                class="perm-tag"
+                effect="light"
+                size="small"
+                @click="togglePerm(u, p.code)"
+              >
+                {{ p.name }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+        <div class="perms" v-else-if="perms.length">
           <el-tag
             v-for="p in perms"
             :key="p.code"
@@ -72,18 +91,24 @@ import { api } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const users = ref([])
-const perms = ref([])
+const perms = ref([]) // 兼容旧平铺列表
+const permTree = ref(null) // 新的权限树（分组展示）
 const creating = ref(false)
 const newUser = ref({ username: '', password: '', display_name: '' })
 const reset = ref({ visible: false, user: null, password: '', loading: false })
 const removeDlg = ref({ visible: false, user: null, loading: false })
+const reseed = ref({ loading: false })
 
 function userHas(u, code) {
   return (u._perms || []).includes(code)
 }
 
 async function load() {
-  const [us, ps] = await Promise.all([api.users.list(), api.perms.list()])
+  const [us, ps, pt] = await Promise.all([
+    api.users.list(),
+    api.perms.list().catch(() => []),
+    api.perms.tree().then(r => r?.tree).catch(() => null)
+  ])
   // attach perms to each user
   const withPerms = await Promise.all(us.map(async (u) => {
     const up = await api.users.getPerms(u.id)
@@ -91,6 +116,7 @@ async function load() {
   }))
   users.value = withPerms
   perms.value = ps
+  permTree.value = pt
 }
 
 async function createUser() {
@@ -165,6 +191,19 @@ function togglePerm(u, code) {
   setUserPerm(u, code, !has)
 }
 
+async function doReseed() {
+  reseed.value.loading = true
+  try {
+    const r = await api.perms.reseed(false)
+    await load()
+    ElMessage.success(`权限已重建，共 ${r.total} 项`)
+  } catch (e) {
+    ElMessage.error('重建失败：' + (e.message || ''))
+  } finally {
+    reseed.value.loading = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -182,4 +221,7 @@ onMounted(load)
 .perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .perm-tag { cursor: pointer; user-select: none; }
 .ops { display: flex; gap: 8px; align-items: center; }
+.perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
+.perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
+.perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }
 </style>

@@ -59,7 +59,9 @@ export const api = {
     setPerms: (id, perms) => request(`/users/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ perms }) }),
   },
   perms: {
-    list: () => request('/permissions')
+    list: () => request('/permissions'),
+    tree: () => request('/permissions/tree'),
+    reseed: (reset=false) => request('/permissions/reseed', { method: 'POST', body: JSON.stringify({ reset }) })
   },
   changePassword: (old_password, new_password) => request('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) }),
   customers: {
