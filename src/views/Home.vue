@@ -4,38 +4,7 @@
       <div class="welcome">{{ t('home.welcome') }}</div>
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
-  <div class="grid">
-  <el-card v-if="has('manage_users')" class="home-card jelly" v-tilt @click="go('/users')">
-  <div class="icon"><User /></div>
-        <div class="name">{{ t('home.users') }}</div>
-        <div class="desc">{{ t('home.usersDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_customers')" class="home-card jelly" v-tilt @click="go('/customers')">
-  <div class="icon"><UserFilled /></div>
-        <div class="name">{{ t('home.customers') }}</div>
-        <div class="desc">{{ t('home.customersDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_banks')" class="home-card jelly" v-tilt @click="go('/banks')">
-  <div class="icon"><OfficeBuilding /></div>
-        <div class="name">{{ t('home.banks') }}</div>
-        <div class="desc">{{ t('home.banksDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_accounts')" class="home-card jelly" v-tilt @click="go('/accounts')">
-  <div class="icon"><OfficeBuilding /></div>
-        <div class="name">{{ t('home.accounts') }}</div>
-        <div class="desc">{{ t('home.accountsDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_transactions')" class="home-card jelly" v-tilt @click="go('/transactions')">
-  <div class="icon"><Document /></div>
-        <div class="name">{{ t('home.transactions') }}</div>
-        <div class="desc">{{ t('home.transactionsDesc') }}</div>
-      </el-card>
-  <el-card v-if="has('view_settings')" class="home-card jelly" v-tilt @click="go('/settings')">
-  <div class="icon"><Setting /></div>
-        <div class="name">{{ t('home.settings') }}</div>
-        <div class="desc">{{ t('home.settingsDesc') }}</div>
-      </el-card>
-    </div>
+    <!-- 菜单卡片区域已移除 -->
     <div class="todo" style="margin-top:16px;">
       <el-card>
         <div class="todo-title">待办事项</div>
@@ -87,7 +56,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, onMounted } from 'vue'
 import { api } from '@/api'
-import { User, UserFilled, OfficeBuilding, Setting, Document } from '@element-plus/icons-vue'
+// 菜单卡片已移除，无需引入图标
 const router = useRouter()
 const go = (path) => router.push(path)
 const { has, state } = useAuth()
@@ -127,16 +96,7 @@ async function approve(row){
 .hero { margin: 8px 8px 16px; }
 .welcome { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
 .meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-}
-.home-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; border-radius: 14px; }
-.home-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
-.icon { font-size: 28px; }
-.name { margin-top: 8px; font-weight: 600; color: var(--el-text-color-primary); }
-.desc { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 13px; }
+/* 菜单卡片样式已移除 */
 .todo-title { font-weight: 700; margin-bottom: 8px; }
 .todo-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .todo-head > div { color: var(--el-text-color-primary); font-weight: 600; }
