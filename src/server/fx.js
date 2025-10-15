@@ -12,6 +12,8 @@ import { query } from './db.js'
 export const fxRouter = express.Router()
 // 简易内存缓存（BOC抓取）
 const _bocCache = { data: null, time: 0, ttl: 60 * 1000 }
+// 简易内存缓存（Huaji API），按 pair 逐项缓存
+const _huajiCache = { map: new Map(), ttl: 60 * 1000 }
 
 async function ensureDDL() {
   await query(`
@@ -278,6 +280,98 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
     await query('rollback')
     console.error('platform convert failed', e)
     res.status(500).json({ error: 'convert failed', detail: e.message })
+  }
+})
+
+// ---------- Huaji 汇率服务（表单 POST） ----------
+// GET /fx/rates/huaji?pair=USD/CNY|MYR/CNY|MYR/USD|USD/MYR
+fxRouter.get('/rates/huaji', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  const raw = String(req.query.pair || '').toUpperCase().replace('-', '/')
+  const allowed = new Set(['USD/CNY','MYR/CNY','MYR/USD','USD/MYR'])
+  if (!allowed.has(raw)) return res.status(400).json({ error: 'invalid pair' })
+
+  // 通用请求函数：向 Huaji API 发送 x-www-form-urlencoded
+  async function requestHuaji(from, to) {
+    const url = process.env.HUAJI_API_URL || 'https://api.huajidata.com/v1/exchange/rate'
+    const key = process.env.HUAJI_API_KEY || ''
+    const body = new URLSearchParams()
+    body.set('from', from)
+    body.set('to', to)
+    // 附加常见字段以提升兼容性
+    body.set('pair', `${from}/${to}`)
+    body.set('amount', '1')
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+    if (key) {
+      headers['Authorization'] = `Bearer ${key}`
+      headers['X-API-Key'] = key
+    }
+    const r = await fetch(url, { method: 'POST', headers, body })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    let data
+    const ct = r.headers.get('content-type') || ''
+    if (ct.includes('application/json')) data = await r.json()
+    else {
+      const text = await r.text()
+      try { data = JSON.parse(text) } catch { data = { text } }
+    }
+    // 兼容多种返回结构：优先 data.rate / rate / price
+    const val = Number(
+      (data && (data.rate ?? data.price ?? data?.data?.rate ?? data?.data?.price)) || 0
+    )
+    if (!isFinite(val) || val <= 0) throw new Error('invalid rate from huaji')
+    return val
+  }
+
+  function getCached(pair) {
+    const it = _huajiCache.map.get(pair)
+    if (!it) return null
+    if (Date.now() - it.time > _huajiCache.ttl) { _huajiCache.map.delete(pair); return null }
+    return it.rate
+  }
+  function setCached(pair, rate) {
+    _huajiCache.map.set(pair, { time: Date.now(), rate: Number(rate) })
+  }
+
+  async function getPair(pair) {
+    const cached = getCached(pair)
+    if (cached) return cached
+    const [base, quote] = pair.split('/')
+    // 先尝试直接请求该货币对
+    try {
+      const direct = await requestHuaji(base, quote)
+      setCached(pair, direct)
+      return direct
+    } catch {}
+    // 交叉：通过 USD/CNY 与 MYR/CNY
+    try {
+      const usd_cny = base === 'USD' && quote === 'CNY' ? null : await getPair('USD/CNY')
+      const myr_cny = base === 'MYR' && quote === 'CNY' ? null : await getPair('MYR/CNY')
+      let v = null
+      if (pair === 'USD/CNY') {
+        v = await requestHuaji('USD','CNY')
+      } else if (pair === 'MYR/CNY') {
+        v = await requestHuaji('MYR','CNY')
+      } else if (pair === 'MYR/USD') {
+        if (!isFinite(myr_cny) || !isFinite(usd_cny)) throw new Error('cross rate missing')
+        v = myr_cny / usd_cny
+      } else if (pair === 'USD/MYR') {
+        if (!isFinite(myr_cny) || !isFinite(usd_cny)) throw new Error('cross rate missing')
+        v = usd_cny / myr_cny
+      }
+      if (!isFinite(v) || v <= 0) throw new Error('invalid cross rate')
+      setCached(pair, v)
+      return v
+    } catch (e) {
+      throw e
+    }
+  }
+
+  try {
+    const rate = await getPair(raw)
+    return res.json({ pair: raw, rate: Number(rate) })
+  } catch (e) {
+    console.error('huaji rate failed', e)
+    return res.status(502).json({ error: 'huaji rate failed', detail: e.message })
   }
 })
 

@@ -138,6 +138,12 @@ function startPolling(){
 function stopPolling(){ if (timer) { clearInterval(timer); timer=null } }
 
 async function fetchBocRate(){
+  // 优先 Huaji，失败回退 BOC
+  try {
+    const r1 = await api.buyfx.getHuajiRate(pair.value)
+    bocRate.value = r1?.rate ?? null
+    if (bocRate.value != null) return
+  } catch {}
   try{ const r = await api.buyfx.getBocRate(pair.value); bocRate.value = r?.rate ?? null } catch(e) { bocRate.value = null }
 }
 function onPairChange(){ fetchBocRate() }
