@@ -138,28 +138,51 @@ function startPolling(){
 function stopPolling(){ if (timer) { clearInterval(timer); timer=null } }
 
 async function fetchBocRate(){
-  // 优先 Huaji，失败回退 BOC
+  // 优先 Huaji，失败回退 BOC，再失败回退本地存储 fx_rates
   try {
     const r1 = await api.buyfx.getHuajiRate(pair.value)
     bocRate.value = r1?.rate ?? null
     if (bocRate.value != null) return
   } catch {}
-  try{ const r = await api.buyfx.getBocRate(pair.value); bocRate.value = r?.rate ?? null } catch(e) { bocRate.value = null }
+  try {
+    const r = await api.buyfx.getBocRate(pair.value)
+    bocRate.value = r?.rate ?? null
+    if (bocRate.value != null) return
+  } catch {}
+  try {
+    const r = await api.buyfx.getRate(pair.value)
+    bocRate.value = r?.rate ?? null
+  } catch { bocRate.value = null }
 }
 function onPairChange(){ fetchBocRate() }
 watch(pair, () => { /* 冗余保障 */ fetchBocRate() })
 
 // 卖出金额默认对应币种余额（可手动修改）
-watch(() => convert.value.platform_id, (pid) => {
-  const p = platforms.value.find(x=>x.id===pid)
+const amountEdited = ref(false)
+let updatingAmount = false
+function setAmountFromBalance(){
+  const p = platforms.value.find(x=>x.id===convert.value.platform_id)
   if (!p) return
-  // 以卖出币种余额作为默认金额
   const from = convert.value.from
   let bal = 0
   if (from==='USD') bal = Number(p.balance_usd||0)
   else if (from==='MYR') bal = Number(p.balance_myr||0)
   else if (from==='CNY') bal = Number(p.balance_cny||0)
-  if (!convert.value.amount) convert.value.amount = Math.max(0, bal)
+  updatingAmount = true
+  convert.value.amount = Math.max(0, bal)
+  // 下一轮微任务后允许用户编辑标记
+  queueMicrotask(() => { updatingAmount = false })
+}
+watch(() => convert.value.amount, (v, ov) => {
+  if (updatingAmount) return
+  // 用户主动输入后，标记为已编辑
+  if (v != null && v !== 0) amountEdited.value = true
+})
+watch(() => convert.value.platform_id, () => {
+  if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
+})
+watch(() => convert.value.from, () => {
+  if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
 })
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 function percent(v){
@@ -230,18 +253,14 @@ onMounted(async () => { await loadPlatforms(); await fetchBocRate() })
 onBeforeUnmount(stopPolling)
 
 // 转换（平台内互换）
-const convert = ref({ platform_id: null, from: 'CNY', to: 'MYR', amount: null, rate: null })
+const convert = ref({ platform_id: null, from: 'MYR', to: 'CNY', amount: null, rate: null })
 const canConvert = computed(() => !!convert.value.platform_id && convert.value.from && convert.value.to && convert.value.from!==convert.value.to && Number(convert.value.amount||0)>0 && Number(convert.value.rate||0)>0 )
 const convertSummary = computed(() => {
-  const p = platforms.value.find(x=>x.id===convert.value.platform_id)
-  if (!p) return ''
-  const feePct = Number(p.fee_percent||0)
   const amt = Number(convert.value.amount||0)
   const r = Number(convert.value.rate||0)
   if (!(amt>0) || !(r>0)) return ''
-  const fee = amt * feePct / 100
   const toAmt = amt * r
-  return `${t('buyfx.fee')}: ${money(fee)} | ${t('buyfx.amountTo')}: ${money(toAmt)}`
+  return `${t('buyfx.amountTo')}: ${money(toAmt)}`
 })
 async function doConvert(){
   try{
