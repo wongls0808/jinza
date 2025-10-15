@@ -77,8 +77,7 @@ const messages = {
       amountPayCny: '购汇金额(CNY)',
       expectedRate: '预期汇率(CNY/MYR)',
       submitBuy: '提交下单',
-      liveRate: '实时汇率 (CNY/MYR)：',
-      refresh: '刷新',
+  // 实时汇率文案已移除
       orderNo: '订单号',
       platform: '平台商',
       amountCny: '金额(CNY)',

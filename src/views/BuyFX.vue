@@ -46,16 +46,7 @@
               <span>{{ t('buyfx.title') }}</span>
             </div>
           </template>
-          <div class="rate-bar">
-            <el-radio-group v-model="pair" size="small" @change="onPairChange">
-              <el-radio-button label="MYR/USD">MYR = USD</el-radio-button>
-              <el-radio-button label="MYR/CNY">MYR = CNY</el-radio-button>
-              <el-radio-button label="USD/CNY">USD = CNY</el-radio-button>
-            </el-radio-group>
-            <el-tag type="info" effect="light">{{ bocRateText }}</el-tag>
-            <el-button size="small" type="primary" text @click="fetchBocRate">{{ t('buyfx.refresh') }}</el-button>
-          </div>
-          <el-divider />
+          
           <div class="convert-form">
             <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" @change="onPlatformChange">
               <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
@@ -105,7 +96,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
@@ -115,13 +106,6 @@ const { t } = useI18n()
 const router = useRouter()
 
 const platforms = ref([])
-const rate = ref(null)
-const pair = ref('MYR/CNY') // 默认：卖出 MYR 买入 CNY
-const bocRate = ref(null)
-let timer = null
-
-const liveRateText = computed(() => rate.value==null ? '—' : Number(rate.value||0).toFixed(6))
-const bocRateText = computed(() => bocRate.value==null ? '—' : Number(bocRate.value||0).toFixed(6))
 
 async function loadPlatforms(){
   const res = await api.buyfx.listPlatforms()
@@ -135,35 +119,7 @@ async function loadPlatforms(){
     if (convert.value.platform_id && (!amountEdited.value || !convert.value.amount)) setAmountFromBalance()
   }
 }
-async function refreshRate(){
-  const r = await api.buyfx.getRate('CNY/MYR')
-  rate.value = r?.rate ?? null
-}
-function startPolling(){
-  stopPolling()
-  timer = setInterval(refreshRate, 5000)
-}
-function stopPolling(){ if (timer) { clearInterval(timer); timer=null } }
-
-async function fetchBocRate(){
-  // 优先 Huaji，失败回退 BOC，再失败回退本地存储 fx_rates
-  try {
-    const r1 = await api.buyfx.getHuajiRate(pair.value)
-    bocRate.value = r1?.rate ?? null
-    if (bocRate.value != null) return
-  } catch {}
-  try {
-    const r = await api.buyfx.getBocRate(pair.value)
-    bocRate.value = r?.rate ?? null
-    if (bocRate.value != null) return
-  } catch {}
-  try {
-    const r = await api.buyfx.getRate(pair.value)
-    bocRate.value = r?.rate ?? null
-  } catch { bocRate.value = null }
-}
-function onPairChange(){ fetchBocRate() }
-watch(pair, () => { /* 冗余保障 */ fetchBocRate() })
+// 已移除实时汇率调用，支持手工录入汇率
 
 // 卖出金额默认对应币种余额（可手动修改）
 const amountEdited = ref(false)
@@ -257,8 +213,7 @@ async function removePlatform(row){
   }
 }
 
-onMounted(async () => { await loadPlatforms(); await fetchBocRate() })
-onBeforeUnmount(stopPolling)
+onMounted(async () => { await loadPlatforms() })
 
 // 转换（平台内互换）
 const convert = ref({ platform_id: null, from: 'MYR', to: 'CNY', amount: null, rate: null })
@@ -299,7 +254,6 @@ function onFromChange(){
 
 <style scoped>
 .fx-buy { padding: 8px; }
-.rate-bar { display:flex; gap:10px; align-items:center; margin-bottom: 8px; }
 .buy-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin-bottom:8px; }
 @media (max-width: 1200px){ .buy-form { grid-template-columns: 1fr; } }
 .convert-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin: 8px 0; }

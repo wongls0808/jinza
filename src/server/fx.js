@@ -221,30 +221,12 @@ fxRouter.delete('/platforms/:id', authMiddleware(true), requirePerm('manage_fx')
   res.json({ ok: true })
 })
 
-// ---------- 汇率（动态展示） ----------
+// ---------- 汇率（已停用） ----------
 fxRouter.get('/rates', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
-  await ensureDDL()
-  const pair = String(req.query.pair||'').toUpperCase()
-  if (pair) {
-    const rs = await query(`select * from fx_rates where pair=$1`, [pair])
-    return res.json(rs.rowCount ? rs.rows[0] : null)
-  }
-  const rs = await query(`select * from fx_rates order by pair`)
-  res.json({ items: rs.rows })
+  return res.status(410).json({ error: 'rates disabled' })
 })
 fxRouter.post('/rates', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
-  await ensureDDL()
-  const { pair, rate, source } = req.body || {}
-  if (!pair || !rate) return res.status(400).json({ error: 'pair/rate required' })
-  const p = String(pair).toUpperCase()
-  const r = Number(rate)
-  const rs = await query(`
-    insert into fx_rates(pair, rate, source, updated_at)
-    values($1,$2,$3, now())
-    on conflict(pair) do update set rate=EXCLUDED.rate, source=EXCLUDED.source, updated_at=now()
-    returning *
-  `, [p, r, source||null])
-  res.json(rs.rows[0])
+  return res.status(410).json({ error: 'rates disabled' })
 })
 
 // ---------- 购汇下单（记录） ----------
@@ -327,96 +309,9 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
   }
 })
 
-// ---------- Huaji 汇率服务（表单 POST） ----------
-// GET /fx/rates/huaji?pair=USD/CNY|MYR/CNY|MYR/USD|USD/MYR
+// ---------- Huaji 汇率服务（已停用） ----------
 fxRouter.get('/rates/huaji', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
-  const raw = String(req.query.pair || '').toUpperCase().replace('-', '/')
-  const allowed = new Set(['USD/CNY','MYR/CNY','MYR/USD','USD/MYR'])
-  if (!allowed.has(raw)) return res.status(400).json({ error: 'invalid pair' })
-
-  // 通用请求函数：向 Huaji API 发送 x-www-form-urlencoded
-  async function requestHuaji(from, to) {
-    const url = process.env.HUAJI_API_URL || 'https://api.huajidata.com/v1/exchange/rate'
-    const key = process.env.HUAJI_API_KEY || ''
-    const body = new URLSearchParams()
-    body.set('from', from)
-    body.set('to', to)
-    // 附加常见字段以提升兼容性
-    body.set('pair', `${from}/${to}`)
-    body.set('amount', '1')
-    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-    if (key) {
-      headers['Authorization'] = `Bearer ${key}`
-      headers['X-API-Key'] = key
-    }
-    const r = await fetch(url, { method: 'POST', headers, body })
-    if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    let data
-    const ct = r.headers.get('content-type') || ''
-    if (ct.includes('application/json')) data = await r.json()
-    else {
-      const text = await r.text()
-      try { data = JSON.parse(text) } catch { data = { text } }
-    }
-    // 兼容多种返回结构：优先 data.rate / rate / price
-    const val = Number(
-      (data && (data.rate ?? data.price ?? data?.data?.rate ?? data?.data?.price)) || 0
-    )
-    if (!isFinite(val) || val <= 0) throw new Error('invalid rate from huaji')
-    return val
-  }
-
-  function getCached(pair) {
-    const it = _huajiCache.map.get(pair)
-    if (!it) return null
-    if (Date.now() - it.time > _huajiCache.ttl) { _huajiCache.map.delete(pair); return null }
-    return it.rate
-  }
-  function setCached(pair, rate) {
-    _huajiCache.map.set(pair, { time: Date.now(), rate: Number(rate) })
-  }
-
-  async function getPair(pair) {
-    const cached = getCached(pair)
-    if (cached) return cached
-    const [base, quote] = pair.split('/')
-    // 先尝试直接请求该货币对
-    try {
-      const direct = await requestHuaji(base, quote)
-      setCached(pair, direct)
-      return direct
-    } catch {}
-    // 交叉：通过 USD/CNY 与 MYR/CNY
-    try {
-      const usd_cny = base === 'USD' && quote === 'CNY' ? null : await getPair('USD/CNY')
-      const myr_cny = base === 'MYR' && quote === 'CNY' ? null : await getPair('MYR/CNY')
-      let v = null
-      if (pair === 'USD/CNY') {
-        v = await requestHuaji('USD','CNY')
-      } else if (pair === 'MYR/CNY') {
-        v = await requestHuaji('MYR','CNY')
-      } else if (pair === 'MYR/USD') {
-        if (!isFinite(myr_cny) || !isFinite(usd_cny)) throw new Error('cross rate missing')
-        v = myr_cny / usd_cny
-      } else if (pair === 'USD/MYR') {
-        if (!isFinite(myr_cny) || !isFinite(usd_cny)) throw new Error('cross rate missing')
-        v = usd_cny / myr_cny
-      }
-      if (!isFinite(v) || v <= 0) throw new Error('invalid cross rate')
-      setCached(pair, v)
-      return v
-    } catch (e) {
-      throw e
-    }
-  }
-
-  try {
-    const rate = await getPair(raw)
-    return res.json({ pair: raw, rate: Number(rate) })
-  } catch (e) {
-    console.error('huaji rate failed', e)
-    return res.status(502).json({ error: 'huaji rate failed', detail: e.message })
-  }
+  return res.status(410).json({ error: 'rates disabled' })
 })
 
 // ---------- 平台购汇历史（转换记录） ----------

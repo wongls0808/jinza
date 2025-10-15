@@ -272,10 +272,7 @@ export const api = {
     listPlatforms: () => request('/fx/platforms'),
     savePlatform: (m) => request('/fx/platforms', { method: 'POST', body: JSON.stringify(m) }),
     deletePlatform: (id) => request(`/fx/platforms/${id}`, { method: 'DELETE' }),
-    getRate: (pair) => request(`/fx/rates?pair=${encodeURIComponent(pair)}`),
-    getHuajiRate: (pair) => request(`/fx/rates/huaji?pair=${encodeURIComponent(pair)}`),
-    getBocRate: (pair) => request(`/fx/rates/boc?pair=${encodeURIComponent(pair)}`),
-    upsertRate: (data) => request('/fx/rates', { method: 'POST', body: JSON.stringify(data) }),
+    // 实时汇率接口已移除，改为手工录入汇率
   // 历史记录改用平台内互换记录
   listOrders: () => request('/fx/transfers'),
   updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),

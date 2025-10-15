@@ -66,7 +66,7 @@
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
-                <el-button size="small" type="danger" :disabled="row.status==='completed'">{{ t('common.delete') }}</el-button>
+                <el-button size="small" type="danger" :disabled="row.status==='completed' || row.status==='pending'">{{ t('common.delete') }}</el-button>
               </template>
             </el-popconfirm>
           </template>
