@@ -91,7 +91,7 @@
     </el-drawer>
 
     <!-- 审核弹窗：选择平台（手续费按平台配置） -->
-    <el-dialog v-model="approveDialog.visible" title="审核付款单" width="420px">
+    <el-dialog v-model="approveDialog.visible" title="审核付款单" width="520px">
       <el-form label-width="100px">
         <el-form-item label="平台商">
           <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
@@ -101,10 +101,41 @@
         <el-alert v-if="approveDialog.platform_id" type="info" :closable="false" show-icon>
           将按平台商配置的手续费比例进行扣减。
         </el-alert>
+        <!-- 单笔审核余额预览 -->
+        <div v-if="approveDialog.platform_id" class="preview-card" style="margin-top:8px;">
+          <div class="row">
+            <div class="cell head">平台手续费</div>
+            <div class="cell">{{ Number(selectedPlatformSingle?.fee_percent||0).toFixed(4) }}%</div>
+          </div>
+          <div class="row">
+            <div class="cell head">币种</div>
+            <div class="cell">USD</div>
+            <div class="cell">MYR</div>
+            <div class="cell">CNY</div>
+          </div>
+          <div class="row">
+            <div class="cell head">可用余额</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_usd||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_myr||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_cny||0)) }}</div>
+          </div>
+          <div class="row">
+            <div class="cell head">本单应扣(含手续费)</div>
+            <div class="cell mono warn" :class="{ danger: needSingle.USD>0 && afterSingle.USD<0 }">{{ money(needSingle.USD) }}</div>
+            <div class="cell mono warn" :class="{ danger: needSingle.MYR>0 && afterSingle.MYR<0 }">{{ money(needSingle.MYR) }}</div>
+            <div class="cell mono warn" :class="{ danger: needSingle.CNY>0 && afterSingle.CNY<0 }">{{ money(needSingle.CNY) }}</div>
+          </div>
+          <div class="row">
+            <div class="cell head">扣减后余额</div>
+            <div class="cell mono" :class="{ danger: afterSingle.USD<0 }">{{ money(afterSingle.USD) }}</div>
+            <div class="cell mono" :class="{ danger: afterSingle.MYR<0 }">{{ money(afterSingle.MYR) }}</div>
+            <div class="cell mono" :class="{ danger: afterSingle.CNY<0 }">{{ money(afterSingle.CNY) }}</div>
+          </div>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="approveDialog.visible=false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" :loading="approveDialog.loading" @click="confirmApprove">{{ t('common.ok') }}</el-button>
+        <el-button type="primary" :disabled="!canApproveSingle" :loading="approveDialog.loading" @click="confirmApprove">{{ t('common.ok') }}</el-button>
       </template>
     </el-dialog>
 
@@ -175,7 +206,21 @@ async function approve(row){
 async function loadPlatforms(){ const res = await api.buyfx.listPlatforms(); platforms.value = res.items || [] }
 
 const approveDialog = ref({ visible: false, loading: false, id: null, platform_id: null })
-function openApprove(row){ approveDialog.value = { visible: true, loading: false, id: row.id, platform_id: null } }
+const currentPaymentTotals = ref({ USD:0, MYR:0, CNY:0 })
+async function openApprove(row){
+  approveDialog.value = { visible: true, loading: false, id: row.id, platform_id: null }
+  // 拉取明细合计
+  try {
+    const d = await api.fx.payments.detail(row.id)
+    const totals = { USD:0, MYR:0, CNY:0 }
+    for (const it of (d.items||[])) {
+      const cur = String(it.currency_code||'').toUpperCase()
+      const amt = Math.round(Number(it.amount||0) * 100) / 100
+      if (cur==='USD' || cur==='MYR' || cur==='CNY') totals[cur] = Math.round((totals[cur] + amt) * 100) / 100
+    }
+    currentPaymentTotals.value = totals
+  } catch { currentPaymentTotals.value = { USD:0, MYR:0, CNY:0 } }
+}
 async function confirmApprove(){
   const { id, platform_id } = approveDialog.value
   if (!platform_id) return
@@ -201,6 +246,26 @@ async function openAudits(row){
   const list = await api.fx.payments.audits(row.id)
   auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
 }
+
+// 单笔审核余额预览计算
+const selectedPlatformSingle = computed(() => platforms.value.find(p => p.id === approveDialog.value.platform_id) || null)
+const feePctSingle = computed(() => Number(selectedPlatformSingle.value?.fee_percent || 0))
+const needSingle = computed(() => ({
+  USD: Math.round((currentPaymentTotals.value.USD + Math.round((currentPaymentTotals.value.USD * feePctSingle.value / 100) * 100) / 100) * 100) / 100,
+  MYR: Math.round((currentPaymentTotals.value.MYR + Math.round((currentPaymentTotals.value.MYR * feePctSingle.value / 100) * 100) / 100) * 100) / 100,
+  CNY: Math.round((currentPaymentTotals.value.CNY + Math.round((currentPaymentTotals.value.CNY * feePctSingle.value / 100) * 100) / 100) * 100) / 100,
+}))
+const afterSingle = computed(() => ({
+  USD: Math.round(((Number(selectedPlatformSingle.value?.balance_usd||0)) - needSingle.value.USD) * 100) / 100,
+  MYR: Math.round(((Number(selectedPlatformSingle.value?.balance_myr||0)) - needSingle.value.MYR) * 100) / 100,
+  CNY: Math.round(((Number(selectedPlatformSingle.value?.balance_cny||0)) - needSingle.value.CNY) * 100) / 100,
+}))
+const canApproveSingle = computed(() => {
+  if (!approveDialog.value.platform_id) return false
+  const anyNeed = (needSingle.value.USD>0 || needSingle.value.MYR>0 || needSingle.value.CNY>0)
+  if (!anyNeed) return false
+  return afterSingle.value.USD >= 0 && afterSingle.value.MYR >= 0 && afterSingle.value.CNY >= 0
+})
 
 // 批量审批 + 余额预览
 const multipleSelection = ref([])
