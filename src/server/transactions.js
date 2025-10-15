@@ -475,7 +475,42 @@ transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('view_tr
     const { type, targetId, targetName } = req.body || {}
     if (!id || !type) return res.status(400).json({ error: 'missing fields' })
     const t = String(type).toLowerCase()
-    if (!['customer','supplier','expense'].includes(t)) return res.status(400).json({ error: 'invalid type' })
+    if (!['customer','supplier','expense','buyfx'].includes(t)) return res.status(400).json({ error: 'invalid type' })
+
+    // 特殊处理：购汇匹配到平台商，同时更新平台余额
+    if (t === 'buyfx') {
+      // 需要 FX 权限
+      const hasManageFx = (req.user?.perms || []).includes('manage_fx')
+      if (!hasManageFx) return res.status(403).json({ error: 'Forbidden' })
+      const pid = Number(targetId)
+      if (!pid) return res.status(400).json({ error: 'invalid platform id' })
+      // 读取交易金额（借方/贷方）与账户币种
+      const tr = await query(`
+        select t.debit_amount, t.credit_amount, a.currency_code
+        from transactions t
+        left join receiving_accounts a on a.bank_account = t.account_number
+        where t.id=$1
+      `, [id])
+      if (!tr.rowCount) return res.status(404).json({ error: 'transaction not found' })
+      const debit = Number(tr.rows[0].debit_amount||0)
+      const credit = Number(tr.rows[0].credit_amount||0)
+      const cur = String(tr.rows[0].currency_code||'').toUpperCase()
+      // 平台余额字段按币种映射
+      const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
+      if (!field) return res.status(400).json({ error: `unsupported currency ${cur}` })
+      // 规则：交易管理的借方金额对应平台商为贷方金额 -> 平台余额 += 借方；平台余额 -= 贷方
+      const delta = debit - credit
+      await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+      const matched_by = req.user?.id || null
+      const name = (targetName || '').toString().trim() || null
+      await query(
+        `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now() where id=$5` ,
+        [t, pid, name, matched_by, id]
+      )
+      return res.json({ ok: true })
+    }
+
+    // 其他类型：沿用通用逻辑
     const matched_by = req.user?.id || null
     const name = (targetName || '').toString().trim() || null
     const tid = targetId ? Number(targetId) : null

@@ -344,7 +344,25 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeBuyFx')" name="buyfx">
-            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+            <el-form label-width="100px">
+              <el-form-item :label="t('transactions.selectPlatform')">
+                <el-select
+                  v-model="matchForm.platformId"
+                  filterable
+                  :loading="platformsLoading"
+                  :placeholder="t('transactions.searchPlatformPlaceholder')"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="p in platformOptions"
+                    :key="p.id"
+                    :label="(p.code ? (p.code + ' · ') : '') + p.name"
+                    :value="p.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
+            </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
             <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
@@ -910,13 +928,17 @@ const matchDrawerVisible = ref(false)
 const matching = ref(false)
 const customersLoading = ref(false)
 const customerOptions = ref([])
-const matchForm = reactive({ id: null, customerId: null })
+const platformsLoading = ref(false)
+const platformOptions = ref([])
+const matchForm = reactive({ id: null, customerId: null, platformId: null })
 const matchType = ref('settle') // settle | buyfx | transfer | expense
 
 const handleMatchRow = (row) => {
   matchForm.id = row?.id || null
   matchForm.customerId = null
+  matchForm.platformId = null
   customerOptions.value = []
+  platformOptions.value = []
   matchType.value = 'settle'
   matchDrawerVisible.value = true
 }
@@ -930,6 +952,25 @@ const searchCustomers = async (q) => {
     customersLoading.value = false
   }
 }
+
+// 拉取平台商列表
+const fetchPlatforms = async () => {
+  platformsLoading.value = true
+  try {
+    const list = await api.buyfx.listPlatforms()
+    platformOptions.value = Array.isArray(list) ? list : (list?.items || [])
+  } catch (e) {
+    console.error('获取平台商失败', e)
+  } finally {
+    platformsLoading.value = false
+  }
+}
+
+watch(matchType, (nv) => {
+  if (nv === 'buyfx' && platformOptions.value.length === 0) {
+    fetchPlatforms()
+  }
+})
 
 const confirmMatch = async () => {
   if (matchType.value === 'settle') {
@@ -952,7 +993,28 @@ const confirmMatch = async () => {
       matching.value = false
     }
   } else {
-    ElMessage.info(t('transactions.todoPlaceholder'))
+    if (matchType.value === 'buyfx') {
+      if (!matchForm.id || !matchForm.platformId) {
+        ElMessage.warning(t('transactions.selectPlatformFirst'))
+        return
+      }
+      try {
+        matching.value = true
+        const p = platformOptions.value.find(x => x.id === matchForm.platformId)
+        const name = p?.name || ''
+        await api.transactions.match(matchForm.id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name })
+        matchDrawerVisible.value = false
+        ElMessage.success(t('transactions.matchSuccess'))
+        fetchTransactions()
+      } catch (e) {
+        console.error('match buyfx failed', e)
+        ElMessage.error(t('transactions.matchFailed'))
+      } finally {
+        matching.value = false
+      }
+    } else {
+      ElMessage.info(t('transactions.todoPlaceholder'))
+    }
   }
 }
 
