@@ -70,9 +70,9 @@
               <el-option label="MYR" value="MYR"/>
               <el-option label="CNY" value="CNY"/>
             </el-select>
-            <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" :placeholder="t('buyfx.amountFrom')"/>
+            <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" :placeholder="t('buyfx.sellAmount')" @change="() => { amountEdited.value = true }"/>
             <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" :placeholder="t('buyfx.rate')"/>
-            <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.convert') }}</el-button>
+            <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.sell') }}</el-button>
           </div>
           <div class="convert-hint" v-if="convertSummary">
             <el-alert type="info" :title="convertSummary" show-icon :closable="false" />

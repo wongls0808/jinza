@@ -99,14 +99,19 @@ const messages = {
       submitFailed: '提交失败'
       ,fromCurrency: '从币种',
       toCurrency: '到币种',
-      amountFrom: '换出金额',
+  sellAmount: '卖出金额',
       rate: '汇率',
-      convert: '币种互换',
+  sell: '卖出',
       fee: '手续费',
       amountTo: '到账金额',
       converted: '互换成功',
       convertFailed: '互换失败',
       viewOrders: '查看购汇历史'
+      ,historyDate: '购汇日期',
+      sellCurrency: '卖出币种',
+      buyAmount: '买入金额',
+      fromBalance: '卖出币种余额',
+      toBalance: '买入币种余额'
     },
     customers: {
       title: '客户管理',
@@ -487,14 +492,19 @@ const messages = {
       submitFailed: 'Submit failed'
       ,fromCurrency: 'From',
       toCurrency: 'To',
-      amountFrom: 'Amount',
+  sellAmount: 'Sell Amount',
       rate: 'Rate',
-      convert: 'Convert',
+  sell: 'Sell',
       fee: 'Fee',
       amountTo: 'To Amount',
       converted: 'Converted',
       convertFailed: 'Convert failed',
       viewOrders: 'View Buy Orders'
+      ,historyDate: 'Date',
+      sellCurrency: 'Sell Currency',
+      buyAmount: 'Buy Amount',
+      fromBalance: 'From Balance',
+      toBalance: 'To Balance'
     },
     customers: {
       title: 'Customers',

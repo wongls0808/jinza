@@ -15,18 +15,35 @@
 
       <el-table :data="rows" size="small" border stripe>
         <el-table-column type="index" width="50"/>
-        <el-table-column prop="order_no" :label="t('buyfx.orderNo')" width="160"/>
-        <el-table-column prop="platform_name" :label="t('buyfx.platform')" width="160"/>
-        <el-table-column prop="customer_name" :label="t('buyfx.customer')" width="180"/>
-        <el-table-column prop="pay_currency" :label="t('buyfx.payCurrency')" width="100"/>
-        <el-table-column prop="buy_currency" :label="t('buyfx.buyCurrency')" width="100"/>
-        <el-table-column :label="t('buyfx.amountPay')" width="140" align="right">
-          <template #default="{ row }">{{ money(row.amount_pay) }}</template>
+        <el-table-column prop="created_at" :label="t('buyfx.historyDate')" width="170"/>
+        <el-table-column :label="t('buyfx.fromBalance')" width="160" align="right">
+          <template #default="{ row }">{{ row.from_currency }} {{ money(row.balance_src_after) }}</template>
         </el-table-column>
-        <el-table-column prop="expected_rate" :label="t('buyfx.expectedRate')" width="140" align="right">
-          <template #default="{ row }">{{ rate6(row.expected_rate) }}</template>
+        <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100"/>
+        <el-table-column :label="t('buyfx.sellAmount')" width="140" align="right">
+          <template #default="{ row }">{{ money(row.amount_from) }}</template>
         </el-table-column>
-        <el-table-column prop="created_at" :label="t('common.createdAt')" width="180"/>
+        <el-table-column :label="t('buyfx.rate')" width="120" align="right">
+          <template #default="{ row }">{{ rate6(row.rate) }}</template>
+        </el-table-column>
+        <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="100"/>
+        <el-table-column :label="t('buyfx.buyAmount')" width="140" align="right">
+          <template #default="{ row }">{{ money(row.amount_to) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('buyfx.toBalance')" width="160" align="right">
+          <template #default="{ row }">{{ row.to_currency }} {{ money(row.balance_dst_after) }}</template>
+        </el-table-column>
+        <el-table-column prop="created_by_name" :label="t('common.createdBy')" width="140"/>
+        <el-table-column :label="t('common.actions')" width="160">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="editNote(row)">{{ t('common.edit') }}</el-button>
+            <el-popconfirm :title="t('buyfx.confirmDelete')" @confirm="onDelete(row)">
+              <template #reference>
+                <el-button size="small" text type="danger">{{ t('common.delete') }}</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div v-if="!loading && rows.length===0" class="empty">{{ t('common.empty') }}</div>
@@ -54,6 +71,17 @@ async function loadOrders(){
   } finally {
     loading.value = false
   }
+}
+
+async function editNote(row){
+  const note = prompt(t('common.details'), row.note || '')
+  if (note === null) return
+  await api.buyfx.updateOrderNote(row.id, note)
+  await loadOrders()
+}
+async function onDelete(row){
+  await api.buyfx.deleteOrder(row.id)
+  await loadOrders()
 }
 
 onMounted(loadOrders)

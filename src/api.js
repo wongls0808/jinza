@@ -273,8 +273,11 @@ export const api = {
     getHuajiRate: (pair) => request(`/fx/rates/huaji?pair=${encodeURIComponent(pair)}`),
     getBocRate: (pair) => request(`/fx/rates/boc?pair=${encodeURIComponent(pair)}`),
     upsertRate: (data) => request('/fx/rates', { method: 'POST', body: JSON.stringify(data) }),
-    listOrders: () => request('/fx/buy'),
-    createOrder: (data) => request('/fx/buy', { method: 'POST', body: JSON.stringify(data) }),
+  // 历史记录改用平台内互换记录
+  listOrders: () => request('/fx/transfers'),
+  updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),
+  deleteOrder: (id) => request(`/fx/transfers/${id}`, { method: 'DELETE' }),
+  createOrder: (data) => request('/fx/buy', { method: 'POST', body: JSON.stringify(data) }),
     convertPlatformCurrency: (platformId, data) => request(`/fx/platforms/${platformId}/convert`, { method: 'POST', body: JSON.stringify(data) })
   },
   // 按客户拉取已匹配交易，辅助结汇区
