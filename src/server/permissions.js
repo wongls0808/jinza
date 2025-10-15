@@ -124,3 +124,43 @@ export async function reseedPermissions({ reset = false } = {}) {
   const count = (await query('select count(*) from permissions')).rows?.[0]?.count || 0
   return { total: Number(count), insertedOrUpdated: newPerms.length, removed }
 }
+
+// 将新权限代码集合展开为包含旧权限键的兼容集合（供前端菜单/后端旧 requirePerm 使用）
+export function expandWithLegacy(codes = []) {
+  const set = new Set(codes || [])
+  const hasPrefix = (p) => [...set].some(c => c.startsWith(p))
+  const hasAny = (...arr) => arr.some(c => set.has(c))
+
+  // users -> manage_users
+  if (hasPrefix('users:')) set.add('manage_users')
+
+  // customers -> view_customers
+  if (hasPrefix('customers:')) set.add('view_customers')
+
+  // banks -> view_banks
+  if (hasPrefix('banks:')) set.add('view_banks')
+
+  // accounts -> view_accounts
+  if (hasPrefix('accounts:')) set.add('view_accounts')
+
+  // transactions -> legacy view/manage/delete
+  if (hasPrefix('transactions:')) set.add('view_transactions')
+  if (hasAny('transactions:create','transactions:update','transactions:match','transactions:unmatch','transactions:import')) {
+    set.add('manage_transactions')
+  }
+  if (hasAny('transactions:delete')) set.add('delete_transactions')
+
+  // fx -> legacy view/manage/delete
+  if (hasPrefix('fx:')) set.add('view_fx')
+  if (hasAny('fx:manage','fx:platforms:save','fx:payments:approve','fx:payments:batchApprove','fx:payments:unapprove','fx:settlements:create','fx:buy:create','fx:convert')) {
+    set.add('manage_fx')
+  }
+  if (hasAny('fx:delete','fx:platforms:delete')) set.add('delete_fx')
+
+  // settings/currencies -> view_settings
+  if (hasPrefix('settings:') || hasPrefix('currencies:')) set.add('view_settings')
+
+  // dashboard 已兼容 view_dashboard（新树里的首页仅有 view_dashboard）
+  // 保持原有 codes
+  return [...set]
+}
