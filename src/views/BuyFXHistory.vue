@@ -52,15 +52,38 @@
       <div v-if="!loading && rows.length===0" class="empty">{{ t('common.empty') }}</div>
     </el-card>
 
-    <el-dialog v-model="editDialog.visible" :title="t('common.edit')" width="420px">
-      <el-form label-width="80px">
+    <el-dialog v-model="editDialog.visible" :title="t('common.edit')" width="520px">
+      <el-form label-width="100px">
+        <el-form-item :label="t('buyfx.platform')">
+          <el-input v-model="editDialog.platform_name" disabled />
+        </el-form-item>
+        <el-form-item :label="t('buyfx.sellCurrency')">
+          <el-select v-model="editDialog.from_currency" style="width: 140px">
+            <el-option label="USD" value="USD" />
+            <el-option label="MYR" value="MYR" />
+            <el-option label="CNY" value="CNY" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('buyfx.buyCurrency')">
+          <el-select v-model="editDialog.to_currency" style="width: 140px">
+            <el-option label="USD" value="USD" />
+            <el-option label="MYR" value="MYR" />
+            <el-option label="CNY" value="CNY" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('buyfx.sellAmount')">
+          <el-input v-model.number="editDialog.amount_from" type="number" />
+        </el-form-item>
+        <el-form-item :label="t('buyfx.rate')">
+          <el-input v-model.number="editDialog.rate" type="number" />
+        </el-form-item>
         <el-form-item :label="t('common.details')">
-          <el-input v-model="editDialog.note" type="textarea" :rows="4" />
+          <el-input v-model="editDialog.note" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialog.visible=false" :disabled="editDialog.loading">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="saveEdit" :loading="editDialog.loading">{{ t('common.ok') }}</el-button>
+        <el-button type="primary" @click="saveEdit" :loading="editDialog.loading">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -91,11 +114,34 @@ async function loadOrders(){
   }
 }
 
-const editDialog = ref({ visible: false, loading: false, id: null, note: '' })
-function openEdit(row){ editDialog.value = { visible: true, loading: false, id: row.id, note: row.note || '' } }
+const editDialog = ref({ visible: false, loading: false, id: null, platform_name: '', from_currency: 'MYR', to_currency: 'CNY', amount_from: 0, rate: 0, note: '' })
+function openEdit(row){
+  editDialog.value = {
+    visible: true,
+    loading: false,
+    id: row.id,
+    platform_name: row.platform_name || '',
+    from_currency: row.from_currency || 'MYR',
+    to_currency: row.to_currency || 'CNY',
+    amount_from: Number(row.amount_from||0),
+    rate: Number(row.rate||0),
+    note: row.note || ''
+  }
+}
 async function saveEdit(){
   editDialog.value.loading = true
-  try { await api.buyfx.updateOrderNote(editDialog.value.id, editDialog.value.note); editDialog.value.visible = false; await loadOrders() } finally { editDialog.value.loading = false }
+  try {
+    const payload = {
+      from_currency: editDialog.value.from_currency,
+      to_currency: editDialog.value.to_currency,
+      amount_from: editDialog.value.amount_from,
+      rate: editDialog.value.rate,
+      note: editDialog.value.note
+    }
+    await api.buyfx.updateOrder(editDialog.value.id, payload)
+    editDialog.value.visible = false
+    await loadOrders()
+  } finally { editDialog.value.loading = false }
 }
 async function onDelete(row){
   await api.buyfx.deleteOrder(row.id)

@@ -413,11 +413,98 @@ fxRouter.get('/transfers', authMiddleware(true), requirePerm('view_fx'), async (
 fxRouter.put('/transfers/:id', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
-  const { note } = req.body || {}
   if (!id) return res.status(400).json({ error: 'invalid id' })
-  const rs = await query(`update fx_platform_fx_transfers set note = $1 where id = $2 returning *`, [note||null, id])
-  if (!rs.rowCount) return res.status(404).json({ error: 'not found' })
-  res.json(rs.rows[0])
+  const { note, from_currency, to_currency, amount_from, rate } = req.body || {}
+
+  // 若仅有备注，保持轻量更新
+  const hasEdit = (from_currency!=null) || (to_currency!=null) || (amount_from!=null) || (rate!=null)
+  if (!hasEdit) {
+    const rs = await query(`update fx_platform_fx_transfers set note = $1 where id = $2 returning *`, [note||null, id])
+    if (!rs.rowCount) return res.status(404).json({ error: 'not found' })
+    return res.json(rs.rows[0])
+  }
+
+  // 完整编辑：回滚旧影响 -> 应用新影响 -> 更新记录与快照
+  const tr = await query(`select * from fx_platform_fx_transfers where id=$1`, [id])
+  if (!tr.rowCount) return res.status(404).json({ error: 'not found' })
+  const old = tr.rows[0]
+
+  // 新值与校验
+  const from = String((from_currency ?? old.from_currency) || '').toUpperCase()
+  const to = String((to_currency ?? old.to_currency) || '').toUpperCase()
+  const amt = Number((amount_from ?? old.amount_from) || 0)
+  const r = Number((rate ?? old.rate) || 0)
+  const okCurr = new Set(['USD','MYR','CNY'])
+  if (!okCurr.has(from) || !okCurr.has(to) || from === to) return res.status(400).json({ error: 'invalid currency' })
+  if (!(amt > 0) || !(r > 0)) return res.status(400).json({ error: 'invalid amount/rate' })
+
+  // 统一两位小数的借/贷对平台影响
+  const debitTotal = Math.round(amt * 100) / 100
+  const creditTo = Math.round((amt * r) * 100) / 100
+
+  const oldSrcField = old.from_currency === 'USD' ? 'balance_usd' : (old.from_currency === 'MYR' ? 'balance_myr' : 'balance_cny')
+  const oldDstField = old.to_currency === 'USD' ? 'balance_usd' : (old.to_currency === 'MYR' ? 'balance_myr' : 'balance_cny')
+  const newSrcField = from === 'USD' ? 'balance_usd' : (from === 'MYR' ? 'balance_myr' : 'balance_cny')
+  const newDstField = to === 'USD' ? 'balance_usd' : (to === 'MYR' ? 'balance_myr' : 'balance_cny')
+
+  try {
+    await query('begin')
+    // 锁住平台行，避免并发
+    const plat = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [old.platform_id])
+    if (!plat.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+    let p = plat.rows[0]
+
+    // 回滚旧影响：优先按快照差值
+    const hasSnap = old.balance_src_before != null && old.balance_dst_before != null && old.balance_src_after != null && old.balance_dst_after != null
+    if (hasSnap) {
+      const deltaSrc = Number(old.balance_src_after) - Number(old.balance_src_before)
+      const deltaDst = Number(old.balance_dst_after) - Number(old.balance_dst_before)
+      const ps = Number(p[oldSrcField]||0) - deltaSrc
+      const pd = Number(p[oldDstField]||0) - deltaDst
+      await query(`update fx_platforms set ${oldSrcField} = round($1,2), ${oldDstField} = round($2,2) where id=$3`, [ps, pd, old.platform_id])
+      p[oldSrcField] = Math.round(ps * 100) / 100
+      p[oldDstField] = Math.round(pd * 100) / 100
+    } else {
+      const addBack = Math.round(Number(old.amount_from||0) * 100) / 100
+      const minusBack = Math.round(Number(old.amount_to||0) * 100) / 100
+      const ps = Number(p[oldSrcField]||0) + addBack
+      const pd = Number(p[oldDstField]||0) - minusBack
+      await query(`update fx_platforms set ${oldSrcField} = round($1,2), ${oldDstField} = round($2,2) where id=$3`, [ps, pd, old.platform_id])
+      p[oldSrcField] = Math.round(ps * 100) / 100
+      p[oldDstField] = Math.round(pd * 100) / 100
+    }
+
+    // 读取回滚后的最新余额作为新的 before 快照
+    const lock2 = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [old.platform_id])
+    if (!lock2.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+    p = lock2.rows[0]
+    const srcBefore = Number(p[newSrcField]||0)
+    const dstBefore = Number(p[newDstField]||0)
+    // 充足性校验
+    if (srcBefore < debitTotal) {
+      await query('rollback')
+      return res.status(400).json({ error: 'insufficient balance', detail: { required: debitTotal, current: srcBefore, currency: from } })
+    }
+    const srcAfter = Math.round((srcBefore - debitTotal) * 100) / 100
+    const dstAfter = Math.round((dstBefore + creditTo) * 100) / 100
+    // 应用新影响
+    await query(`update fx_platforms set ${newSrcField} = $1, ${newDstField} = $2 where id=$3`, [srcAfter, dstAfter, old.platform_id])
+    // 更新记录
+    const upd = await query(`
+      update fx_platform_fx_transfers
+         set from_currency=$1, to_currency=$2, amount_from=$3, rate=$4, amount_to=$5,
+             balance_src_before=$6, balance_dst_before=$7, balance_src_after=$8, balance_dst_after=$9,
+             note=$10
+       where id=$11
+       returning *
+    `, [from, to, amt, r, creditTo, srcBefore, dstBefore, srcAfter, dstAfter, (note||null), id])
+    await query('commit')
+    return res.json(upd.rows[0])
+  } catch (e) {
+    await query('rollback')
+    console.error('update transfer failed', e)
+    return res.status(500).json({ error: 'update failed', detail: e.message })
+  }
 })
 
 // 删除记录并回滚平台余额

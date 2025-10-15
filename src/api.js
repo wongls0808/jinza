@@ -276,6 +276,7 @@ export const api = {
   // 历史记录改用平台内互换记录
   listOrders: () => request('/fx/transfers'),
   updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),
+  updateOrder: (id, data) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOrder: (id) => request(`/fx/transfers/${id}`, { method: 'DELETE' }),
   createOrder: (data) => request('/fx/buy', { method: 'POST', body: JSON.stringify(data) }),
     convertPlatformCurrency: (platformId, data) => request(`/fx/platforms/${platformId}/convert`, { method: 'POST', body: JSON.stringify(data) })
