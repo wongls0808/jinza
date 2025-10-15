@@ -12,14 +12,14 @@
           <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:240px" filterable>
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
           </el-select>
-          <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.value.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
+          <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
           <span v-if="batch.platform_id" style="color: var(--el-text-color-secondary); font-size:12px;">将按所选平台的手续费比例扣减。</span>
         </div>
         <!-- 余额预览 -->
-        <div v-if="batch.platform_id" class="preview-card">
+        <div v-if="selectedPlatform" class="preview-card">
           <div class="row">
             <div class="cell head">平台手续费</div>
-            <div class="cell">{{ Number(selectedPlatform?.fee_percent||0).toFixed(4) }}%</div>
+            <div class="cell">{{ Number(selectedPlatform.fee_percent||0).toFixed(4) }}%</div>
           </div>
           <div class="row">
             <div class="cell head">币种</div>
@@ -29,9 +29,9 @@
           </div>
           <div class="row">
             <div class="cell head">可用余额</div>
-            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_usd||0)) }}</div>
-            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_myr||0)) }}</div>
-            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_cny||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform.balance_usd||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform.balance_myr||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform.balance_cny||0)) }}</div>
           </div>
           <div class="row">
             <div class="cell head">已选应扣(含手续费)</div>
@@ -91,7 +91,7 @@
     </el-drawer>
 
     <!-- 审核弹窗：选择平台（手续费按平台配置） -->
-    <el-dialog v-model="approveDialog.visible" title="审核付款单" width="520px">
+  <el-dialog v-model="approveDialog.visible" title="审核付款单" width="520px">
       <el-form label-width="100px">
         <el-form-item label="平台商">
           <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
@@ -102,10 +102,10 @@
           将按平台商配置的手续费比例进行扣减。
         </el-alert>
         <!-- 单笔审核余额预览 -->
-        <div v-if="approveDialog.platform_id" class="preview-card" style="margin-top:8px;">
+        <div v-if="selectedPlatformSingle" class="preview-card" style="margin-top:8px;">
           <div class="row">
             <div class="cell head">平台手续费</div>
-            <div class="cell">{{ Number(selectedPlatformSingle?.fee_percent||0).toFixed(4) }}%</div>
+            <div class="cell">{{ Number(selectedPlatformSingle.fee_percent||0).toFixed(4) }}%</div>
           </div>
           <div class="row">
             <div class="cell head">币种</div>
@@ -115,9 +115,9 @@
           </div>
           <div class="row">
             <div class="cell head">可用余额</div>
-            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_usd||0)) }}</div>
-            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_myr||0)) }}</div>
-            <div class="cell mono">{{ money(Number(selectedPlatformSingle?.balance_cny||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_usd||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_myr||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_cny||0)) }}</div>
           </div>
           <div class="row">
             <div class="cell head">本单应扣(含手续费)</div>
@@ -268,7 +268,8 @@ const canApproveSingle = computed(() => {
 })
 
 // 批量审批 + 余额预览
-const multipleSelection = ref([])
+const multipleSelectionRef = ref([])
+const multipleSelection = computed({ get: () => multipleSelectionRef.value, set: (v) => { multipleSelectionRef.value = Array.isArray(v)? v: [] } })
 const batch = ref({ platform_id: null })
 const selectedPlatform = computed(() => platforms.value.find(p => p.id === batch.value.platform_id) || null)
 
@@ -295,7 +296,7 @@ async function onSelectionChange(rows){
 }
 const selectionTotals = computed(() => {
   const totals = { USD:0, MYR:0, CNY:0 }
-  for (const r of multipleSelection.value) {
+  for (const r of (multipleSelection.value || [])) {
     const t = paymentTotalsById.value[r.id]
     if (!t) continue
     totals.USD = Math.round((totals.USD + (t.USD||0)) * 100) / 100
@@ -304,16 +305,16 @@ const selectionTotals = computed(() => {
   }
   return totals
 })
-const feePct4 = computed(() => Number(selectedPlatform.value?.fee_percent || 0))
+const feePct4 = computed(() => Number((selectedPlatform.value && selectedPlatform.value.fee_percent) || 0))
 const need = computed(() => ({
-  USD: Math.round((selectionTotals.value.USD + Math.round((selectionTotals.value.USD * feePct4.value / 100) * 100) / 100) * 100) / 100,
-  MYR: Math.round((selectionTotals.value.MYR + Math.round((selectionTotals.value.MYR * feePct4.value / 100) * 100) / 100) * 100) / 100,
-  CNY: Math.round((selectionTotals.value.CNY + Math.round((selectionTotals.value.CNY * feePct4.value / 100) * 100) / 100) * 100) / 100,
+  USD: Math.round(((selectionTotals.value?.USD || 0) + Math.round((((selectionTotals.value?.USD || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
+  MYR: Math.round(((selectionTotals.value?.MYR || 0) + Math.round((((selectionTotals.value?.MYR || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
+  CNY: Math.round(((selectionTotals.value?.CNY || 0) + Math.round((((selectionTotals.value?.CNY || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
 }))
 const after = computed(() => ({
-  USD: Math.round(((Number(selectedPlatform.value?.balance_usd||0)) - need.value.USD) * 100) / 100,
-  MYR: Math.round(((Number(selectedPlatform.value?.balance_myr||0)) - need.value.MYR) * 100) / 100,
-  CNY: Math.round(((Number(selectedPlatform.value?.balance_cny||0)) - need.value.CNY) * 100) / 100,
+  USD: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_usd) || 0)) - (need.value?.USD || 0)) * 100) / 100,
+  MYR: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_myr) || 0)) - (need.value?.MYR || 0)) * 100) / 100,
+  CNY: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_cny) || 0)) - (need.value?.CNY || 0)) * 100) / 100,
 }))
 const canBatchApprove = computed(() => {
   // 若没有任何需要扣减的金额，则允许；若有扣减，要求全部 after >= 0
@@ -323,7 +324,7 @@ const canBatchApprove = computed(() => {
 })
 async function doBatchApprove(){
   if (!batch.value.platform_id || !multipleSelection.value.length) return
-  const ids = multipleSelection.value.map(r => r.id)
+  const ids = (multipleSelection.value || []).map(r => r.id)
   await api.fx.payments.batchApprove(ids, batch.value.platform_id)
   multipleSelection.value = []
   batch.value.platform_id = null
