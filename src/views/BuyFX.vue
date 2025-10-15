@@ -107,15 +107,15 @@ let timer = null
 const liveRateText = computed(() => rate.value==null ? '—' : Number(rate.value||0).toFixed(6))
 
 async function loadPlatforms(){
-  const res = await api.fx.buyfx.listPlatforms()
+  const res = await api.buyfx.listPlatforms()
   platforms.value = Array.isArray(res?.items) ? res.items : []
 }
 async function loadOrders(){
-  const res = await api.fx.buyfx.listOrders()
+  const res = await api.buyfx.listOrders()
   orders.value = Array.isArray(res?.items) ? res.items : []
 }
 async function refreshRate(){
-  const r = await api.fx.buyfx.getRate('CNY/MYR')
+  const r = await api.buyfx.getRate('CNY/MYR')
   rate.value = r?.rate ?? null
 }
 function startPolling(){
@@ -141,7 +141,7 @@ async function submitOrder(){
       amount_pay: Number(form.value.amount_pay||0),
       expected_rate: form.value.expected_rate==null? null : Number(form.value.expected_rate)
     }
-    await api.fx.buyfx.createOrder(payload)
+  await api.buyfx.createOrder(payload)
     ElMessage.success('已提交购汇')
     form.value = { platform_id: null, customer_name: '', amount_pay: null, expected_rate: null }
     await loadOrders()
@@ -172,7 +172,7 @@ async function savePlatform(){
   if (!m.name) { ElMessage.error('请输入名称'); return }
   platformDialog.value.loading = true
   try {
-    await api.fx.buyfx.savePlatform({
+  await api.buyfx.savePlatform({
       id: m.id,
       code: m.code||null,
       name: m.name,
@@ -195,7 +195,7 @@ async function savePlatform(){
 }
 async function removePlatform(row){
   try {
-    await api.fx.buyfx.deletePlatform(row.id)
+  await api.buyfx.deletePlatform(row.id)
     ElMessage.success('已删除')
     await loadPlatforms()
   } catch (e) {
