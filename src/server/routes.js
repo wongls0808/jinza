@@ -22,21 +22,24 @@ const __dirname = path.dirname(__filename)
 router.post('/auth/login', async (req, res) => {
   const { username, password } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' })
-  const userRes = await query('select id, username, password_hash, display_name, is_active, must_change_password from users where username=$1', [username])
+  const userRes = await query('select id, username, password_hash, display_name, is_active, must_change_password, is_admin from users where username=$1', [username])
   if (userRes.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' })
   const user = userRes.rows[0]
   if (!user.is_active) return res.status(403).json({ error: 'User disabled' })
   const ok = await verifyPassword(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: 'Invalid credentials' })
 
-  const perms = await query(
-    `select p.code from permissions p
-     join user_permissions up on up.permission_id = p.id
-     where up.user_id=$1`,
-    [user.id]
-  )
-  const token = signToken({ id: user.id, username: user.username, perms: perms.rows.map(r => r.code), must_change_password: !!user.must_change_password })
-  res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name }, perms: perms.rows.map(r => r.code), must_change_password: !!user.must_change_password })
+  const perms = user.is_admin
+    ? await query(`select code from permissions order by code`)
+    : await query(
+      `select p.code from permissions p
+       join user_permissions up on up.permission_id = p.id
+       where up.user_id=$1`,
+      [user.id]
+    )
+  const permCodes = [...new Set(perms.rows.map(r => r.code))]
+  const token = signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password })
+  res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name, is_admin: !!user.is_admin }, perms: permCodes, must_change_password: !!user.must_change_password })
 })
 
 router.get('/auth/me', authMiddleware(true), async (req, res) => {
@@ -152,6 +155,13 @@ router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
   // Replace permissions
   await query('delete from user_permissions where user_id=$1', [id])
   if (perms.length) {
+    // 确保传入的权限码存在于 permissions 表（若缺失则按 code 作为 name 写入）
+    await query(
+      `insert into permissions(code, name)
+       select x.code, x.code from unnest($1::text[]) as x(code)
+       on conflict(code) do nothing`,
+      [perms]
+    )
     const getIds = await query('select id, code from permissions where code = any($1::text[])', [perms])
     const values = getIds.rows.map(r => `(${id}, ${r.id})`).join(',')
     if (values) {

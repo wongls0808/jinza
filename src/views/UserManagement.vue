@@ -45,6 +45,23 @@
               </el-tag>
             </div>
           </div>
+          <!-- 树外权限（兼容旧键） -->
+          <div class="perm-group" v-if="extraPerms && extraPerms.length">
+            <div class="perm-group-title">其他/兼容</div>
+            <div class="perm-group-items">
+              <el-tag
+                v-for="p in extraPerms"
+                :key="p.code"
+                :type="userHas(u, p.code) ? 'success' : 'info'"
+                class="perm-tag"
+                effect="light"
+                size="small"
+                @click="togglePerm(u, p.code)"
+              >
+                {{ p.name }}
+              </el-tag>
+            </div>
+          </div>
         </div>
         <div class="perms" v-else-if="perms.length">
           <el-tag
@@ -91,8 +108,9 @@ import { api } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const users = ref([])
-const perms = ref([]) // 兼容旧平铺列表
+const perms = ref([]) // 后端完整清单（含新树与旧键）
 const permTree = ref(null) // 新的权限树（分组展示）
+const extraPerms = ref([]) // 不在新树中的“兼容旧权限”
 const creating = ref(false)
 const newUser = ref({ username: '', password: '', display_name: '' })
 const reset = ref({ visible: false, user: null, password: '', loading: false })
@@ -117,6 +135,11 @@ async function load() {
   users.value = withPerms
   perms.value = ps
   permTree.value = pt
+  // 计算“树外权限”（通常是兼容的旧权限键），用于额外分组展示
+  try {
+    const treeCodes = new Set((pt || []).flatMap(g => (g.items || []).map(it => it.code)))
+    extraPerms.value = (ps || []).filter(p => !treeCodes.has(p.code))
+  } catch { extraPerms.value = [] }
 }
 
 async function createUser() {

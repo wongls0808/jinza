@@ -11,32 +11,21 @@ export function signToken(payload) {
 
 export function authMiddleware(required = true) {
   return async (req, res, next) => {
-    // 开发模式：跳过身份验证，使用默认管理员权限
-    if (process.env.NODE_ENV !== 'production') {
-      // 开发模式下模拟管理员用户
+    // 显式允许通过环境变量绕过鉴权（仅用于临时联调），默认不启用
+    if (process.env.AUTH_BYPASS === '1') {
       req.user = {
         id: 1,
         username: 'admin',
+        is_admin: true,
         perms: [
-          'view_dashboard', 
-          'manage_users', 
-          'view_customers', 
-          'view_banks', 
-          'view_accounts', 
-          'view_transactions',
-          'manage_transactions',
-          'delete_transactions',
-          'view_settings',
-          // FX permissions (dev mode): view/manage/delete
-          'view_fx',
-          'manage_fx',
-          'delete_fx'
+          'view_dashboard','manage_users','view_customers','view_banks','view_accounts','view_transactions',
+          'manage_transactions','delete_transactions','view_settings','view_fx','manage_fx','delete_fx'
         ]
       }
       return next()
     }
     
-    // 生产模式下的正常身份验证逻辑
+    // 正常身份验证逻辑（所有环境）
     const auth = req.headers.authorization
     if (!auth) {
       if (required) return res.status(401).json({ error: 'Unauthorized' })
@@ -71,6 +60,7 @@ export async function ensureSchema() {
       username text unique not null,
       password_hash text not null,
       display_name text,
+      is_admin boolean default false,
       is_active boolean default true,
       must_change_password boolean default false,
       password_updated_at timestamptz,
@@ -141,6 +131,7 @@ export async function ensureSchema() {
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
   await query(`alter table users add column if not exists password_updated_at timestamptz`)
+  await query(`alter table users add column if not exists is_admin boolean default false`)
   // 升级已存在列的精度（若之前为 numeric 或其他数值类型）
   try { await query(`alter table customers alter column tax_rate type numeric(6,3) using round(coalesce(tax_rate,0)::numeric, 3)`) } catch {}
   // 迁移：若历史数据以系数(0..1)存储，则转换为百分比 p=(1 - f)*100；保证幂等：仅转换 0<=tax_rate<=1 的行
@@ -181,12 +172,14 @@ export async function seedInitialAdmin() {
   if (res.rowCount === 0) {
     const hash = await hashPassword(adminPassword)
     const ins = await query(
-      'insert into users(username, password_hash, display_name, must_change_password) values($1,$2,$3,$4) returning id',
-      [adminUsername, hash, adminDisplay, true]
+      'insert into users(username, password_hash, display_name, is_admin, must_change_password) values($1,$2,$3,$4,$5) returning id',
+      [adminUsername, hash, adminDisplay, true, true]
     )
     adminId = ins.rows[0].id
   } else {
     adminId = res.rows[0].id
+    // 确保已有管理员账号被标记为 is_admin
+    try { await query('update users set is_admin=true where id=$1', [adminId]) } catch {}
   }
   // Grant admin all permissions
   const allPerms = await query('select id from permissions')
@@ -263,12 +256,10 @@ export function validatePasswordStrength(password) {
 
 export function requirePerm(code) {
   return (req, res, next) => {
-    // 开发模式：跳过权限检查
-    if (process.env.NODE_ENV !== 'production') {
-      return next()
-    }
-    
-    // 生产模式：正常权限检查
+    // 管理员直接放行
+    if (req.user && req.user.is_admin) return next()
+
+    // 正常权限检查
     const perms = (req.user && req.user.perms) || []
     if (!perms.includes(code)) return res.status(403).json({ error: 'Forbidden' })
     next()
