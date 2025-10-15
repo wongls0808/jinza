@@ -95,6 +95,12 @@ async function ensureDDL() {
   await query(`alter table fx_payments add column if not exists approved_by int`)
   await query(`alter table fx_payments add column if not exists approved_at timestamptz`)
   try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
+  // 平台商表补充字段（登录网址、三币余额、支付手续费%）
+  try { await query(`alter table fx_platforms add column if not exists login_url varchar(500)`) } catch {}
+  try { await query(`alter table fx_platforms add column if not exists balance_usd numeric(18,2) default 0`) } catch {}
+  try { await query(`alter table fx_platforms add column if not exists balance_myr numeric(18,2) default 0`) } catch {}
+  try { await query(`alter table fx_platforms add column if not exists balance_cny numeric(18,2) default 0`) } catch {}
+  try { await query(`alter table fx_platforms add column if not exists fee_percent numeric(6,3) default 0`) } catch {}
 }
 
 // ---------- 平台商管理 ----------
@@ -105,14 +111,52 @@ fxRouter.get('/platforms', authMiddleware(true), requirePerm('view_fx'), async (
 })
 fxRouter.post('/platforms', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
   await ensureDDL()
-  const { id, code, name, contact, active } = req.body || {}
+  const { id, code, name, contact, active, login_url, balance_usd, balance_myr, balance_cny, fee_percent } = req.body || {}
   if (!name) return res.status(400).json({ error: 'name required' })
   if (id) {
-    const rs = await query(`update fx_platforms set code=coalesce($1,code), name=$2, contact=$3, active=coalesce($4, active) where id=$5 returning *`, [code||null, name, contact||null, (active==null? null : !!active), Number(id)])
+    const rs = await query(`
+      update fx_platforms
+         set code = coalesce($1, code),
+             name = $2,
+             contact = $3,
+             active = coalesce($4, active),
+             login_url = $6,
+             balance_usd = $7,
+             balance_myr = $8,
+             balance_cny = $9,
+             fee_percent = $10
+       where id = $5
+       returning *
+    `,
+    [
+      code||null,
+      name,
+      contact||null,
+      (active==null? null : !!active),
+      Number(id),
+      login_url||null,
+      (balance_usd==null? null : Number(balance_usd)),
+      (balance_myr==null? null : Number(balance_myr)),
+      (balance_cny==null? null : Number(balance_cny)),
+      (fee_percent==null? null : Number(fee_percent))
+    ])
     if (!rs.rowCount) return res.status(404).json({ error: 'not found' })
     return res.json(rs.rows[0])
   } else {
-    const rs = await query(`insert into fx_platforms(code,name,contact,active) values($1,$2,$3,$4) returning *`, [code||null, name, contact||null, !!active])
+    const rs = await query(`
+      insert into fx_platforms(code, name, contact, active, login_url, balance_usd, balance_myr, balance_cny, fee_percent)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *
+    `, [
+      code||null,
+      name,
+      contact||null,
+      !!active,
+      login_url||null,
+      (balance_usd==null? null : Number(balance_usd)),
+      (balance_myr==null? null : Number(balance_myr)),
+      (balance_cny==null? null : Number(balance_cny)),
+      (fee_percent==null? null : Number(fee_percent))
+    ])
     return res.json(rs.rows[0])
   }
 })

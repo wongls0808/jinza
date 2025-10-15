@@ -10,27 +10,33 @@
               <el-button size="small" type="primary" @click="openPlatformDialog()">新增平台商</el-button>
             </div>
           </template>
-          <el-table :data="platforms" size="small" border height="40vh">
-            <el-table-column type="index" label="#" width="60" />
-            <el-table-column prop="code" label="代码" width="120" />
-            <el-table-column prop="name" label="名称" />
-            <el-table-column prop="contact" label="联系人" />
-            <el-table-column prop="active" label="启用" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '是' : '否' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="140" align="center">
-              <template #default="{ row }">
-                <el-button size="small" @click="openPlatformDialog(row)">编辑</el-button>
-                <el-popconfirm title="确认删除？" @confirm="removePlatform(row)">
-                  <template #reference>
-                    <el-button size="small" type="danger">删除</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="platform-list">
+            <div v-for="(p, idx) in platforms" :key="p.id" class="platform-card">
+              <div class="platform-card__header">
+                <div class="title">
+                  <span class="index">#{{ idx + 1 }}</span>
+                  <span class="code">{{ p.code || '-' }}</span>
+                  <span class="name">{{ p.name }}</span>
+                </div>
+                <div class="ops">
+                  <el-button size="small" @click="openPlatformDialog(p)">编辑</el-button>
+                  <el-popconfirm title="确认删除？" @confirm="removePlatform(p)">
+                    <template #reference>
+                      <el-button size="small" type="danger">删除</el-button>
+                    </template>
+                  </el-popconfirm>
+                </div>
+              </div>
+              <div class="platform-card__body">
+                <div class="row"><span class="label">登陆网址</span><a :href="p.login_url" target="_blank" rel="noopener" class="value link" v-if="p.login_url">{{ p.login_url }}</a><span v-else class="value">-</span></div>
+                <div class="row"><span class="label">美元余额</span><span class="value mono">{{ money(p.balance_usd) }}</span></div>
+                <div class="row"><span class="label">马币余额</span><span class="value mono">{{ money(p.balance_myr) }}</span></div>
+                <div class="row"><span class="label">人民币余额</span><span class="value mono">{{ money(p.balance_cny) }}</span></div>
+                <div class="row"><span class="label">支付手续费%</span><span class="value">{{ percent(p.fee_percent) }}</span></div>
+              </div>
+            </div>
+            <div v-if="!platforms.length" class="empty">暂无平台商</div>
+          </div>
         </el-card>
       </el-col>
       <el-col :span="14">
@@ -68,10 +74,15 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="platformDialog.visible" title="平台商" width="520px">
-      <el-form label-width="90px">
+    <el-dialog v-model="platformDialog.visible" title="平台商" width="560px">
+      <el-form label-width="100px" :model="platformDialog.model">
         <el-form-item label="代码"><el-input v-model="platformDialog.model.code" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="platformDialog.model.name" /></el-form-item>
+        <el-form-item label="登陆网址"><el-input v-model="platformDialog.model.login_url" placeholder="https://..." /></el-form-item>
+        <el-form-item label="美元余额"><el-input-number v-model="platformDialog.model.balance_usd" :min="0" :precision="2" :step="100" /></el-form-item>
+        <el-form-item label="马币余额"><el-input-number v-model="platformDialog.model.balance_myr" :min="0" :precision="2" :step="100" /></el-form-item>
+        <el-form-item label="人民币余额"><el-input-number v-model="platformDialog.model.balance_cny" :min="0" :precision="2" :step="100" /></el-form-item>
+        <el-form-item label="支付手续费%"><el-input-number v-model="platformDialog.model.fee_percent" :min="0" :max="100" :precision="3" :step="0.1" /></el-form-item>
         <el-form-item label="联系人"><el-input v-model="platformDialog.model.contact" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="platformDialog.model.active" /></el-form-item>
       </el-form>
@@ -116,6 +127,11 @@ function stopPolling(){ if (timer) { clearInterval(timer); timer=null } }
 const form = ref({ platform_id: null, customer_name: '', amount_pay: null, expected_rate: null })
 const canSubmit = computed(() => Number(form.value.amount_pay||0) > 0 && !!form.value.platform_id)
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
+function percent(v){
+  const n = Number(v||0)
+  if (!isFinite(n)) return '0%'
+  return `${n.toFixed(3)}%`
+}
 
 async function submitOrder(){
   try {
@@ -134,15 +150,38 @@ async function submitOrder(){
   }
 }
 
-const platformDialog = ref({ visible:false, model: { id:null, code:'', name:'', contact:'', active:true } })
+const platformDialog = ref({ visible:false, model: { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 } })
 function openPlatformDialog(row){
   platformDialog.value.visible = true
-  platformDialog.value.model = row ? { ...row } : { id:null, code:'', name:'', contact:'', active:true }
+  platformDialog.value.model = row ? { 
+    id: row.id,
+    code: row.code||'',
+    name: row.name||'',
+    contact: row.contact||'',
+    active: !!row.active,
+    login_url: row.login_url||'',
+    balance_usd: Number(row.balance_usd||0),
+    balance_myr: Number(row.balance_myr||0),
+    balance_cny: Number(row.balance_cny||0),
+    fee_percent: row.fee_percent==null? 0 : Number(row.fee_percent)
+  } : { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 }
 }
 async function savePlatform(){
   const m = platformDialog.value.model
   if (!m.name) { ElMessage.error('请输入名称'); return }
-  await api.fx.buyfx.savePlatform(m)
+  // 提交所有字段
+  await api.fx.buyfx.savePlatform({
+    id: m.id,
+    code: m.code||null,
+    name: m.name,
+    contact: m.contact||null,
+    active: !!m.active,
+    login_url: m.login_url||null,
+    balance_usd: Number(m.balance_usd||0),
+    balance_myr: Number(m.balance_myr||0),
+    balance_cny: Number(m.balance_cny||0),
+    fee_percent: Number(m.fee_percent||0)
+  })
   platformDialog.value.visible = false
   await loadPlatforms()
 }
@@ -160,4 +199,19 @@ onBeforeUnmount(stopPolling)
 .rate-bar { display:flex; gap:10px; align-items:center; margin-bottom: 8px; }
 .buy-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin-bottom:8px; }
 @media (max-width: 1200px){ .buy-form { grid-template-columns: 1fr; } }
+/* 平台卡片列表 */
+.platform-list { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow:auto; }
+.platform-card { border: 1px solid var(--el-border-color); border-radius: 6px; padding: 10px; background: var(--el-fill-color-blank); }
+.platform-card__header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.platform-card .title { display:flex; align-items:center; gap:8px; }
+.platform-card .index { color: var(--el-text-color-secondary); font-weight: 600; }
+.platform-card .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; color: var(--el-text-color-secondary); }
+.platform-card .name { font-weight: 600; }
+.platform-card__body { display:flex; flex-direction:column; gap:4px; }
+.platform-card .row { display:flex; align-items:center; gap:8px; }
+.platform-card .label { flex: 0 0 88px; color: var(--el-text-color-secondary); }
+.platform-card .value { flex: 1; }
+.platform-card .value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+.platform-card .value.link { color: var(--el-color-primary); word-break: break-all; }
+.empty { text-align:center; color: var(--el-text-color-secondary); padding: 16px 0; }
 </style>
