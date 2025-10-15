@@ -532,12 +532,51 @@ transactionsRouter.post('/:id/unmatch', authMiddleware(true), requirePerm('view_
     await ensureTransactionsDDL()
     const id = Number(req.params.id)
     if (!id) return res.status(400).json({ error: 'missing id' })
-    const rs = await query(
-      `update transactions set matched=false, match_type=null, match_target_id=null, match_target_name=null, matched_by=null, matched_at=null, updated_at=now() where id=$1 returning id`,
-      [id]
-    )
-    if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
-    res.json({ ok: true })
+
+    // 读取当前匹配信息与交易金额/币种
+    const tr = await query(`
+      select t.id, t.matched, t.match_type, t.match_target_id,
+             t.debit_amount, t.credit_amount,
+             a.currency_code
+      from transactions t
+      left join receiving_accounts a on a.bank_account = t.account_number
+      where t.id=$1
+    `, [id])
+    if (!tr.rowCount) return res.status(404).json({ error: 'not found' })
+    const row = tr.rows[0]
+
+    // 开启事务，先处理余额回滚，再清空匹配标记
+    await query('begin')
+    try {
+      if (row.matched && String(row.match_type||'').toLowerCase() === 'buyfx' && row.match_target_id) {
+        const pid = Number(row.match_target_id)
+        const debit = Number(row.debit_amount||0)
+        const credit = Number(row.credit_amount||0)
+        const cur = String(row.currency_code||'').toUpperCase()
+        const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
+        if (!field) {
+          await query('rollback')
+          return res.status(400).json({ error: `unsupported currency ${cur}` })
+        }
+        // 与匹配时相反：delta = debit - credit 在匹配时 +delta，这里需要 -delta
+        const delta = debit - credit
+        await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, pid])
+      }
+
+      const rs = await query(
+        `update transactions set matched=false, match_type=null, match_target_id=null, match_target_name=null, matched_by=null, matched_at=null, updated_at=now() where id=$1 returning id`,
+        [id]
+      )
+      if (rs.rowCount === 0) {
+        await query('rollback')
+        return res.status(404).json({ error: 'not found' })
+      }
+      await query('commit')
+      return res.json({ ok: true })
+    } catch (e) {
+      await query('rollback')
+      throw e
+    }
   } catch (e) {
     console.error('unmatch failed', e)
     res.status(500).json({ error: 'unmatch failed', detail: e.message })
