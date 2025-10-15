@@ -10,7 +10,7 @@
         <div class="todo-title">待办事项</div>
         <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
           <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:220px" filterable>
-            <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent? `（手续费 ${p.fee_percent}%）` : '')" />
+            <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
           </el-select>
           <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
           <span v-if="batch.platform_id" style="color: var(--el-text-color-secondary); font-size:12px;">将按所选平台的手续费比例扣减。</span>

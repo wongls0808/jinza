@@ -92,7 +92,7 @@
         <el-form-item :label="t('buyfx.balanceUSD')"><el-input-number v-model="platformDialog.model.balance_usd" :min="0" :precision="2" :step="100" /></el-form-item>
         <el-form-item :label="t('buyfx.balanceMYR')"><el-input-number v-model="platformDialog.model.balance_myr" :min="0" :precision="2" :step="100" /></el-form-item>
         <el-form-item :label="t('buyfx.balanceCNY')"><el-input-number v-model="platformDialog.model.balance_cny" :min="0" :precision="2" :step="100" /></el-form-item>
-        <el-form-item :label="t('buyfx.feePercent')"><el-input-number v-model="platformDialog.model.fee_percent" :min="0" :max="100" :precision="3" :step="0.1" /></el-form-item>
+  <el-form-item :label="t('buyfx.feePercent')"><el-input-number v-model="platformDialog.model.fee_percent" :min="0" :max="100" :precision="4" :step="0.0001" /></el-form-item>
         <el-form-item :label="t('buyfx.contact')"><el-input v-model="platformDialog.model.contact" /></el-form-item>
         <el-form-item :label="t('buyfx.active')"><el-switch v-model="platformDialog.model.active" /></el-form-item>
       </el-form>
@@ -196,7 +196,7 @@ function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFraction
 function percent(v){
   const n = Number(v||0)
   if (!isFinite(n)) return '0%'
-  return `${n.toFixed(3)}%`
+  return `${n.toFixed(4)}%`
 }
 
 function goBuyOrderHistory(){

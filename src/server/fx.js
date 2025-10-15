@@ -99,7 +99,7 @@ async function ensureDDL() {
       to_currency varchar(8) not null,
       amount_from numeric(18,6) not null,
       rate numeric(18,6) not null,
-      fee_percent numeric(6,3) default 0,
+  fee_percent numeric(8,4) default 0,
       fee_amount numeric(18,6) default 0,
       amount_to numeric(18,6) not null,
       balance_src_before numeric(18,6),
@@ -119,7 +119,7 @@ async function ensureDDL() {
   await query(`alter table fx_payments add column if not exists approved_at timestamptz`)
   // 付款单：审核后从平台商余额扣减所需字段
   try { await query(`alter table fx_payments add column if not exists platform_id int references fx_platforms(id)`) } catch {}
-  try { await query(`alter table fx_payments add column if not exists platform_fee_percent numeric(6,3) default 0`) } catch {}
+  try { await query(`alter table fx_payments add column if not exists platform_fee_percent numeric(8,4) default 0`) } catch {}
   try { await query(`alter table fx_payments add column if not exists platform_fee_amount numeric(18,2) default 0`) } catch {}
   // 审核日志
   try {
@@ -129,7 +129,7 @@ async function ensureDDL() {
         payment_id int not null references fx_payments(id) on delete cascade,
         action varchar(20) not null, -- approve | unapprove
         platform_id int references fx_platforms(id),
-        fee_percent numeric(6,3) default 0,
+  fee_percent numeric(8,4) default 0,
         fee_amount numeric(18,2) default 0,
         deltas jsonb, -- { "MYR": { amount: 100.00, fee: 0.50, total: 100.50 }, ... }
         acted_by int,
@@ -143,7 +143,12 @@ async function ensureDDL() {
   try { await query(`alter table fx_platforms add column if not exists balance_usd numeric(18,2) default 0`) } catch {}
   try { await query(`alter table fx_platforms add column if not exists balance_myr numeric(18,2) default 0`) } catch {}
   try { await query(`alter table fx_platforms add column if not exists balance_cny numeric(18,2) default 0`) } catch {}
-  try { await query(`alter table fx_platforms add column if not exists fee_percent numeric(6,3) default 0`) } catch {}
+  try { await query(`alter table fx_platforms add column if not exists fee_percent numeric(8,4) default 0`) } catch {}
+  // 升级已存在列到4位小数（保留现有数值，四舍五入到4位）
+  try { await query(`alter table fx_platforms alter column fee_percent type numeric(8,4) using round(coalesce(fee_percent,0)::numeric, 4)`) } catch {}
+  try { await query(`alter table fx_payments alter column platform_fee_percent type numeric(8,4) using round(coalesce(platform_fee_percent,0)::numeric, 4)`) } catch {}
+  try { await query(`alter table fx_platform_fx_transfers alter column fee_percent type numeric(8,4) using round(coalesce(fee_percent,0)::numeric, 4)`) } catch {}
+  try { await query(`alter table fx_payment_audits alter column fee_percent type numeric(8,4) using round(coalesce(fee_percent,0)::numeric, 4)`) } catch {}
   // 转换记录表补充余额快照列
   try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_src_before numeric(18,6)`) } catch {}
   try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_dst_before numeric(18,6)`) } catch {}
