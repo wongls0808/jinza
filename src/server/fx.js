@@ -1313,36 +1313,40 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const headerY = doc.y
   const headerHeight = 22
   doc.save()
-  doc.font(fontBold).fontSize(12).fillColor(ACCENT).text(BRAND, left, headerY, { continued: true })
-  doc.font(font).fontSize(11).fillColor('#30424f').text('  |  ' + titleLine)
-  // 状态徽章 (右侧)
-  const statusZh = h.status==='completed' ? '支付确认' : '待确认'
-  const statusEn = h.status==='completed' ? 'Completed' : 'Pending'
-  const statusText = `${statusZh} | ${statusEn}`
-  const badgeW = 110
-  const badgeH = 16
-  const badgeX = right - badgeW
-  const badgeY = headerY + 2
-  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 6)
-    .fill(h.status==='completed' ? '#d9f2de' : '#fff3cd')
-  doc.fillColor(h.status==='completed' ? '#2b6d32' : '#856404').font(fontBold).fontSize(7)
-    .text(statusText, badgeX, badgeY + 4, { width: badgeW, align: 'center' })
+  doc.font(fontBold).fontSize(14).fillColor(ACCENT).text(BRAND, left, headerY, { continued: true })
+  doc.font(font).fontSize(13).fillColor('#30424f').text('  |  ' + titleLine)
   doc.restore()
-  doc.moveDown(0.1)
+  doc.moveDown(0.2)
 
-  // ===== 金额条 =====
-  const amountBarY = doc.y
-  const amountBarH = 34
+  // ===== 状态彩条（替代右上徽章，移至页眉下） =====
+  const statusZh = h.status==='completed' ? '交付确认' : '待确认'
+  const statusEn = h.status==='completed' ? 'Delivery Confirmation' : 'Pending Confirmation'
+  const statusBarH = 20
+  const statusBg = h.status==='completed' ? '#d9f2de' : '#fff3cd'
+  const statusFg = h.status==='completed' ? '#2b6d32' : '#856404'
+  const statusBarY = doc.y
   doc.save()
-  doc.roundedRect(left, amountBarY, contentWidth, amountBarH, 6).fill(LIGHT_ACCENT)
-  // 左侧：支付金额 Payment Amount ；右侧：CNY: 金额（大号）
-  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
-  const amountTitleBi = '支付金额 Payment Amount'
-  const currencyLabel = 'CNY: ' + money(total)
-  doc.fillColor('#455a64').font(fontBold).fontSize(9).text(amountTitleBi, left + 14, amountBarY + 8)
-  doc.font(fontBold).fontSize(16).fillColor(ACCENT).text(currencyLabel, left + 14, amountBarY + 14, { width: contentWidth - 28, align: 'right' })
+  doc.roundedRect(left, statusBarY, contentWidth, statusBarH, 4).fill(statusBg)
+  doc.fillColor(statusFg).font(fontBold).fontSize(11).text(`${statusZh} / ${statusEn}`, left + 12, statusBarY + 4)
   doc.restore()
-  doc.y = amountBarY + amountBarH + 6
+  doc.y = statusBarY + statusBarH + 6
+
+  // ===== 金额分节条 + 金额下方展示 =====
+  const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
+  // 分节彩条
+  ;(function amountSection(){
+    const y = doc.y
+    const hBar = 20
+    doc.save()
+    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#eaf3f7')
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', left + 12, y + 4)
+    doc.restore()
+    doc.y = y + hBar + 4
+  })()
+  // 位于彩条下方显示金额
+  const currencyLabel = 'CNY: ' + money(total)
+  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, left, doc.y, { width: contentWidth, align: 'right' })
+  doc.moveDown(0.6)
 
   // 工具：分节彩条 + 双语标题
   const sectionBar = (zh, en) => {
@@ -1350,7 +1354,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     const hBar = 20
     doc.save()
     doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#eaf3f7')
-    doc.fillColor(ACCENT).font(fontBold).fontSize(9).text(`${zh} / ${en}`, left + 12, y + 5)
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, left + 12, y + 4)
     doc.restore()
     doc.y = y + hBar + 4
   }
@@ -1358,8 +1362,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const drawLabelValue = (zh, en, value) => {
     const label = `${zh} / ${en}: `
     const y = doc.y
-    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(label, left, y, { continued: true })
-    doc.font(font).fontSize(10).fillColor('#111').text(value==null?'':String(value))
+    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, left, y, { continued: true })
+    doc.font(font).fontSize(12).fillColor('#111').text(value==null?'':String(value))
     doc.moveDown(0.2)
   }
 
@@ -1369,8 +1373,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   drawLabelValue('账户号码', 'Account No', items.rows[0]?.bank_account||'')
   // 银行名称：尝试渲染 Logo
   {
-    const bankName = items.rows[0]?.bank_name || ''
-    const bankLabelBi = '银行名称 / Bank:'
+  const bankName = items.rows[0]?.bank_name || ''
+  const bankLabelBi = '银行名称 / Bank:'
     // 解析 bank logo 路径
     let bankLogoPath = null
     try {
@@ -1396,24 +1400,32 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
         if (fs.existsSync(cand)) bankLogoPath = cand
       }
     } catch {}
-    // 绘制
+    // 映射中文银行名（仅对中资常见几家，其他沿用原值）
+    let bankNameCN = bankName
+    const lower = String(bankName).toLowerCase()
+    if (lower.includes('icbc') || bankName.includes('工商')) bankNameCN = '中国工商银行'
+    else if (lower.includes('ccb') || bankName.includes('建设')) bankNameCN = '中国建设银行'
+    else if (lower.includes('abc') || bankName.includes('农业')) bankNameCN = '中国农业银行'
+    else if (lower.includes('boc') || bankName.includes('中国银行')) bankNameCN = '中国银行'
+    else if (lower.includes('bcm') || bankName.includes('交通')) bankNameCN = '交通银行'
+
+    // 绘制：始终显示中文名，其右侧附 Logo（若存在），不再单独仅显示 Logo
     const y = doc.y
-    doc.font(fontBold).fontSize(8).fillColor('#5a5f63').text(bankLabelBi, left, y)
+    // 标签
+    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(bankLabelBi, left, y)
+    // 名称
+    doc.font(font).fontSize(12).fillColor('#111').text(bankNameCN, left + 80, y)
+    // Logo（若有）
     if (bankLogoPath) {
       try {
         const svg = fs.readFileSync(bankLogoPath, 'utf8')
-        // Logo 尺寸：高度约 14pt，宽度按比例
-        const logoW = 64
-        const logoX = left + 60
-        const logoY = y - 2
+        const logoW = 72
+        const logoX = left + Math.min(260, contentWidth - 120)
+        const logoY = y - 4
         SVGtoPDF(doc, svg, logoX, logoY, { width: logoW, preserveAspectRatio: 'xMidYMid meet' })
-        doc.moveDown(1)
-      } catch {
-        drawLabelValue('银行名称', 'Bank', bankName)
-      }
-    } else {
-      drawLabelValue('银行名称', 'Bank', bankName)
+      } catch {}
     }
+    doc.moveDown(1)
   }
 
   // ===== 交易详情 / Transaction Details =====
