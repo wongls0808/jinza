@@ -1324,17 +1324,14 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
 
-  // ===== 头部标题（去品牌与分隔符，采用上/中/下英排版） =====
+  // ===== 头部标题（两行：付款凭证 / Payment Receipt） =====
   const headerBlockY = doc.y
   const centerX = left + contentWidth/2
   doc.save()
   doc.fillColor(ACCENT)
-  // 上：支付确认（大）
+  // 上：付款凭证（大）
   doc.font(fontBold).fontSize(20)
-  doc.text('支付确认', left, headerBlockY, { width: contentWidth, align: 'center' })
-  // 中：回单（中）
-  doc.font(fontBold).fontSize(16)
-  doc.text('回单', left, doc.y - 4, { width: contentWidth, align: 'center' })
+  doc.text('付款凭证', left, headerBlockY, { width: contentWidth, align: 'center' })
   // 下：Payment Receipt（英）
   doc.font(font).fontSize(12).fillColor('#30424f')
   doc.text('Payment Receipt', left, doc.y - 2, { width: contentWidth, align: 'center' })
@@ -1345,20 +1342,21 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   doc.moveDown(0.6)
 
   // ===== 金额分节条 + 金额下方左对齐展示 =====
+  const padX = left + 12
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
   // 分节彩条
   ;(function amountSection(){
     const y = doc.y
     const hBar = 20
     doc.save()
-    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#eaf3f7')
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', left + 12, y + 4)
+    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#e4edf1')
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', padX, y + 4)
     doc.restore()
     doc.y = y + hBar + 4
   })()
   // 位于彩条下方显示金额
   const currencyLabel = 'CNY: ' + money(total)
-  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, left + 12, doc.y)
+  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, padX, doc.y)
   doc.moveDown(0.6)
 
   // 工具：分节彩条 + 双语标题
@@ -1366,8 +1364,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     const y = doc.y
     const hBar = 20
     doc.save()
-    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#eaf3f7')
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, left + 12, y + 4)
+    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#e4edf1')
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, padX, y + 4)
     doc.restore()
     doc.y = y + hBar + 4
   }
@@ -1375,7 +1373,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const drawLabelValue = (zh, en, value) => {
     const label = `${zh} / ${en}: `
     const y = doc.y
-    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, left, y, { continued: true })
+    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, padX, y, { continued: true })
     doc.font(font).fontSize(12).fillColor('#111').text(value==null?'':String(value))
     doc.moveDown(0.2)
   }
@@ -1404,7 +1402,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
 
     const label = '银行名称 / Bank: '
     const y = doc.y
-    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, left, y, { continued: true })
+    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, padX, y, { continued: true })
     doc.font(font).fontSize(12).fillColor('#111').text(`${cn} / ${en}`)
     doc.moveDown(0.8)
   }
