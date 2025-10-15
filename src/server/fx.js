@@ -1146,10 +1146,6 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
-  const isPreview = (() => {
-    const v = String(req.query.preview || '').toLowerCase()
-    return v === '1' || v === 'true' || v === 'yes'
-  })()
   const head = await query(`
     select p.*, coalesce(u.display_name, u.username) as created_by_name, coalesce(a.display_name, a.username) as approved_by_name
     from fx_payments p
@@ -1214,7 +1210,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k
 
   res.setHeader('Content-Type', 'application/pdf')
-  // 文件名：付款日期 + 账户名 + 金额 + 银行代码（下载模式使用；预览模式改为 inline 且不提供文件名）
+  // 文件名：付款日期 + 账户名 + 金额 + 银行代码
   const h0 = head.rows[0]
   const payDate = (() => { try { const v = h0.pay_date; let s=''; if (typeof v === 'string') s = v.slice(0,10); else if (v && v.toISOString) s = v.toISOString().slice(0,10); else s = String(v||'').slice(0,10); return s.replace(/-/g,'') } catch { return '' } })()
   const acctName0 = (items.rows[0]?.account_name) || h0.customer_name || 'Account'
@@ -1225,13 +1221,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const baseName = `${payDate}+${sanitize(acctName0)}+${amountStr}+${bankCode0}`
   const asciiName = `${baseName}.pdf`.replace(/[^\x20-\x7E]/g, '_')
   const utf8Name = encodeURIComponent(`${baseName}.pdf`)
-  if (isPreview) {
-    res.setHeader('Content-Disposition', 'inline')
-    res.setHeader('Cache-Control', 'no-store, max-age=0')
-    // 告知浏览器仅用于内联预览（无法完全阻止另存为，但不触发下载框）
-  } else {
-    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
-  }
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
 
   const ACCENT = '#2F4858' // 深色强调
   const LIGHT_ACCENT = '#e4edf1'
@@ -1302,11 +1292,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
       } catch {}
     }
   }
-  // 首页与后续页面都绘制（页脚 + 预览水印）
-  doc.on('pageAdded', () => {
-    if (isPreview) try { drawPreviewWatermark() } catch {}
-    drawFooter()
-  })
+  // 首页与后续页面都绘制页脚
+  doc.on('pageAdded', drawFooter)
   let hasCJK = false, hasCJKBold = false
   try {
     const __filename = fileURLToPath(import.meta.url)
@@ -1328,26 +1315,6 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   } catch {}
   const font = hasCJK ? 'CJK' : 'Helvetica'
   const fontBold = hasCJKBold ? 'CJK-Bold' : (hasCJK ? 'CJK' : 'Helvetica-Bold')
-
-  // 预览水印：多语言斜向浅色大字，覆盖整页（视觉预览用途）
-  function drawPreviewWatermark(){
-    const pageW = doc.page.width
-    const pageH = doc.page.height
-    const txt = 'PREVIEW ONLY · 仅用于预览 · Aperçu uniquement · Solo vista previa · Nur Vorschau'
-    doc.save()
-    try {
-      doc.font(fontBold).fillColor('#6b8090').fillOpacity(0.12)
-      const angle = -30
-      const step = 220
-      for (let y = -pageH; y < pageH * 2; y += step) {
-        doc.rotate(angle, { origin: [pageW/2, y] })
-        doc.fontSize(36)
-        doc.text(txt, -pageW*0.2, y, { width: pageW*1.4, align: 'center' })
-        doc.rotate(-angle, { origin: [pageW/2, y] })
-      }
-    } catch {}
-    doc.fillOpacity(1).fillColor('black').restore()
-  }
   const toDate = (v) => { try { if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
   const money = (n) => Number(n||0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 })
 
@@ -1372,8 +1339,6 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   doc.restore()
   doc.moveDown(0.6)
 
-  // 预览模式：在当前页加水印
-  if (isPreview) { try { drawPreviewWatermark() } catch {} }
 
   // ===== 金额分节条 + 金额下方左对齐展示 =====
   const padX = left + 12

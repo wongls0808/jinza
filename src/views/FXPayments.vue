@@ -51,7 +51,7 @@
       </el-table-column>
       <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 180)" align="center">
         <template #default="{ row }">
-          <el-button size="small" @click="viewPdf(row)">{{ t('common.view') }}</el-button>
+          <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button 
             size="small"
             :type="row.status==='completed' ? 'success' : 'default'"
@@ -212,13 +212,6 @@ async function downloadCsv(row){
   a.click()
   URL.revokeObjectURL(url)
 }
-async function previewPdf(row){
-  const id = row.id
-  const blob = await api.fx.payments.exportPdf(id)
-  const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
-  setTimeout(() => URL.revokeObjectURL(url), 5000)
-}
 // 回执已并入统一 PDF 模板
 async function removeBill(row){
   try {
@@ -315,21 +308,6 @@ function onLogoError(evt, row){
   if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
   else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
   else logoFail.value[key] = true
-}
-async function viewPdf(row){
-  const id = row.payment_id || row.id
-  if (row.status !== 'completed') {
-    return openDetail(row)
-  }
-  try {
-    const lang = (navigator.language || '').toLowerCase().includes('zh') ? 'zh' : 'en'
-    const { blob } = await api.fx.payments.exportPdfPreview(id, { lang })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank', 'noopener')
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-  } catch (e) {
-    ElMessage.error(e?.message || 'Preview failed')
-  }
 }
 </script>
 
