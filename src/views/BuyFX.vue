@@ -87,8 +87,8 @@
         <el-form-item label="启用"><el-switch v-model="platformDialog.model.active" /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="platformDialog.visible=false">取消</el-button>
-        <el-button type="primary" @click="savePlatform">保存</el-button>
+        <el-button @click="platformDialog.visible=false" :disabled="platformDialog.loading">取消</el-button>
+        <el-button type="primary" @click="savePlatform" :loading="platformDialog.loading">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -150,9 +150,10 @@ async function submitOrder(){
   }
 }
 
-const platformDialog = ref({ visible:false, model: { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 } })
+const platformDialog = ref({ visible:false, loading:false, model: { id:null, code:'', name:'', contact:'', active:true, login_url:'', balance_usd:0, balance_myr:0, balance_cny:0, fee_percent:0 } })
 function openPlatformDialog(row){
   platformDialog.value.visible = true
+  platformDialog.value.loading = false
   platformDialog.value.model = row ? { 
     id: row.id,
     code: row.code||'',
@@ -169,25 +170,37 @@ function openPlatformDialog(row){
 async function savePlatform(){
   const m = platformDialog.value.model
   if (!m.name) { ElMessage.error('请输入名称'); return }
-  // 提交所有字段
-  await api.fx.buyfx.savePlatform({
-    id: m.id,
-    code: m.code||null,
-    name: m.name,
-    contact: m.contact||null,
-    active: !!m.active,
-    login_url: m.login_url||null,
-    balance_usd: Number(m.balance_usd||0),
-    balance_myr: Number(m.balance_myr||0),
-    balance_cny: Number(m.balance_cny||0),
-    fee_percent: Number(m.fee_percent||0)
-  })
-  platformDialog.value.visible = false
-  await loadPlatforms()
+  platformDialog.value.loading = true
+  try {
+    await api.fx.buyfx.savePlatform({
+      id: m.id,
+      code: m.code||null,
+      name: m.name,
+      contact: m.contact||null,
+      active: !!m.active,
+      login_url: m.login_url||null,
+      balance_usd: Number(m.balance_usd||0),
+      balance_myr: Number(m.balance_myr||0),
+      balance_cny: Number(m.balance_cny||0),
+      fee_percent: Number(m.fee_percent||0)
+    })
+    ElMessage.success('保存成功')
+    platformDialog.value.visible = false
+    await loadPlatforms()
+  } catch (e) {
+    ElMessage.error(e?.message || '保存失败')
+  } finally {
+    platformDialog.value.loading = false
+  }
 }
 async function removePlatform(row){
-  await api.fx.buyfx.deletePlatform(row.id)
-  await loadPlatforms()
+  try {
+    await api.fx.buyfx.deletePlatform(row.id)
+    ElMessage.success('已删除')
+    await loadPlatforms()
+  } catch (e) {
+    ElMessage.error(e?.message || '删除失败')
+  }
 }
 
 onMounted(async () => { await loadPlatforms(); await loadOrders(); await refreshRate(); startPolling() })
