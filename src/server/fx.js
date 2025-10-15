@@ -56,6 +56,37 @@ async function ensureDDL() {
       currency_code varchar(8),
       amount numeric(18,2) not null
     );
+    -- 平台商管理
+    create table if not exists fx_platforms(
+      id serial primary key,
+      code varchar(40) unique,
+      name varchar(200) not null,
+      contact varchar(200),
+      active boolean default true,
+      created_at timestamptz default now()
+    );
+    -- 汇率表（动态展示/轮询）
+    create table if not exists fx_rates(
+      id serial primary key,
+      pair varchar(16) unique,
+      rate numeric(18,6) not null,
+      source varchar(64),
+      updated_at timestamptz default now()
+    );
+    -- 购汇订单记录（轻量）
+    create table if not exists fx_buy_orders(
+      id serial primary key,
+      order_no varchar(40),
+      platform_id int references fx_platforms(id) on delete set null,
+      customer_id int references customers(id) on delete set null,
+      customer_name varchar(255),
+      pay_currency varchar(8) not null,
+      buy_currency varchar(8) not null,
+      amount_pay numeric(18,2) not null,
+      expected_rate numeric(18,6),
+      created_by int,
+      created_at timestamptz default now()
+    );
   `)
   // 向后兼容：老表补充 bill_no 列
   await query(`alter table fx_settlements add column if not exists bill_no varchar(40)`)
@@ -65,6 +96,78 @@ async function ensureDDL() {
   await query(`alter table fx_payments add column if not exists approved_at timestamptz`)
   try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
 }
+
+// ---------- 平台商管理 ----------
+fxRouter.get('/platforms', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const rs = await query(`select * from fx_platforms order by id desc`)
+  res.json({ items: rs.rows })
+})
+fxRouter.post('/platforms', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const { id, code, name, contact, active } = req.body || {}
+  if (!name) return res.status(400).json({ error: 'name required' })
+  if (id) {
+    const rs = await query(`update fx_platforms set code=coalesce($1,code), name=$2, contact=$3, active=coalesce($4, active) where id=$5 returning *`, [code||null, name, contact||null, (active==null? null : !!active), Number(id)])
+    if (!rs.rowCount) return res.status(404).json({ error: 'not found' })
+    return res.json(rs.rows[0])
+  } else {
+    const rs = await query(`insert into fx_platforms(code,name,contact,active) values($1,$2,$3,$4) returning *`, [code||null, name, contact||null, !!active])
+    return res.json(rs.rows[0])
+  }
+})
+fxRouter.delete('/platforms/:id', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  await query(`delete from fx_platforms where id=$1`, [id])
+  res.json({ ok: true })
+})
+
+// ---------- 汇率（动态展示） ----------
+fxRouter.get('/rates', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const pair = String(req.query.pair||'').toUpperCase()
+  if (pair) {
+    const rs = await query(`select * from fx_rates where pair=$1`, [pair])
+    return res.json(rs.rowCount ? rs.rows[0] : null)
+  }
+  const rs = await query(`select * from fx_rates order by pair`)
+  res.json({ items: rs.rows })
+})
+fxRouter.post('/rates', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const { pair, rate, source } = req.body || {}
+  if (!pair || !rate) return res.status(400).json({ error: 'pair/rate required' })
+  const p = String(pair).toUpperCase()
+  const r = Number(rate)
+  const rs = await query(`
+    insert into fx_rates(pair, rate, source, updated_at)
+    values($1,$2,$3, now())
+    on conflict(pair) do update set rate=EXCLUDED.rate, source=EXCLUDED.source, updated_at=now()
+    returning *
+  `, [p, r, source||null])
+  res.json(rs.rows[0])
+})
+
+// ---------- 购汇下单（记录） ----------
+fxRouter.get('/buy', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const rs = await query(`select b.*, p.name as platform_name from fx_buy_orders b left join fx_platforms p on p.id=b.platform_id order by id desc limit 200`)
+  res.json({ items: rs.rows })
+})
+fxRouter.post('/buy', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const { platform_id, customer_id, customer_name, pay_currency='CNY', buy_currency='MYR', amount_pay, expected_rate } = req.body || {}
+  if (!amount_pay || Number(amount_pay) <= 0) return res.status(400).json({ error: 'amount_pay required' })
+  const created_by = req.user?.id || null
+  const order_no = new Date().toISOString().replaceAll('-', '').replaceAll(':', '').replace('.', '')
+  const rs = await query(`
+    insert into fx_buy_orders(order_no, platform_id, customer_id, customer_name, pay_currency, buy_currency, amount_pay, expected_rate, created_by)
+    values($1,$2,$3,$4,upper($5),upper($6),$7,$8,$9) returning *
+  `, [order_no, platform_id||null, customer_id||null, customer_name||null, pay_currency, buy_currency, Number(amount_pay), (expected_rate==null? null : Number(expected_rate)), created_by])
+  res.json(rs.rows[0])
+})
 
 // 创建结汇单
 fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
