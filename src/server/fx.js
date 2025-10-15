@@ -117,6 +117,10 @@ async function ensureDDL() {
   await query(`alter table fx_payments add column if not exists status varchar(20) default 'pending'`)
   await query(`alter table fx_payments add column if not exists approved_by int`)
   await query(`alter table fx_payments add column if not exists approved_at timestamptz`)
+  // 付款单：审核后从平台商余额扣减所需字段
+  try { await query(`alter table fx_payments add column if not exists platform_id int references fx_platforms(id)`) } catch {}
+  try { await query(`alter table fx_payments add column if not exists platform_fee_percent numeric(6,3) default 0`) } catch {}
+  try { await query(`alter table fx_payments add column if not exists platform_fee_amount numeric(18,2) default 0`) } catch {}
   try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
   // 平台商表补充字段（登录网址、三币余额、支付手续费%）
   try { await query(`alter table fx_platforms add column if not exists login_url varchar(500)`) } catch {}
@@ -1700,10 +1704,68 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
+  const { platform_id, fee_percent } = req.body || {}
+  const pid = Number(platform_id)
+  const feePct = Math.max(0, Number(fee_percent||0))
+  if (!pid && feePct > 0) return res.status(400).json({ error: 'platform required when fee set' })
   const uid = req.user?.id || null
-  const rs = await query(`update fx_payments set status='completed', approved_by=$1, approved_at=now() where id=$2 returning *`, [uid, id])
-  if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
-  res.json({ ok: true })
+
+  try {
+    await query('begin')
+    // 锁定单据头，校验状态
+    const h = await query(`select * from fx_payments where id=$1 for update`, [id])
+    if (!h.rowCount) { await query('rollback'); return res.status(404).json({ error: 'not found' }) }
+    const head = h.rows[0]
+    if (String(head.status) !== 'pending') { await query('rollback'); return res.status(400).json({ error: 'only pending can be approved' }) }
+
+    // 汇总明细：按币种统计金额
+    const items = await query(`select upper(currency_code) as currency, sum(amount) as total from fx_payment_items where payment_id=$1 group by upper(currency_code)`, [id])
+    // 没有明细视为错误
+    if (!items.rowCount) { await query('rollback'); return res.status(400).json({ error: 'empty items' }) }
+
+    // 如指定平台，则校验并扣减余额
+    let feeTotal = 0
+    if (pid) {
+      // 锁平台行
+      const pr = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [pid])
+      if (!pr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+      const p = pr.rows[0]
+
+      // 逐币种计算应扣余额与手续费
+      for (const r of items.rows) {
+        const cur = String(r.currency||'').toUpperCase()
+        const amt = Math.round(Number(r.total||0) * 100) / 100
+        if (!(amt > 0)) continue
+        const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
+        if (!field) { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
+        const fee = Math.round((amt * feePct / 100) * 100) / 100
+        feeTotal += fee
+        const before = Number(p[field]||0)
+        const need = Math.round((amt + fee) * 100) / 100
+        if (before < need) { await query('rollback'); return res.status(400).json({ error: 'insufficient platform balance', detail: { currency: cur, required: need, current: before } }) }
+        const after = Math.round((before - need) * 100) / 100
+        await query(`update fx_platforms set ${field}=$1 where id=$2`, [after, pid])
+        p[field] = after
+      }
+    }
+
+    // 更新单据头：状态、平台与手续费
+    const up = await query(`
+      update fx_payments
+         set status='completed', approved_by=$1, approved_at=now(),
+             platform_id=$2, platform_fee_percent=$3, platform_fee_amount=$4
+       where id=$5
+       returning *
+    `, [uid, (pid||null), feePct, Math.round(feeTotal*100)/100, id])
+    if (!up.rowCount) { await query('rollback'); return res.status(404).json({ error: 'not found' }) }
+
+    await query('commit')
+    return res.json({ ok: true })
+  } catch (e) {
+    await query('rollback')
+    console.error('approve payment failed', e)
+    return res.status(500).json({ error: 'approve failed', detail: e.message })
+  }
 })
 
 // 付款单：导出 PDF（凭证）
