@@ -1223,24 +1223,40 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
     const cand = path.join(__dirname, '..', '..', 'public', 'pdf-assets', 'footer-logo.png')
     if (fs.existsSync(cand)) footerLogoPath = cand
   } catch {}
-  // 生成二维码 payload（选取关键信息 + hash）
+  // 生成二维码 ASCII 查询串（更整洁，避免中文乱码）
   const h = head.rows[0]
-  const qrDataCore = {
-    id: h.id,
-    bill_no: h.bill_no || ('Payment-'+h.id),
-    customer: h.customer_name||'',
-    status: h.status,
-    total: items.rows.reduce((s,r)=> s + Number(r.amount||0), 0),
-    item_count: items.rows.length,
-    ts: Date.now()
-  }
-  const hash = crypto.createHash('sha256')
-    .update(JSON.stringify(qrDataCore))
-    .digest('hex')
-    .slice(0,20) // 截取前20位
-  const qrPayload = { v:1, ...qrDataCore, sig: hash }
+  const totalAmt = items.rows.reduce((s,r)=> s + Number(r.amount||0), 0)
+  const bankRaw = (items.rows[0]?.bank_name || '')
+  const acct = (items.rows[0]?.bank_account || '')
+  const acct4 = acct ? String(acct).replace(/\D/g,'').slice(-4) : ''
+  // 银行代码与中英文映射（供 QR 使用代码）
+  const bankLower = bankRaw.toLowerCase()
+  const bankMap = [
+    { code:'ICBC', m:['icbc','工商'] },
+    { code:'CCB',  m:['ccb','建设'] },
+    { code:'ABC',  m:['abc','农业'] },
+    { code:'BOC',  m:['boc','中国银行'] },
+    { code:'BCM',  m:['bcm','交通'] },
+    { code:'MBB',  m:['maybank'] },
+    { code:'PBB',  m:['public bank','public '] },
+    { code:'RHB',  m:['rhb'] },
+    { code:'CIMB', m:['cimb'] },
+    { code:'HLB',  m:['hlb','hong leong'] }
+  ]
+  const bankHit = bankMap.find(x => x.m.some(k => bankLower.includes(k)))
+  const bankCode = bankHit ? bankHit.code : 'OTHER'
+  const v = 1
+  const idStr = String(h.id)
+  const no = encodeURIComponent(h.bill_no || ('Payment-'+h.id))
+  const amt = (Number(totalAmt||0)).toFixed(2)
+  const cur = 'CNY'
+  const st = (h.status==='completed' ? 'C' : 'P')
+  const tsNum = Date.now()
+  const baseQuery = `v=${v}&id=${idStr}&no=${no}&amt=${amt}&cur=${cur}&st=${st}&bk=${bankCode}&acct4=${acct4}&ts=${tsNum}`
+  const hash = crypto.createHash('sha256').update(baseQuery).digest('hex').slice(0,24)
+  const qrText = `${baseQuery}&sig=${hash}`
   let qrDataUrl = null
-  try { qrDataUrl = await QRCode.toDataURL(JSON.stringify(qrPayload), { errorCorrectionLevel:'M', margin:0, scale:4 }) } catch {}
+  try { qrDataUrl = await QRCode.toDataURL(qrText, { errorCorrectionLevel:'M', margin:0, scale:4 }) } catch {}
 
   const drawFooter = () => {
     const pageWidth = doc.page.width
@@ -1308,30 +1324,27 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   const right = doc.page.width - doc.page.margins.right
   const contentWidth = right - left
 
-  // ===== 紧凑头部 =====
-  const titleLine = t('title')
-  const headerY = doc.y
-  const headerHeight = 22
+  // ===== 头部标题（去品牌与分隔符，采用上/中/下英排版） =====
+  const headerBlockY = doc.y
+  const centerX = left + contentWidth/2
   doc.save()
-  doc.font(fontBold).fontSize(14).fillColor(ACCENT).text(BRAND, left, headerY, { continued: true })
-  doc.font(font).fontSize(13).fillColor('#30424f').text('  |  ' + titleLine)
+  doc.fillColor(ACCENT)
+  // 上：支付确认（大）
+  doc.font(fontBold).fontSize(20)
+  doc.text('支付确认', left, headerBlockY, { width: contentWidth, align: 'center' })
+  // 中：回单（中）
+  doc.font(fontBold).fontSize(16)
+  doc.text('回单', left, doc.y - 4, { width: contentWidth, align: 'center' })
+  // 下：Payment Receipt（英）
+  doc.font(font).fontSize(12).fillColor('#30424f')
+  doc.text('Payment Receipt', left, doc.y - 2, { width: contentWidth, align: 'center' })
+  // 下划线强调
+  const underlineY = doc.y + 2
+  doc.moveTo(left + contentWidth*0.3, underlineY).lineTo(left + contentWidth*0.7, underlineY).lineWidth(1).strokeColor('#9fb3bf').stroke()
   doc.restore()
-  doc.moveDown(0.2)
+  doc.moveDown(0.6)
 
-  // ===== 状态彩条（替代右上徽章，移至页眉下） =====
-  const statusZh = h.status==='completed' ? '交付确认' : '待确认'
-  const statusEn = h.status==='completed' ? 'Delivery Confirmation' : 'Pending Confirmation'
-  const statusBarH = 20
-  const statusBg = h.status==='completed' ? '#d9f2de' : '#fff3cd'
-  const statusFg = h.status==='completed' ? '#2b6d32' : '#856404'
-  const statusBarY = doc.y
-  doc.save()
-  doc.roundedRect(left, statusBarY, contentWidth, statusBarH, 4).fill(statusBg)
-  doc.fillColor(statusFg).font(fontBold).fontSize(11).text(`${statusZh} / ${statusEn}`, left + 12, statusBarY + 4)
-  doc.restore()
-  doc.y = statusBarY + statusBarH + 6
-
-  // ===== 金额分节条 + 金额下方展示 =====
+  // ===== 金额分节条 + 金额下方左对齐展示 =====
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
   // 分节彩条
   ;(function amountSection(){
@@ -1345,7 +1358,7 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   })()
   // 位于彩条下方显示金额
   const currencyLabel = 'CNY: ' + money(total)
-  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, left, doc.y, { width: contentWidth, align: 'right' })
+  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, left + 12, doc.y)
   doc.moveDown(0.6)
 
   // 工具：分节彩条 + 双语标题
@@ -1371,61 +1384,29 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
   sectionBar('收款人信息', 'Payee Info')
   drawLabelValue('收款人', 'Payee', items.rows[0]?.account_name||'')
   drawLabelValue('账户号码', 'Account No', items.rows[0]?.bank_account||'')
-  // 银行名称：尝试渲染 Logo
+  // 银行名称：中文 + 英文（不再渲染 Logo）
   {
-  const bankName = items.rows[0]?.bank_name || ''
-  const bankLabelBi = '银行名称 / Bank:'
-    // 解析 bank logo 路径
-    let bankLogoPath = null
-    try {
-      const __filename2 = fileURLToPath(import.meta.url)
-      const __dirname2 = path.dirname(__filename2)
-      const banksDir = path.join(__dirname2, '..', '..', 'public', 'banks')
-      const lower = String(bankName).toLowerCase()
-      const map = [
-        { k: ['icbc','工商'], f: 'icbc.svg' },
-        { k: ['ccb','建设'], f: 'ccb.svg' },
-        { k: ['abc','农业'], f: 'abc.svg' },
-        { k: ['boc','中国银行'], f: 'boc.svg' },
-        { k: ['bcm','交通'], f: 'bcm.svg' },
-        { k: ['maybank'], f: 'maybank.svg' },
-        { k: ['public bank','public '], f: 'public.svg' },
-        { k: ['rhb'], f: 'rhb.svg' },
-        { k: ['cimb'], f: 'cimb.svg' },
-        { k: ['hlb','hong leong'], f: 'hlb.svg' }
-      ]
-      const hit = map.find(m => m.k.some(key => lower.includes(key)))
-      if (hit) {
-        const cand = path.join(banksDir, hit.f)
-        if (fs.existsSync(cand)) bankLogoPath = cand
-      }
-    } catch {}
-    // 映射中文银行名（仅对中资常见几家，其他沿用原值）
-    let bankNameCN = bankName
-    const lower = String(bankName).toLowerCase()
-    if (lower.includes('icbc') || bankName.includes('工商')) bankNameCN = '中国工商银行'
-    else if (lower.includes('ccb') || bankName.includes('建设')) bankNameCN = '中国建设银行'
-    else if (lower.includes('abc') || bankName.includes('农业')) bankNameCN = '中国农业银行'
-    else if (lower.includes('boc') || bankName.includes('中国银行')) bankNameCN = '中国银行'
-    else if (lower.includes('bcm') || bankName.includes('交通')) bankNameCN = '交通银行'
+    const bankRawName = items.rows[0]?.bank_name || ''
+    // 映射中英文
+    let cn = bankRawName
+    let en = bankRawName
+    const lower = bankRawName.toLowerCase()
+    if (lower.includes('icbc') || bankRawName.includes('工商')) { cn='中国工商银行'; en='Industrial and Commercial Bank of China (ICBC)' }
+    else if (lower.includes('ccb') || bankRawName.includes('建设')) { cn='中国建设银行'; en='China Construction Bank (CCB)' }
+    else if (lower.includes('abc') || bankRawName.includes('农业')) { cn='中国农业银行'; en='Agricultural Bank of China (ABC)' }
+    else if (lower.includes('boc') || bankRawName.includes('中国银行')) { cn='中国银行'; en='Bank of China (BOC)' }
+    else if (lower.includes('bcm') || bankRawName.includes('交通')) { cn='交通银行'; en='Bank of Communications (BCM)' }
+    else if (lower.includes('maybank')) { cn='马来亚银行'; en='Malayan Banking Berhad (Maybank)' }
+    else if (lower.includes('public ')) { cn='大众银行'; en='Public Bank Berhad' }
+    else if (lower.includes('rhb')) { cn='兴业银行（马来西亚）'; en='RHB Bank' }
+    else if (lower.includes('cimb')) { cn='联昌国际银行'; en='CIMB Bank' }
+    else if (lower.includes('hong leong') || lower.includes('hlb')) { cn='丰隆银行'; en='Hong Leong Bank' }
 
-    // 绘制：始终显示中文名，其右侧附 Logo（若存在），不再单独仅显示 Logo
+    const label = '银行名称 / Bank: '
     const y = doc.y
-    // 标签
-    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(bankLabelBi, left, y)
-    // 名称
-    doc.font(font).fontSize(12).fillColor('#111').text(bankNameCN, left + 80, y)
-    // Logo（若有）
-    if (bankLogoPath) {
-      try {
-        const svg = fs.readFileSync(bankLogoPath, 'utf8')
-        const logoW = 72
-        const logoX = left + Math.min(260, contentWidth - 120)
-        const logoY = y - 4
-        SVGtoPDF(doc, svg, logoX, logoY, { width: logoW, preserveAspectRatio: 'xMidYMid meet' })
-      } catch {}
-    }
-    doc.moveDown(1)
+    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, left, y, { continued: true })
+    doc.font(font).fontSize(12).fillColor('#111').text(`${cn} / ${en}`)
+    doc.moveDown(0.8)
   }
 
   // ===== 交易详情 / Transaction Details =====
