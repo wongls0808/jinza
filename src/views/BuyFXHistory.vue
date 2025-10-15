@@ -15,23 +15,26 @@
 
       <el-table :data="rows" size="small" border stripe>
         <el-table-column type="index" width="50"/>
-        <el-table-column prop="created_at" :label="t('buyfx.historyDate')" width="170"/>
-        <el-table-column :label="t('buyfx.fromBalance')" width="220" align="right">
-          <template #default="{ row }">{{ row.from_currency }} {{ money(row.balance_src_before) }} → {{ money(row.balance_src_after) }}</template>
+        <el-table-column :label="t('buyfx.historyDate')" width="170">
+          <template #default="{ row }">{{ fmtDate(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100"/>
+        <el-table-column prop="platform_name" :label="t('buyfx.platform')" width="160"/>
+        <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="110"/>
         <el-table-column :label="t('buyfx.sellAmount')" width="140" align="right">
           <template #default="{ row }">{{ money(row.amount_from) }}</template>
         </el-table-column>
         <el-table-column :label="t('buyfx.rate')" width="120" align="right">
           <template #default="{ row }">{{ rate6(row.rate) }}</template>
         </el-table-column>
-        <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="100"/>
+        <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="110"/>
         <el-table-column :label="t('buyfx.buyAmount')" width="140" align="right">
           <template #default="{ row }">{{ money(row.amount_to) }}</template>
         </el-table-column>
-        <el-table-column :label="t('buyfx.toBalance')" width="220" align="right">
-          <template #default="{ row }">{{ row.to_currency }} {{ money(row.balance_dst_before) }} → {{ money(row.balance_dst_after) }}</template>
+        <el-table-column :label="t('buyfx.fromBalance')" width="180" align="right">
+          <template #default="{ row }">{{ row.from_currency }} {{ money(row.balance_src_after) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('buyfx.toBalance')" width="180" align="right">
+          <template #default="{ row }">{{ row.to_currency }} {{ money(row.balance_dst_after) }}</template>
         </el-table-column>
         <el-table-column prop="created_by_name" :label="t('common.createdBy')" width="140"/>
         <el-table-column :label="t('common.actions')" width="160">
@@ -62,6 +65,9 @@ const rows = ref([])
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 function rate6(v){ const n = Number(v||0); return n ? n.toFixed(6) : '' }
+function fmtDate(s){
+  try { const d = new Date(s); if (isNaN(d)) return s; const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` } catch { return s }
+}
 
 async function loadOrders(){
   loading.value = true

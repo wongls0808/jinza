@@ -57,10 +57,10 @@
           </div>
           <el-divider />
           <div class="convert-form">
-            <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')">
+            <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" @change="onPlatformChange">
               <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
             </el-select>
-            <el-select v-model="convert.from" :placeholder="t('buyfx.sellCurrency')">
+            <el-select v-model="convert.from" :placeholder="t('buyfx.sellCurrency')" @change="onFromChange">
               <el-option label="USD" value="USD"/>
               <el-option label="MYR" value="MYR"/>
               <el-option label="CNY" value="CNY"/>
@@ -126,6 +126,14 @@ const bocRateText = computed(() => bocRate.value==null ? '—' : Number(bocRate.
 async function loadPlatforms(){
   const res = await api.buyfx.listPlatforms()
   platforms.value = Array.isArray(res?.items) ? res.items : []
+  // 若仅有一个平台且尚未选择，自动选择并填充金额
+  if (!convert.value.platform_id && platforms.value.length === 1) {
+    convert.value.platform_id = platforms.value[0].id
+    if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
+  } else {
+    // 平台列表加载完成后，若已选平台且未编辑过金额，尝试填充
+    if (convert.value.platform_id && (!amountEdited.value || !convert.value.amount)) setAmountFromBalance()
+  }
 }
 async function refreshRate(){
   const r = await api.buyfx.getRate('CNY/MYR')
@@ -273,9 +281,19 @@ async function doConvert(){
     })
     ElMessage.success(t('buyfx.converted'))
     await loadPlatforms()
+    // 卖出成功后，若未再次编辑金额，继续按余额自动更新显示
+    amountEdited.value = false
+    if (!convert.value.amount) setAmountFromBalance()
   }catch(e){
     ElMessage.error(e?.message || t('buyfx.convertFailed'))
   }
+}
+
+function onPlatformChange(){
+  if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
+}
+function onFromChange(){
+  if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
 }
 </script>
 

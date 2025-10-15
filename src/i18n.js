@@ -107,11 +107,15 @@ const messages = {
       converted: '互换成功',
       convertFailed: '互换失败',
       viewOrders: '查看购汇历史'
-      ,historyDate: '购汇日期',
-      sellCurrency: '卖出币种',
-      buyAmount: '买入金额',
-      fromBalance: '卖出币种余额',
-      toBalance: '买入币种余额'
+  ,historyDate: '日期',
+  platform: '平台',
+  sellCurrency: '卖出币种',
+  sellAmount: '卖出金额',
+  rate: '汇率',
+  buyCurrency: '买入币种',
+  buyAmount: '买入金额',
+  fromBalance: '卖出币种余额',
+  toBalance: '买入币种余额'
     },
     customers: {
       title: '客户管理',
@@ -500,11 +504,15 @@ const messages = {
       converted: 'Converted',
       convertFailed: 'Convert failed',
       viewOrders: 'View Buy Orders'
-      ,historyDate: 'Date',
-      sellCurrency: 'Sell Currency',
-      buyAmount: 'Buy Amount',
-      fromBalance: 'From Balance',
-      toBalance: 'To Balance'
+  ,historyDate: 'Date',
+  platform: 'Platform',
+  sellCurrency: 'Sell Currency',
+  sellAmount: 'Sell Amount',
+  rate: 'Rate',
+  buyCurrency: 'Buy Currency',
+  buyAmount: 'Buy Amount',
+  fromBalance: 'Sell Currency Balance',
+  toBalance: 'Buy Currency Balance'
     },
     customers: {
       title: 'Customers',
