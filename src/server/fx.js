@@ -1273,8 +1273,8 @@ fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), 
       try {
         const base64 = qrDataUrl.split(',')[1]
         const buf = Buffer.from(base64, 'base64')
-        doc.image(buf, qrX, qrY, { width: qrSize, height: qrSize })
-        doc.fontSize(6).fillColor('#555555').text('Verify QR', qrX, qrY - 8, { width: qrSize, align:'center' })
+  doc.image(buf, qrX, qrY, { width: qrSize, height: qrSize })
+  doc.fontSize(6).fillColor('#555555').text('验证二维码 / Verify QR', qrX, qrY - 8, { width: qrSize, align:'center' })
       } catch {}
     }
   }
