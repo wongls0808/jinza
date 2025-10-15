@@ -235,7 +235,9 @@ export const api = {
         if (!res.ok) throw new Error(await res.text())
         return res.text()
       },
-      approve: (id) => request(`/fx/payments/${id}/approve`, { method: 'POST' }),
+  approve: (id, data) => request(`/fx/payments/${id}/approve`, { method: 'POST', body: JSON.stringify(data||{}) }),
+  unapprove: (id) => request(`/fx/payments/${id}/unapprove`, { method: 'POST' }),
+  audits: (id) => request(`/fx/payments/${id}/audits`),
       exportPdf: async (id) => {
         const token = (function(){
           try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}

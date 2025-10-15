@@ -121,6 +121,22 @@ async function ensureDDL() {
   try { await query(`alter table fx_payments add column if not exists platform_id int references fx_platforms(id)`) } catch {}
   try { await query(`alter table fx_payments add column if not exists platform_fee_percent numeric(6,3) default 0`) } catch {}
   try { await query(`alter table fx_payments add column if not exists platform_fee_amount numeric(18,2) default 0`) } catch {}
+  // 审核日志
+  try {
+    await query(`
+      create table if not exists fx_payment_audits(
+        id serial primary key,
+        payment_id int not null references fx_payments(id) on delete cascade,
+        action varchar(20) not null, -- approve | unapprove
+        platform_id int references fx_platforms(id),
+        fee_percent numeric(6,3) default 0,
+        fee_amount numeric(18,2) default 0,
+        deltas jsonb, -- { "MYR": { amount: 100.00, fee: 0.50, total: 100.50 }, ... }
+        acted_by int,
+        acted_at timestamptz default now()
+      );
+    `)
+  } catch {}
   try { await query(`alter table fx_settlements alter column customer_tax_rate type numeric(6,3) using round(coalesce(customer_tax_rate,0)::numeric, 3)`) } catch {}
   // 平台商表补充字段（登录网址、三币余额、支付手续费%）
   try { await query(`alter table fx_platforms add column if not exists login_url varchar(500)`) } catch {}
@@ -1724,7 +1740,8 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
     if (!items.rowCount) { await query('rollback'); return res.status(400).json({ error: 'empty items' }) }
 
     // 如指定平台，则校验并扣减余额
-    let feeTotal = 0
+  let feeTotal = 0
+  const deltas = {}
     if (pid) {
       // 锁平台行
       const pr = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [pid])
@@ -1746,6 +1763,7 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
         const after = Math.round((before - need) * 100) / 100
         await query(`update fx_platforms set ${field}=$1 where id=$2`, [after, pid])
         p[field] = after
+        deltas[cur] = { amount: amt, fee, total: need }
       }
     }
 
@@ -1759,6 +1777,10 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
     `, [uid, (pid||null), feePct, Math.round(feeTotal*100)/100, id])
     if (!up.rowCount) { await query('rollback'); return res.status(404).json({ error: 'not found' }) }
 
+    // 写审核日志
+    await query(`insert into fx_payment_audits(payment_id, action, platform_id, fee_percent, fee_amount, deltas, acted_by) values($1,$2,$3,$4,$5,$6,$7)`,
+      [id, 'approve', (pid||null), feePct, Math.round(feeTotal*100)/100, JSON.stringify(deltas), uid])
+
     await query('commit')
     return res.json({ ok: true })
   } catch (e) {
@@ -1766,6 +1788,73 @@ fxRouter.post('/payments/:id/approve', authMiddleware(true), requirePerm('manage
     console.error('approve payment failed', e)
     return res.status(500).json({ error: 'approve failed', detail: e.message })
   }
+})
+
+// 付款单：撤销审批（回滚平台余额扣减，状态回到 pending）
+fxRouter.post('/payments/:id/unapprove', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const uid = req.user?.id || null
+  try {
+    await query('begin')
+    const h = await query(`select * from fx_payments where id=$1 for update`, [id])
+    if (!h.rowCount) { await query('rollback'); return res.status(404).json({ error: 'not found' }) }
+    const head = h.rows[0]
+    if (String(head.status) !== 'completed') { await query('rollback'); return res.status(400).json({ error: 'only completed can be unapproved' }) }
+
+    const pid = Number(head.platform_id||0)
+    const feePct = Number(head.platform_fee_percent||0)
+    const items = await query(`select upper(currency_code) as currency, sum(amount) as total from fx_payment_items where payment_id=$1 group by upper(currency_code)`, [id])
+    const deltas = {}
+    if (pid) {
+      const pr = await query(`select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1 for update`, [pid])
+      if (!pr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+      const p = pr.rows[0]
+      for (const r of items.rows) {
+        const cur = String(r.currency||'').toUpperCase()
+        const amt = Math.round(Number(r.total||0) * 100) / 100
+        if (!(amt > 0)) continue
+        const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
+        if (!field) { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
+        const fee = Math.round((amt * feePct / 100) * 100) / 100
+        const back = Math.round((amt + fee) * 100) / 100
+        const before = Number(p[field]||0)
+        const after = Math.round((before + back) * 100) / 100
+        await query(`update fx_platforms set ${field}=$1 where id=$2`, [after, pid])
+        p[field] = after
+        deltas[cur] = { amount: amt, fee, total: back }
+      }
+    }
+
+    // 回到 pending（保留 platform_id/fee% 以便再次审批）
+    await query(`update fx_payments set status='pending', approved_by=null, approved_at=null where id=$1`, [id])
+    await query(`insert into fx_payment_audits(payment_id, action, platform_id, fee_percent, fee_amount, deltas, acted_by) values($1,$2,$3,$4,$5,$6,$7)`,
+      [id, 'unapprove', (pid||null), feePct, Number(head.platform_fee_amount||0), JSON.stringify(deltas), uid])
+
+    await query('commit')
+    return res.json({ ok: true })
+  } catch (e) {
+    await query('rollback')
+    console.error('unapprove payment failed', e)
+    return res.status(500).json({ error: 'unapprove failed', detail: e.message })
+  }
+})
+
+// 审核日志列表
+fxRouter.get('/payments/:id/audits', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  const rs = await query(`
+    select a.*, coalesce(u.display_name,u.username) as acted_by_name, p.name as platform_name
+    from fx_payment_audits a
+    left join users u on u.id = a.acted_by
+    left join fx_platforms p on p.id = a.platform_id
+    where a.payment_id=$1
+    order by a.id desc
+  `, [id])
+  res.json({ items: rs.rows })
 })
 
 // 付款单：导出 PDF（凭证）

@@ -49,7 +49,7 @@
           <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 180)" align="center">
+      <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 280)" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button 
@@ -58,6 +58,17 @@
             :disabled="row.status!=='completed'"
             @click="downloadPdf(row)"
           >PDF</el-button>
+          <el-button 
+            v-if="has('manage_fx') && row.status==='pending'"
+            size="small" type="primary"
+            @click="openApprove(row)"
+          >审核</el-button>
+          <el-button 
+            v-if="has('manage_fx') && row.status==='completed'"
+            size="small" type="warning"
+            @click="doUnapprove(row)"
+          >撤销</el-button>
+          <el-button size="small" @click="openAudits(row)">日志</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
@@ -122,6 +133,48 @@
       </div>
     </el-drawer>
   </div>
+
+  <!-- 审核弹窗：选择平台与手续费% -->
+  <el-dialog v-model="approveDialog.visible" title="审核付款单" width="420px">
+    <el-form label-width="100px">
+      <el-form-item label="平台商">
+        <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
+          <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="手续费%">
+        <el-input v-model.number="approveDialog.fee_percent" type="number" placeholder="0" />
+      </el-form-item>
+      <el-alert v-if="approveDialog.platform_id" type="info" :closable="false" show-icon>
+        备注：将按明细币种分别从平台余额中扣减 金额+手续费。
+      </el-alert>
+    </el-form>
+    <template #footer>
+      <el-button @click="approveDialog.visible=false">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :loading="approveDialog.loading" @click="confirmApprove">{{ t('common.ok') }}</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 审核日志抽屉 -->
+  <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
+    <el-table :data="auditRows" size="small" border>
+      <el-table-column type="index" label="#" width="60" />
+      <el-table-column prop="acted_at" label="时间" width="170" />
+      <el-table-column prop="action" label="动作" width="110" />
+      <el-table-column prop="platform_name" label="平台" width="160" />
+      <el-table-column label="手续费" width="120" align="right">
+        <template #default="{ row }">{{ money(row.fee_amount) }} ({{ row.fee_percent }}%)</template>
+      </el-table-column>
+      <el-table-column label="扣减明细">
+        <template #default="{ row }">
+          <div v-if="row.deltas">
+            <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：金额 {{ money(v.amount) }}，手续费 {{ money(v.fee) }}，合计 {{ money(v.total) }}</div>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="acted_by_name" label="操作人" width="140" />
+    </el-table>
+  </el-drawer>
 </template>
 
 <script setup>
@@ -133,6 +186,8 @@ import { useTableMemory } from '@/composables/useTableMemory'
 import { useAuth } from '@/composables/useAuth'
 const { t } = useI18n()
 const { has } = useAuth()
+const platforms = ref([])
+async function loadPlatforms(){ const res = await api.buyfx.listPlatforms(); platforms.value = res.items || [] }
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -179,7 +234,7 @@ async function exportCsv(scope){
   a.click()
   URL.revokeObjectURL(url)
 }
-onMounted(() => { loadCustomers(); reload(1) })
+onMounted(() => { loadCustomers(); loadPlatforms(); reload(1) })
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 const drawerVisible = ref(false)
@@ -235,6 +290,44 @@ async function approve(row){
   } catch(e) {
     ElMessage.error(e?.message || '审批失败')
   }
+}
+
+// 新审核流程：弹窗选择平台与费率
+const approveDialog = ref({ visible: false, loading: false, id: null, platform_id: null, fee_percent: 0 })
+function openApprove(row){
+  approveDialog.value = { visible: true, loading: false, id: row.payment_id || row.id, platform_id: null, fee_percent: 0 }
+}
+async function confirmApprove(){
+  const { id, platform_id, fee_percent } = approveDialog.value
+  approveDialog.value.loading = true
+  try {
+    await api.fx.payments.approve(id, { platform_id, fee_percent })
+    ElMessage.success('审核完成')
+    approveDialog.value.visible = false
+    reload()
+  } catch(e) {
+    ElMessage.error(e?.message || '审批失败')
+  } finally { approveDialog.value.loading = false }
+}
+
+// 撤销审批
+async function doUnapprove(row){
+  try {
+    const id = row.payment_id || row.id
+    await api.fx.payments.unapprove(id)
+    ElMessage.success('已撤销审批')
+    reload()
+  } catch(e) { ElMessage.error(e?.message || '撤销失败') }
+}
+
+// 审核日志
+const auditDrawer = ref({ visible: false, id: null })
+const auditRows = ref([])
+async function openAudits(row){
+  auditDrawer.value = { visible: true, id: row.payment_id || row.id }
+  const list = await api.fx.payments.audits(auditDrawer.value.id)
+  // 确保 deltas 为对象
+  auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
 }
 
 async function downloadPdf(row){
