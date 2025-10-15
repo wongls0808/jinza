@@ -8,12 +8,13 @@
   "scripts": {
     "dev": "node server.js",
     "frontend": "vite",
-    "build": "vite build",
+  "build": "vite build && node scripts/write-version.mjs",
     "prestart": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
-    "start:dev": "set NODE_ENV=development && node server.js"
+    "start:dev": "set NODE_ENV=development && node server.js",
+    "build:with-sha": "npm run build"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
