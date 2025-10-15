@@ -60,12 +60,12 @@
             <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')">
               <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
             </el-select>
-            <el-select v-model="convert.from" :placeholder="t('buyfx.fromCurrency')">
+            <el-select v-model="convert.from" :placeholder="t('buyfx.sellCurrency')">
               <el-option label="USD" value="USD"/>
               <el-option label="MYR" value="MYR"/>
               <el-option label="CNY" value="CNY"/>
             </el-select>
-            <el-select v-model="convert.to" :placeholder="t('buyfx.toCurrency')">
+            <el-select v-model="convert.to" :placeholder="t('buyfx.buyCurrency')">
               <el-option label="USD" value="USD"/>
               <el-option label="MYR" value="MYR"/>
               <el-option label="CNY" value="CNY"/>

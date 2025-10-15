@@ -16,8 +16,8 @@
       <el-table :data="rows" size="small" border stripe>
         <el-table-column type="index" width="50"/>
         <el-table-column prop="created_at" :label="t('buyfx.historyDate')" width="170"/>
-        <el-table-column :label="t('buyfx.fromBalance')" width="160" align="right">
-          <template #default="{ row }">{{ row.from_currency }} {{ money(row.balance_src_after) }}</template>
+        <el-table-column :label="t('buyfx.fromBalance')" width="220" align="right">
+          <template #default="{ row }">{{ row.from_currency }} {{ money(row.balance_src_before) }} → {{ money(row.balance_src_after) }}</template>
         </el-table-column>
         <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100"/>
         <el-table-column :label="t('buyfx.sellAmount')" width="140" align="right">
@@ -30,8 +30,8 @@
         <el-table-column :label="t('buyfx.buyAmount')" width="140" align="right">
           <template #default="{ row }">{{ money(row.amount_to) }}</template>
         </el-table-column>
-        <el-table-column :label="t('buyfx.toBalance')" width="160" align="right">
-          <template #default="{ row }">{{ row.to_currency }} {{ money(row.balance_dst_after) }}</template>
+        <el-table-column :label="t('buyfx.toBalance')" width="220" align="right">
+          <template #default="{ row }">{{ row.to_currency }} {{ money(row.balance_dst_before) }} → {{ money(row.balance_dst_after) }}</template>
         </el-table-column>
         <el-table-column prop="created_by_name" :label="t('common.createdBy')" width="140"/>
         <el-table-column :label="t('common.actions')" width="160">

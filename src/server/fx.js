@@ -102,6 +102,8 @@ async function ensureDDL() {
       fee_percent numeric(6,3) default 0,
       fee_amount numeric(18,6) default 0,
       amount_to numeric(18,6) not null,
+      balance_src_before numeric(18,6),
+      balance_dst_before numeric(18,6),
       balance_src_after numeric(18,6),
       balance_dst_after numeric(18,6),
       note varchar(200),
@@ -123,6 +125,8 @@ async function ensureDDL() {
   try { await query(`alter table fx_platforms add column if not exists balance_cny numeric(18,2) default 0`) } catch {}
   try { await query(`alter table fx_platforms add column if not exists fee_percent numeric(6,3) default 0`) } catch {}
   // 转换记录表补充余额快照列
+  try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_src_before numeric(18,6)`) } catch {}
+  try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_dst_before numeric(18,6)`) } catch {}
   try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_src_after numeric(18,6)`) } catch {}
   try { await query(`alter table fx_platform_fx_transfers add column if not exists balance_dst_after numeric(18,6)`) } catch {}
 }
@@ -258,8 +262,9 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
   // 根据最新需求：购汇不计手续费
   const feePercent = 0
   const fee = 0
-  const debitTotal = amt
-  const creditTo = Math.round((amt * r) * 1e6) / 1e6
+  // 平台余额精度为两位小数，这里对更新量统一取两位，保证删除时可精确回滚
+  const debitTotal = Math.round(amt * 100) / 100
+  const creditTo = Math.round((amt * r) * 100) / 100
   const srcField = from === 'USD' ? 'balance_usd' : (from === 'MYR' ? 'balance_myr' : 'balance_cny')
   const dstField = to === 'USD' ? 'balance_usd' : (to === 'MYR' ? 'balance_myr' : 'balance_cny')
 
@@ -272,20 +277,24 @@ fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manag
   // 原子更新：事务
   try {
     await query('begin')
-    await query(`update fx_platforms set ${srcField} = coalesce(${srcField},0) - $1, ${dstField} = coalesce(${dstField},0) + $2 where id=$3`, [debitTotal, creditTo, id])
+    // 计算交易前余额
+    const srcBefore = Number(p[srcField]||0)
+    const dstBefore = Number(p[dstField]||0)
+    const srcAfter = Math.round((srcBefore - debitTotal) * 100) / 100
+    const dstAfter = Math.round((dstBefore + creditTo) * 100) / 100
+    // 更新平台余额
+    await query(`update fx_platforms set ${srcField} = $1, ${dstField} = $2 where id=$3`, [srcAfter, dstAfter, id])
+    // 写记录（包含前后余额）
     await query(
-      `insert into fx_platform_fx_transfers(platform_id, from_currency, to_currency, amount_from, rate, fee_percent, fee_amount, amount_to, balance_src_after, balance_dst_after, note, created_by)
-       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [id, from, to, amt, r, feePercent, fee, creditTo, null, null, (note||null), req.user?.id || null]
+      `insert into fx_platform_fx_transfers(
+        platform_id, from_currency, to_currency, amount_from, rate, fee_percent, fee_amount, amount_to,
+        balance_src_before, balance_dst_before, balance_src_after, balance_dst_after, note, created_by)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [id, from, to, debitTotal, r, feePercent, fee, creditTo,
+       srcBefore, dstBefore, srcAfter, dstAfter, (note||null), req.user?.id || null]
     )
-    const updated = await query('select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1', [id])
-    // 回填刚才插入记录的余额快照（使用最新余额）
-    const u = updated.rows[0]
-    const srcAfter = from === 'USD' ? Number(u.balance_usd||0) : (from === 'MYR' ? Number(u.balance_myr||0) : Number(u.balance_cny||0))
-    const dstAfter = to === 'USD' ? Number(u.balance_usd||0) : (to === 'MYR' ? Number(u.balance_myr||0) : Number(u.balance_cny||0))
-    await query(`update fx_platform_fx_transfers set balance_src_after=$1, balance_dst_after=$2 where platform_id=$3 and created_by=$4 and created_at=(select max(created_at) from fx_platform_fx_transfers where platform_id=$3 and created_by=$4)`, [srcAfter, dstAfter, id, req.user?.id || null])
     await query('commit')
-    res.json({ ok: true, balances: updated.rows[0], fee_amount: fee, amount_to: creditTo })
+    res.json({ ok: true, balances: { id, balance_usd: (from==='USD'||to==='USD')? (from==='USD'?srcAfter:dstAfter) : Number(p.balance_usd||0), balance_myr: (from==='MYR'||to==='MYR')? (from==='MYR'?srcAfter:dstAfter) : Number(p.balance_myr||0), balance_cny: (from==='CNY'||to==='CNY')? (from==='CNY'?srcAfter:dstAfter) : Number(p.balance_cny||0) }, fee_amount: fee, amount_to: creditTo })
   } catch (e) {
     await query('rollback')
     console.error('platform convert failed', e)
@@ -423,7 +432,9 @@ fxRouter.delete('/transfers/:id', authMiddleware(true), requirePerm('manage_fx')
   const dstField = row.to_currency === 'USD' ? 'balance_usd' : (row.to_currency === 'MYR' ? 'balance_myr' : 'balance_cny')
   try {
     await query('begin')
-    await query(`update fx_platforms set ${srcField} = coalesce(${srcField},0) + $1, ${dstField} = coalesce(${dstField},0) - $2 where id=$3`, [Number(row.amount_from||0), Number(row.amount_to||0), Number(row.platform_id)])
+    const addBack = Math.round(Number(row.amount_from||0) * 100) / 100
+    const minusBack = Math.round(Number(row.amount_to||0) * 100) / 100
+    await query(`update fx_platforms set ${srcField} = round(coalesce(${srcField},0) + $1, 2), ${dstField} = round(coalesce(${dstField},0) - $2, 2) where id=$3`, [addBack, minusBack, Number(row.platform_id)])
     await query(`delete from fx_platform_fx_transfers where id=$1`, [id])
     await query('commit')
     res.json({ ok: true })
