@@ -60,12 +60,19 @@
           <el-table-column prop="total_amount" label="金额" width="140" align="right">
             <template #default="{ row }">{{ money(row.total_amount) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="320" align="center">
+          <el-table-column label="操作" width="420" align="center">
             <template #default="{ row }">
               <el-button size="small" type="primary" @click="openTodo(row)">查看</el-button>
               <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">审核</el-button>
               <el-button v-if="has('manage_fx') && row.status==='completed'" size="small" type="warning" @click="doUnapprove(row)">撤销</el-button>
               <el-button size="small" @click="openAudits(row)">日志</el-button>
+              <template v-if="has('delete_fx') && row.status==='pending'">
+                <el-popconfirm :title="t('common.confirmDelete')" @confirm="rejectPayment(row)">
+                  <template #reference>
+                    <el-button size="small" type="danger">驳回</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -167,7 +174,8 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, onMounted } from 'vue'
-import { api } from '@/api'
+import { api, request as httpRequest } from '@/api'
+import { ElMessage } from 'element-plus'
 // 菜单卡片已移除，无需引入图标
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -245,6 +253,17 @@ async function openAudits(row){
   auditDrawer.value.visible = true
   const list = await api.fx.payments.audits(row.id)
   auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
+}
+
+// 驳回：仅 pending 状态可执行，等价于删除该付款单
+async function rejectPayment(row){
+  try {
+    await httpRequest(`/fx/payments/${row.id}`, { method: 'DELETE' })
+    ElMessage.success(t('common.ok'))
+    await loadTodos()
+  } catch (e) {
+    ElMessage.error(e?.message || '驳回失败')
+  }
 }
 
 // 单笔审核余额预览计算
