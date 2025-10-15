@@ -20,10 +20,12 @@
           <el-table-column prop="total_amount" label="金额" width="140" align="right">
             <template #default="{ row }">{{ money(row.total_amount) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="220" align="center">
+          <el-table-column label="操作" width="320" align="center">
             <template #default="{ row }">
               <el-button size="small" type="primary" @click="openTodo(row)">查看</el-button>
-              <el-button size="small" type="success" @click="approve(row)">完成</el-button>
+              <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">审核</el-button>
+              <el-button v-if="has('manage_fx') && row.status==='completed'" size="small" type="warning" @click="doUnapprove(row)">撤销</el-button>
+              <el-button size="small" @click="openAudits(row)">日志</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -47,6 +49,48 @@
         </el-table>
       </div>
     </el-drawer>
+
+    <!-- 审核弹窗：选择平台与手续费% -->
+    <el-dialog v-model="approveDialog.visible" title="审核付款单" width="420px">
+      <el-form label-width="100px">
+        <el-form-item label="平台商">
+          <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
+            <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="手续费%">
+          <el-input v-model.number="approveDialog.fee_percent" type="number" placeholder="0" />
+        </el-form-item>
+        <el-alert v-if="approveDialog.platform_id" type="info" :closable="false" show-icon>
+          审核后将按明细币种分别从该平台余额扣减 金额+手续费。
+        </el-alert>
+      </el-form>
+      <template #footer>
+        <el-button @click="approveDialog.visible=false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="approveDialog.loading" @click="confirmApprove">{{ t('common.ok') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 审核日志抽屉 -->
+    <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
+      <el-table :data="auditRows" size="small" border>
+        <el-table-column type="index" label="#" width="60" />
+        <el-table-column prop="acted_at" label="时间" width="170" />
+        <el-table-column prop="action" label="动作" width="110" />
+        <el-table-column prop="platform_name" label="平台" width="160" />
+        <el-table-column label="手续费" width="120" align="right">
+          <template #default="{ row }">{{ money(row.fee_amount) }} ({{ row.fee_percent }}%)</template>
+        </el-table-column>
+        <el-table-column label="扣减明细">
+          <template #default="{ row }">
+            <div v-if="row.deltas">
+              <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：金额 {{ money(v.amount) }}，手续费 {{ money(v.fee) }}，合计 {{ money(v.total) }}</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="acted_by_name" label="操作人" width="140" />
+      </el-table>
+    </el-drawer>
   </div>
 </template>
 
@@ -65,6 +109,7 @@ const username = computed(() => state.user?.display_name || state.user?.username
 const today = new Date().toLocaleDateString()
 
 const todos = ref([])
+const platforms = ref([])
 const todoDrawer = ref(false)
 const todoDetail = ref(null)
 function fmtDate(v){ try { if (!v) return ''; if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
@@ -76,7 +121,7 @@ async function loadTodos(){
     todos.value = items
   } catch {}
 }
-onMounted(loadTodos)
+onMounted(() => { loadTodos(); loadPlatforms() })
 
 async function openTodo(row){
   const d = await api.fx.payments.detail(row.id)
@@ -88,6 +133,35 @@ async function approve(row){
   todoDrawer.value = false
   todoDetail.value = null
   await loadTodos()
+}
+
+async function loadPlatforms(){ const res = await api.buyfx.listPlatforms(); platforms.value = res.items || [] }
+
+const approveDialog = ref({ visible: false, loading: false, id: null, platform_id: null, fee_percent: 0 })
+function openApprove(row){ approveDialog.value = { visible: true, loading: false, id: row.id, platform_id: null, fee_percent: 0 } }
+async function confirmApprove(){
+  const { id, platform_id, fee_percent } = approveDialog.value
+  approveDialog.value.loading = true
+  try {
+    await api.fx.payments.approve(id, { platform_id, fee_percent })
+    approveDialog.value.visible = false
+    todoDrawer.value = false
+    todoDetail.value = null
+    await loadTodos()
+  } finally { approveDialog.value.loading = false }
+}
+
+async function doUnapprove(row){
+  await api.fx.payments.unapprove(row.id)
+  await loadTodos()
+}
+
+const auditDrawer = ref({ visible: false })
+const auditRows = ref([])
+async function openAudits(row){
+  auditDrawer.value.visible = true
+  const list = await api.fx.payments.audits(row.id)
+  auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
 }
 </script>
 
