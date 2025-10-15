@@ -8,14 +8,46 @@
     <div class="todo" style="margin-top:16px;">
       <el-card>
         <div class="todo-title">待办事项</div>
-        <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
-          <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:220px" filterable>
+        <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+          <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:240px" filterable>
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
           </el-select>
-          <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
+          <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.value.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
           <span v-if="batch.platform_id" style="color: var(--el-text-color-secondary); font-size:12px;">将按所选平台的手续费比例扣减。</span>
         </div>
-        <el-table :data="todos" size="small" border @selection-change="(rows)=> multipleSelection = rows">
+        <!-- 余额预览 -->
+        <div v-if="batch.platform_id" class="preview-card">
+          <div class="row">
+            <div class="cell head">平台手续费</div>
+            <div class="cell">{{ Number(selectedPlatform?.fee_percent||0).toFixed(4) }}%</div>
+          </div>
+          <div class="row">
+            <div class="cell head">币种</div>
+            <div class="cell">USD</div>
+            <div class="cell">MYR</div>
+            <div class="cell">CNY</div>
+          </div>
+          <div class="row">
+            <div class="cell head">可用余额</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_usd||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_myr||0)) }}</div>
+            <div class="cell mono">{{ money(Number(selectedPlatform?.balance_cny||0)) }}</div>
+          </div>
+          <div class="row">
+            <div class="cell head">已选应扣(含手续费)</div>
+            <div class="cell mono warn" :class="{ danger: need.USD>0 && after.USD<0 }">{{ money(need.USD) }}</div>
+            <div class="cell mono warn" :class="{ danger: need.MYR>0 && after.MYR<0 }">{{ money(need.MYR) }}</div>
+            <div class="cell mono warn" :class="{ danger: need.CNY>0 && after.CNY<0 }">{{ money(need.CNY) }}</div>
+          </div>
+          <div class="row">
+            <div class="cell head">扣减后余额</div>
+            <div class="cell mono" :class="{ danger: after.USD<0 }">{{ money(after.USD) }}</div>
+            <div class="cell mono" :class="{ danger: after.MYR<0 }">{{ money(after.MYR) }}</div>
+            <div class="cell mono" :class="{ danger: after.CNY<0 }">{{ money(after.CNY) }}</div>
+          </div>
+        </div>
+
+        <el-table :data="todos" size="small" border @selection-change="onSelectionChange">
           <el-table-column type="selection" width="46" />
           <el-table-column label="#" width="60">
             <template #default="{ $index }">{{ $index + 1 }}</template>
@@ -170,14 +202,65 @@ async function openAudits(row){
   auditRows.value = (list.items || []).map(it => ({ ...it, deltas: typeof it.deltas === 'string' ? JSON.parse(it.deltas) : it.deltas }))
 }
 
-// 批量审批
-let multipleSelection = []
+// 批量审批 + 余额预览
+const multipleSelection = ref([])
 const batch = ref({ platform_id: null })
+const selectedPlatform = computed(() => platforms.value.find(p => p.id === batch.value.platform_id) || null)
+
+// 选择项 -> 每笔的币种合计缓存
+const paymentTotalsById = ref({}) // { [id]: { USD: number, MYR: number, CNY: number } }
+async function fetchPaymentTotals(id){
+  // 已缓存则跳过
+  if (paymentTotalsById.value[id]) return
+  try {
+    const d = await api.fx.payments.detail(id)
+    const totals = { USD:0, MYR:0, CNY:0 }
+    for (const it of (d.items||[])) {
+      const cur = String(it.currency_code||'').toUpperCase()
+      const amt = Math.round(Number(it.amount||0) * 100) / 100
+      if (cur==='USD' || cur==='MYR' || cur==='CNY') totals[cur] = Math.round((totals[cur] + amt) * 100) / 100
+    }
+    paymentTotalsById.value[id] = totals
+  } catch {}
+}
+async function onSelectionChange(rows){
+  multipleSelection.value = rows
+  // 拉取明细，计算合计
+  await Promise.all(rows.map(r => fetchPaymentTotals(r.id)))
+}
+const selectionTotals = computed(() => {
+  const totals = { USD:0, MYR:0, CNY:0 }
+  for (const r of multipleSelection.value) {
+    const t = paymentTotalsById.value[r.id]
+    if (!t) continue
+    totals.USD = Math.round((totals.USD + (t.USD||0)) * 100) / 100
+    totals.MYR = Math.round((totals.MYR + (t.MYR||0)) * 100) / 100
+    totals.CNY = Math.round((totals.CNY + (t.CNY||0)) * 100) / 100
+  }
+  return totals
+})
+const feePct4 = computed(() => Number(selectedPlatform.value?.fee_percent || 0))
+const need = computed(() => ({
+  USD: Math.round((selectionTotals.value.USD + Math.round((selectionTotals.value.USD * feePct4.value / 100) * 100) / 100) * 100) / 100,
+  MYR: Math.round((selectionTotals.value.MYR + Math.round((selectionTotals.value.MYR * feePct4.value / 100) * 100) / 100) * 100) / 100,
+  CNY: Math.round((selectionTotals.value.CNY + Math.round((selectionTotals.value.CNY * feePct4.value / 100) * 100) / 100) * 100) / 100,
+}))
+const after = computed(() => ({
+  USD: Math.round(((Number(selectedPlatform.value?.balance_usd||0)) - need.value.USD) * 100) / 100,
+  MYR: Math.round(((Number(selectedPlatform.value?.balance_myr||0)) - need.value.MYR) * 100) / 100,
+  CNY: Math.round(((Number(selectedPlatform.value?.balance_cny||0)) - need.value.CNY) * 100) / 100,
+}))
+const canBatchApprove = computed(() => {
+  // 若没有任何需要扣减的金额，则允许；若有扣减，要求全部 after >= 0
+  const anyNeed = (need.value.USD>0 || need.value.MYR>0 || need.value.CNY>0)
+  if (!anyNeed) return false
+  return after.value.USD >= 0 && after.value.MYR >= 0 && after.value.CNY >= 0
+})
 async function doBatchApprove(){
-  if (!batch.value.platform_id || !multipleSelection.length) return
-  const ids = multipleSelection.map(r => r.id)
+  if (!batch.value.platform_id || !multipleSelection.value.length) return
+  const ids = multipleSelection.value.map(r => r.id)
   await api.fx.payments.batchApprove(ids, batch.value.platform_id)
-  multipleSelection = []
+  multipleSelection.value = []
   batch.value.platform_id = null
   await loadTodos()
 }
@@ -192,4 +275,10 @@ async function doBatchApprove(){
 .todo-title { font-weight: 700; margin-bottom: 8px; }
 .todo-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .todo-head > div { color: var(--el-text-color-primary); font-weight: 600; }
+.preview-card { border: 1px solid var(--el-border-color); border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+.preview-card .row { display: grid; grid-template-columns: 120px repeat(3, minmax(0,1fr)); gap: 8px; align-items: center; margin: 4px 0; }
+.preview-card .cell.head { color: var(--el-text-color-secondary); font-size: 12px; }
+.preview-card .cell.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.preview-card .cell.warn { color: var(--el-text-color-primary); }
+.preview-card .cell.danger { color: var(--el-color-danger); font-weight: 600; }
 </style>
