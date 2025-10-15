@@ -49,7 +49,6 @@
           <div class="rate-bar">
             <span>{{ t('buyfx.liveRate') }}</span>
             <el-tag type="info">{{ liveRateText }}</el-tag>
-            <el-button size="small" @click="refreshRate">{{ t('buyfx.refresh') }}</el-button>
           </div>
           <div class="buy-form">
             <el-select v-model="form.platform_id" filterable :placeholder="t('buyfx.placePlatform')">
