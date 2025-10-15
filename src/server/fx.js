@@ -87,6 +87,21 @@ async function ensureDDL() {
       created_by int,
       created_at timestamptz default now()
     );
+    -- 平台内币种互换记录
+    create table if not exists fx_platform_fx_transfers(
+      id serial primary key,
+      platform_id int not null references fx_platforms(id) on delete cascade,
+      from_currency varchar(8) not null,
+      to_currency varchar(8) not null,
+      amount_from numeric(18,6) not null,
+      rate numeric(18,6) not null,
+      fee_percent numeric(6,3) default 0,
+      fee_amount numeric(18,6) default 0,
+      amount_to numeric(18,6) not null,
+      note varchar(200),
+      created_by int,
+      created_at timestamptz default now()
+    );
   `)
   // 向后兼容：老表补充 bill_no 列
   await query(`alter table fx_settlements add column if not exists bill_no varchar(40)`)
@@ -211,6 +226,56 @@ fxRouter.post('/buy', authMiddleware(true), requirePerm('manage_fx'), async (req
     values($1,$2,$3,$4,upper($5),upper($6),$7,$8,$9) returning *
   `, [order_no, platform_id||null, customer_id||null, customer_name||null, pay_currency, buy_currency, Number(amount_pay), (expected_rate==null? null : Number(expected_rate)), created_by])
   res.json(rs.rows[0])
+})
+
+// ---------- 平台内币种互换（余额相互购汇） ----------
+fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  const { from_currency, to_currency, amount_from, rate, note } = req.body || {}
+  if (!id) return res.status(400).json({ error: 'invalid platform id' })
+  const from = String(from_currency||'').toUpperCase()
+  const to = String(to_currency||'').toUpperCase()
+  const amt = Number(amount_from||0)
+  const r = Number(rate||0)
+  const okCurr = new Set(['USD','MYR','CNY'])
+  if (!okCurr.has(from) || !okCurr.has(to) || from === to) return res.status(400).json({ error: 'invalid currency' })
+  if (!(amt > 0) || !(r > 0)) return res.status(400).json({ error: 'invalid amount/rate' })
+
+  // 获取平台与费率
+  const pr = await query('select id, fee_percent, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1', [id])
+  if (!pr.rowCount) return res.status(404).json({ error: 'platform not found' })
+  const p = pr.rows[0]
+  const feePercent = Number(p.fee_percent||0)
+  const fee = Math.round((amt * feePercent / 100) * 1e6) / 1e6
+  const debitTotal = amt + fee
+  const creditTo = Math.round((amt * r) * 1e6) / 1e6
+  const srcField = from === 'USD' ? 'balance_usd' : (from === 'MYR' ? 'balance_myr' : 'balance_cny')
+  const dstField = to === 'USD' ? 'balance_usd' : (to === 'MYR' ? 'balance_myr' : 'balance_cny')
+
+  // 充足性校验
+  const currentSrc = Number(p[srcField]||0)
+  if (currentSrc < debitTotal) {
+    return res.status(400).json({ error: 'insufficient balance', detail: { required: debitTotal, current: currentSrc, currency: from } })
+  }
+
+  // 原子更新：事务
+  try {
+    await query('begin')
+    await query(`update fx_platforms set ${srcField} = coalesce(${srcField},0) - $1, ${dstField} = coalesce(${dstField},0) + $2 where id=$3`, [debitTotal, creditTo, id])
+    await query(
+      `insert into fx_platform_fx_transfers(platform_id, from_currency, to_currency, amount_from, rate, fee_percent, fee_amount, amount_to, note, created_by)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, from, to, amt, r, feePercent, fee, creditTo, (note||null), req.user?.id || null]
+    )
+    const updated = await query('select id, balance_usd, balance_myr, balance_cny from fx_platforms where id=$1', [id])
+    await query('commit')
+    res.json({ ok: true, balances: updated.rows[0], fee_amount: fee, amount_to: creditTo })
+  } catch (e) {
+    await query('rollback')
+    console.error('platform convert failed', e)
+    res.status(500).json({ error: 'convert failed', detail: e.message })
+  }
 })
 
 // 创建结汇单

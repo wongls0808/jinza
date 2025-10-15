@@ -272,7 +272,8 @@ export const api = {
     getRate: (pair) => request(`/fx/rates?pair=${encodeURIComponent(pair)}`),
     upsertRate: (data) => request('/fx/rates', { method: 'POST', body: JSON.stringify(data) }),
     listOrders: () => request('/fx/buy'),
-    createOrder: (data) => request('/fx/buy', { method: 'POST', body: JSON.stringify(data) })
+    createOrder: (data) => request('/fx/buy', { method: 'POST', body: JSON.stringify(data) }),
+    convertPlatformCurrency: (platformId, data) => request(`/fx/platforms/${platformId}/convert`, { method: 'POST', body: JSON.stringify(data) })
   },
   // 按客户拉取已匹配交易，辅助结汇区
   transactionsByCustomer: (customerId, params={}) => request(`/transactions?${new URLSearchParams({ status:'matched', matchTargetId: customerId, ...params }).toString()}`),

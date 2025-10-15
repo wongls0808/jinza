@@ -60,6 +60,28 @@
             <el-input-number v-model="form.expected_rate" :min="0" :step="0.001" :precision="6" :placeholder="t('buyfx.expectedRate')" />
             <el-button type="primary" :disabled="!canSubmit" @click="submitOrder">{{ t('buyfx.submitBuy') }}</el-button>
           </div>
+          <el-divider />
+          <div class="convert-form">
+            <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')">
+              <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
+            </el-select>
+            <el-select v-model="convert.from" :placeholder="t('buyfx.fromCurrency')">
+              <el-option label="USD" value="USD"/>
+              <el-option label="MYR" value="MYR"/>
+              <el-option label="CNY" value="CNY"/>
+            </el-select>
+            <el-select v-model="convert.to" :placeholder="t('buyfx.toCurrency')">
+              <el-option label="USD" value="USD"/>
+              <el-option label="MYR" value="MYR"/>
+              <el-option label="CNY" value="CNY"/>
+            </el-select>
+            <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" :placeholder="t('buyfx.amountFrom')"/>
+            <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" :placeholder="t('buyfx.rate')"/>
+            <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.convert') }}</el-button>
+          </div>
+          <div class="convert-hint" v-if="convertSummary">
+            <el-alert type="info" :title="convertSummary" show-icon :closable="false" />
+          </div>
           <el-table :data="orders" size="small" border height="38vh" style="margin-top:10px;">
             <el-table-column type="index" label="#" width="60" />
             <el-table-column prop="order_no" :label="t('buyfx.orderNo')" width="200" />
@@ -208,6 +230,36 @@ async function removePlatform(row){
 
 onMounted(async () => { await loadPlatforms(); await loadOrders(); await refreshRate(); startPolling() })
 onBeforeUnmount(stopPolling)
+
+// 转换（平台内互换）
+const convert = ref({ platform_id: null, from: 'CNY', to: 'MYR', amount: null, rate: null })
+const canConvert = computed(() => !!convert.value.platform_id && convert.value.from && convert.value.to && convert.value.from!==convert.value.to && Number(convert.value.amount||0)>0 && Number(convert.value.rate||0)>0 )
+const convertSummary = computed(() => {
+  const p = platforms.value.find(x=>x.id===convert.value.platform_id)
+  if (!p) return ''
+  const feePct = Number(p.fee_percent||0)
+  const amt = Number(convert.value.amount||0)
+  const r = Number(convert.value.rate||0)
+  if (!(amt>0) || !(r>0)) return ''
+  const fee = amt * feePct / 100
+  const toAmt = amt * r
+  return `${t('buyfx.fee')}: ${money(fee)} | ${t('buyfx.amountTo')}: ${money(toAmt)}`
+})
+async function doConvert(){
+  try{
+    const pid = convert.value.platform_id
+    await api.buyfx.convertPlatformCurrency(pid, {
+      from_currency: convert.value.from,
+      to_currency: convert.value.to,
+      amount_from: Number(convert.value.amount||0),
+      rate: Number(convert.value.rate||0)
+    })
+    ElMessage.success(t('buyfx.converted'))
+    await loadPlatforms()
+  }catch(e){
+    ElMessage.error(e?.message || t('buyfx.convertFailed'))
+  }
+}
 </script>
 
 <style scoped>
@@ -215,6 +267,8 @@ onBeforeUnmount(stopPolling)
 .rate-bar { display:flex; gap:10px; align-items:center; margin-bottom: 8px; }
 .buy-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin-bottom:8px; }
 @media (max-width: 1200px){ .buy-form { grid-template-columns: 1fr; } }
+.convert-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin: 8px 0; }
+@media (max-width: 1200px){ .convert-form { grid-template-columns: 1fr; } }
 /* 平台卡片列表 */
 .platform-list { display: flex; flex-direction: column; gap: 10px; max-height: 40vh; overflow:auto; padding-right: 2px; }
 .platform-card { border: 1px solid var(--el-border-color); border-radius: 10px; padding: 12px; background: var(--el-fill-color-blank); transition: box-shadow .2s ease, border-color .2s ease; }

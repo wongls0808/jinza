@@ -89,6 +89,15 @@ const messages = {
       deleteFailed: '删除失败',
       buySubmitted: '已提交购汇',
       submitFailed: '提交失败'
+      ,fromCurrency: '从币种',
+      toCurrency: '到币种',
+      amountFrom: '换出金额',
+      rate: '汇率',
+      convert: '币种互换',
+      fee: '手续费',
+      amountTo: '到账金额',
+      converted: '互换成功',
+      convertFailed: '互换失败'
     },
     customers: {
       title: '客户管理',
@@ -459,6 +468,15 @@ const messages = {
       deleteFailed: 'Delete failed',
       buySubmitted: 'Buy order submitted',
       submitFailed: 'Submit failed'
+      ,fromCurrency: 'From',
+      toCurrency: 'To',
+      amountFrom: 'Amount',
+      rate: 'Rate',
+      convert: 'Convert',
+      fee: 'Fee',
+      amountTo: 'To Amount',
+      converted: 'Converted',
+      convertFailed: 'Convert failed'
     },
     customers: {
       title: 'Customers',
