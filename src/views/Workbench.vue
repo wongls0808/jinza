@@ -6,8 +6,7 @@
     </div>
 
     <div class="quick" style="margin-top:8px; margin-bottom:8px;">
-      <el-card shadow="never">
-        <div class="quick-title" data-testid="qa-title">{{ t('home.quickActions') }}</div>
+      <el-card shadow="never" class="card--plain">
         <div class="card-grid">
           <div
             v-for="it in quickActions" :key="it.key"
@@ -62,7 +61,8 @@ const quickActions = computed(() => [
 .hero { margin: 8px 8px 16px; }
 .welcome { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
 .meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
-.quick-title { font-weight: 800; margin-bottom: 10px; letter-spacing: .2px; }
+.quick-title { display:none; }
+.card--plain { background: transparent; border: none; box-shadow: none; }
 
 /* 卡片网格 */
 .card-grid { 
@@ -78,35 +78,24 @@ const quickActions = computed(() => [
   gap: 10px;
   padding: 16px;
   border-radius: 16px;
-  color: #fff;
-  background: linear-gradient(145deg, var(--fc-bg1), var(--fc-bg2));
-  box-shadow: 0 14px 30px rgba(0,0,0,.14);
-  border: 1px solid color-mix(in oklab, #fff 12%, transparent);
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color);
+  box-shadow: 0 8px 20px rgba(0,0,0,.06);
+  border: 1px solid var(--el-border-color);
   overflow: hidden;
   cursor: pointer;
   user-select: none;
   transition: box-shadow .2s ease, filter .2s ease, transform .06s ease;
 }
-.feature-card::after {
-  content: "";
-  position: absolute;
-  right: -20px; bottom: -20px;
-  width: 140px; height: 140px;
-  background: radial-gradient(closest-side, rgba(255,255,255,.22), transparent 70%);
-  filter: blur(6px);
-}
+.feature-card::after { display: none; }
 .feature-card:hover { box-shadow: 0 22px 46px rgba(0,0,0,.2); filter: saturate(1.06); }
 .feature-card:focus { outline: 3px solid rgba(255,255,255,.5); outline-offset: 2px; }
-.fc-icon { font-size: 26px; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.fc-icon { font-size: 26px; line-height: 1; text-shadow: none; }
 .fc-texts { display: grid; gap: 4px; }
 .fc-title { font-weight: 800; letter-spacing: .2px; }
-.fc-desc { opacity: .92; font-size: 12px; color: rgba(255,255,255,.95); text-shadow: 0 1px 2px rgba(0,0,0,.18); }
-.fc-arrow { font-size: 20px; opacity: .9; }
+.fc-desc { opacity: .92; font-size: 12px; color: var(--el-text-color-secondary); text-shadow: none; }
+.fc-arrow { font-size: 20px; opacity: .65; color: var(--el-text-color-secondary); }
 
 /* 主题色系 */
-.feature-card.is-blue { --fc-bg1: #5aa9ff; --fc-bg2: #3f7ef1; }
-.feature-card.is-green { --fc-bg1: #43e97b; --fc-bg2: #38c172; }
-.feature-card.is-teal { --fc-bg1: #2dd4bf; --fc-bg2: #14b8a6; }
-.feature-card.is-orange { --fc-bg1: #f6ad55; --fc-bg2: #ed8936; }
-.feature-card.is-purple { --fc-bg1: #a78bfa; --fc-bg2: #7c3aed; }
+/* 主题占位已合并为统一白卡风格，无需额外色系 */
 </style>
