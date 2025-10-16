@@ -76,6 +76,14 @@
         <div class="kpi-title">待付余额(CNY)</div>
         <div class="kpi-value">{{ money(stats.totals.pendingCNY) }}</div>
       </div>
+      <!-- 新增：未匹配交易（统一为KPI卡片，加入同一网格） -->
+      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
+        <el-tooltip :content="`未匹配 ${unmatchedCount} / 总计 ${totalTx}`" placement="top">
+          <span class="kpi-count">{{ unmatchedCount }}</span>
+        </el-tooltip>
+        <div class="kpi-title">未匹配交易</div>
+        <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
+      </div>
     </div>
 
     <!-- 可拖拽的“付款待审”浮动按钮（持久化位置） -->
@@ -199,17 +207,7 @@
       </div>
     </el-drawer>
 
-    <!-- KPI 风格：未匹配交易（与客户余额卡片一致） -->
-    <div class="kpi6-grid">
-      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
-        <el-tooltip :content="`未匹配 ${unmatchedCount} / 总计 ${totalTx}`" placement="top">
-          <span class="kpi-count">{{ unmatchedCount }}</span>
-        </el-tooltip>
-        <div class="kpi-title">未匹配交易</div>
-        <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
-        <div class="kpi-sub">总计 {{ totalTx.toLocaleString() }} 条</div>
-      </div>
-    </div>
+    
 
     <!-- 审核弹窗：选择平台并预览余额 -->
     <el-dialog v-model="approveDialog.visible" title="审核付款单" width="520px">
