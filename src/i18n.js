@@ -888,6 +888,7 @@ const messages = {
         bankAccount: 'Bank Account',
         currency: 'Currency',
         openingBalance: 'Opening Balance',
+        balance: 'Balance',
         ops: 'Actions',
       },
       form: {

@@ -10,7 +10,7 @@ import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
 import { fxRouter } from './fx.js'
-import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, expandWithLegacy } from './permissions.js'
+import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes } from './permissions.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -37,8 +37,7 @@ router.post('/auth/login', async (req, res) => {
        where up.user_id=$1`,
       [user.id]
     )
-  const permCodesRaw = [...new Set(perms.rows.map(r => r.code))]
-  const permCodes = expandWithLegacy(permCodesRaw)
+  const permCodes = [...new Set(perms.rows.map(r => r.code))]
   const token = signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password })
   res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name, is_admin: !!user.is_admin }, perms: permCodes, must_change_password: !!user.must_change_password })
 })

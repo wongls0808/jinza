@@ -48,7 +48,7 @@
           </el-menu-item>
           <el-menu-item index="expenses" :route="{name: 'expenses'}" v-if="has('expenses:list')">
             <el-icon><Document /></el-icon>
-            <span>费用管理</span>
+            <span>{{ t('expenses.title') }}</span>
           </el-menu-item>
           <el-menu-item index="users" :route="{name: 'users'}" v-if="has('manage_users')">
             <el-icon><User /></el-icon>

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "moduleResolution": "Node",
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM"],
+    "jsx": "preserve"
+  },
+  "include": [
+    "src/**/*",
+    "server.js",
+    "vite.config.js",
+    "env.d.ts"
+  ],
+  "vueCompilerOptions": {
+    "globalTypesPath": "./src/volar.d.ts"
+  }
+}
