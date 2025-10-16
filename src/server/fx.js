@@ -1595,6 +1595,8 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
     const rows = await query(
       `with agg as (
          select payment_id, sum(amount) as total_amount from fx_payment_items group by payment_id
+       ), first_item as (
+         select payment_id, min(id) as item_id from fx_payment_items group by payment_id
        )
        select 
          p.*, 
@@ -1626,11 +1628,18 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
                  and upper(i2.currency_code) = 'CNY'
                  and (p2.pay_date < p.pay_date or (p2.pay_date = p.pay_date and p2.id < p.id))
              ), 0)
-         ) as balance_cny
+         ) as balance_cny,
+         b.zh as bank_name,
+         b.code as bank_code
        from fx_payments p
        left join users u on u.id = p.created_by
        left join agg a on a.payment_id = p.id
        left join customers c on c.id = p.customer_id
+       left join first_item fi on fi.payment_id = p.id
+       left join fx_payment_items i on i.id = fi.item_id
+       left join receiving_accounts ra on ra.bank_account = i.bank_account
+       left join customer_receiving_accounts cra on cra.bank_account = i.bank_account and cra.customer_id = p.customer_id
+       left join banks b on b.id = coalesce(cra.bank_id, ra.bank_id)
        ${whereSql}
        order by p.id desc offset $${idx++} limit $${idx++}`,
       [...params, offset, Number(pageSize)]

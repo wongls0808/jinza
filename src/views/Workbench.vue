@@ -99,7 +99,7 @@
         <el-table-column label="银行" min-width="160">
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:6px;">
-              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:16px; height:16px; object-fit:contain;" />
+              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:16px; height:16px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
               <span>{{ row.bank_name || row.bank_code || '-' }}</span>
             </div>
           </template>
@@ -140,7 +140,7 @@
           <el-table-column label="银行" min-width="180">
             <template #default="{ row }">
               <div style="display:flex; align-items:center; gap:8px;">
-                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:18px; height:18px; object-fit:contain;" />
+                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:18px; height:18px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
                 <span>{{ row.bank_name || row.bank_code || '-' }}</span>
               </div>
             </template>
@@ -296,7 +296,19 @@ function bankLogoUrl(code){
   const c = String(code||'').trim().toLowerCase()
   if (!c) return ''
   // 优先 svg，其次 png / jpg
-  return `/banks/${c}.svg` // 由浏览器与后端静态资源兜底到 png/jpg；若需更稳妥可做多图尝试
+  return `/banks/${c}.svg`
+}
+function onLogoError(ev, code){
+  try {
+    const img = ev?.target
+    if (!img || !code) return
+    const step = Number(img.getAttribute('data-step')||'0')
+    const c = String(code||'').trim().toLowerCase()
+    if (step === 0) { img.src = `/banks/${c}.png`; img.setAttribute('data-step','1'); return }
+    if (step === 1) { img.src = `/banks/${c}.jpg`; img.setAttribute('data-step','2'); return }
+    // 最后一步：移除错误处理，避免循环抖动
+    img.onerror = null
+  } catch {}
 }
 async function openTodo(row){
   try {
