@@ -15,7 +15,8 @@ import { User, UserFilled, Box, Document, Setting, Lock, OfficeBuilding, Search,
 const app = createApp(App)
 app.use(router)
 app.use(i18n)
-app.use(ElementPlus)
+// 统一 Element Plus 全局尺寸与层级，确保视觉密度一致
+app.use(ElementPlus, { size: 'small', zIndex: 3000 })
 app.directive('tilt', Tilt)
 // 按需注册用到的图标组件
 app.component('User', User)

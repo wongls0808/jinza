@@ -83,13 +83,13 @@
     <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="560px">
       <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="90px" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
-          <el-input v-model.trim="addDlg.form.abbr" placeholder="例如：HZ" />
+          <el-input v-model.trim="addDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('customers.form.name')" prop="name">
-          <el-input v-model.trim="addDlg.form.name" placeholder="" />
+          <el-input v-model.trim="addDlg.form.name" :placeholder="$t('customers.form.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
-          <el-input-number v-model="addDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" placeholder="0-100" style="width:100%" />
+          <el-input-number v-model="addDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
         <div class="grid2">
           <el-form-item :label="$t('customers.form.openingMYR')">
@@ -99,7 +99,7 @@
               :min="0"
               :step="100"
               controls-position="right"
-              placeholder="0.00"
+              :placeholder="'0.00'"
               :formatter="moneyFormatter"
               :parser="moneyParser"
               style="width:100%"
@@ -112,7 +112,7 @@
               :min="0"
               :step="100"
               controls-position="right"
-              placeholder="0.00"
+              :placeholder="'0.00'"
               :formatter="moneyFormatter"
               :parser="moneyParser"
               style="width:100%"
@@ -131,13 +131,13 @@
     <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="560px">
       <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="90px" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
-          <el-input v-model.trim="editDlg.form.abbr" placeholder="例如：HZ" />
+          <el-input v-model.trim="editDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('customers.form.name')" prop="name">
-          <el-input v-model.trim="editDlg.form.name" />
+          <el-input v-model.trim="editDlg.form.name" :placeholder="$t('customers.form.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
-          <el-input-number v-model="editDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" placeholder="0-100" style="width:100%" />
+          <el-input-number v-model="editDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -195,15 +195,15 @@
     <!-- 编辑客户账户 -->
   <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="560px">
       <el-form :model="editAcc.form" label-width="120px" size="small" class="form">
-        <el-form-item label="账户名称"><el-input v-model.trim="editAcc.form.account_name" placeholder="账户名称" clearable /></el-form-item>
-        <el-form-item label="银行">
-          <el-select v-model="editAcc.form.bank_id" filterable clearable style="width:100%" placeholder="银行">
+        <el-form-item :label="$t('customers.accounts.accountName')"><el-input v-model.trim="editAcc.form.account_name" :placeholder="$t('customers.accounts.accountName')" clearable /></el-form-item>
+        <el-form-item :label="$t('customers.accounts.bank')">
+          <el-select v-model="editAcc.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('customers.accounts.bank')">
             <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en" />
           </el-select>
         </el-form-item>
-        <el-form-item label="银行账户"><el-input v-model.trim="editAcc.form.bank_account" placeholder="银行账户" clearable /></el-form-item>
-        <el-form-item label="币种">
-          <el-select v-model="editAcc.form.currency_code" clearable style="width:100%" placeholder="币种">
+        <el-form-item :label="$t('customers.accounts.bankAccount')"><el-input v-model.trim="editAcc.form.bank_account" :placeholder="$t('customers.accounts.bankAccount')" clearable /></el-form-item>
+        <el-form-item :label="$t('customers.accounts.currency')">
+          <el-select v-model="editAcc.form.currency_code" clearable style="width:100%" :placeholder="$t('customers.accounts.currency')">
             <el-option v-for="c in accDrawer.currencies" :key="c.code" :label="c.code + ' · ' + c.name" :value="c.code" />
           </el-select>
         </el-form-item>
@@ -219,6 +219,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Papa from 'papaparse'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
@@ -241,14 +242,15 @@ const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '',
 const editDlg = ref({ visible: false, loading: false, id: null, form: { abbr: '', name: '', tax_rate: null } })
 const addFormRef = ref()
 const editFormRef = ref()
+const { t } = useI18n()
 const addRules = {
-  name: [{ required: true, message: '请填写客户名', trigger: 'blur' }],
+  name: [{ required: true, message: () => t('customers.rules.nameRequired'), trigger: 'blur' }],
   tax_rate: [
     {
       validator: (_, v, cb) => {
         if (v === null || v === undefined || v === '') return cb()
         const n = Number(v)
-        if (isNaN(n) || n < 0 || n > 100) return cb(new Error('税率应在 0-100 之间'))
+        if (isNaN(n) || n < 0 || n > 100) return cb(new Error(t('customers.rules.taxRateRange')))
         cb()
       },
       trigger: 'change'
@@ -287,7 +289,7 @@ async function doAdd() {
   await api.customers.create({ abbr: f.abbr, name: f.name, tax_rate: f.tax_rate, opening_myr: f.opening_myr, opening_cny: f.opening_cny })
     addDlg.value.visible = false
     await reload()
-    ElMessage.success('已添加')
+  ElMessage.success(t('customers.messages.added'))
   } finally {
     addDlg.value.loading = false
   }
@@ -298,7 +300,7 @@ async function removeSelected() {
   const ids = selection.value.map(r => r.id)
   await api.customers.removeBatch(ids)
   await reload()
-  ElMessage.success('已删除所选')
+  ElMessage.success(t('customers.messages.deletedSelected'))
 }
 
 // 自动检测编码并解码 CSV 文本：优先 utf-8，回退 gb18030/gbk/big5
@@ -322,7 +324,7 @@ async function decodeCsvFile(file) {
       // 某些浏览器可能不支持 big5/gb18030，忽略
     }
   }
-  if (!best) throw new Error('无法读取文件，请确认文件未损坏')
+  if (!best) throw new Error(t('customers.messages.cannotReadFile'))
   return best
 }
 
@@ -366,11 +368,11 @@ async function onImport(file) {
     const data = parseCSV(text)
     const inserted = await batchImport(data)
     await reload()
-    ElMessage.success(`导入成功：${inserted} 条（编码：${encoding}）`)
+    ElMessage.success(t('customers.messages.importSuccessWithEncoding', { n: inserted, encoding }))
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
-    ElMessage.error('导入失败：' + (msg || ''))
+    ElMessage.error(t('customers.messages.importFailedWithMsg', { msg: msg || '' }))
   }
 }
 
@@ -391,11 +393,11 @@ async function onImportCsv(file) {
     })).filter(r => r.name)
     const inserted = await batchImport(rows)
     await reload()
-    ElMessage.success(`导入成功：${inserted} 条（编码：${encoding}）`)
+    ElMessage.success(t('customers.messages.importSuccessWithEncoding', { n: inserted, encoding }))
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.detail || j.error || msg } catch {}
-    ElMessage.error('导入失败：' + (msg || ''))
+    ElMessage.error(t('customers.messages.importFailedWithMsg', { msg: msg || '' }))
   }
 }
 
@@ -450,7 +452,7 @@ async function onExport() {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    ElMessage.error('导出失败：' + (e.message || ''))
+  ElMessage.error(t('customers.messages.exportFailedWithMsg', { msg: e.message || '' }))
   }
 }
 
@@ -484,9 +486,9 @@ async function downloadTemplate() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      ElMessage.info('后端暂不可用，已使用本地模板文件')
+      ElMessage.info(t('customers.messages.templateBackendFallback'))
     } catch (err) {
-      ElMessage.error('下载模板失败：' + (e.message || ''))
+      ElMessage.error(t('customers.messages.templateDownloadFailedWithMsg', { msg: e.message || '' }))
     }
   }
 }
@@ -562,9 +564,9 @@ async function doEdit() {
     await api.customers.update(editDlg.value.id, f)
     editDlg.value.visible = false
     await reload()
-    ElMessage.success('已保存')
+    ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
-    ElMessage.error(e?.message || '保存失败')
+    ElMessage.error(e?.message || t('customers.messages.saveFailed'))
   } finally {
     editDlg.value.loading = false
   }
@@ -603,14 +605,14 @@ async function openAccounts(cus) {
 async function addCusAccount() {
   const c = accDrawer.value.customer
   const f = accDrawer.value.form
-  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请完整填写'); return }
+  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning(t('customers.messages.fillAllFields')); return }
   try {
     await api.customerAccounts.create(c.id, f)
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
     if (/已存在/.test(msg) || /exists/i.test(msg)) {
-      ElMessage.error('该客户下该银行账户已存在')
+      ElMessage.error(t('customers.messages.accountExists'))
       return
     }
     throw e
@@ -618,14 +620,14 @@ async function addCusAccount() {
   const items = await api.customerAccounts.list(c.id)
   accDrawer.value.items = items
   accDrawer.value.form = { account_name: '', bank_id: accDrawer.value.banks[0]?.id || null, bank_account: '', currency_code: accDrawer.value.currencies[0]?.code || 'CNY' }
-  ElMessage.success('已添加')
+  ElMessage.success(t('customers.messages.added'))
 }
 
 async function removeCusAccount(row) {
   const c = accDrawer.value.customer
   await api.customerAccounts.remove(c.id, row.id)
   accDrawer.value.items = await api.customerAccounts.list(c.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('customers.messages.deleted'))
 }
 
 // 编辑客户账户
@@ -641,20 +643,20 @@ async function doEditCusAccount() {
   const c = accDrawer.value.customer
   const id = editAcc.value.id
   const f = editAcc.value.form
-  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请完整填写'); return }
+  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning(t('customers.messages.fillAllFields')); return }
   editAcc.value.loading = true
   try {
     await api.customerAccounts.update(c.id, id, f)
     editAcc.value.visible = false
     accDrawer.value.items = await api.customerAccounts.list(c.id)
-    ElMessage.success('已保存')
+    ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
     if (/已存在/.test(msg) || /exists/i.test(msg)) {
-      ElMessage.error('该客户下该银行账户已存在')
+      ElMessage.error(t('customers.messages.accountExists'))
     } else {
-      ElMessage.error('保存失败：' + msg)
+      ElMessage.error(t('customers.messages.saveFailedWithMsg', { msg }))
     }
   } finally {
     editAcc.value.loading = false

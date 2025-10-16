@@ -5,11 +5,11 @@
       <div class="spacer"></div>
       <!-- 移除了返回首页按钮 -->
       <div class="actions">
-        <el-input v-model.trim="newUser.username" placeholder="用户名" style="width:180px" size="small" />
-        <el-input v-model.trim="newUser.password" type="password" placeholder="初始密码" style="width:180px" size="small" />
-        <el-input v-model.trim="newUser.display_name" placeholder="显示名" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.username" :placeholder="$t('users.usernamePlaceholder')" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('users.passwordPlaceholder')" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.display_name" :placeholder="$t('users.displayNamePlaceholder')" style="width:180px" size="small" />
   <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
-        <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">重建权限树</el-button>
+        <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">{{ $t('users.reseedPermTree') }}</el-button>
       </div>
     </div>
 
@@ -22,7 +22,7 @@
               <div class="username">@{{ u.username }}</div>
             </div>
             <div class="ops">
-              <el-switch v-model="u.is_active" @change="toggleActive(u)" active-text="启用" />
+              <el-switch v-model="u.is_active" @change="toggleActive(u)" :active-text="$t('users.active')" />
               <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
               <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
@@ -47,7 +47,7 @@
           </div>
           <!-- 树外权限（兼容旧键） -->
           <div class="perm-group" v-if="extraPerms && extraPerms.length">
-            <div class="perm-group-title">其他/兼容</div>
+            <div class="perm-group-title">{{ $t('users.otherCompat') }}</div>
             <div class="perm-group-items">
               <el-tag
                 v-for="p in extraPerms"
@@ -82,8 +82,8 @@
     <!-- 重置密码对话框 -->
   <el-dialog v-model="reset.visible" :title="$t('common.reset')" width="420px">
       <div style="display:grid;gap:12px;">
-        <div>用户：<strong>{{ reset.user?.username }}</strong></div>
-        <el-input v-model.trim="reset.password" type="password" placeholder="输入新的初始密码" />
+        <div>{{ $t('users.userLabelWithValue', { username: reset.user?.username }) }}</div>
+        <el-input v-model.trim="reset.password" type="password" :placeholder="$t('users.resetNewPasswordPlaceholder')" />
       </div>
       <template #footer>
   <el-button @click="reset.visible=false">{{ $t('common.cancel') }}</el-button>
@@ -104,8 +104,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
+
+const { t } = useI18n()
 
 const users = ref([])
 const perms = ref([]) // 后端完整清单（含新树与旧键）
@@ -143,15 +146,15 @@ async function load() {
 }
 
 async function createUser() {
-  if (!newUser.value.username || !newUser.value.password) return alert('请填写用户名与密码')
+  if (!newUser.value.username || !newUser.value.password) return alert(t('users.fillUsernamePassword'))
   creating.value = true
   try {
     await api.users.create(newUser.value)
     newUser.value = { username: '', password: '', display_name: '' }
     await load()
-    ElMessage.success('用户已创建（首登需改密）')
+    ElMessage.success(t('users.createdNeedChangePassword'))
   } catch (e) {
-    ElMessage.error('创建失败：' + (e.message || ''))
+    ElMessage.error(t('users.createFailed') + '：' + (e.message || ''))
   } finally {
     creating.value = false
   }
@@ -160,9 +163,9 @@ async function createUser() {
 async function toggleActive(u) {
   try {
     await api.users.update(u.id, { is_active: u.is_active })
-    ElMessage.success('状态已更新')
+    ElMessage.success(t('users.statusUpdated'))
   } catch (e) {
-    ElMessage.error('更新失败')
+    ElMessage.error(t('users.updateFailed'))
   }
 }
 
@@ -171,23 +174,23 @@ async function setUserPerm(u, code, on) {
     const next = on ? Array.from(new Set([...(u._perms || []), code])) : (u._perms || []).filter(x => x !== code)
     await api.users.setPerms(u.id, next)
     u._perms = next
-    ElMessage.success('权限已更新')
+    ElMessage.success(t('users.permsUpdated'))
   } catch (e) {
-    ElMessage.error('权限更新失败')
+    ElMessage.error(t('users.permsUpdateFailed'))
   }
 }
 
 function openReset(u) { reset.value = { visible: true, user: u, password: '', loading: false } }
 async function doReset() {
   const { user, password } = reset.value
-  if (!password) return ElMessage.warning('请输入新初始密码')
+  if (!password) return ElMessage.warning(t('users.enterNewInitialPassword'))
   reset.value.loading = true
   try {
     await api.users.resetPassword(user.id, password)
     reset.value.visible = false
-    ElMessage.success('已重置，新密码将强制首登改密')
+    ElMessage.success(t('users.resetSuccessForceChangeOnFirstLogin'))
   } catch (e) {
-    ElMessage.error('重置失败：' + (e.message || ''))
+    ElMessage.error(t('users.resetFailed') + '：' + (e.message || ''))
   } finally {
     reset.value.loading = false
   }
@@ -201,9 +204,9 @@ async function doRemove() {
     await api.users.remove(user.id)
     users.value = users.value.filter(x => x.id !== user.id)
     removeDlg.value.visible = false
-    ElMessage.success('用户已删除')
+    ElMessage.success(t('users.userDeleted'))
   } catch (e) {
-    ElMessage.error('删除失败：' + (e.message || ''))
+    ElMessage.error(t('users.deleteFailed') + '：' + (e.message || ''))
   } finally {
     removeDlg.value.loading = false
   }
@@ -219,9 +222,9 @@ async function doReseed() {
   try {
     const r = await api.perms.reseed(false)
     await load()
-    ElMessage.success(`权限已重建，共 ${r.total} 项`)
+    ElMessage.success(t('users.reseedSuccess', { total: r.total }))
   } catch (e) {
-    ElMessage.error('重建失败：' + (e.message || ''))
+    ElMessage.error(t('users.reseedFailed') + '：' + (e.message || ''))
   } finally {
     reseed.value.loading = false
   }

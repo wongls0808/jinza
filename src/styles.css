@@ -5,7 +5,7 @@ body {
 	/* 更优的中英文字体栈，优先系统优雅字体，兼容 Windows/Android/macOS */
 	font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial,
 	  "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-	font-size: 15px; /* 全局字体放大 1 级（默认 14 → 15） */
+	font-size: 14px; /* 统一字号，配合 Element Plus small 尺寸 */
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	color: var(--el-text-color-primary);
@@ -15,16 +15,44 @@ body {
 /* Design tokens (lightweight) */
 :root {
 	--app-container-width: 1200px;
-	--app-radius: 12px;
-	--app-gap: 16px;
+	--app-radius: 10px;
+	--app-gap: 12px;
 	--app-shadow-sm: 0 4px 12px rgba(0,0,0,.06);
 	--app-shadow-lg: 0 20px 50px rgba(0,0,0,.12);
 	--app-glass-bg: color-mix(in oklab, var(--el-color-primary) 6%, transparent);
 	--app-glass-border: color-mix(in oklab, var(--el-color-primary) 12%, var(--el-border-color));
+
+	/* 统一标题字号（与 small 尺寸协调） */
+	--title-xl: 20px;
+	--title-lg: 18px;
+	--title-md: 16px;
+	--text-sm: 12px;
+
+	/* 主题主色（可按品牌调整） */
+	--brand-primary: var(--el-color-primary);
+	--brand-success: var(--el-color-success);
+	--brand-warning: var(--el-color-warning);
+	--brand-danger: var(--el-color-danger);
+	--brand-info: var(--el-color-info);
+
+	/* 浅色背景（状态底色） */
+	--bg-primary-weak: color-mix(in oklab, var(--el-color-primary) 14%, #ffffff);
+	--bg-success-weak: color-mix(in oklab, var(--el-color-success) 12%, #ffffff);
+	--bg-warning-weak: color-mix(in oklab, var(--el-color-warning) 12%, #ffffff);
+	--bg-danger-weak: color-mix(in oklab, var(--el-color-danger) 12%, #ffffff);
+	--bg-info-weak: color-mix(in oklab, var(--el-color-info) 12%, #ffffff);
 }
 
 /* Containers */
 .container { max-width: var(--app-container-width); margin: 0 auto; padding: 20px; }
+
+/* 页面通用结构（统一各 View 的头部与工具栏） */
+.page { padding: 12px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 10px; }
+.title { font-size: var(--title-lg); font-weight: 700; letter-spacing: .2px; }
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.pager { display: flex; justify-content: flex-end; padding: 10px 0 6px; }
 
 /* Utility */
 .card { background: var(--el-bg-color-overlay); border: 1px solid var(--el-border-color); border-radius: var(--app-radius); box-shadow: var(--app-shadow-sm); }
@@ -36,7 +64,7 @@ body {
 	backdrop-filter: saturate(140%) blur(16px);
 	-webkit-backdrop-filter: saturate(140%) blur(16px);
 	border: 1px solid var(--app-glass-border);
-	border-radius: calc(var(--app-radius) + 2px);
+	border-radius: var(--app-radius);
 	box-shadow: var(--app-shadow-lg);
 	transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
 }
@@ -72,3 +100,58 @@ input:focus, select:focus, textarea:focus {
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
 .badge.green { background: #dcfce7; color: #166534; }
 .badge.gray { background: #f3f4f6; color: #374151; }
+
+/* 统一空状态（ElEmpty） */
+.el-empty { padding: 28px 8px; }
+.el-empty__image { width: 160px !important; }
+.el-empty__description { color: var(--el-text-color-secondary); font-size: 13px; }
+
+/* 统一加载遮罩（v-loading）透明度与动效） */
+.el-loading-mask { backdrop-filter: blur(2px); background-color: rgba(255,255,255,.45) !important; }
+.el-loading-spinner .path { stroke: var(--brand-primary) !important; }
+
+/* 表格空状态 padding 统一 */
+.el-table__empty-block { padding: 16px 0; }
+
+/* 状态色辅助类（chip/tag 风格） */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.chip .dot { width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+.status-primary { background: var(--bg-primary-weak); color: var(--el-color-primary); }
+.status-success { background: var(--bg-success-weak); color: var(--el-color-success); }
+.status-warning { background: var(--bg-warning-weak); color: var(--el-color-warning); }
+.status-danger { background: var(--bg-danger-weak); color: var(--el-color-danger); }
+.status-info { background: var(--bg-info-weak); color: var(--el-color-info); }
+.status-primary .dot { background: var(--el-color-primary); }
+.status-success .dot { background: var(--el-color-success); }
+.status-warning .dot { background: var(--el-color-warning); }
+.status-danger .dot { background: var(--el-color-danger); }
+.status-info .dot { background: var(--el-color-info); }
+
+/* 统一 Dialog/Drawer 的样式比例（Element Plus 覆盖） */
+.el-dialog__header {
+	padding: 12px 16px 10px !important;
+	border-bottom: 1px solid var(--el-border-color-light);
+}
+.el-dialog__title { font-size: var(--title-md); font-weight: 600; }
+.el-dialog__body { padding: 14px 16px !important; }
+.el-dialog { border-radius: var(--app-radius); box-shadow: var(--app-shadow-lg); }
+.el-dialog__footer { padding: 10px 16px !important; border-top: 1px solid var(--el-border-color-lighter); }
+
+.el-drawer { border-radius: var(--app-radius) 0 0 var(--app-radius); }
+.el-drawer__header { margin-bottom: 0 !important; padding: 12px 16px !important; border-bottom: 1px solid var(--el-border-color-light); }
+.el-drawer__title { font-size: var(--title-md); font-weight: 600; }
+.el-drawer__body { padding: 14px 16px !important; }
+
+/* 统一表格密度和标题文字大小 */
+.el-table { --el-table-header-text-color: var(--el-text-color-primary); }
+.el-table th.el-table__cell > .cell { font-weight: 600; font-size: 13px; }
+.el-table .cell { font-size: 13px; }
+
+/* 统一表单项间距与标签宽度（保持小尺寸紧凑） */
+.el-form-item { margin-bottom: 10px; }
+.el-form-item__label { font-size: 13px; }
+.el-input__inner, .el-textarea__inner { font-size: 13px; }
+
+/* 统一工具栏按钮大小与间距 */
+.el-button { font-weight: 500; }
+.el-button + .el-button { margin-left: 6px; }
