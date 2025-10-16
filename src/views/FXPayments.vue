@@ -5,10 +5,10 @@
       <el-select v-model="qCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px">
         <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
       </el-select>
-      <el-date-picker v-model="qRange" type="daterange" range-separator="-" start-placeholder="Start" end-placeholder="End" value-format="YYYY-MM-DD" />
-      <el-select v-model="qStatus" clearable placeholder="状态" style="width:140px">
-        <el-option :value="'pending'" label="审核中" />
-        <el-option :value="'completed'" label="已完成" />
+      <el-date-picker v-model="qRange" type="daterange" range-separator="-" :start-placeholder="t('transactions.startDate')" :end-placeholder="t('transactions.endDate')" value-format="YYYY-MM-DD" />
+      <el-select v-model="qStatus" clearable :placeholder="t('transactions.status')" style="width:140px">
+        <el-option :value="'pending'" :label="t('fx.status.pending')" />
+        <el-option :value="'completed'" :label="t('fx.status.completed')" />
       </el-select>
       <el-button type="primary" @click="reload(1)">{{ t('common.search') }}</el-button>
       <el-button @click="resetFilters">{{ t('common.reset') }}</el-button>
@@ -20,16 +20,16 @@
       <el-table-column column-key="idx" :label="t('common.no')" :width="colW('idx', 60)">
         <template #default="{ $index }">{{ (page-1)*pageSize + $index + 1 }}</template>
       </el-table-column>
-      <el-table-column prop="pay_date" column-key="pay_date" label="付款日期" :width="colW('pay_date', 120)">
+      <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colW('pay_date', 120)">
         <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
       </el-table-column>
-      <el-table-column prop="bill_no" column-key="bill_no" label="单号" :width="colW('bill_no', 180)" />
-      <el-table-column prop="customer_name" column-key="customer_name" label="客户" :width="colW('customer_name', 200)" />
-      <el-table-column prop="balance_cny" column-key="balance_cny" label="余额(CNY)" :width="colW('balance_cny', 140)" align="right">
+      <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colW('bill_no', 180)" />
+      <el-table-column prop="customer_name" column-key="customer_name" :label="t('common.customer')" :width="colW('customer_name', 200)" />
+      <el-table-column prop="balance_cny" column-key="balance_cny" :label="t('transactions.balance') + ' (CNY)'" :width="colW('balance_cny', 140)" align="right">
         <template #default="{ row }">{{ money(row.balance_cny) }}</template>
       </el-table-column>
-      <el-table-column prop="account_name" column-key="account_name" label="账户名称" :width="colW('account_name', 200)" />
-      <el-table-column prop="bank_name" column-key="bank_name" label="银行" :width="colW('bank_name', 200)">
+      <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colW('account_name', 200)" />
+      <el-table-column prop="bank_name" column-key="bank_name" :label="t('accounts.fields.bank')" :width="colW('bank_name', 200)">
         <template #default="{ row }">
           <div class="bank-cell">
             <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
@@ -38,15 +38,15 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="bank_account" column-key="bank_account" label="银行账户" :width="colW('bank_account', 180)" />
-      <el-table-column prop="currency_code" column-key="currency_code" label="币种" :width="colW('currency_code', 100)" />
-      <el-table-column prop="amount" column-key="amount" label="金额" :width="colW('amount', 140)" align="right">
+      <el-table-column prop="bank_account" column-key="bank_account" :label="t('accounts.fields.bankAccount')" :width="colW('bank_account', 180)" />
+      <el-table-column prop="currency_code" column-key="currency_code" :label="t('transactions.currency')" :width="colW('currency_code', 100)" />
+      <el-table-column prop="amount" column-key="amount" :label="t('common.amount')" :width="colW('amount', 140)" align="right">
         <template #default="{ row }">{{ money(row.amount) }}</template>
       </el-table-column>
       <el-table-column prop="created_by_name" column-key="created_by_name" :label="t('common.createdBy')" :width="colW('created_by_name', 120)" />
-      <el-table-column prop="status" column-key="status" label="状态" :width="colW('status', 110)">
+      <el-table-column prop="status" column-key="status" :label="t('transactions.status')" :width="colW('status', 110)">
         <template #default="{ row }">
-          <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? '已完成' : '审核中' }}</el-tag>
+          <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? t('fx.status.completed') : t('fx.status.pending') }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 260)" align="center">
@@ -62,7 +62,7 @@
             v-if="has('manage_fx') && row.status==='completed'"
             size="small" type="warning"
             @click="doUnapprove(row)"
-          >撤销</el-button>
+          >{{ t('common.revoke') }}</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
@@ -102,7 +102,7 @@
           <div class="row">
             <div class="cell actions" style="display:flex; gap:8px;">
               <el-button @click="downloadCsv(detail)">CSV</el-button>
-              <el-button type="primary" v-if="detail.status==='completed'" @click="previewPdf(detail)">预览PDF</el-button>
+              <el-button type="primary" v-if="detail.status==='completed'" @click="previewPdf(detail)">{{ t('fx.previewPdf') }}</el-button>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@
           <el-table-column type="index" column-key="idx" :label="t('common.no')" :width="memDetail.colW('idx', 60)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="memDetail.colW('account_name', 220)" />
           <el-table-column prop="bank_account" column-key="bank_account" :label="t('accounts.fields.bankAccount')" :width="memDetail.colW('bank_account', 200)" />
-          <el-table-column prop="currency_code" column-key="currency_code" :label="t('currencies.code')" :width="memDetail.colW('currency_code', 120)" />
+          <el-table-column prop="currency_code" column-key="currency_code" :label="t('transactions.currency')" :width="memDetail.colW('currency_code', 120)" />
           <el-table-column prop="amount" column-key="amount" :label="t('common.amount')" :width="memDetail.colW('amount', 140)" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
@@ -201,7 +201,7 @@ async function openDetail(row){
     detail.value = d
     memDetail.setId && memDetail.setId(d.id)
   } catch (e) {
-    ElMessage.error(e?.message || 'Failed to load')
+    ElMessage.error(t('common.loadFailed'))
     drawerVisible.value = false
   } finally {
     detailLoading.value = false
@@ -226,7 +226,7 @@ async function removeBill(row){
     ElMessage.success(t('common.ok'))
     reload()
   } catch (e) {
-    ElMessage.error(e?.message || 'Delete failed')
+    ElMessage.error(t('common.deleteFailed'))
   }
 }
 
@@ -235,9 +235,9 @@ async function doUnapprove(row){
   try {
     const id = row.payment_id || row.id
     await api.fx.payments.unapprove(id)
-    ElMessage.success('已撤销审批')
+    ElMessage.success(t('fx.unapproved'))
     reload()
-  } catch(e) { ElMessage.error(e?.message || '撤销失败') }
+  } catch(e) { ElMessage.error(t('fx.unapproveFailed')) }
 }
 
 async function downloadPdf(row){

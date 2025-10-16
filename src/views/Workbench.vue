@@ -35,42 +35,42 @@
     <!-- 6 张固定指标卡：仅标题 + 合计金额，点击查看明细 -->
     <div class="kpi6-grid">
       <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('cusMYR')" @keydown.enter.prevent="openStat('cusMYR')" @keydown.space.prevent="openStat('cusMYR')">
-        <el-tooltip :content="`共${stats.lists.cusMYR.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.cusMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.cusMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.cusMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.cusMYR) }}</div>
       </div>
       <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
-        <el-tooltip :content="`共${stats.lists.cusCNY.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.cusCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.cusCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.cusCNY') }}</div>
         <div class="kpi-value">{{ money(stats.totals.cusCNY) }}</div>
       </div>
       <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
-        <el-tooltip :content="`共${stats.lists.bankMYR.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.bankMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.bankMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.bankMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.bankMYR) }}</div>
       </div>
       <div class="kpi-card theme-info" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
-        <el-tooltip :content="`共${stats.lists.payCNY.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.payCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.payCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.payCNY') }}</div>
         <div class="kpi-value">{{ money(stats.totals.payCNY) }}</div>
       </div>
       <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
-        <el-tooltip :content="`共${stats.lists.exchMYR.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.exchMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.exchMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.exchMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.exchMYR) }}</div>
       </div>
       <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
-        <el-tooltip :content="`共${stats.lists.pendingCNY.length}条`" placement="top">
+        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.pendingCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.pendingCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.pendingCNY') }}</div>
@@ -270,7 +270,7 @@
   <el-table-column :label="t('workbench.deductionDetails')">
           <template #default="{ row }">
             <div v-if="row.deltas">
-              <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：金额 {{ money(v.amount) }}，手续费 {{ money(v.fee) }}，合计 {{ money(v.total) }}</div>
+              <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：{{ t('common.amount') }} {{ money(v.amount) }}，{{ t('buyfx.fee') }} {{ money(v.fee) }}，{{ t('common.total') }} {{ money(v.total) }}</div>
             </div>
           </template>
         </el-table-column>

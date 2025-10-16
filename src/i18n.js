@@ -48,7 +48,9 @@ const messages = {
       errExceedBalance: '金额超过余额',
       errExceedSelected: '金额超过已选合计',
       errNothingToSettle: '无可结汇金额',
-      errRateRequired: '请输入有效汇率'
+      errRateRequired: '请输入有效汇率',
+      loadFailed: '加载失败',
+      deleteFailed: '删除失败'
     },
     buyfx: {
       title: '购汇管理',
@@ -265,7 +267,9 @@ const messages = {
     qaTxStats: '交易统计',
     qaBanks: '银行列表',
     qaCustomers: '客户管理',
-    qaAccounts: '收款账户'
+    qaAccounts: '收款账户',
+    noQuickActions: '暂无可用快捷操作',
+    approveHint: '将按所选平台的手续费比例扣减。'
   },
   workbench: {
       title: '工作台',
@@ -292,6 +296,7 @@ const messages = {
           orderDeduction: '本单应扣(含手续费)',
           balanceAfter: '扣减后余额'
         },
+      countTooltip: '共 {n} 条',
       approveDialogTitle: '审核付款单',
       auditLog: '审核日志',
         deductionDetails: '扣减明细',
@@ -544,7 +549,11 @@ const messages = {
   baseAmount: '马币金额',
       settledAmount: '折算后金额',
       preBalance: '结汇前余额',
-      maxSelectionTip: '单次最多选择 {n} 条'
+      maxSelectionTip: '单次最多选择 {n} 条',
+      status: { title: '状态', pending: '审核中', completed: '已完成' },
+      previewPdf: '预览 PDF',
+      unapproved: '已撤销审批',
+      unapproveFailed: '撤销失败'
     }
   },
   receipts: {
@@ -595,6 +604,7 @@ const messages = {
         orderDeduction: 'Order deduction (incl. fee)',
         balanceAfter: 'Balance after deduction'
       },
+      countTooltip: '{n} items',
       approveDialogTitle: 'Approve Payment',
       auditLog: 'Audit Log',
       deductionDetails: 'Deduction Details',
@@ -676,7 +686,11 @@ const messages = {
       baseAmount: 'Base Amount',
       settledAmount: 'Converted Amount',
       preBalance: 'Pre-Settle Balance',
-      maxSelectionTip: 'Select up to {n} items per operation'
+      maxSelectionTip: 'Select up to {n} items per operation',
+      status: { title: 'Status', pending: 'Pending', completed: 'Completed' },
+      previewPdf: 'Preview PDF',
+      unapproved: 'Unapproved',
+      unapproveFailed: 'Unapprove failed'
     },
     receipts: {
       title: 'Bank Receipts Import',
@@ -737,6 +751,8 @@ const messages = {
       ok: 'OK',
       total: 'Total',
       save: 'Save',
+      loadFailed: 'Load failed',
+      deleteFailed: 'Delete failed',
     },
     buyfx: {
       title: 'Buy FX',
@@ -930,7 +946,9 @@ const messages = {
       qaTxStats: 'Transaction Stats',
       qaBanks: 'Banks',
       qaCustomers: 'Customers',
-      qaAccounts: 'Receiving Accounts'
+      qaAccounts: 'Receiving Accounts',
+      noQuickActions: 'No quick actions available',
+      approveHint: 'Deductions will apply using the selected platform fee rate.'
     },
     users: {
       usernamePlaceholder: 'Username',
