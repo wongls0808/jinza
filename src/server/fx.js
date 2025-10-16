@@ -514,20 +514,21 @@ fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requirePerm('view_
 
 // ---------- 平台统一借贷账目（互换=买/卖 + 审批支出=支出） ----------
 fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
-  await ensureDDL()
-  const id = Number(req.params.id)
-  if (!id) return res.status(400).json({ error: 'invalid platform id' })
-  const { currency, startDate, endDate, page = 1, pageSize = 100 } = req.query || {}
-  const where = [ `platform_id = $1` ]
-  // 构建公共筛选条件：在外层再按 currency/date 过滤
-  const params = [ id ]
-  let idx = 2
-  const more = []
-  if (currency) { more.push(`upper(currency) = $${idx++}`); params.push(String(currency).toUpperCase()) }
-  if (startDate) { more.push(`ts >= $${idx++}`); params.push(startDate) }
-  if (endDate) { more.push(`ts <= $${idx++}`); params.push(endDate) }
-  const moreSql = more.length ? ('where ' + more.join(' and ')) : ''
-  const offset = (Number(page)-1) * Number(pageSize)
+  try {
+    await ensureDDL()
+    const id = Number(req.params.id)
+    if (!id) return res.status(400).json({ error: 'invalid platform id' })
+    const { currency, startDate, endDate, page = 1, pageSize = 100 } = req.query || {}
+    const where = [ `platform_id = $1` ]
+    // 构建公共筛选条件：在外层再按 currency/date 过滤
+    const params = [ id ]
+    let idx = 2
+    const more = []
+    if (currency) { more.push(`upper(currency) = $${idx++}`); params.push(String(currency).toUpperCase()) }
+    if (startDate) { more.push(`ts >= $${idx++}`); params.push(startDate) }
+    if (endDate) { more.push(`ts <= $${idx++}`); params.push(endDate) }
+    const moreSql = more.length ? ('where ' + more.join(' and ')) : ''
+    const offset = (Number(page)-1) * Number(pageSize)
 
   const sqlBase = `
     with xfer as (
@@ -563,7 +564,12 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
              'expense'::text as source,
              'expense'::text as action,
              upper(k.key) as currency,
-             round(coalesce((k.value->>'total')::numeric,0), 2)::numeric(18,2) as debit,
+             (
+               case when (k.value->>'total') ~ '^[-]?\\d+(\\.\\d+)?$'
+                    then round(((k.value->>'total')::numeric), 2)::numeric(18,2)
+                    else 0::numeric(18,2)
+               end
+             ) as debit,
              0::numeric(18,2) as credit,
              p.bill_no::text as ref_no,
              p.customer_name::text as note,
@@ -583,15 +589,19 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     select * from all_rows
   `
 
-  const total = await query(
-    `select count(*) from (${sqlBase}) z ${moreSql}`,
-    params
-  )
-  const rows = await query(
-    `select * from (${sqlBase}) z ${moreSql} order by ts desc, ref_id desc offset $${idx++} limit $${idx++}`,
-    [ ...params, offset, Number(pageSize) ]
-  )
-  res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
+    const total = await query(
+      `select count(*) from (${sqlBase}) z ${moreSql}`,
+      params
+    )
+    const rows = await query(
+      `select * from (${sqlBase}) z ${moreSql} order by ts desc, ref_id desc offset $${idx++} limit $${idx++}`,
+      [ ...params, offset, Number(pageSize) ]
+    )
+    res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
+  } catch (e) {
+    console.error('ledger error', e)
+    res.status(500).json({ error: 'ledger failed', detail: e?.message || String(e) })
+  }
 })
 
 // ---------- 中国银行挂牌价（银行买入价） ----------
