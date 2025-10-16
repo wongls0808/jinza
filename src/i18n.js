@@ -259,6 +259,16 @@ const messages = {
       settingsDesc: '基础资料与偏好',
       banksDesc: '中国与马来西亚主流银行（中英名与 Logo）',
       accountsDesc: '银行账户、币种与期初余额',
+    quickActions: '快捷入口',
+    qaFx: '购汇管理',
+    qaPlatformLedger: '平台借贷账目',
+    qaPayments: '付款审批',
+    qaSettlements: '结汇管理',
+    qaTransactions: '交易管理',
+    qaTxStats: '交易统计',
+    qaBanks: '银行列表',
+    qaCustomers: '客户管理',
+    qaAccounts: '收款账户'
     },
     users: {
       usernamePlaceholder: '用户名',

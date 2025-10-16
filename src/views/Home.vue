@@ -4,6 +4,23 @@
       <div class="welcome">{{ t('home.welcome') }}</div>
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
+    <!-- 快捷入口 -->
+    <div class="quick" style="margin-top:8px;">
+      <el-card shadow="never">
+        <div class="quick-title">{{ t('home.quickActions') }}</div>
+        <div class="quick-grid">
+          <el-button v-if="has('view_fx')" @click="go({ name: 'fx' })" type="primary" plain>{{ t('home.qaFx') }}</el-button>
+          <el-button v-if="has('view_fx')" @click="go({ name: 'fx-buy' })" type="primary" plain>{{ t('home.qaPlatformLedger') }}</el-button>
+          <el-button v-if="has('view_fx')" @click="go({ name: 'fx-payments' })" type="warning" plain>{{ t('home.qaPayments') }}</el-button>
+          <el-button v-if="has('view_fx')" @click="go({ name: 'fx-settlements' })" type="success" plain>{{ t('home.qaSettlements') }}</el-button>
+          <el-button v-if="has('view_transactions')" @click="go({ name: 'transactions' })" type="info" plain>{{ t('home.qaTransactions') }}</el-button>
+          <el-button v-if="has('view_transactions')" @click="go({ name: 'transactions-stats' })" type="info" plain>{{ t('home.qaTxStats') }}</el-button>
+          <el-button v-if="has('view_banks')" @click="go({ name: 'banks' })" plain>{{ t('home.qaBanks') }}</el-button>
+          <el-button v-if="has('view_customers')" @click="go({ name: 'customers' })" plain>{{ t('home.qaCustomers') }}</el-button>
+          <el-button v-if="has('view_accounts')" @click="go({ name: 'accounts' })" plain>{{ t('home.qaAccounts') }}</el-button>
+        </div>
+      </el-card>
+    </div>
     <!-- 菜单卡片区域已移除 -->
     <div class="todo" style="margin-top:16px;">
       <el-card>
@@ -356,6 +373,9 @@ async function doBatchApprove(){
 .hero { margin: 8px 8px 16px; }
 .welcome { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
 .meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
+/* 快捷入口 */
+.quick-title { font-weight: 700; margin-bottom: 8px; }
+.quick-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 /* 菜单卡片样式已移除 */
 .todo-title { font-weight: 700; margin-bottom: 8px; }
 .todo-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
