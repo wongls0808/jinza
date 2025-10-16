@@ -518,15 +518,15 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     await ensureDDL()
     const id = Number(req.params.id)
     if (!id) return res.status(400).json({ error: 'invalid platform id' })
-    const { currency, startDate, endDate, page = 1, pageSize = 100 } = req.query || {}
+  const { currency, startDate, endDate, page = 1, pageSize = 100 } = req.query || {}
     const where = [ `platform_id = $1` ]
     // 构建公共筛选条件：在外层再按 currency/date 过滤
     const params = [ id ]
     let idx = 2
     const more = []
-    if (currency) { more.push(`upper(currency) = $${idx++}`); params.push(String(currency).toUpperCase()) }
-    if (startDate) { more.push(`ts >= $${idx++}`); params.push(startDate) }
-    if (endDate) { more.push(`ts <= $${idx++}`); params.push(endDate) }
+  if (currency) { more.push(`upper(currency) = $${idx++}`); params.push(String(currency).toUpperCase()) }
+  if (startDate) { more.push(`ts::date >= $${idx++}::date`); params.push(startDate) }
+  if (endDate) { more.push(`ts::date <= $${idx++}::date`); params.push(endDate) }
     const moreSql = more.length ? ('where ' + more.join(' and ')) : ''
     const offset = (Number(page)-1) * Number(pageSize)
 
@@ -565,7 +565,7 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
              'expense'::text as action,
              upper(k.key) as currency,
              (
-               case when (k.value->>'total') ~ '^[-]?\\d+(\\.\\d+)?$'
+               case when (k.value->>'total') ~ '^[+-]?[0-9]+(\\.[0-9]+)?$'
                     then round(((k.value->>'total')::numeric), 2)::numeric(18,2)
                     else 0::numeric(18,2)
                end
@@ -606,7 +606,9 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
   } catch (e) {
     console.error('ledger error', e)
-    res.status(500).json({ error: 'ledger failed', detail: e?.message || String(e) })
+    // 将错误 message 合并到 error 字段，便于前端直接展示定位
+    const msg = e?.message || String(e)
+    res.status(500).json({ error: `ledger failed: ${msg}`, detail: msg })
   }
 })
 
