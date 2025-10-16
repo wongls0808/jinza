@@ -199,30 +199,16 @@
       </div>
     </el-drawer>
 
-    <!-- 迷你图表：交易管理未匹配条数 -->
-    <div class="mini-charts" style="margin-top:12px;">
-      <el-card shadow="never">
-        <div class="chart-grid">
-          <div class="chart-card">
-            <div class="chart-title">未匹配交易</div>
-            <div class="chart-body">
-              <svg class="donut" width="84" height="84" viewBox="0 0 84 84" aria-label="未匹配交易图表">
-                <circle class="ring-bg" cx="42" cy="42" r="34" fill="none" stroke-width="12" />
-                <circle class="ring-fg" cx="42" cy="42" r="34" fill="none" stroke-width="12" stroke-linecap="round" :stroke-dasharray="circ + ' ' + circ" :stroke-dashoffset="dashOffsetPending" />
-                <text x="42" y="46" text-anchor="middle" class="donut-text">{{ unmatchedCount }}</text>
-              </svg>
-              <div class="chart-meta">
-                <div class="big">{{ unmatchedCount }}</div>
-                <div class="sub">未匹配 / 总计：{{ totalTx }} 条</div>
-                <div class="ops">
-                  <el-button size="small" text @click="loadUnmatchedMetrics">刷新</el-button>
-                  <el-button size="small" text type="primary" @click="go({ name: 'transactions' })">去匹配</el-button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </el-card>
+    <!-- KPI 风格：未匹配交易（与客户余额卡片一致） -->
+    <div class="kpi6-grid">
+      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
+        <el-tooltip :content="`未匹配 ${unmatchedCount} / 总计 ${totalTx}`" placement="top">
+          <span class="kpi-count">{{ unmatchedCount }}</span>
+        </el-tooltip>
+        <div class="kpi-title">未匹配交易</div>
+        <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
+        <div class="kpi-sub">总计 {{ totalTx.toLocaleString() }} 条</div>
+      </div>
     </div>
 
     <!-- 审核弹窗：选择平台并预览余额 -->
@@ -619,17 +605,10 @@ async function loadStats(){
 
 onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats() })
 
-// —— 交易管理：未匹配统计（图形） ——
+// —— 交易管理：未匹配统计（KPI） ——
 const unmatchedCount = ref(0)
 const matchedCount = ref(0)
 const totalTx = computed(() => (unmatchedCount.value + matchedCount.value))
-const circ = 2 * Math.PI * 34 // r=34
-const dashOffsetPending = computed(() => {
-  const total = totalTx.value
-  if (!total) return circ
-  const ratio = Math.max(0, Math.min(1, unmatchedCount.value / total))
-  return circ * (1 - ratio)
-})
 async function loadUnmatchedMetrics(){
   try {
     const p = await api.transactions.stats({ status: 'pending' })
@@ -651,6 +630,7 @@ async function loadUnmatchedMetrics(){
   }
 }
 onMounted(() => { loadUnmatchedMetrics() })
+function goToPendingTx(){ router.push({ name: 'transactions' }) }
 
 // —— 付款待审：可拖拽浮动按钮 ——
 const fabPos = ref({ x: 16, y: 160 })
@@ -785,9 +765,7 @@ onMounted(() => { readFab() })
 .chart-card { border: 1px solid var(--el-border-color); border-radius: 12px; padding: 12px; background: var(--el-bg-color); }
 .chart-title { font-weight: 700; color: var(--el-text-color-primary); margin-bottom: 8px; }
 .chart-body { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 12px; }
-.donut .ring-bg { stroke: var(--el-border-color); opacity: .6; }
-.donut .ring-fg { stroke: var(--el-color-danger); transition: stroke-dashoffset .3s ease; }
-.donut-text { font-size: 16px; font-weight: 800; fill: var(--el-text-color-primary); }
+.kpi-sub { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 12px; }
 .chart-meta .big { font-size: 22px; font-weight: 800; line-height: 1.1; }
 .chart-meta .sub { color: var(--el-text-color-secondary); font-size: 12px; }
 .chart-meta .ops { margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
