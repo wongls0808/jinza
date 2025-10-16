@@ -50,10 +50,46 @@
     <!-- 付款待审抽屉列表（含审核操作） -->
     <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="60%">
       <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+        <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:240px" filterable>
+          <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
+        </el-select>
+        <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
         <el-button size="small" type="primary" @click="loadPaymentsList">刷新</el-button>
         <el-button size="small" @click="goPaymentsManage">去处理</el-button>
       </div>
-      <el-table :data="payments" size="small" border v-loading="paymentsLoading">
+      <!-- 余额预览（批量） -->
+      <div v-if="selectedPlatform" class="preview-card">
+        <div class="row">
+          <div class="cell head">平台手续费</div>
+          <div class="cell">{{ Number(selectedPlatform.fee_percent||0).toFixed(4) }}%</div>
+        </div>
+        <div class="row">
+          <div class="cell head">币种</div>
+          <div class="cell">USD</div>
+          <div class="cell">MYR</div>
+          <div class="cell">CNY</div>
+        </div>
+        <div class="row">
+          <div class="cell head">可用余额</div>
+          <div class="cell mono">{{ money(Number(selectedPlatform.balance_usd||0)) }}</div>
+          <div class="cell mono">{{ money(Number(selectedPlatform.balance_myr||0)) }}</div>
+          <div class="cell mono">{{ money(Number(selectedPlatform.balance_cny||0)) }}</div>
+        </div>
+        <div class="row">
+          <div class="cell head">已选应扣(含手续费)</div>
+          <div class="cell mono warn" :class="{ danger: need.USD>0 && after.USD<0 }">{{ money(need.USD) }}</div>
+          <div class="cell mono warn" :class="{ danger: need.MYR>0 && after.MYR<0 }">{{ money(need.MYR) }}</div>
+          <div class="cell mono warn" :class="{ danger: need.CNY>0 && after.CNY<0 }">{{ money(need.CNY) }}</div>
+        </div>
+        <div class="row">
+          <div class="cell head">扣减后余额</div>
+          <div class="cell mono" :class="{ danger: after.USD<0 }">{{ money(after.USD) }}</div>
+          <div class="cell mono" :class="{ danger: after.MYR<0 }">{{ money(after.MYR) }}</div>
+          <div class="cell mono" :class="{ danger: after.CNY<0 }">{{ money(after.CNY) }}</div>
+        </div>
+      </div>
+      <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="46" />
         <el-table-column type="index" label="#" width="60" />
         <el-table-column prop="pay_date" label="付款日期" width="120">
           <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
@@ -203,6 +239,12 @@ const payments = ref([])
 const paymentsLoading = ref(false)
 // 平台列表用于审核
 const platforms = ref([])
+// 批量审核所需状态
+const multipleSelectionRef = ref([])
+const multipleSelection = computed({ get: () => multipleSelectionRef.value, set: (v) => { multipleSelectionRef.value = Array.isArray(v)? v: [] } })
+const batch = ref({ platform_id: null })
+const selectedPlatform = computed(() => platforms.value.find(p => p.id === batch.value.platform_id) || null)
+const paymentTotalsById = ref({}) // { [id]: { USD, MYR, CNY } }
 
 async function loadPaymentsCount(){
   try {
@@ -217,7 +259,9 @@ async function loadPaymentsList(){
   paymentsLoading.value = true
   try {
     const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 50 })
-    payments.value = Array.isArray(res) ? res : (res.items || [])
+    const items = Array.isArray(res) ? res : (res.items || [])
+    // 默认按日期升序
+    payments.value = [...items].sort((a,b) => String(a.pay_date||'').localeCompare(String(b.pay_date||'')))
   } catch (e) {
     // 后端不可用（本地未配置数据库）时，静默为空以保证 UI 可用
     payments.value = []
@@ -309,6 +353,62 @@ const canApproveSingle = computed(() => {
   if (!anyNeed) return false
   return afterSingle.value.USD >= 0 && afterSingle.value.MYR >= 0 && afterSingle.value.CNY >= 0
 })
+
+// —— 批量审核：选择行 -> 计算合计/需求/扣后余额 ——
+async function fetchPaymentTotals(id){
+  if (paymentTotalsById.value[id]) return
+  try {
+    const d = await api.fx.payments.detail(id)
+    const totals = { USD:0, MYR:0, CNY:0 }
+    for (const it of (d.items||[])) {
+      const cur = String(it.currency_code||'').toUpperCase()
+      const amt = Math.round(Number(it.amount||0) * 100) / 100
+      if (cur==='USD' || cur==='MYR' || cur==='CNY') totals[cur] = Math.round((totals[cur] + amt) * 100) / 100
+    }
+    paymentTotalsById.value[id] = totals
+  } catch {}
+}
+async function onSelectionChange(rows){
+  multipleSelection.value = rows
+  await Promise.all(rows.map(r => fetchPaymentTotals(r.id)))
+}
+const selectionTotals = computed(() => {
+  const totals = { USD:0, MYR:0, CNY:0 }
+  for (const r of (multipleSelection.value || [])) {
+    const t = paymentTotalsById.value[r.id]
+    if (!t) continue
+    totals.USD = Math.round((totals.USD + (t.USD||0)) * 100) / 100
+    totals.MYR = Math.round((totals.MYR + (t.MYR||0)) * 100) / 100
+    totals.CNY = Math.round((totals.CNY + (t.CNY||0)) * 100) / 100
+  }
+  return totals
+})
+const feePct4 = computed(() => Number((selectedPlatform.value && selectedPlatform.value.fee_percent) || 0))
+const need = computed(() => ({
+  USD: Math.round(((selectionTotals.value?.USD || 0) + Math.round((((selectionTotals.value?.USD || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
+  MYR: Math.round(((selectionTotals.value?.MYR || 0) + Math.round((((selectionTotals.value?.MYR || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
+  CNY: Math.round(((selectionTotals.value?.CNY || 0) + Math.round((((selectionTotals.value?.CNY || 0) * feePct4.value / 100)) * 100) / 100) * 100) / 100,
+}))
+const after = computed(() => ({
+  USD: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_usd) || 0)) - (need.value?.USD || 0)) * 100) / 100,
+  MYR: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_myr) || 0)) - (need.value?.MYR || 0)) * 100) / 100,
+  CNY: Math.round(((Number((selectedPlatform.value && selectedPlatform.value.balance_cny) || 0)) - (need.value?.CNY || 0)) * 100) / 100,
+}))
+const canBatchApprove = computed(() => {
+  const anyNeed = (need.value.USD>0 || need.value.MYR>0 || need.value.CNY>0)
+  if (!anyNeed) return false
+  return after.value.USD >= 0 && after.value.MYR >= 0 && after.value.CNY >= 0
+})
+async function doBatchApprove(){
+  if (!batch.value.platform_id || !multipleSelection.value.length) return
+  const ids = (multipleSelection.value || []).map(r => r.id)
+  try {
+    await api.fx.payments.batchApprove(ids, batch.value.platform_id)
+    multipleSelection.value = []
+    batch.value.platform_id = null
+    await Promise.all([loadPaymentsList(), loadPaymentsCount()])
+  } catch {}
+}
 
 async function loadPlatforms(){
   try {
