@@ -97,8 +97,8 @@
       </el-table>
     </el-drawer>
 
-  <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="min(720px, 92vw)">
-      <el-form :model="dlg.form" label-width="120px" size="small" class="form">
+  <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
+    <el-form :model="dlg.form" label-width="120px" label-position="left" size="small" class="form">
         <el-form-item :label="$t('accounts.form.accountName')">
           <el-input v-model.trim="dlg.form.account_name" :placeholder="$t('accounts.form.accountName')" clearable />
         </el-form-item>

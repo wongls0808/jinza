@@ -80,8 +80,8 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-  <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="min(720px, 92vw)">
-      <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="90px" class="form">
+    <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
+      <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="120px" label-position="left" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="addDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
@@ -91,34 +91,38 @@
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
           <el-input-number v-model="addDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
-        <div class="grid2">
-          <el-form-item :label="$t('customers.form.openingMYR')">
-            <el-input-number
-              v-model="addDlg.form.opening_myr"
-              :precision="2"
-              :min="0"
-              :step="100"
-              controls-position="right"
-              :placeholder="'0.00'"
-              :formatter="moneyFormatter"
-              :parser="moneyParser"
-              style="width:100%"
-            />
-          </el-form-item>
-          <el-form-item :label="$t('customers.form.openingCNY')">
-            <el-input-number
-              v-model="addDlg.form.opening_cny"
-              :precision="2"
-              :min="0"
-              :step="100"
-              controls-position="right"
-              :placeholder="'0.00'"
-              :formatter="moneyFormatter"
-              :parser="moneyParser"
-              style="width:100%"
-            />
-          </el-form-item>
-        </div>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item :label="$t('customers.form.openingMYR')">
+              <el-input-number
+                v-model="addDlg.form.opening_myr"
+                :precision="2"
+                :min="0"
+                :step="100"
+                controls-position="right"
+                :placeholder="'0.00'"
+                :formatter="moneyFormatter"
+                :parser="moneyParser"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('customers.form.openingCNY')">
+              <el-input-number
+                v-model="addDlg.form.opening_cny"
+                :precision="2"
+                :min="0"
+                :step="100"
+                controls-position="right"
+                :placeholder="'0.00'"
+                :formatter="moneyFormatter"
+                :parser="moneyParser"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
       </el-form>
       <template #footer>
@@ -128,8 +132,8 @@
     </el-dialog>
 
     <!-- 编辑客户对话框 -->
-  <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="min(720px, 92vw)">
-      <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="90px" class="form">
+    <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="min(720px, 92vw)" :close-on-click-modal="false">
+      <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="120px" label-position="left" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="editDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
@@ -193,8 +197,8 @@
       </div>
     </el-drawer>
     <!-- 编辑客户账户 -->
-  <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="min(720px, 92vw)">
-      <el-form :model="editAcc.form" label-width="120px" size="small" class="form">
+  <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
+      <el-form :model="editAcc.form" label-width="120px" label-position="left" size="small" class="form">
         <el-form-item :label="$t('customers.accounts.accountName')"><el-input v-model.trim="editAcc.form.account_name" :placeholder="$t('customers.accounts.accountName')" clearable /></el-form-item>
         <el-form-item :label="$t('customers.accounts.bank')">
           <el-select v-model="editAcc.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('customers.accounts.bank')">
