@@ -201,7 +201,7 @@ const messages = {
       title: '收款账户',
       addTitle: '新增账户',
       fields: {
-        index: '#',
+        index: '序号',
         accountName: '账户名称',
         bank: '银行',
         bankAccount: '银行账户',
