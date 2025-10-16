@@ -145,7 +145,7 @@
       </div>
       <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange" @header-dragend="onColResizePay">
         <el-table-column type="selection" column-key="__sel" :width="colWPay('__sel', 46)" />
-  <el-table-column type="index" column-key="__idx" label="序号" :width="colWPay('__idx', 60)" />
+        <el-table-column type="index" column-key="__idx" :label="t('common.no')" :width="colWPay('__idx', 60)" />
         <el-table-column prop="pay_date" label="付款日期" :width="colWPay('pay_date', 120)">
           <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
         </el-table-column>
@@ -162,15 +162,15 @@
         <el-table-column prop="total_amount" label="金额" :width="colWPay('total_amount', 140)" align="right">
           <template #default="{ row }">{{ money(row.total_amount) }}</template>
         </el-table-column>
-        <el-table-column label="操作" column-key="ops" :width="colWPay('ops', 420)" align="center">
+        <el-table-column :label="t('common.actions')" column-key="ops" :width="colWPay('ops', 420)" align="center">
           <template #default="{ row }">
-            <el-button size="small" type="primary" @click="openTodo(row)">查看</el-button>
-            <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">审核</el-button>
-            <el-button v-if="has('manage_fx') && row.status==='completed'" size="small" type="warning" @click="doUnapprove(row)">撤销</el-button>
+            <el-button size="small" type="primary" @click="openTodo(row)">{{ t('common.view') }}</el-button>
+            <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">{{ t('common.approve') }}</el-button>
+            <el-button v-if="has('manage_fx') && row.status==='completed'" size="small" type="warning" @click="doUnapprove(row)">{{ t('common.revoke') }}</el-button>
             <template v-if="has('delete_fx') && row.status==='pending'">
               <el-popconfirm :title="t('common.confirmDelete')" @confirm="rejectPayment(row)">
                 <template #reference>
-                  <el-button size="small" type="danger">驳回</el-button>
+                  <el-button size="small" type="danger">{{ t('common.reject') }}</el-button>
                 </template>
               </el-popconfirm>
             </template>
@@ -180,7 +180,7 @@
     </el-drawer>
 
     <!-- 付款单明细抽屉 -->
-    <el-drawer v-model="todoDrawer" title="付款单待审" size="60%">
+  <el-drawer v-model="todoDrawer" :title="t('workbench.todos.payments')" size="60%">
       <div v-if="todoDetail">
         <div class="todo-head">
           <div>单号：{{ todoDetail.bill_no || ('Payment-' + todoDetail.id) }}</div>
@@ -188,7 +188,7 @@
           <div>日期：{{ fmtDate(todoDetail.pay_date) }}</div>
         </div>
         <el-table :data="todoDetail.items || []" border size="small" height="50vh" @header-dragend="onColResizeTodo">
-          <el-table-column type="index" column-key="__idx" label="序号" :width="colWTodo('__idx', 60)" />
+          <el-table-column type="index" column-key="__idx" :label="t('common.no')" :width="colWTodo('__idx', 60)" />
           <el-table-column prop="account_name" label="账户名称" :width="colWTodo('account_name', 180)" />
           <el-table-column prop="bank_account" label="银行账户" :width="colWTodo('bank_account', 200)" />
           <el-table-column label="银行" column-key="bank" :width="colWTodo('bank', 180)">
@@ -210,9 +210,9 @@
     
 
     <!-- 审核弹窗：选择平台并预览余额 -->
-    <el-dialog v-model="approveDialog.visible" title="审核付款单" width="520px">
+    <el-dialog v-model="approveDialog.visible" :title="t('workbench.approveDialogTitle')" width="520px">
       <el-form label-width="100px">
-        <el-form-item label="平台商">
+        <el-form-item :label="t('buyfx.platform')">
           <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
           </el-select>
@@ -258,9 +258,9 @@
     </el-dialog>
 
   <!-- 审核日志抽屉 -->
-    <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
+    <el-drawer v-model="auditDrawer.visible" :title="t('workbench.auditLog')" size="40%">
       <el-table :data="auditRows" size="small" border>
-  <el-table-column type="index" label="序号" width="60" />
+        <el-table-column type="index" :label="t('common.no')" width="60" />
         <el-table-column prop="acted_at" label="时间" width="170" />
         <el-table-column prop="action" label="动作" width="110" />
         <el-table-column prop="platform_name" label="平台" width="160" />
@@ -281,8 +281,8 @@
     <!-- 统计明细抽屉（通用） -->
     <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="50%">
       <el-table :data="statDrawer.rows" size="small" border>
-        <el-table-column prop="label" label="名称" />
-        <el-table-column prop="value" label="金额" width="160" align="right">
+        <el-table-column prop="label" :label="t('common.name')" />
+        <el-table-column prop="value" :label="t('common.amount')" width="160" align="right">
           <template #default="{ row }">{{ money(row.value) }}</template>
         </el-table-column>
       </el-table>

@@ -55,6 +55,11 @@ const messages = {
       ok: '确定',
       total: '合计',
       save: '保存',
+      approve: '审核',
+      revoke: '撤销',
+      reject: '驳回',
+      name: '名称',
+      amount: '金额',
     },
     buyfx: {
       title: '购汇管理',
@@ -282,6 +287,8 @@ const messages = {
         payHistory: '查看付款记录与导出',
         buyHistory: '查看购汇历史与管理'
       },
+      approveDialogTitle: '审核付款单',
+      auditLog: '审核日志',
       todos: {
         title: '待办事项',
         payments: '付款待审'
