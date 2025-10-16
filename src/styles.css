@@ -111,6 +111,9 @@ input:focus, select:focus, textarea:focus {
 .el-loading-mask { backdrop-filter: blur(2px); background-color: rgba(255,255,255,.45) !important; }
 .el-loading-spinner .path { stroke: var(--brand-primary) !important; }
 
+/* 全屏 loading 遮罩不挡顶部任务栏 */
+.el-loading-mask.is-fullscreen { top: var(--topbar-height) !important; height: calc(100vh - var(--topbar-height)) !important; }
+
 /* 表格空状态 padding 统一 */
 .el-table__empty-block { padding: 16px 0; }
 
@@ -127,6 +130,10 @@ input:focus, select:focus, textarea:focus {
 .status-warning .dot { background: var(--el-color-warning); }
 .status-danger .dot { background: var(--el-color-danger); }
 .status-info .dot { background: var(--el-color-info); }
+
+/* 顶部提示不挡任务栏（Element Plus Message/Notification） */
+.el-message { top: calc(var(--topbar-height) + 12px) !important; }
+.el-notification { top: calc(var(--topbar-height) + 12px) !important; }
 
 /* 统一 Dialog/Drawer 的样式比例（Element Plus 覆盖） */
 .el-message-box { margin-top: calc(var(--topbar-height) + 12px) !important; }
