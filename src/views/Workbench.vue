@@ -32,6 +32,15 @@
       </el-card>
     </div>
 
+    <!-- 统计图区域（五个独立图表，无标题/描述，只显示有数据的项） -->
+    <div class="charts-grid">
+      <div ref="elCusMYR" class="chart"></div>
+      <div ref="elCusCNY" class="chart"></div>
+      <div ref="elAccounts" class="chart"></div>
+      <div ref="elPending" class="chart"></div>
+      <div ref="elPlatforms" class="chart"></div>
+    </div>
+
     <!-- 可拖拽的“付款待审”浮动按钮（持久化位置） -->
     <div
       class="floating-payments"
@@ -231,6 +240,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref, onMounted } from 'vue'
 import { api, request as httpRequest } from '@/api'
 import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -447,7 +457,118 @@ async function loadPlatforms(){
   } catch { platforms.value = [] }
 }
 
-onMounted(() => { loadPaymentsCount(); loadPlatforms() })
+onMounted(() => { loadPaymentsCount(); loadPlatforms(); renderCharts(); window.addEventListener('resize', () => setTimeout(() => [chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms].forEach(ch => ch && ch.resize()), 0)) })
+
+// —— 统计图：5 个独立图表 ——
+const elCusMYR = ref(null)
+const elCusCNY = ref(null)
+const elAccounts = ref(null)
+const elPending = ref(null)
+const elPlatforms = ref(null)
+let chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms
+
+function barOption(xData, yData, opts={}){
+  return {
+    grid: { left: 30, right: 10, top: 10, bottom: 40 },
+    animationDuration: 400,
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    xAxis: { type: 'category', data: xData, axisLabel: { interval: 0, rotate: 24, color: 'var(--el-text-color-primary)', fontSize: 11 } },
+    yAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    legend: { show: !!opts.legend, bottom: 0, textStyle: { color: 'var(--el-text-color-primary)' } },
+    series: [ { name: opts.name || '', type: 'bar', data: yData, itemStyle: { color: opts.color || '#409EFF' }, barMaxWidth: 30 } ]
+  }
+}
+function barStackOption(xData, series){
+  return {
+    grid: { left: 30, right: 10, top: 10, bottom: 40 },
+    animationDuration: 400,
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    xAxis: { type: 'category', data: xData, axisLabel: { interval: 0, rotate: 24, color: 'var(--el-text-color-primary)', fontSize: 11 } },
+    yAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    legend: { show: false },
+    series: series.map(s => ({ ...s, type: 'bar', stack: 'bal', barMaxWidth: 30 }))
+  }
+}
+
+async function renderCharts(){
+  // 1/2. 客户余额：MYR/CNY
+  try {
+    const data = await api.customers.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
+    const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
+    const cusMYR = items.filter(r => Number(r.balance_myr) > 0)
+    const cusCNY = items.filter(r => Number(r.balance_cny) > 0)
+    if (elCusMYR.value) {
+      chCusMYR ||= echarts.init(elCusMYR.value)
+      chCusMYR.setOption(barOption(cusMYR.map(r => r.name||r.abbr||''), cusMYR.map(r => Number(r.balance_myr)||0), { name: 'MYR', color: '#67C23A' }))
+    }
+    if (elCusCNY.value) {
+      chCusCNY ||= echarts.init(elCusCNY.value)
+      chCusCNY.setOption(barOption(cusCNY.map(r => r.name||r.abbr||''), cusCNY.map(r => Number(r.balance_cny)||0), { name: 'CNY', color: '#E6A23C' }))
+    }
+  } catch {}
+
+  // 3. 收款账户余额（按账户，名称附加币种；仅展示 balance>0）
+  try {
+    const data = await api.accounts.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
+    const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
+    const rows = items.filter(r => Number(r.balance) > 0)
+    if (elAccounts.value) {
+      chAccounts ||= echarts.init(elAccounts.value)
+      chAccounts.setOption(barOption(rows.map(r => `${r.account_name||''} (${String(r.currency_code||'').toUpperCase()})`), rows.map(r => Number(r.balance)||0), { color: '#409EFF' }))
+    }
+  } catch {}
+
+  // 4. 付款待办余额（汇总 USD/MYR/CNY）
+  try {
+    const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 500 })
+    const heads = Array.isArray(res) ? res : (res?.items || [])
+    const sum = { USD:0, MYR:0, CNY:0 }
+    // 逐单明细合计（币种安全）
+    for (const h of heads) {
+      try {
+        const d = await api.fx.payments.detail(h.id)
+        for (const it of (d.items||[])) {
+          const cur = String(it.currency_code||'').toUpperCase()
+          const amt = Number(it.amount||0)
+          if (cur==='USD' || cur==='MYR' || cur==='CNY') sum[cur] = Math.round((sum[cur] + amt) * 100) / 100
+        }
+      } catch {}
+    }
+    const cats = ['USD','MYR','CNY']
+    const vals = cats.map(k => Number(sum[k]||0))
+    const cats2 = cats.filter((k,i) => vals[i] > 0)
+    const vals2 = vals.filter(v => v>0)
+    if (elPending.value) {
+      chPending ||= echarts.init(elPending.value)
+      chPending.setOption(barOption(cats2, vals2, { color: '#F56C6C' }))
+    }
+  } catch {}
+
+  // 5. 平台余额（每个平台 3 币种堆叠，隐藏图例）
+  try {
+    const res = await api.buyfx.listPlatforms()
+    const items = res?.items || []
+    const rows = items.map(p => ({
+      name: p.name,
+      USD: Number(p.balance_usd||0),
+      MYR: Number(p.balance_myr||0),
+      CNY: Number(p.balance_cny||0)
+    })).filter(r => r.USD>0 || r.MYR>0 || r.CNY>0)
+    const x = rows.map(r => r.name)
+    const series = [
+      { name: 'USD', data: rows.map(r => r.USD), itemStyle: { color: '#409EFF' } },
+      { name: 'MYR', data: rows.map(r => r.MYR), itemStyle: { color: '#67C23A' } },
+      { name: 'CNY', data: rows.map(r => r.CNY), itemStyle: { color: '#E6A23C' } },
+    ]
+    if (elPlatforms.value) {
+      chPlatforms ||= echarts.init(elPlatforms.value)
+      chPlatforms.setOption(barStackOption(x, series))
+    }
+  } catch {}
+
+  // resize
+  setTimeout(() => [chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms].forEach(ch => ch && ch.resize()), 0)
+}
 
 // —— 付款待审：可拖拽浮动按钮 ——
 const fabPos = ref({ x: 16, y: 160 })
@@ -554,4 +675,8 @@ onMounted(() => { readFab() })
 .preview-card .cell.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .preview-card .cell.warn { color: var(--el-text-color-primary); }
 .preview-card .cell.danger { color: var(--el-color-danger); font-weight: 600; }
+
+/* 图表区域 */
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 8px; }
+.chart { height: 260px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); }
 </style>
