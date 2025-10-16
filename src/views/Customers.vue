@@ -80,7 +80,7 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="560px">
+  <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="min(720px, 92vw)">
       <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="90px" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="addDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
@@ -128,7 +128,7 @@
     </el-dialog>
 
     <!-- 编辑客户对话框 -->
-    <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="560px">
+  <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="min(720px, 92vw)">
       <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="90px" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="editDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
@@ -193,7 +193,7 @@
       </div>
     </el-drawer>
     <!-- 编辑客户账户 -->
-  <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="560px">
+  <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="min(720px, 92vw)">
       <el-form :model="editAcc.form" label-width="120px" size="small" class="form">
         <el-form-item :label="$t('customers.accounts.accountName')"><el-input v-model.trim="editAcc.form.account_name" :placeholder="$t('customers.accounts.accountName')" clearable /></el-form-item>
         <el-form-item :label="$t('customers.accounts.bank')">
@@ -670,7 +670,7 @@ async function doEditCusAccount() {
 .title { font-size: 18px; font-weight: 700; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
-.form { display: grid; gap: 12px; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .pager { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
 </style>

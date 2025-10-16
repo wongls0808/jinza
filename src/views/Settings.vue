@@ -5,22 +5,7 @@
       <div class="spacer" style="flex:1"></div>
       <!-- 移除了返回首页按钮 -->
     </div>
-    <el-card>
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
-        <div class="item">
-          <div class="label">{{ t('settings.language') }}</div>
-          <el-select v-model="lang" style="width:200px" @change="onLangChange">
-            <el-option :label="t('settings.zh')" value="zh" />
-            <el-option :label="t('settings.en')" value="en" />
-          </el-select>
-        </div>
-        <!-- 已移除主题选择功能 -->
-        <div class="item">
-          <div class="label">{{ t('settings.account') }}</div>
-          <el-button type="danger" @click="onLogout">{{ t('settings.logout') || '退出登录' }}</el-button>
-        </div>
-      </div>
-    </el-card>
+    <!-- 移除语言切换与注销：统一在顶栏进行 -->
 
     <el-card style="margin-top:16px;">
       <template #header>
@@ -52,30 +37,11 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAuth } from '@/composables/useAuth'
-import { useRouter } from 'vue-router'
+// 顶栏已提供语言切换与注销逻辑，此页面仅保留业务设置（如币种）
 import { api } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-const { locale, t } = useI18n()
-const { logout } = useAuth()
-const router = useRouter()
-
-const lang = ref(locale.value)
-
-function onLangChange(v) {
-  locale.value = v
-  sessionStorage.setItem('lang', v)
-  // 保持向后兼容，同时也存储在localStorage
-  localStorage.setItem('lang', v)
-}
-
-function onLogout() {
-  logout()
-  router.replace('/login')
-}
-
-watch(locale, (v) => { lang.value = v })
+const { t } = useI18n()
 
 // 币种设置
 const currencies = ref([])

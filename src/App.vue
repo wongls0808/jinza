@@ -49,10 +49,7 @@
             <el-icon><User /></el-icon>
             <span>{{ t('home.users') }}</span>
           </el-menu-item>
-          <el-menu-item index="settings" :route="{name: 'settings'}" v-if="has('view_settings')">
-            <el-icon><Setting /></el-icon>
-            <span>{{ t('settings.title') }}</span>
-          </el-menu-item>
+          
         </el-menu>
       </div>
       
@@ -80,7 +77,6 @@ import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
 import { 
   Document, 
-  Setting, 
   Box, 
   UserFilled, 
   HomeFilled,
@@ -93,11 +89,18 @@ const route = useRoute()
 const { state, logout: doLogout, has } = useAuth()
 const authed = computed(() => !!state.token)
 
-// 增强登出功能，确保完全清除会话
-const logout = () => { 
-  doLogout(); 
-  sessionStorage.removeItem('auth_user'); // 确保清除会话存储
-  router.replace('/login') 
+// 增强登出功能：彻底清理并硬跳转到登录页，避免残留状态
+const logout = () => {
+  try { doLogout() } catch {}
+  // 双保：清理所有相关的存储键，避免路由守卫从 localStorage 恢复
+  try {
+    sessionStorage.removeItem('auth_user')
+    sessionStorage.removeItem('auth_session')
+    localStorage.removeItem('auth_user')
+    localStorage.removeItem('remember_auth')
+  } catch {}
+  // 硬跳转确保应用与路由守卫重新初始化
+  window.location.replace('/login')
 }
 
 // 验证会话有效性

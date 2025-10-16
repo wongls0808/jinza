@@ -9,6 +9,7 @@
       <template #header>
         <div class="toolbar">
           <div class="spacer"></div>
+          <el-button size="small" @click="openCurrencyDrawer">{{ $t('settings.currenciesTitle') }}</el-button>
           <el-button type="primary" size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
         </div>
       </template>
@@ -64,7 +65,39 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="600px">
+    <!-- 币种设置抽屉 -->
+    <el-drawer v-model="currencyDrawer.visible" :title="$t('settings.currenciesTitle')" size="40%">
+      <div class="add-row">
+        <el-input
+          v-model="currencyDrawer.newCode"
+          :placeholder="$t('settings.currencies.addPlaceholderCode')"
+          style="width:150px"
+          maxlength="8"
+          @input="currencyDrawer.newCode = (currencyDrawer.newCode || '').toUpperCase().trim()"
+        />
+        <el-input
+          v-model="currencyDrawer.newName"
+          :placeholder="$t('settings.currencies.addPlaceholderName')"
+          style="width:240px"
+          maxlength="32"
+        />
+        <el-button type="primary" :loading="currencyDrawer.adding" @click="onAddCurrency">{{ $t('common.add') }}</el-button>
+      </div>
+
+      <el-table :data="currencies" size="small" :border="true" style="width:100%;">
+        <el-table-column prop="code" :label="$t('settings.currencies.code')" width="120" />
+        <el-table-column prop="name" :label="$t('settings.currencies.name')" />
+        <el-table-column :label="$t('customers.fields.ops')" width="120">
+          <template #default="{ row }">
+            <el-popconfirm :title="$t('common.confirmDelete')" @confirm="removeCurrency(row)">
+              <template #reference><el-button size="small" type="danger" text>{{ $t('common.delete') }}</el-button></template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
+
+  <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="min(720px, 92vw)">
       <el-form :model="dlg.form" label-width="120px" size="small" class="form">
         <el-form-item :label="$t('accounts.form.accountName')">
           <el-input v-model.trim="dlg.form.account_name" :placeholder="$t('accounts.form.accountName')" clearable />
@@ -128,6 +161,9 @@ const banks = ref([])
 const currencies = ref([])
 const dlg = ref({ visible: false, loading: false, form: { account_name: '', bank_id: null, bank_account: '', currency_code: 'CNY', opening_balance: 0 } })
 
+// 币种抽屉状态
+const currencyDrawer = ref({ visible: false, adding: false, newCode: '', newName: '' })
+
 function formatMoney(v) { return Number(v||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 // InputNumber 千分位展示与两位小数解析
 function moneyFormatter(value) {
@@ -152,6 +188,45 @@ async function load() {
 }
 
 function openAdd() { dlg.value = { visible: true, loading: false, form: { account_name: '', bank_id: banks.value[0]?.id || null, bank_account: '', currency_code: currencies.value[0]?.code || 'CNY', opening_balance: 0 } } }
+
+// 打开币种抽屉并刷新币种列表
+async function openCurrencyDrawer() {
+  currencyDrawer.value.visible = true
+  await reloadCurrencies()
+}
+
+async function reloadCurrencies() {
+  currencies.value = await api.currencies.list()
+}
+
+async function onAddCurrency() {
+  const code = (currencyDrawer.value.newCode || '').toUpperCase().trim()
+  const name = (currencyDrawer.value.newName || '').trim()
+  if (!code) return ElMessage.warning('请输入币种代码')
+  if (!name) return ElMessage.warning('请输入币种名称')
+  try {
+    currencyDrawer.value.adding = true
+    await api.currencies.create(code, name)
+    ElMessage.success('已添加')
+    currencyDrawer.value.newCode = ''
+    currencyDrawer.value.newName = ''
+    await reloadCurrencies()
+  } catch (err) {
+    ElMessage.error(String(err?.message || err))
+  } finally {
+    currencyDrawer.value.adding = false
+  }
+}
+
+async function removeCurrency(row) {
+  try {
+    await api.currencies.remove(row.code)
+    ElMessage.success('已删除')
+    await reloadCurrencies()
+  } catch (err) {
+    ElMessage.error(String(err?.message || err))
+  }
+}
 
 async function submit() {
   dlg.value.loading = true
@@ -214,7 +289,8 @@ function onRowDblClick(row) {
 .title { font-size: 18px; font-weight: 700; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
-.form { display: grid; gap: 12px; }
+.form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.add-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .bankcell, .bankopt { display: inline-flex; align-items: center; gap: 10px; }
 .bankcell .logo, .bankopt .logo { height: 16px; width: auto; object-fit: contain; }
 .bankcell .zh, .bankopt .zh { font-weight: 600; }

@@ -9,7 +9,6 @@ const Login = () => import('@/views/Login.vue')
 const Customers = () => import('@/views/Customers.vue')
 const Banks = () => import('@/views/Banks.vue')
 const Accounts = () => import('@/views/Accounts.vue')
-const Settings = () => import('@/views/Settings.vue')
 const NoAccess = () => import('@/views/NoAccess.vue')
 const Transactions = () => import('@/views/TransactionsView.vue')
 const TransactionsStats = () => import('@/views/TransactionsStats.vue')
@@ -34,7 +33,6 @@ export const routes = [
   { path: '/fx/payments', name: 'fx-payments', component: FXPayments, meta: { perm: 'view_fx' } },
   { path: '/fx/buy', name: 'fx-buy', component: BuyFX, meta: { perm: 'view_fx' } },
   { path: '/fx/buy/history', name: 'fx-buy-history', component: BuyFXHistory, meta: { perm: 'view_fx' } },
-  { path: '/settings', name: 'settings', component: Settings, meta: { perm: 'view_settings' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
 
@@ -67,7 +65,7 @@ const readAuth = () => {
 
 // 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
 function firstAllowed(perms) {
-  const order = ['home','users','customers','banks','accounts','transactions','settings']
+  const order = ['home','users','customers','banks','accounts','transactions']
   for (const name of order) {
     const r = routes.find(r => r.name === name)
     if (!r) continue
