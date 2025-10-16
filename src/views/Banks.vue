@@ -195,4 +195,8 @@ function imgSrc(code) {
 .form { display: grid; gap: 12px; }
 .hint { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 8px; }
 .text-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 去除银行新增/替换对话框中的表单背景 */
+:deep(.el-dialog__body) { background: transparent !important; }
+:deep(.el-form) { background: transparent; }
 </style>

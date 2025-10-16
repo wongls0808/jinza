@@ -691,4 +691,10 @@ function onBankImgErr(e) {
 .form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .pager { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
+
+/* 去除对话框/抽屉内表单的默认白色背景 */
+:deep(.el-dialog__body), :deep(.el-drawer__body) {
+  background: transparent !important;
+}
+:deep(.el-form) { background: transparent; }
 </style>
