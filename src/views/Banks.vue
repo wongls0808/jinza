@@ -199,4 +199,15 @@ function imgSrc(code) {
 /* 去除银行新增/替换对话框中的表单背景 */
 :deep(.el-dialog__body) { background: transparent !important; }
 :deep(.el-form) { background: transparent; }
+/* 容器去“表框” */
+:deep(.el-dialog) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+:deep(.el-dialog__header), :deep(.el-dialog__footer) {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  border-top: 0 !important;
+}
 </style>

@@ -697,4 +697,15 @@ function onBankImgErr(e) {
   background: transparent !important;
 }
 :deep(.el-form) { background: transparent; }
+/* 容器去“表框”：透明背景、无阴影、无边框，头/尾部无分割线 */
+:deep(.el-dialog), :deep(.el-drawer) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+:deep(.el-dialog__header), :deep(.el-dialog__footer), :deep(.el-drawer__header) {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  border-top: 0 !important;
+}
 </style>
