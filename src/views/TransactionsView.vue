@@ -20,7 +20,7 @@
             v-model="searchAmountOnly"
             class="amount-only"
             @change="handleSearch">
-            金额
+            {{ t('common.amount') }}
           </el-checkbox>
         </div>
         <div class="toolbar-center">
@@ -196,7 +196,7 @@
       <el-table-column label="" width="140">
         <template #header>
           <el-checkbox v-model="batchMatchToggle" :disabled="!multipleSelection.length" @change="onBatchMatchToggle">
-            批量匹配
+            {{ t('transactions.batchMatch') }}
           </el-checkbox>
         </template>
         <template #default="scope">
@@ -238,7 +238,7 @@
             v-model="form.account_number"
             filterable
             @change="handleAccountChange"
-            placeholder="选择收款账户"
+            :placeholder="t('transactions.selectReceivingAccount')"
             style="width: 100%">
             <el-option
               v-for="account in accounts"
@@ -371,11 +371,11 @@
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
             <el-form label-width="100px">
-              <el-form-item label="收款银行账户">
+              <el-form-item :label="t('transactions.receivingBankAccount')">
                 <el-select
                   v-model="matchForm.transferAccountId"
                   filterable
-                  :placeholder="'选择收款账户（按银行/账户名/账号过滤）'"
+                  :placeholder="t('transactions.searchReceivingAccountPlaceholder')"
                   style="width: 100%">
                   <el-option
                     v-for="a in accounts"
@@ -385,19 +385,19 @@
                   />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">选择内部收款账户，将未匹配的交易标记为“调拨”。</div>
+              <div class="gray-text">{{ t('transactions.transferHint') }}</div>
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
             <el-form label-width="100px">
-              <el-form-item label="选择费用项目">
+              <el-form-item :label="t('transactions.selectExpenseItem')">
                 <el-select
                   v-model="matchForm.expenseId"
                   filterable
                   remote
                   :remote-method="searchExpenses"
                   :loading="expensesLoading"
-                  placeholder="搜索 项目名/分类"
+                  :placeholder="t('expenses.searchPlaceholder')"
                   style="width: 100%">
                   <el-option
                     v-for="e in expenseOptions"
@@ -406,7 +406,7 @@
                     :value="e.id" />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">将所选交易标记为“费用”，并关联到指定费用项目。</div>
+              <div class="gray-text">{{ t('transactions.expenseHint') }}</div>
             </el-form>
           </el-tab-pane>
         </el-tabs>
