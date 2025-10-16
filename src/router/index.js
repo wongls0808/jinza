@@ -28,7 +28,7 @@ export const routes = [
   { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
   { path: '/accounts', name: 'accounts', component: Accounts, meta: { perm: 'view_accounts' } },
   { path: '/transactions', name: 'transactions', component: Transactions, meta: { perm: 'view_transactions' } },
-  { path: '/transactions/stats', name: 'transactions-stats', component: TransactionsStats, meta: { perm: 'view_transactions' } },
+  { path: '/transactions/stats', name: 'transactions-stats', component: TransactionsStats, meta: { perm: 'view_transactions_stats' } },
   { path: '/fx', name: 'fx', component: FXManagement, meta: { perm: 'view_fx' } },
   { path: '/fx/settlements', name: 'fx-settlements', component: FXSettlements, meta: { perm: 'view_fx' } },
   { path: '/fx/payments', name: 'fx-payments', component: FXPayments, meta: { perm: 'view_fx' } },
@@ -68,7 +68,7 @@ const readAuth = () => {
           token: 'dev-mock-token',
           perms: [
             'view_dashboard','manage_users','view_customers','view_banks','view_accounts',
-            'view_transactions','view_fx','view_settings','view_account_management','expenses:list','expenses:create','expenses:update','expenses:delete'
+            'view_transactions','view_transactions_stats','view_fx','expenses:list','expenses:create','expenses:update','expenses:delete'
           ],
           user: { id: 1, username: 'admin', display_name: '开发者账户' }
         }

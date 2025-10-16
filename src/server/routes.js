@@ -10,7 +10,7 @@ import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
 import { fxRouter } from './fx.js'
-import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes } from './permissions.js'
+import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, getModuleViewCode, buildPermissionIndex } from './permissions.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -303,6 +303,25 @@ router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
   }
 
   if (perms.length) {
+    // 查看权限为主：若某模块未勾选“查看”，则剔除该模块下的非查看权限
+    const { codeToModule } = buildPermissionIndex(PERMISSION_TREE)
+    const selected = new Set(perms)
+    // 预先收集所有模块的查看码
+    const moduleView = new Map()
+    for (const m of PERMISSION_TREE) {
+      moduleView.set(m.module, getModuleViewCode(m.module))
+    }
+    const filtered = []
+    for (const code of selected) {
+      const mod = codeToModule.get(code)
+      if (!mod) { filtered.push(code); continue }
+      const viewCode = moduleView.get(mod)
+      if (code === viewCode) { filtered.push(code); continue }
+      // expenses 的查看码为 expenses:list；buyfx 复用 view_fx
+      if (selected.has(viewCode)) filtered.push(code)
+    }
+    // 用过滤后的 perms 覆盖
+    perms.splice(0, perms.length, ...filtered)
     await query(
       `insert into permissions(code, name)
        select x.code, x.code from unnest($1::text[]) as x(code)
@@ -653,17 +672,17 @@ router.get('/customers/export', authMiddleware(true), requirePerm('view_customer
 })
 
 // Currencies CRUD (simple)
-router.get('/currencies', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+router.get('/currencies', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
   const rs = await query('select code, name from currencies order by code')
   res.json(rs.rows)
 })
-router.post('/currencies', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+router.post('/currencies', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
   const { code, name } = req.body || {}
   if (!code || !name) return res.status(400).json({ error: 'Missing fields' })
   await query('insert into currencies(code, name) values($1,$2) on conflict do nothing', [code.toUpperCase(), name])
   res.json({ ok: true })
 })
-router.delete('/currencies/:code', authMiddleware(true), requirePerm('view_settings'), async (req, res) => {
+router.delete('/currencies/:code', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
   const code = (req.params.code || '').toUpperCase()
   await query('delete from currencies where code=$1', [code])
   res.json({ ok: true })
