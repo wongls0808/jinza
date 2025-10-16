@@ -99,7 +99,7 @@
         <el-table-column label="银行" min-width="160">
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:6px;">
-              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:48px; height:48px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
+              <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
               <span>{{ row.bank_name || row.bank_code || '-' }}</span>
             </div>
           </template>
@@ -139,7 +139,7 @@
           <el-table-column label="银行" min-width="180">
             <template #default="{ row }">
               <div style="display:flex; align-items:center; gap:8px;">
-                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:54px; height:54px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
+                <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
                 <span>{{ row.bank_name || row.bank_code || '-' }}</span>
               </div>
             </template>
@@ -291,23 +291,19 @@ const todoDrawer = ref(false)
 const todoDetail = ref(null)
 function fmtDate(v){ try { if (!v) return ''; if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
-function bankLogoUrl(code){
-  const c = String(code||'').trim().toLowerCase()
-  if (!c) return ''
-  // 优先 svg，其次 png / jpg
+// 参照其它列表的银行 Logo 回退策略：svg → png → jpg → public.svg
+function bankImg(code) {
+  const c = String(code || 'public').toLowerCase()
   return `/banks/${c}.svg`
 }
-function onLogoError(ev, code){
-  try {
-    const img = ev?.target
-    if (!img || !code) return
-    const step = Number(img.getAttribute('data-step')||'0')
-    const c = String(code||'').trim().toLowerCase()
-    if (step === 0) { img.src = `/banks/${c}.png`; img.setAttribute('data-step','1'); return }
-    if (step === 1) { img.src = `/banks/${c}.jpg`; img.setAttribute('data-step','2'); return }
-    // 最后一步：移除错误处理，避免循环抖动
-    img.onerror = null
-  } catch {}
+function onBankImgErr(e) {
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    const current = el.getAttribute('src') || ''
+    if (/\.svg$/i.test(current)) el.src = current.replace(/\.svg$/i, '.png')
+    else if (/\.png$/i.test(current)) el.src = current.replace(/\.png$/i, '.jpg')
+    else el.src = '/banks/public.svg'
+  }
 }
 async function openTodo(row){
   try {
