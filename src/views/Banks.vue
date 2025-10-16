@@ -5,7 +5,7 @@
       <div class="spacer"></div>
       <!-- 移除了返回首页按钮 -->
     </div>
-    <el-card class="jelly">
+  <el-card class="plain-card" shadow="never">
       <template #header>
         <div class="toolbar">
           <el-button size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
@@ -196,18 +196,6 @@ function imgSrc(code) {
 .hint { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 8px; }
 .text-clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 去除银行新增/替换对话框中的表单背景 */
-:deep(.el-dialog__body) { background: transparent !important; }
-:deep(.el-form) { background: transparent; }
-/* 容器去“表框” */
-:deep(.el-dialog) {
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-}
-:deep(.el-dialog__header), :deep(.el-dialog__footer) {
-  background: transparent !important;
-  border-bottom: 0 !important;
-  border-top: 0 !important;
-}
+/* 页面主表卡片：透明无边框（对话框保留默认样式） */
+.plain-card { background: transparent; border: none; box-shadow: none; }
 </style>

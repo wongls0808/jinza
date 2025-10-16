@@ -5,7 +5,7 @@
       <div class="spacer"></div>
       <!-- 移除了返回首页按钮 -->
     </div>
-    <el-card class="jelly">
+  <el-card class="plain-card" shadow="never">
       <template #header>
         <div class="toolbar">
           <div class="spacer"></div>
@@ -309,4 +309,5 @@ function onBankImgErr(e) {
 .bankcell .logo, .bankopt .logo { height: 16px; width: auto; object-fit: contain; }
 .bankcell .zh, .bankopt .zh { font-weight: 600; }
 .bankcell .en, .bankopt .en { color: var(--el-text-color-secondary); font-size: 12px; }
+.plain-card { background: transparent; border: none; box-shadow: none; }
 </style>

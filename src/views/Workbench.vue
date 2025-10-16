@@ -135,15 +135,15 @@
           <div class="cell mono" :class="{ danger: after.CNY<0 }">{{ money(after.CNY) }}</div>
         </div>
       </div>
-      <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange">
-        <el-table-column type="selection" width="46" />
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="pay_date" label="付款日期" width="120">
+      <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange" @header-dragend="onColResizePay">
+        <el-table-column type="selection" column-key="__sel" :width="colWPay('__sel', 46)" />
+        <el-table-column type="index" column-key="__idx" label="#" :width="colWPay('__idx', 60)" />
+        <el-table-column prop="pay_date" label="付款日期" :width="colWPay('pay_date', 120)">
           <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
         </el-table-column>
-        <el-table-column prop="bill_no" label="单号" width="200" />
-        <el-table-column prop="customer_name" label="客户" />
-        <el-table-column label="银行" min-width="160">
+        <el-table-column prop="bill_no" label="单号" :width="colWPay('bill_no', 200)" />
+        <el-table-column prop="customer_name" label="客户" :width="colWPay('customer_name', 180)" />
+        <el-table-column label="银行" column-key="bank" :width="colWPay('bank', 160)">
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:6px;">
               <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
@@ -151,10 +151,10 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="total_amount" label="金额" width="140" align="right">
+        <el-table-column prop="total_amount" label="金额" :width="colWPay('total_amount', 140)" align="right">
           <template #default="{ row }">{{ money(row.total_amount) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="420" align="center">
+        <el-table-column label="操作" column-key="ops" :width="colWPay('ops', 420)" align="center">
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="openTodo(row)">查看</el-button>
             <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">审核</el-button>
@@ -179,11 +179,11 @@
           <div>客户：{{ todoDetail.customer_name }}</div>
           <div>日期：{{ fmtDate(todoDetail.pay_date) }}</div>
         </div>
-        <el-table :data="todoDetail.items || []" border size="small" height="50vh">
-          <el-table-column type="index" label="#" width="60" />
-          <el-table-column prop="account_name" label="账户名称" />
-          <el-table-column prop="bank_account" label="银行账户" />
-          <el-table-column label="银行" min-width="180">
+        <el-table :data="todoDetail.items || []" border size="small" height="50vh" @header-dragend="onColResizeTodo">
+          <el-table-column type="index" column-key="__idx" label="#" :width="colWTodo('__idx', 60)" />
+          <el-table-column prop="account_name" label="账户名称" :width="colWTodo('account_name', 180)" />
+          <el-table-column prop="bank_account" label="银行账户" :width="colWTodo('bank_account', 200)" />
+          <el-table-column label="银行" column-key="bank" :width="colWTodo('bank', 180)">
             <template #default="{ row }">
               <div style="display:flex; align-items:center; gap:8px;">
                 <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
@@ -191,8 +191,8 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="currency_code" label="币种" width="120" />
-          <el-table-column prop="amount" label="金额" width="140" align="right">
+          <el-table-column prop="currency_code" label="币种" :width="colWTodo('currency_code', 120)" />
+          <el-table-column prop="amount" label="金额" :width="colWTodo('amount', 140)" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
         </el-table>
@@ -288,6 +288,7 @@ import { computed, ref, onMounted } from 'vue'
 import { api, request as httpRequest } from '@/api'
 import { ElMessage } from 'element-plus'
 // 指标图无需 echarts
+import { useTableMemory } from '@/composables/useTableMemory'
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -295,6 +296,9 @@ const { has, state } = useAuth()
 const { t } = useI18n()
 const username = computed(() => state.user?.display_name || state.user?.username || '')
 const today = new Date().toLocaleDateString()
+// 表格列宽记忆（付款待审列表 / 付款明细表）
+const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('wb-payments')
+const { colW: colWTodo, onColResize: onColResizeTodo } = useTableMemory('wb-todo')
 
 // 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [

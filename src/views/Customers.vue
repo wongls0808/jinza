@@ -6,7 +6,7 @@
       <!-- 移除了返回首页按钮 -->
     </div>
 
-  <el-card class="jelly">
+  <el-card class="plain-card" shadow="never">
       <template #header>
         <div class="toolbar">
           <el-input v-model.trim="q" :placeholder="$t('customers.searchPlaceholder')" size="small" style="width:220px" @keyup.enter.native="reload" />
@@ -692,20 +692,6 @@ function onBankImgErr(e) {
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .pager { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
 
-/* 去除对话框/抽屉内表单的默认白色背景 */
-:deep(.el-dialog__body), :deep(.el-drawer__body) {
-  background: transparent !important;
-}
-:deep(.el-form) { background: transparent; }
-/* 容器去“表框”：透明背景、无阴影、无边框，头/尾部无分割线 */
-:deep(.el-dialog), :deep(.el-drawer) {
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-}
-:deep(.el-dialog__header), :deep(.el-dialog__footer), :deep(.el-drawer__header) {
-  background: transparent !important;
-  border-bottom: 0 !important;
-  border-top: 0 !important;
-}
+/* 页面主表卡片：透明无边框（保留对话框/抽屉默认样式） */
+.plain-card { background: transparent; border: none; box-shadow: none; }
 </style>
