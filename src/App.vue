@@ -14,6 +14,7 @@
           :background-color="navBgColor"
           text-color="#ffffff"
           active-text-color="#ffffff"
+          :ellipsis="false"
           router
           @select="handleSelect">
           <el-menu-item index="home" :route="{name: 'home'}">
@@ -170,7 +171,7 @@ function handleSelect(key) {
 .nav-menu {
   flex: 1;
   display: flex;
-  justify-content: flex-start; /* 左对齐，避免中间截断 */
+  justify-content: center; /* 居中排列 */
   overflow-x: auto; /* 超出时允许横向滚动，不再折叠为下拉 */
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
