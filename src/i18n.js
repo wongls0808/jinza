@@ -540,6 +540,89 @@ const messages = {
       title: 'Enterprise Management',
       logout: 'Logout',
     },
+    workbench: {
+      title: 'Workbench',
+      cards: {
+        tx: 'Import/manage transactions, match and analyze',
+        settleManage: 'Handle settlements and write-offs',
+        settleHistory: 'View settlement records & export',
+        payHistory: 'View payment records & export',
+        buyHistory: 'View and manage buy FX history'
+      },
+      kpis: {
+        cusMYR: 'Customer Balance (MYR)',
+        cusCNY: 'Customer Balance (CNY)',
+        bankMYR: 'Bank Balance (MYR)',
+        payCNY: 'Payable Balance (CNY)',
+        exchMYR: 'Exchangeable (MYR)',
+        pendingCNY: 'Pending Pay (CNY)',
+        unmatched: 'Unmatched Transactions'
+      },
+      preview: {
+        feePercent: 'Fee %',
+        currency: 'Currency',
+        availableBalance: 'Available',
+        orderDeduction: 'Order deduction (incl. fee)',
+        balanceAfter: 'Balance after deduction'
+      },
+      approveDialogTitle: 'Approve Payment',
+      auditLog: 'Audit Log',
+      deductionDetails: 'Deduction Details',
+      todos: {
+        title: 'Todos',
+        payments: 'Payments Pending'
+      }
+    },
+    expenses: {
+      title: 'Expenses',
+      subtitle: 'Operational entries · auto debit/credit',
+      searchPlaceholder: 'Search name/category',
+      category: 'Category',
+      direction: 'Direction',
+      query: 'Query',
+      add: 'Add',
+      index: '#',
+      description: 'Name',
+      createdAt: 'Created At',
+      actions: 'Actions',
+      edit: 'Edit',
+      delete: 'Delete',
+      confirmDelete: 'Confirm delete?',
+      reportTitle: 'Debit/Credit Report',
+      startDate: 'Start Date',
+      endDate: 'End Date',
+      refresh: 'Refresh',
+      summary: {
+        debitTotal: 'Debit Total',
+        creditTotal: 'Credit Total',
+        net: 'Net',
+        count: 'Count'
+      },
+      columns: {
+        count: 'Matched Count',
+        debit: 'Debit',
+        credit: 'Credit',
+        net: 'Net'
+      },
+      drawer: {
+        titleAdd: 'New Expense Item',
+        titleEdit: 'Edit Expense Item',
+        fields: {
+          description: 'Name',
+          category: 'Category',
+          direction: 'Direction'
+        },
+        cancel: 'Cancel',
+        save: 'Save'
+      },
+      messages: {
+        fillDescription: 'Please enter a name',
+        saved: 'Saved',
+        saveFailed: 'Save failed',
+        deleted: 'Deleted',
+        deleteFailed: 'Delete failed'
+      }
+    },
     fx: {
       title: 'FX Management',
       settlementArea: 'Settlement',

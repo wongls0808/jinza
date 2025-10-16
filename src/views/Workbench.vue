@@ -38,50 +38,50 @@
         <el-tooltip :content="`共${stats.lists.cusMYR.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.cusMYR.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">客户余额(MYR)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.cusMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.cusMYR) }}</div>
       </div>
       <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
         <el-tooltip :content="`共${stats.lists.cusCNY.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.cusCNY.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">客户余额(CNY)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.cusCNY') }}</div>
         <div class="kpi-value">{{ money(stats.totals.cusCNY) }}</div>
       </div>
       <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
         <el-tooltip :content="`共${stats.lists.bankMYR.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.bankMYR.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">银行余额(MYR)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.bankMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.bankMYR) }}</div>
       </div>
       <div class="kpi-card theme-info" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
         <el-tooltip :content="`共${stats.lists.payCNY.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.payCNY.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">可付余额(CNY)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.payCNY') }}</div>
         <div class="kpi-value">{{ money(stats.totals.payCNY) }}</div>
       </div>
       <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
         <el-tooltip :content="`共${stats.lists.exchMYR.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.exchMYR.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">可兑余额(MYR)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.exchMYR') }}</div>
         <div class="kpi-value">{{ money(stats.totals.exchMYR) }}</div>
       </div>
       <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
         <el-tooltip :content="`共${stats.lists.pendingCNY.length}条`" placement="top">
           <span class="kpi-count">{{ stats.lists.pendingCNY.length }}</span>
         </el-tooltip>
-        <div class="kpi-title">待付余额(CNY)</div>
+  <div class="kpi-title">{{ t('workbench.kpis.pendingCNY') }}</div>
         <div class="kpi-value">{{ money(stats.totals.pendingCNY) }}</div>
       </div>
       <!-- 新增：未匹配交易（统一为KPI卡片，加入同一网格） -->
       <div class="kpi-card theme-danger" role="button" tabindex="0" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
-        <el-tooltip :content="`未匹配 ${unmatchedCount} / 总计 ${totalTx}`" placement="top">
+  <el-tooltip :content="`${t('workbench.kpis.unmatched')} ${unmatchedCount} / ${t('common.total')} ${totalTx}`" placement="top">
           <span class="kpi-count">{{ unmatchedCount }}</span>
         </el-tooltip>
-        <div class="kpi-title">未匹配交易</div>
+  <div class="kpi-title">{{ t('workbench.kpis.unmatched') }}</div>
         <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
       </div>
     </div>
@@ -91,7 +91,7 @@
       class="floating-payments"
       :style="fabStyle"
       role="button"
-      aria-label="付款待审"
+  :aria-label="t('workbench.todos.payments')"
       @mousedown="onFabDown"
       @touchstart="onFabDown"
       @click="onFabClick"
@@ -106,38 +106,38 @@
     <!-- 付款待审抽屉列表（含审核操作） -->
     <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="60%">
       <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
-        <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:240px" filterable>
-          <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
+  <el-select v-model="batch.platform_id" :placeholder="t('transactions.selectPlatform')" size="small" style="width:240px" filterable>
+          <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? ` (${t('workbench.preview.feePercent')} ${Number(p.fee_percent||0).toFixed(4)}%)` : '')" />
         </el-select>
-        <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核</el-button>
-        <el-button size="small" type="primary" @click="loadPaymentsList">刷新</el-button>
+  <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">{{ t('common.approve') }}</el-button>
+  <el-button size="small" type="primary" @click="loadPaymentsList">{{ t('common.refresh') }}</el-button>
       </div>
       <!-- 余额预览（批量） -->
       <div v-if="selectedPlatform" class="preview-card">
         <div class="row">
-          <div class="cell head">平台手续费</div>
+          <div class="cell head">{{ t('workbench.preview.feePercent') }}</div>
           <div class="cell">{{ Number(selectedPlatform.fee_percent||0).toFixed(4) }}%</div>
         </div>
         <div class="row">
-          <div class="cell head">币种</div>
+          <div class="cell head">{{ t('workbench.preview.currency') }}</div>
           <div class="cell">USD</div>
           <div class="cell">MYR</div>
           <div class="cell">CNY</div>
         </div>
         <div class="row">
-          <div class="cell head">可用余额</div>
+          <div class="cell head">{{ t('workbench.preview.availableBalance') }}</div>
           <div class="cell mono">{{ money(Number(selectedPlatform.balance_usd||0)) }}</div>
           <div class="cell mono">{{ money(Number(selectedPlatform.balance_myr||0)) }}</div>
           <div class="cell mono">{{ money(Number(selectedPlatform.balance_cny||0)) }}</div>
         </div>
         <div class="row">
-          <div class="cell head">已选应扣(含手续费)</div>
+          <div class="cell head">{{ t('workbench.preview.orderDeduction') }}</div>
           <div class="cell mono warn" :class="{ danger: need.USD>0 && after.USD<0 }">{{ money(need.USD) }}</div>
           <div class="cell mono warn" :class="{ danger: need.MYR>0 && after.MYR<0 }">{{ money(need.MYR) }}</div>
           <div class="cell mono warn" :class="{ danger: need.CNY>0 && after.CNY<0 }">{{ money(need.CNY) }}</div>
         </div>
         <div class="row">
-          <div class="cell head">扣减后余额</div>
+          <div class="cell head">{{ t('workbench.preview.balanceAfter') }}</div>
           <div class="cell mono" :class="{ danger: after.USD<0 }">{{ money(after.USD) }}</div>
           <div class="cell mono" :class="{ danger: after.MYR<0 }">{{ money(after.MYR) }}</div>
           <div class="cell mono" :class="{ danger: after.CNY<0 }">{{ money(after.CNY) }}</div>
@@ -146,12 +146,12 @@
       <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange" @header-dragend="onColResizePay">
         <el-table-column type="selection" column-key="__sel" :width="colWPay('__sel', 46)" />
         <el-table-column type="index" column-key="__idx" :label="t('common.no')" :width="colWPay('__idx', 60)" />
-        <el-table-column prop="pay_date" label="付款日期" :width="colWPay('pay_date', 120)">
+  <el-table-column prop="pay_date" :label="t('fx.payDate')" :width="colWPay('pay_date', 120)">
           <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
         </el-table-column>
-        <el-table-column prop="bill_no" label="单号" :width="colWPay('bill_no', 200)" />
-        <el-table-column prop="customer_name" label="客户" :width="colWPay('customer_name', 180)" />
-        <el-table-column label="银行" column-key="bank" :width="colWPay('bank', 160)">
+  <el-table-column prop="bill_no" :label="t('common.billNo')" :width="colWPay('bill_no', 200)" />
+  <el-table-column prop="customer_name" :label="t('common.customer')" :width="colWPay('customer_name', 180)" />
+  <el-table-column :label="t('transactions.bankName')" column-key="bank" :width="colWPay('bank', 160)">
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:6px;">
               <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
@@ -159,7 +159,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="total_amount" label="金额" :width="colWPay('total_amount', 140)" align="right">
+  <el-table-column prop="total_amount" :label="t('common.amount')" :width="colWPay('total_amount', 140)" align="right">
           <template #default="{ row }">{{ money(row.total_amount) }}</template>
         </el-table-column>
         <el-table-column :label="t('common.actions')" column-key="ops" :width="colWPay('ops', 420)" align="center">
@@ -183,15 +183,15 @@
   <el-drawer v-model="todoDrawer" :title="t('workbench.todos.payments')" size="60%">
       <div v-if="todoDetail">
         <div class="todo-head">
-          <div>单号：{{ todoDetail.bill_no || ('Payment-' + todoDetail.id) }}</div>
-          <div>客户：{{ todoDetail.customer_name }}</div>
-          <div>日期：{{ fmtDate(todoDetail.pay_date) }}</div>
+          <div>{{ t('common.billNo') }}：{{ todoDetail.bill_no || ('Payment-' + todoDetail.id) }}</div>
+          <div>{{ t('common.customer') }}：{{ todoDetail.customer_name }}</div>
+          <div>{{ t('common.date') }}：{{ fmtDate(todoDetail.pay_date) }}</div>
         </div>
         <el-table :data="todoDetail.items || []" border size="small" height="50vh" @header-dragend="onColResizeTodo">
           <el-table-column type="index" column-key="__idx" :label="t('common.no')" :width="colWTodo('__idx', 60)" />
-          <el-table-column prop="account_name" label="账户名称" :width="colWTodo('account_name', 180)" />
-          <el-table-column prop="bank_account" label="银行账户" :width="colWTodo('bank_account', 200)" />
-          <el-table-column label="银行" column-key="bank" :width="colWTodo('bank', 180)">
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" :width="colWTodo('account_name', 180)" />
+          <el-table-column prop="bank_account" :label="t('accounts.fields.bankAccount')" :width="colWTodo('bank_account', 200)" />
+          <el-table-column :label="t('transactions.bankName')" column-key="bank" :width="colWTodo('bank', 180)">
             <template #default="{ row }">
               <div style="display:flex; align-items:center; gap:8px;">
                 <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
@@ -199,8 +199,8 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="currency_code" label="币种" :width="colWTodo('currency_code', 120)" />
-          <el-table-column prop="amount" label="金额" :width="colWTodo('amount', 140)" align="right">
+          <el-table-column prop="currency_code" :label="t('transactions.currency')" :width="colWTodo('currency_code', 120)" />
+          <el-table-column prop="amount" :label="t('common.amount')" :width="colWTodo('amount', 140)" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
         </el-table>
@@ -213,38 +213,38 @@
     <el-dialog v-model="approveDialog.visible" :title="t('workbench.approveDialogTitle')" width="520px">
       <el-form label-width="100px">
         <el-form-item :label="t('buyfx.platform')">
-          <el-select v-model="approveDialog.platform_id" filterable placeholder="选择平台商" style="width: 260px">
+          <el-select v-model="approveDialog.platform_id" filterable :placeholder="t('transactions.selectPlatform')" style="width: 260px">
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
           </el-select>
         </el-form-item>
         <el-alert v-if="approveDialog.platform_id" type="info" :closable="false" show-icon>
-          将按平台商配置的手续费比例进行扣减。
+          {{ t('workbench.preview.orderDeduction') }}
         </el-alert>
         <div v-if="selectedPlatformSingle" class="preview-card" style="margin-top:8px;">
           <div class="row">
-            <div class="cell head">平台手续费</div>
+            <div class="cell head">{{ t('workbench.preview.feePercent') }}</div>
             <div class="cell">{{ Number(selectedPlatformSingle.fee_percent||0).toFixed(4) }}%</div>
           </div>
           <div class="row">
-            <div class="cell head">币种</div>
+            <div class="cell head">{{ t('workbench.preview.currency') }}</div>
             <div class="cell">USD</div>
             <div class="cell">MYR</div>
             <div class="cell">CNY</div>
           </div>
           <div class="row">
-            <div class="cell head">可用余额</div>
+            <div class="cell head">{{ t('workbench.preview.availableBalance') }}</div>
             <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_usd||0)) }}</div>
             <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_myr||0)) }}</div>
             <div class="cell mono">{{ money(Number(selectedPlatformSingle.balance_cny||0)) }}</div>
           </div>
           <div class="row">
-            <div class="cell head">本单应扣(含手续费)</div>
+            <div class="cell head">{{ t('workbench.preview.orderDeduction') }}</div>
             <div class="cell mono warn" :class="{ danger: needSingle.USD>0 && afterSingle.USD<0 }">{{ money(needSingle.USD) }}</div>
             <div class="cell mono warn" :class="{ danger: needSingle.MYR>0 && afterSingle.MYR<0 }">{{ money(needSingle.MYR) }}</div>
             <div class="cell mono warn" :class="{ danger: needSingle.CNY>0 && afterSingle.CNY<0 }">{{ money(needSingle.CNY) }}</div>
           </div>
           <div class="row">
-            <div class="cell head">扣减后余额</div>
+            <div class="cell head">{{ t('workbench.preview.balanceAfter') }}</div>
             <div class="cell mono" :class="{ danger: afterSingle.USD<0 }">{{ money(afterSingle.USD) }}</div>
             <div class="cell mono" :class="{ danger: afterSingle.MYR<0 }">{{ money(afterSingle.MYR) }}</div>
             <div class="cell mono" :class="{ danger: afterSingle.CNY<0 }">{{ money(afterSingle.CNY) }}</div>
@@ -261,20 +261,20 @@
     <el-drawer v-model="auditDrawer.visible" :title="t('workbench.auditLog')" size="40%">
       <el-table :data="auditRows" size="small" border>
         <el-table-column type="index" :label="t('common.no')" width="60" />
-        <el-table-column prop="acted_at" label="时间" width="170" />
-        <el-table-column prop="action" label="动作" width="110" />
-        <el-table-column prop="platform_name" label="平台" width="160" />
-        <el-table-column label="手续费" width="120" align="right">
+  <el-table-column prop="acted_at" :label="t('common.date')" width="170" />
+  <el-table-column prop="action" :label="t('buyfx.action')" width="110" />
+  <el-table-column prop="platform_name" :label="t('buyfx.platform')" width="160" />
+  <el-table-column :label="t('workbench.preview.feePercent')" width="120" align="right">
           <template #default="{ row }">{{ money(row.fee_amount) }} ({{ row.fee_percent }}%)</template>
         </el-table-column>
-        <el-table-column label="扣减明细">
+  <el-table-column :label="t('workbench.deductionDetails')">
           <template #default="{ row }">
             <div v-if="row.deltas">
               <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：金额 {{ money(v.amount) }}，手续费 {{ money(v.fee) }}，合计 {{ money(v.total) }}</div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="acted_by_name" label="操作人" width="140" />
+  <el-table-column prop="acted_by_name" :label="t('common.createdBy')" width="140" />
       </el-table>
     </el-drawer>
 
