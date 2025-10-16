@@ -562,13 +562,13 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     -- 规则：交易借方(debit_amount)表示平台贷方(credit)；交易贷方(credit_amount)表示平台借方(debit)
     txn as (
       select 
-        t.id as ref_id,
         t.transaction_date::timestamptz as ts,
         'transaction'::text as source,
         case when coalesce(t.debit_amount,0) > 0 then 'income' else 'outcome' end as action,
         upper(a.currency_code) as currency,
         round(coalesce(t.credit_amount,0)::numeric, 2)::numeric(18,2) as debit,
         round(coalesce(t.debit_amount,0)::numeric, 2)::numeric(18,2) as credit,
+        t.id as ref_id,
         coalesce(t.cheque_ref_no, t.reference_1, t.reference_2, t.reference_3)::text as ref_no,
         t.description::text as note,
         t.match_target_id as platform_id
