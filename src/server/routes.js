@@ -149,6 +149,81 @@ router.get('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
   res.json(rs.rows.map(r => r.code))
 })
 
+// Expenses（费用管理）
+router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), async (req, res) => {
+  const { q = '', category = '', startDate = '', endDate = '', page = 1, pageSize = 50 } = req.query
+  try {
+    await query(`
+      create table if not exists expenses(
+        id serial primary key,
+        biz_date date not null,
+        type varchar(16) not null, -- expense/income
+        category varchar(128),
+        amount numeric(18,2) not null default 0,
+        currency varchar(8) default 'MYR',
+        subject_debit varchar(128),
+        subject_credit varchar(128),
+        description text,
+        created_by int,
+        created_at timestamptz default now(),
+        updated_at timestamptz default now()
+      );
+    `)
+  } catch {}
+  const term = `%${q}%`
+  const where = []
+  const params = []
+  if (q) { params.push(term); where.push(`(coalesce(category,'') ilike $${params.length} or coalesce(subject_debit,'') ilike $${params.length} or coalesce(subject_credit,'') ilike $${params.length} or coalesce(description,'') ilike $${params.length})`) }
+  if (category) { params.push(category); where.push(`category=$${params.length}`) }
+  if (startDate) { params.push(startDate); where.push(`biz_date >= $${params.length}`) }
+  if (endDate) { params.push(endDate); where.push(`biz_date <= $${params.length}`) }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : ''
+  const offset = (Number(page)-1) * Number(pageSize)
+  const total = await query(`select count(*) from expenses ${whereSql}`, params)
+  params.push(Number(pageSize));
+  params.push(offset);
+  const rows = await query(`select * from expenses ${whereSql} order by biz_date desc, id desc limit $${params.length-1} offset $${params.length}`, params)
+  res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
+})
+
+router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
+  const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc } = req.body || {}
+  if (!biz_date || !type || !amount) return res.status(400).json({ error: 'missing fields' })
+  const rs = await query(
+    `insert into expenses(biz_date, type, category, amount, currency, subject_debit, subject_credit, description, created_by)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+    [biz_date, String(type).toLowerCase(), category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null]
+  )
+  res.json(rs.rows[0])
+})
+
+router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
+  const id = Number(req.params.id)
+  const { biz_date, type, category, amount, currency, subject_debit, subject_credit, desc } = req.body || {}
+  const fields = []
+  const params = []
+  const add = (sql, v) => { fields.push(sql); params.push(v) }
+  if (biz_date !== undefined) add('biz_date=$'+(params.length+1), biz_date)
+  if (type !== undefined) add('type=$'+(params.length+1), String(type).toLowerCase())
+  if (category !== undefined) add('category=$'+(params.length+1), category||null)
+  if (amount !== undefined) add('amount=$'+(params.length+1), Number(amount)||0)
+  if (currency !== undefined) add('currency=$'+(params.length+1), currency||'MYR')
+  if (subject_debit !== undefined) add('subject_debit=$'+(params.length+1), subject_debit||null)
+  if (subject_credit !== undefined) add('subject_credit=$'+(params.length+1), subject_credit||null)
+  if (desc !== undefined) add('description=$'+(params.length+1), desc||null)
+  if (!fields.length) return res.status(400).json({ error: 'no changes' })
+  params.push(id)
+  const rs = await query(`update expenses set ${fields.join(', ')}, updated_at=now() where id=$${params.length} returning *`, params)
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+  res.json(rs.rows[0])
+})
+
+router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delete'), async (req, res) => {
+  const id = Number(req.params.id)
+  const rs = await query('delete from expenses where id=$1', [id])
+  if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+  res.json({ ok: true })
+})
 router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
   const { perms } = req.body || {}

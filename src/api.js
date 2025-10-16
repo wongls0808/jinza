@@ -300,3 +300,15 @@ export const api = {
     return []
   }
 }
+
+// 费用管理 API
+export const expensesApi = {
+  list: (params={}) => request(`/expenses?${new URLSearchParams(params).toString()}`),
+  create: (data) => request('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id) => request(`/expenses/${id}`, { method: 'DELETE' })
+}
+
+// 为向后兼容，透出到 api 下
+export const api2 = api
+api.expenses = expensesApi

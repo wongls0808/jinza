@@ -73,6 +73,12 @@ export const PERMISSION_TREE = [
     { code: 'currencies:create', name: '币种新增' },
     { code: 'currencies:delete', name: '币种删除' },
   ]},
+  { module: 'expenses', name: '费用管理', items: [
+    { code: 'expenses:list', name: '查看' },
+    { code: 'expenses:create', name: '新增' },
+    { code: 'expenses:update', name: '编辑' },
+    { code: 'expenses:delete', name: '删除' },
+  ]},
 ]
 
 // 兼容旧权限代码（前端/后端现存引用）

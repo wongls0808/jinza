@@ -16,6 +16,7 @@ const FXSettlements = () => import('@/views/FXSettlements.vue')
 const FXPayments = () => import('@/views/FXPayments.vue')
 const BuyFX = () => import('@/views/BuyFX.vue')
 const BuyFXHistory = () => import('@/views/BuyFXHistory.vue')
+const Expenses = () => import('@/views/Expenses.vue')
 
 export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -33,6 +34,7 @@ export const routes = [
   { path: '/fx/payments', name: 'fx-payments', component: FXPayments, meta: { perm: 'view_fx' } },
   { path: '/fx/buy', name: 'fx-buy', component: BuyFX, meta: { perm: 'view_fx' } },
   { path: '/fx/buy/history', name: 'fx-buy-history', component: BuyFXHistory, meta: { perm: 'view_fx' } },
+  { path: '/expenses', name: 'expenses', component: Expenses, meta: { perm: 'expenses:list' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]
 
@@ -66,7 +68,7 @@ const readAuth = () => {
           token: 'dev-mock-token',
           perms: [
             'view_dashboard','manage_users','view_customers','view_banks','view_accounts',
-            'view_transactions','view_fx','view_settings','view_account_management'
+            'view_transactions','view_fx','view_settings','view_account_management','expenses:list','expenses:create','expenses:update','expenses:delete'
           ],
           user: { id: 1, username: 'admin', display_name: '开发者账户' }
         }
@@ -81,7 +83,7 @@ const readAuth = () => {
 
 // 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
 function firstAllowed(perms) {
-  const order = ['workbench','users','customers','banks','accounts','transactions']
+  const order = ['workbench','users','customers','banks','accounts','transactions','expenses']
   for (const name of order) {
     const r = routes.find(r => r.name === name)
     if (!r) continue
