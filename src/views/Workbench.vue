@@ -32,37 +32,31 @@
       </el-card>
     </div>
 
-    <!-- 指标图区域（五个独立网格，无标题/描述，仅显示有数据项） -->
-    <div class="charts-grid">
-      <div class="indicator-grid" v-if="inds.cusMYR.length">
-        <div class="kpi" v-for="it in inds.cusMYR" :key="'myr-'+it.key">
-          <div class="val">{{ money(it.value) }}</div>
-          <div class="lbl">{{ it.label }}</div>
-        </div>
+    <!-- 6 张固定指标卡：仅标题 + 合计金额，点击查看明细 -->
+    <div class="kpi6-grid">
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('cusMYR')" @keydown.enter.prevent="openStat('cusMYR')" @keydown.space.prevent="openStat('cusMYR')">
+        <div class="kpi-title">客户余额(MYR)</div>
+        <div class="kpi-value">{{ money(stats.totals.cusMYR) }}</div>
       </div>
-      <div class="indicator-grid" v-if="inds.cusCNY.length">
-        <div class="kpi" v-for="it in inds.cusCNY" :key="'cny-'+it.key">
-          <div class="val">{{ money(it.value) }}</div>
-          <div class="lbl">{{ it.label }}</div>
-        </div>
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
+        <div class="kpi-title">客户余额(CNY)</div>
+        <div class="kpi-value">{{ money(stats.totals.cusCNY) }}</div>
       </div>
-      <div class="indicator-grid" v-if="inds.accounts.length">
-        <div class="kpi" v-for="it in inds.accounts" :key="'acc-'+it.key">
-          <div class="val">{{ money(it.value) }}</div>
-          <div class="lbl">{{ it.label }}</div>
-        </div>
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
+        <div class="kpi-title">银行余额(MYR)</div>
+        <div class="kpi-value">{{ money(stats.totals.bankMYR) }}</div>
       </div>
-      <div class="indicator-grid" v-if="inds.pending.length">
-        <div class="kpi" v-for="it in inds.pending" :key="'pd-'+it.key">
-          <div class="val">{{ money(it.value) }}</div>
-          <div class="lbl">{{ it.label }}</div>
-        </div>
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
+        <div class="kpi-title">可付余额(CNY)</div>
+        <div class="kpi-value">{{ money(stats.totals.payCNY) }}</div>
       </div>
-      <div class="indicator-grid" v-if="inds.platforms.length">
-        <div class="kpi" v-for="it in inds.platforms" :key="'pf-'+it.key">
-          <div class="val">{{ money(it.value) }}</div>
-          <div class="lbl">{{ it.label }}</div>
-        </div>
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
+        <div class="kpi-title">可兑余额(MYR)</div>
+        <div class="kpi-value">{{ money(stats.totals.exchMYR) }}</div>
+      </div>
+      <div class="kpi-card" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
+        <div class="kpi-title">待付余额(CNY)</div>
+        <div class="kpi-value">{{ money(stats.totals.pendingCNY) }}</div>
       </div>
     </div>
 
@@ -235,7 +229,7 @@
       </template>
     </el-dialog>
 
-    <!-- 审核日志抽屉 -->
+  <!-- 审核日志抽屉 -->
     <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
       <el-table :data="auditRows" size="small" border>
         <el-table-column type="index" label="#" width="60" />
@@ -253,6 +247,16 @@
           </template>
         </el-table-column>
         <el-table-column prop="acted_by_name" label="操作人" width="140" />
+      </el-table>
+    </el-drawer>
+
+    <!-- 统计明细抽屉（通用） -->
+    <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="50%">
+      <el-table :data="statDrawer.rows" size="small" border>
+        <el-table-column prop="label" label="名称" />
+        <el-table-column prop="value" label="金额" width="160" align="right">
+          <template #default="{ row }">{{ money(row.value) }}</template>
+        </el-table-column>
       </el-table>
     </el-drawer>
   </div>
@@ -481,58 +485,91 @@ async function loadPlatforms(){
     platforms.value = res.items || []
   } catch { platforms.value = [] }
 }
-// 指标图数据源
-const inds = ref({ cusMYR: [], cusCNY: [], accounts: [], pending: [], platforms: [] })
-async function loadIndicators(){
-  // 1/2. 客户余额：MYR/CNY（每个客户一张指标卡，>0 才显示）
+// 6类统计：合计与明细
+const stats = ref({
+  totals: { cusMYR: 0, cusCNY: 0, bankMYR: 0, payCNY: 0, exchMYR: 0, pendingCNY: 0 },
+  lists: { cusMYR: [], cusCNY: [], bankMYR: [], payCNY: [], exchMYR: [], pendingCNY: [] }
+})
+const statDrawer = ref({ visible: false, title: '', key: '', rows: [] })
+function openStat(key){
+  const titles = {
+    cusMYR: '客户余额(MYR)',
+    cusCNY: '客户余额(CNY)',
+    bankMYR: '银行余额(MYR)',
+    payCNY: '可付余额(CNY)',
+    exchMYR: '可兑余额(MYR)',
+    pendingCNY: '待付余额(CNY)'
+  }
+  statDrawer.value = { visible: true, title: titles[key] || '', key, rows: stats.value.lists[key] || [] }
+}
+
+async function loadStats(){
+  // 1/2 客户余额
   try {
     const data = await api.customers.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
     const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
-    inds.value.cusMYR = items.filter(r => Number(r.balance_myr) > 0).map(r => ({ key: r.id||r.name||r.abbr, label: (r.name||r.abbr||'').toString(), value: Number(r.balance_myr)||0 }))
-    inds.value.cusCNY = items.filter(r => Number(r.balance_cny) > 0).map(r => ({ key: r.id||r.name||r.abbr, label: (r.name||r.abbr||'').toString(), value: Number(r.balance_cny)||0 }))
-  } catch { inds.value.cusMYR = []; inds.value.cusCNY = [] }
+    const listMYR = items.map(r => ({ label: r.name||r.abbr||'', value: Number(r.balance_myr||0) })).filter(x => x.value !== 0)
+    const listCNY = items.map(r => ({ label: r.name||r.abbr||'', value: Number(r.balance_cny||0) })).filter(x => x.value !== 0)
+    stats.value.lists.cusMYR = listMYR
+    stats.value.lists.cusCNY = listCNY
+    stats.value.totals.cusMYR = listMYR.reduce((s, x) => s + x.value, 0)
+    stats.value.totals.cusCNY = listCNY.reduce((s, x) => s + x.value, 0)
+  } catch {
+    stats.value.lists.cusMYR = []; stats.value.lists.cusCNY = []
+    stats.value.totals.cusMYR = 0; stats.value.totals.cusCNY = 0
+  }
 
-  // 3. 收款账户余额（每账户一张指标卡，名称附币种）
+  // 3 银行余额(MYR)：收款账户按 MYR 的余额汇总
   try {
     const data = await api.accounts.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
     const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
-    inds.value.accounts = items.filter(r => Number(r.balance) > 0).map(r => ({ key: r.id, label: `${r.account_name||''} (${String(r.currency_code||'').toUpperCase()})`, value: Number(r.balance)||0 }))
-  } catch { inds.value.accounts = [] }
+    const list = items.filter(r => String(r.currency_code||'').toUpperCase()==='MYR')
+      .map(r => ({ label: `${r.account_name||''} (${r.bank_account||''})`, value: Number(r.balance||0) }))
+      .filter(x => x.value !== 0)
+    stats.value.lists.bankMYR = list
+    stats.value.totals.bankMYR = list.reduce((s, x) => s + x.value, 0)
+  } catch {
+    stats.value.lists.bankMYR = []; stats.value.totals.bankMYR = 0
+  }
 
-  // 4. 付款待办余额（USD/MYR/CNY 合计）
-  try {
-    const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 500 })
-    const heads = Array.isArray(res) ? res : (res?.items || [])
-    const sum = { USD:0, MYR:0, CNY:0 }
-    for (const h of heads) {
-      try {
-        const d = await api.fx.payments.detail(h.id)
-        for (const it of (d.items||[])) {
-          const cur = String(it.currency_code||'').toUpperCase()
-          const amt = Number(it.amount||0)
-          if (cur==='USD' || cur==='MYR' || cur==='CNY') sum[cur] = Math.round((sum[cur] + amt) * 100) / 100
-        }
-      } catch {}
-    }
-    inds.value.pending = Object.entries(sum).filter(([k,v]) => (v||0) > 0).map(([k,v]) => ({ key: k, label: k, value: Number(v)||0 }))
-  } catch { inds.value.pending = [] }
-
-  // 5. 平台余额（每平台+币种为一张指标卡）
+  // 4/5 平台余额：可付(CNY) 与 可兑(MYR)
   try {
     const res = await api.buyfx.listPlatforms()
     const items = res?.items || []
-    const out = []
-    for (const p of items) {
-      const usd = Number(p.balance_usd||0), myr = Number(p.balance_myr||0), cny = Number(p.balance_cny||0)
-      if (usd>0) out.push({ key: `${p.id}-USD`, label: `${p.name} · USD`, value: usd })
-      if (myr>0) out.push({ key: `${p.id}-MYR`, label: `${p.name} · MYR`, value: myr })
-      if (cny>0) out.push({ key: `${p.id}-CNY`, label: `${p.name} · CNY`, value: cny })
+    const listPayCNY = items.map(p => ({ label: p.name, value: Number(p.balance_cny||0) })).filter(x => x.value !== 0)
+    const listExchMYR = items.map(p => ({ label: p.name, value: Number(p.balance_myr||0) })).filter(x => x.value !== 0)
+    stats.value.lists.payCNY = listPayCNY
+    stats.value.lists.exchMYR = listExchMYR
+    stats.value.totals.payCNY = listPayCNY.reduce((s, x) => s + x.value, 0)
+    stats.value.totals.exchMYR = listExchMYR.reduce((s, x) => s + x.value, 0)
+  } catch {
+    stats.value.lists.payCNY = []; stats.value.totals.payCNY = 0
+    stats.value.lists.exchMYR = []; stats.value.totals.exchMYR = 0
+  }
+
+  // 6 待付余额(CNY)：待审付款明细合计 CNY
+  try {
+    const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 500 })
+    const heads = Array.isArray(res) ? res : (res?.items || [])
+    const list = []
+    let total = 0
+    for (const h of heads) {
+      try {
+        const d = await api.fx.payments.detail(h.id)
+        const sumCNY = (d.items||[]).filter(it => String(it.currency_code||'').toUpperCase()==='CNY')
+          .reduce((s,it) => s + Number(it.amount||0), 0)
+        if (sumCNY !== 0) list.push({ label: h.bill_no || ('Payment-'+h.id), value: sumCNY })
+        total += sumCNY
+      } catch {}
     }
-    inds.value.platforms = out
-  } catch { inds.value.platforms = [] }
+    stats.value.lists.pendingCNY = list
+    stats.value.totals.pendingCNY = total
+  } catch {
+    stats.value.lists.pendingCNY = []; stats.value.totals.pendingCNY = 0
+  }
 }
 
-onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadIndicators() })
+onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats() })
 
 // —— 付款待审：可拖拽浮动按钮 ——
 const fabPos = ref({ x: 16, y: 160 })
@@ -648,4 +685,11 @@ onMounted(() => { readFab() })
 .kpi { border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); padding: 10px 12px; display: grid; gap: 4px; }
 .kpi .val { font-weight: 800; font-size: 16px; letter-spacing: .2px; }
 .kpi .lbl { color: var(--el-text-color-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 6 指标卡布局 */
+.kpi6-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+.kpi-card { border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color); padding: 14px 16px; box-shadow: 0 6px 16px rgba(0,0,0,.06); cursor: pointer; user-select: none; }
+.kpi-card:hover { box-shadow: 0 14px 30px rgba(0,0,0,.12); }
+.kpi-title { color: var(--el-text-color-secondary); font-size: 12px; margin-bottom: 6px; }
+.kpi-value { font-size: 22px; font-weight: 800; letter-spacing: .3px; }
 </style>
