@@ -17,7 +17,7 @@
       <div class="cards">
   <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" :title="$t('common.edit') + '/' + $t('banks.replaceLogo')">
           <div class="idx">{{ i + 1 }}</div>
-          <img class="logo" :src="imgSrc(b.code)" @error="onImgErr" />
+          <img class="logo" :src="imgSrc(b)" @error="onImgErr" />
           <div class="names">
             <span class="zh text-clip">{{ b.zh }}</span>
             <span class="en text-clip">{{ b.en }}</span>
@@ -169,9 +169,10 @@ function onImgErr(e) {
   }
 }
 
-function imgSrc(code) {
-  const c = String(code || 'public').toLowerCase()
-  // 默认先 svg，失败时在 onImgErr 回退
+function imgSrc(bank) {
+  // 优先使用后端规范化后的 logo_url，避免前端猜测后缀导致的 404 闪烁
+  if (bank && bank.logo_url) return bank.logo_url
+  const c = String(bank?.code || 'public').toLowerCase()
   return `/banks/${c}.svg`
 }
 </script>

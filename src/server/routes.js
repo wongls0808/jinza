@@ -694,8 +694,8 @@ router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), asyn
        group by account_number
      )
      select a.id, a.account_name, a.bank_account, a.currency_code, a.opening_balance,
-            (a.opening_balance + coalesce(agg.net_amount,0)) as balance,
-            b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
+       (a.opening_balance + coalesce(agg.net_amount,0)) as balance,
+       b.id as bank_id, b.code as bank_code, b.zh as bank_zh, b.en as bank_en, b.logo_url as bank_logo
        from receiving_accounts a
        left join banks b on b.id = a.bank_id
        left join agg on agg.account_number = a.bank_account
@@ -799,7 +799,32 @@ router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('vi
 // Banks CRUD (server-managed)
 router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')
-  res.json(rs.rows)
+  // 规范化 logo 路径：若数据库中的 logo_url 不存在或文件缺失，则按 svg/png/jpg 顺序寻找现有文件
+  const publicDirCandidates = [
+    path.join(process.cwd?.() || '', 'public'),
+    path.join(__dirname, '../../', 'public')
+  ]
+  const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
+  const banksDir = path.join(publicDir, 'banks')
+  function resolveLogoUrl(code, url) {
+    try {
+      const codeLower = String(code || 'public').toLowerCase()
+      // 若 url 存在且文件也存在，则直接使用
+      if (url && typeof url === 'string') {
+        const p = path.join(publicDir, decodeURIComponent(url).replace(/^\//, ''))
+        if (fs.existsSync(p)) return url
+      }
+      // 否则按优先顺序查找实际存在的文件
+      const exts = ['svg', 'png', 'jpg']
+      for (const ext of exts) {
+        const p = path.join(banksDir, `${codeLower}.${ext}`)
+        if (fs.existsSync(p)) return `/banks/${codeLower}.${ext}`
+      }
+      return '/banks/public.svg'
+    } catch { return '/banks/public.svg' }
+  }
+  const rows = rs.rows.map(r => ({ ...r, logo_url: resolveLogoUrl(r.code, r.logo_url) }))
+  res.json(rows)
 })
 
 // Accept either {code, zh, en, logo_url} or {logo_data_url} (data:image/svg+xml;base64,...)

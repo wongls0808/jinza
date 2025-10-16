@@ -28,7 +28,7 @@
         <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
-              <img class="logo" :src="bankImg(row.bank_code)" alt="logo" @error="onBankImgErr($event)" />
+              <img class="logo" :src="bankImg(row)" alt="logo" @error="onBankImgErr($event)" />
               <span class="zh">{{ row.bank_zh }}</span>
               <span class="en">{{ row.bank_en }}</span>
             </div>
@@ -284,8 +284,9 @@ function onRowDblClick(row) {
   } }
 }
 
-function bankImg(code) {
-  const c = String(code||'public').toLowerCase()
+function bankImg(row) {
+  if (row && row.bank_logo) return row.bank_logo
+  const c = String(row?.bank_code||'public').toLowerCase()
   return `/banks/${c}.svg`
 }
 function onBankImgErr(e) {
