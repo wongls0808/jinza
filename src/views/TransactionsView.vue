@@ -1048,7 +1048,7 @@ watch(matchType, (nv) => {
   if (nv === 'transfer' && accounts.value.length === 0) {
     fetchAccounts()
   }
-  if (nv === 'expense' && expenseOptions.value.length === 0) {
+  if (nv === 'expense') {
     searchExpenses('')
   }
 })
@@ -1056,12 +1056,41 @@ watch(matchType, (nv) => {
 const searchExpenses = async (q) => {
   expensesLoading.value = true
   try {
-    const res = await api.expenses.list({ q: q || '', page: 1, pageSize: 20 })
+    // 依据当前选中的交易方向过滤：借方>debit，贷方>credit
+    const direction = currentDirection()
+    const res = await api.expenses.list({ q: q || '', page: 1, pageSize: 20, drcr: direction || '' })
     expenseOptions.value = Array.isArray(res?.items) ? res.items : []
   } catch (e) {
     console.error('获取费用项目失败', e)
   } finally {
     expensesLoading.value = false
+  }
+}
+
+function currentDirection(){
+  // 单笔：看当前行；批量：要求方向一致，否则提示
+  if (!batchMode.value) {
+    const row = transactions.value.find(x => x.id === matchForm.id)
+    if (!row) return ''
+    const debit = Number(row.debit_amount||0)
+    const credit = Number(row.credit_amount||0)
+    if (debit > 0 && credit === 0) return 'debit'
+    if (credit > 0 && debit === 0) return 'credit'
+    return ''
+  } else {
+    const ids = matchForm.ids || []
+    let dir = ''
+    for (const id of ids) {
+      const row = transactions.value.find(x => x.id === id)
+      if (!row) continue
+      const debit = Number(row.debit_amount||0)
+      const credit = Number(row.credit_amount||0)
+      const d = debit > 0 && credit === 0 ? 'debit' : (credit > 0 && debit === 0 ? 'credit' : '')
+      if (!d) return ''
+      if (!dir) dir = d
+      else if (dir !== d) return 'mixed'
+    }
+    return dir
   }
 }
 
@@ -1148,6 +1177,9 @@ const confirmMatch = async () => {
     } else {
       // expense
       if (matchType.value === 'expense') {
+          const dir = currentDirection()
+          if (dir === 'mixed') { ElMessage.warning('批量匹配的借贷方向不一致，无法按费用匹配'); return }
+          if (!dir) { ElMessage.warning('无法识别所选交易的借贷方向'); return }
         if (!matchForm.expenseId) { ElMessage.warning('请选择费用项目'); return }
         try {
           matching.value = true

@@ -151,7 +151,7 @@ router.get('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
 
 // Expenses（费用管理）
 router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), async (req, res) => {
-  const { q = '', category = '', startDate = '', endDate = '', page = 1, pageSize = 50 } = req.query
+  const { q = '', category = '', startDate = '', endDate = '', drcr = '', page = 1, pageSize = 50 } = req.query
   try {
     await query(`
       create table if not exists expenses(
@@ -168,6 +168,7 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
         created_at timestamptz default now(),
         updated_at timestamptz default now()
       );
+      alter table expenses add column if not exists drcr varchar(16);
     `)
   } catch {}
   const term = `%${q}%`
@@ -177,6 +178,7 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
   if (category) { params.push(category); where.push(`category=$${params.length}`) }
   if (startDate) { params.push(startDate); where.push(`biz_date >= $${params.length}`) }
   if (endDate) { params.push(endDate); where.push(`biz_date <= $${params.length}`) }
+  if (drcr) { params.push(String(drcr).toLowerCase()); where.push(`coalesce(drcr,'') = $${params.length}`) }
   const whereSql = where.length ? `where ${where.join(' and ')}` : ''
   const offset = (Number(page)-1) * Number(pageSize)
   const total = await query(`select count(*) from expenses ${whereSql}`, params)
@@ -187,21 +189,21 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
 })
 
 router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
-  const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc } = req.body || {}
+  const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc, drcr } = req.body || {}
   // 放宽为仅需“项目名/分类”，金额通过银行流水匹配；若缺少日期与类型则给默认
   const safeDate = biz_date || new Date().toISOString().slice(0,10)
   const safeType = (type ? String(type) : 'expense').toLowerCase()
   const rs = await query(
-    `insert into expenses(biz_date, type, category, amount, currency, subject_debit, subject_credit, description, created_by)
-     values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
-    [safeDate, safeType, category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null]
+    `insert into expenses(biz_date, type, category, amount, currency, subject_debit, subject_credit, description, created_by, drcr)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
+    [safeDate, safeType, category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null, drcr ? String(drcr).toLowerCase() : null]
   )
   res.json(rs.rows[0])
 })
 
 router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
   const id = Number(req.params.id)
-  const { biz_date, type, category, amount, currency, subject_debit, subject_credit, desc } = req.body || {}
+  const { biz_date, type, category, amount, currency, subject_debit, subject_credit, desc, drcr } = req.body || {}
   const fields = []
   const params = []
   const add = (sql, v) => { fields.push(sql); params.push(v) }
@@ -213,6 +215,7 @@ router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update')
   if (subject_debit !== undefined) add('subject_debit=$'+(params.length+1), subject_debit||null)
   if (subject_credit !== undefined) add('subject_credit=$'+(params.length+1), subject_credit||null)
   if (desc !== undefined) add('description=$'+(params.length+1), desc||null)
+  if (drcr !== undefined) add('drcr=$'+(params.length+1), drcr ? String(drcr).toLowerCase() : null)
   if (!fields.length) return res.status(400).json({ error: 'no changes' })
   params.push(id)
   const rs = await query(`update expenses set ${fields.join(', ')}, updated_at=now() where id=$${params.length} returning *`, params)
@@ -225,6 +228,59 @@ router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delet
   const rs = await query('delete from expenses where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
   res.json({ ok: true })
+})
+
+// 费用借贷报表：基于已匹配到费用项的银行流水
+router.get('/expenses/report', authMiddleware(true), requirePerm('expenses:list'), async (req, res) => {
+  try {
+    const { startDate = '', endDate = '', category = '', drcr = '' } = req.query || {}
+    const wh = []
+    const ps = []
+    wh.push(`coalesce(t.matched,false) = true`)
+    wh.push(`t.match_type = 'expense'`)
+    if (startDate) { ps.push(startDate); wh.push(`t.transaction_date >= $${ps.length}`) }
+    if (endDate) { ps.push(endDate); wh.push(`t.transaction_date <= $${ps.length}`) }
+    if (category) { ps.push(category); wh.push(`coalesce(e.category,'') = $${ps.length}`) }
+    if (drcr) { ps.push(String(drcr).toLowerCase()); wh.push(`coalesce(e.drcr,'') = $${ps.length}`) }
+    const whereSql = wh.length ? `where ${wh.join(' and ')}` : ''
+
+    const summary = await query(`
+      select 
+        sum(t.debit_amount) as debit_total,
+        sum(t.credit_amount) as credit_total,
+        count(*) as txn_count
+      from transactions t
+      left join expenses e on e.id = t.match_target_id
+      ${whereSql}
+    `, ps)
+
+    const items = await query(`
+      select 
+        e.id, e.description, e.category, e.drcr,
+        count(*) as count,
+        sum(t.debit_amount) as debit_total,
+        sum(t.credit_amount) as credit_total,
+        (sum(t.credit_amount) - sum(t.debit_amount)) as net
+      from transactions t
+      left join expenses e on e.id = t.match_target_id
+      ${whereSql}
+      group by e.id, e.description, e.category, e.drcr
+      order by e.category nulls last, e.description nulls last
+    `, ps)
+
+    res.json({
+      summary: {
+        debit_total: Number(summary.rows?.[0]?.debit_total || 0),
+        credit_total: Number(summary.rows?.[0]?.credit_total || 0),
+        net: Number((summary.rows?.[0]?.credit_total || 0) - (summary.rows?.[0]?.debit_total || 0)),
+        txn_count: Number(summary.rows?.[0]?.txn_count || 0)
+      },
+      items: items.rows
+    })
+  } catch (e) {
+    console.error('expenses report failed', e)
+    res.status(500).json({ error: 'report failed', detail: e?.message })
+  }
 })
 router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)

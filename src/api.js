@@ -306,7 +306,8 @@ export const expensesApi = {
   list: (params={}) => request(`/expenses?${new URLSearchParams(params).toString()}`),
   create: (data) => request('/expenses', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  remove: (id) => request(`/expenses/${id}`, { method: 'DELETE' })
+  remove: (id) => request(`/expenses/${id}`, { method: 'DELETE' }),
+  report: (params={}) => request(`/expenses/report?${new URLSearchParams(params).toString()}`)
 }
 
 // 为向后兼容，透出到 api 下
