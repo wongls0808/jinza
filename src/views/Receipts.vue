@@ -29,7 +29,7 @@
         <el-descriptions-item label="对应客户">{{ result.account?.customer_name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="银行">
           <div class="bankcell" v-if="result.account?.bank_code">
-            <img v-if="result.account?.bank_logo" :src="result.account.bank_logo" class="logo" />
+            <img :src="bankImg(result.account.bank_code)" class="logo" @error="onBankImgErr($event)" />
             <span>{{ result.account.bank_code }}</span>
           </div>
           <span v-else>-</span>
@@ -73,7 +73,7 @@
           <template #default="{ row }">
             <div class="accinfo">
               <div class="line">
-                <img v-if="row.bank_logo" :src="row.bank_logo" class="logo" />
+                <img :src="bankImg(row.bank_code)" class="logo" @error="onBankImgErr($event)" />
                 <span class="name">{{ row.account_name || '-' }}</span>
                 <span class="code">{{ row.bank_code || '' }}</span>
               </div>
@@ -115,6 +115,20 @@ const page = ref(1)
 const pageSize = ref(20)
 
 function onSizeChange(ps){ pageSize.value = ps; page.value = 1; load() }
+
+function bankImg(code){
+  const c = String(code||'public').toLowerCase()
+  return `/banks/${c}.svg`
+}
+function onBankImgErr(e){
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    const cur = el.getAttribute('src') || ''
+    if (/\.svg$/i.test(cur)) el.src = cur.replace(/\.svg$/i, '.png')
+    else if (/\.png$/i.test(cur)) el.src = cur.replace(/\.png$/i, '.jpg')
+    else el.src = '/banks/public.svg'
+  }
+}
 
 async function onFileChange(file) {
   try {

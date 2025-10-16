@@ -158,7 +158,7 @@
           <el-select v-model="accDrawer.form.bank_id" filterable clearable :placeholder="$t('customers.accounts.bank')" style="width:220px">
             <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div style="display:inline-flex; align-items:center; gap:8px;">
-                <img :src="b.logo_url" style="height:16px" />
+                <img :src="bankImg(b.code)" style="height:16px" @error="onBankImgErr($event)" />
                 <span style="font-weight:600;">{{ b.zh }}</span>
                 <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ b.en }}</span>
               </div>
@@ -176,7 +176,7 @@
           <el-table-column column-key="bank" :label="$t('customers.accounts.bank')" :width="colWAcc('bank', 260)">
             <template #default="{ row }">
               <div style="display:inline-flex; align-items:center; gap:8px;">
-                <img :src="row.bank_logo" style="height:16px" />
+                <img :src="bankImg(row.bank_code)" style="height:16px" @error="onBankImgErr($event)" />
                 <span style="font-weight:600;">{{ row.bank_zh }}</span>
                 <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ row.bank_en }}</span>
               </div>
@@ -664,6 +664,20 @@ async function doEditCusAccount() {
     }
   } finally {
     editAcc.value.loading = false
+  }
+}
+
+function bankImg(code) {
+  const c = String(code||'public').toLowerCase()
+  return `/banks/${c}.svg`
+}
+function onBankImgErr(e) {
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    const current = el.getAttribute('src') || ''
+    if (/\.svg$/i.test(current)) el.src = current.replace(/\.svg$/i, '.png')
+    else if (/\.png$/i.test(current)) el.src = current.replace(/\.png$/i, '.jpg')
+    else el.src = '/banks/public.svg'
   }
 }
 </script>

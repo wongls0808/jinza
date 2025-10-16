@@ -222,9 +222,9 @@ const messages = {
       resetDefaults: '重置为默认',
       replaceLogo: '替换Logo',
       addTitle: '新增银行',
-      replaceTitle: '替换 Logo',
-      labels: { code: '代码', zh: '中文名', en: '英文名', logoUrl: 'Logo URL', uploadFile: '或 上传文件' },
-      hintFile: '若选择文件，将优先生成为 data URL 上传并覆盖 Logo URL'
+  replaceTitle: '替换 Logo',
+  labels: { code: '代码', zh: '中文名', en: '英文名', uploadFile: '上传文件（自动以代码命名）' },
+  hintFile: '文件上传后将以银行代码命名保存到 /banks 目录（优先 SVG，失败回退 PNG/JPG）'
     },
     login: {
       title: '登录',
@@ -662,9 +662,9 @@ const messages = {
       resetDefaults: 'Reset to Defaults',
       replaceLogo: 'Replace Logo',
       addTitle: 'Add Bank',
-      replaceTitle: 'Replace Logo',
-      labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', logoUrl: 'Logo URL', uploadFile: 'Or Upload File' },
-      hintFile: 'If file is picked, a data URL will be used to upload and override the Logo URL'
+  replaceTitle: 'Replace Logo',
+  labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', uploadFile: 'Upload file (named by code)' },
+  hintFile: 'Uploaded logo will be saved under /banks named by bank code (prefer SVG; fallback PNG/JPG)'
     },
     login: {
       title: 'Sign In',

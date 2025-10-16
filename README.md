@@ -64,3 +64,14 @@
 1) ECONNREFUSED 或 ENOTFOUND：数据库连接失败，请检查 DATABASE_URL、数据库服务与网络可达性。
 2) 权限 403：生产模式下需要具备相应 permission，首次启动会自动建表并创建 admin 用户及权限映射。
 3) 银行 Logo：后端 /banks 支持上传 dataURL 或直接写 public/banks/*.svg 后使用 bank_code 渲染。
+
+
+## 银行 Logo 策略
+
+- 存储位置：项目根目录的 `public/banks/`
+- 命名规范：按银行代码命名，全部小写，例如 `icbc.svg`、`maybank.png`
+- 优先格式：SVG 优先；如无则回退到 PNG，再回退到 JPG
+- 上传方式：在“银行列表”页面上传 Logo 文件时，后端会自动以银行代码命名并写入 `public/banks/`，数据库仅记录标准化路径 `/banks/<code>.<ext>`（或可为空以启用前端回退）
+- 前端展示：各处始终按 `/banks/<code>.svg` 加载，图片加载失败时前端会依次尝试 `.png`、`.jpg`，最终使用占位
+
+注意：旧有的外链 URL 将不再使用；若仍保留数据库中的 `logo_url` 字段，其值仅用于兼容读取 `/banks/<code>.<ext>` 路径，不建议填写外站地址。

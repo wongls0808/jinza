@@ -17,7 +17,7 @@
       <div class="cards">
   <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" title="双击编辑/替换 Logo">
           <div class="idx">{{ i + 1 }}</div>
-          <img class="logo" :src="b.logo_url || ('/banks/' + ((b.code || 'public').toLowerCase()) + '.svg')" @error="onImgErr" />
+          <img class="logo" :src="imgSrc(b.code)" @error="onImgErr" />
           <div class="names">
             <span class="zh text-clip">{{ b.zh }}</span>
             <span class="en text-clip">{{ b.en }}</span>
@@ -40,9 +40,7 @@
         <el-form-item :label="$t('banks.labels.en')">
           <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
-        <el-form-item :label="$t('banks.labels.logoUrl')">
-          <el-input v-model.trim="dlg.form.logo_url" placeholder="https://.../logo.svg" clearable />
-        </el-form-item>
+        <!-- 取消 URL 输入，统一使用本地 /banks/<code>.(svg|png|jpg) -->
         <el-form-item :label="$t('banks.labels.uploadFile')">
           <input type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
           <div class="hint">{{ $t('banks.hintFile') }}</div>
@@ -63,7 +61,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
 
 const banks = ref([])
-const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_url: '', logo_data_url: '' } })
+const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } })
 
 async function load() {
   banks.value = await api.requestBanks()
@@ -87,10 +85,10 @@ async function reset() {
 }
 
 function openAdd() {
-  dlg.value = { visible: true, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_url: '', logo_data_url: '' } }
+  dlg.value = { visible: true, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } }
 }
 function openEdit(b) {
-  dlg.value = { visible: true, mode: 'edit', loading: false, form: { id: b.id, code: b.code, zh: b.zh, en: b.en, logo_url: b.logo_url || '', logo_data_url: '' } }
+  dlg.value = { visible: true, mode: 'edit', loading: false, form: { id: b.id, code: b.code, zh: b.zh, en: b.en, logo_data_url: '' } }
 }
 
 async function fileToDataUrl(file) {
@@ -117,7 +115,6 @@ async function submit() {
         code: (f.code || '').trim().toUpperCase(),
         zh: (f.zh || '').trim().toUpperCase(),
         en: (f.en || '').trim().toUpperCase(),
-        logo_url: f.logo_url?.trim() || undefined,
         logo_data_url: f.logo_data_url || undefined
       })
     } else {
@@ -127,7 +124,6 @@ async function submit() {
     en: (f.en || '').trim().toUpperCase()
   }
   if (f.logo_data_url) body.logo_data_url = f.logo_data_url
-  if (f.logo_url && !f.logo_data_url) body.logo_url = f.logo_url
   await api.updateBank(f.id, body)
     }
     dlg.value.visible = false
@@ -163,9 +159,18 @@ onMounted(load)
 function onImgErr(e) {
   const el = e?.target
   if (el && el.tagName === 'IMG') {
-    // 回退到一个本地占位图，避免破图
-    el.src = '/banks/public.svg'
+    const current = el.getAttribute('src') || ''
+    // .svg -> .png -> .jpg -> 占位
+    if (current.endsWith('.svg')) el.src = current.replace(/\.svg$/i, '.png')
+    else if (current.endsWith('.png')) el.src = current.replace(/\.png$/i, '.jpg')
+    else el.src = '/banks/public.svg'
   }
+}
+
+function imgSrc(code) {
+  const c = String(code || 'public').toLowerCase()
+  // 默认先 svg，失败时在 onImgErr 回退
+  return `/banks/${c}.svg`
 }
 </script>
 

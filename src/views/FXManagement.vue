@@ -339,31 +339,22 @@ function onAmountChange(row){
   }
 }
 
-// ---- 银行 logo 前端回退解析：DB 优先，失败回退到静态 /banks/<code>.(svg|png|jpg) ----
+// ---- 银行 logo 本地解析：统一从 /banks/<code>.(svg|png|jpg) 读取 ----
 const logoFail = ref({})
-const aliasMap = {
-  pbb: 'public', public: 'public',
-  maybank: 'maybank', mbb: 'maybank', mayb: 'maybank',
-  hlb: 'hlb', hongleong: 'hlb',
-  cimb: 'cimb', rhb: 'rhb', icbc: 'icbc', abc: 'abc', boc: 'boc', ccb: 'ccb', bcm: 'bcm',
-  abmb: 'alliance'
-}
 function logoKey(row){ return (row.bank_code || row.bank_name_en || row.bank_name || 'unknown').toLowerCase() }
 function resolveLogo(row){
   const key = logoKey(row)
   if (logoFail.value[key]) return ''
-  const db = row.bank_logo || row.logo_url || ''
-  if (db) return db
   const code = (row.bank_code || '').toLowerCase()
-  const mapped = aliasMap[code] || code
-  return `/banks/${mapped}.svg`
+  if (!code) return ''
+  return `/banks/${code}.svg`
 }
 function onLogoError(evt, row){
   const key = logoKey(row)
   const cur = evt?.target?.getAttribute('src') || ''
   // 依次尝试 svg -> png -> jpg
-  if (cur.endsWith('.svg')) evt.target.setAttribute('src', cur.replace('.svg', '.png'))
-  else if (cur.endsWith('.png')) evt.target.setAttribute('src', cur.replace('.png', '.jpg'))
+  if (/\.svg$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.svg$/i, '.png'))
+  else if (/\.png$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.png$/i, '.jpg'))
   else logoFail.value[key] = true
 }
 

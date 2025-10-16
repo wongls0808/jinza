@@ -165,7 +165,7 @@
               :src="getBankLogo(scope.row)"
               :alt="scope.row.bank_name"
               class="bank-logo"
-              @error="e => e.target.style.display = 'none'" />
+              @error="onBankImgErr" />
             <span v-else>{{ scope.row.bank_name || '-' }}</span>
           </div>
         </template>
@@ -838,10 +838,8 @@ const handleEdit = (row) => {
     account_name: row.account_name || '',
     reference: row.reference || ''
   })
-  // 编辑态：回填银行 Logo
-  if (row.bank_logo) {
-    selectedBankLogo.value = row.bank_logo
-  } else if (row.bank_code) {
+  // 编辑态：回填银行 Logo（统一从 /banks 取）
+  if (row.bank_code) {
     selectedBankLogo.value = `/banks/${String(row.bank_code).toLowerCase()}.svg`
   } else {
     selectedBankLogo.value = ''
@@ -1035,10 +1033,8 @@ const handleAccountChange = (accountNumber) => {
     form.bank_name = selectedAccount.bank_zh || selectedAccount.bank_en
     form.account_name = selectedAccount.account_name
     
-    // 设置银行logo
-    if (selectedAccount.bank_logo) {
-      selectedBankLogo.value = selectedAccount.bank_logo
-    } else if (selectedAccount.bank_code) {
+    // 设置银行logo（统一从 /banks 取）
+    if (selectedAccount.bank_code) {
       selectedBankLogo.value = `/banks/${String(selectedAccount.bank_code).toLowerCase()}.svg`
     } else {
       selectedBankLogo.value = ''
@@ -1416,12 +1412,22 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
 
-// 辅助：获取银行 Logo（优先 DB 返回，其次按 bank_code 回退静态资源）
+// 辅助：获取银行 Logo（统一按代码从 /banks 读取，失败由 <img @error> 处理为 png/jpg 或占位）
 function getBankLogo(row) {
   if (!row) return ''
-  if (row.bank_logo) return row.bank_logo
   if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
-  return ''
+  return '/banks/public.svg'
+}
+
+// 图片加载失败时的回退：svg -> png -> jpg -> 隐藏
+function onBankImgErr(e){
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    const cur = el.getAttribute('src') || ''
+    if (/\.svg$/i.test(cur)) el.src = cur.replace(/\.svg$/i, '.png')
+    else if (/\.png$/i.test(cur)) el.src = cur.replace(/\.png$/i, '.jpg')
+    else el.style.display = 'none'
+  }
 }
 </script>
 

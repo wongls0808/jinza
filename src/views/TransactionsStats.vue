@@ -295,12 +295,11 @@ function formatDate(date) {
   return `${y}-${m}-${day}`
 }
 
-// 获取银行logo，与列表页保持一致逻辑
+// 获取银行logo：统一按银行代码从 /banks 读取（失败由 <img @error> 兜底）
 function getBankLogo(row) {
   if (!row) return ''
-  if (row.bank_logo) return row.bank_logo
   if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
-  return ''
+  return '/banks/public.svg'
 }
 
 // 行双击：打开编辑/取消关联弹窗

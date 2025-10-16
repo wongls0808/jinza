@@ -671,13 +671,25 @@ router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.j
       if (!m) return res.status(400).json({ error: 'invalid data url' })
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
-      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
-      const dataDir = process.env.DATA_DIR || path.join(__dirname, '../../')
-      const uploads = path.join(dataDir, 'uploads')
-      if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
-      const file = path.join(uploads, `bank_${code}.${ext}`)
+      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : (mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'bin'))
+      const publicDirCandidates = [
+        path.join(process.cwd?.() || '', 'public'),
+        path.join(__dirname, '../../', 'public')
+      ]
+      const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
+      const banksDir = path.join(publicDir, 'banks')
+      if (!fs.existsSync(banksDir)) fs.mkdirSync(banksDir, { recursive: true })
+      const codeLower = code.toLowerCase()
+      const file = path.join(banksDir, `${codeLower}.${ext}`)
       fs.writeFileSync(file, buf)
-      logo_url = `/uploads/${path.basename(file)}`
+      // 清理其它后缀的旧文件，避免残留
+      for (const e of ['svg','png','jpg']) {
+        if (e !== ext) {
+          const p = path.join(banksDir, `${codeLower}.${e}`)
+          try { if (fs.existsSync(p)) fs.unlinkSync(p) } catch {}
+        }
+      }
+      logo_url = `/banks/${codeLower}.${ext}`
     } catch (e) {
       return res.status(400).json({ error: 'upload failed' })
     }
@@ -708,13 +720,32 @@ router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), expres
       if (!m) return res.status(400).json({ error: 'invalid data url' })
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
-      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : 'bin')
-      const dataDir = process.env.DATA_DIR || path.join(__dirname, '../../')
-      const uploads = path.join(dataDir, 'uploads')
-      if (!fs.existsSync(uploads)) fs.mkdirSync(uploads, { recursive: true })
-      const file = path.join(uploads, `bank_${code || 'id'+id}.${ext}`)
+      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : (mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'bin'))
+      // 取银行代码用于命名；若未传 code，则从数据库读一次
+      let bankCode = code
+      if (!bankCode) {
+        const rs = await query('select code from banks where id=$1', [id])
+        bankCode = rs.rows?.[0]?.code
+      }
+      if (!bankCode) return res.status(400).json({ error: 'bank code required for upload' })
+      const publicDirCandidates = [
+        path.join(process.cwd?.() || '', 'public'),
+        path.join(__dirname, '../../', 'public')
+      ]
+      const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
+      const banksDir = path.join(publicDir, 'banks')
+      if (!fs.existsSync(banksDir)) fs.mkdirSync(banksDir, { recursive: true })
+      const codeLower = String(bankCode).toLowerCase()
+      const file = path.join(banksDir, `${codeLower}.${ext}`)
       fs.writeFileSync(file, buf)
-      logo_url = `/uploads/${path.basename(file)}`
+      // 清理其它后缀的旧文件
+      for (const e of ['svg','png','jpg']) {
+        if (e !== ext) {
+          const p = path.join(banksDir, `${codeLower}.${e}`)
+          try { if (fs.existsSync(p)) fs.unlinkSync(p) } catch {}
+        }
+      }
+      logo_url = `/banks/${codeLower}.${ext}`
     } catch (e) {
       return res.status(400).json({ error: 'upload failed' })
     }

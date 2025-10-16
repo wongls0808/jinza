@@ -25,6 +25,16 @@ if (!fs.existsSync(uploadsPath)) {
 console.log('[static] DATA_DIR=', dataDir, 'uploadsPath=', uploadsPath)
 app.use('/uploads', express.static(uploadsPath))
 
+// Serve /banks from project public folder so uploaded bank logos are available immediately
+try {
+  const banksDir = path.join(__dirname, 'public', 'banks')
+  if (!fs.existsSync(banksDir)) {
+    try { fs.mkdirSync(banksDir, { recursive: true }) } catch {}
+  }
+  app.use('/banks', express.static(banksDir))
+  console.log('[static] banksDir=', banksDir)
+} catch {}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })

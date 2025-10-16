@@ -28,7 +28,7 @@
         <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
-              <img class="logo" :src="row.bank_logo" alt="logo" />
+              <img class="logo" :src="bankImg(row.bank_code)" alt="logo" @error="onBankImgErr($event)" />
               <span class="zh">{{ row.bank_zh }}</span>
               <span class="en">{{ row.bank_en }}</span>
             </div>
@@ -106,7 +106,7 @@
           <el-select v-model="dlg.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('accounts.form.bank')">
             <el-option v-for="b in banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div class="bankopt">
-                <img class="logo" :src="b.logo_url" />
+                <img class="logo" :src="bankImg(b.code)" @error="onBankImgErr($event)" />
                 <span class="zh">{{ b.zh }}</span>
                 <span class="en">{{ b.en }}</span>
               </div>
@@ -280,6 +280,20 @@ function onRowDblClick(row) {
     currency_code: row.currency_code,
     opening_balance: row.opening_balance
   } }
+}
+
+function bankImg(code) {
+  const c = String(code||'public').toLowerCase()
+  return `/banks/${c}.svg`
+}
+function onBankImgErr(e) {
+  const el = e?.target
+  if (el && el.tagName === 'IMG') {
+    const current = el.getAttribute('src') || ''
+    if (/\.svg$/i.test(current)) el.src = current.replace(/\.svg$/i, '.png')
+    else if (/\.png$/i.test(current)) el.src = current.replace(/\.png$/i, '.jpg')
+    else el.src = '/banks/public.svg'
+  }
 }
 </script>
 
