@@ -15,7 +15,7 @@
       </template>
 
       <div class="cards">
-  <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" title="双击编辑/替换 Logo">
+  <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" :title="$t('common.edit') + '/' + $t('banks.replaceLogo')">
           <div class="idx">{{ i + 1 }}</div>
           <img class="logo" :src="imgSrc(b.code)" @error="onImgErr" />
           <div class="names">
@@ -73,17 +73,17 @@ async function remove(code) {
   try {
     const b = banks.value.find(x => x.code === code)
     if (!b) return
-    await ElMessageBox.confirm(`确认删除【${b.zh}】?`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning') || '提示', { type: 'warning' })
     await api.deleteBank(b.id)
     await load()
-    ElMessage.success('已删除')
+    ElMessage.success($t('customers.messages.deleted'))
   } catch {}
 }
 
 async function reset() {
   await api.resetBanks()
   await load()
-  ElMessage.success('已重置到默认列表')
+  ElMessage.success($t('banks.resetDefaults'))
 }
 
 function openAdd() {
@@ -112,7 +112,7 @@ async function submit() {
   try {
     const f = dlg.value.form
     if (dlg.value.mode === 'add') {
-      if (!f.code || !f.zh || !f.en) { ElMessage.warning('请填写代码/中文名/英文名'); return }
+      if (!f.code || !f.zh || !f.en) { ElMessage.warning($t('customers.messages.fillAllFields')); return }
       await api.createBank({
         code: (f.code || '').trim().toUpperCase(),
         zh: (f.zh || '').trim().toUpperCase(),
@@ -130,11 +130,11 @@ async function submit() {
     }
     dlg.value.visible = false
     await load()
-    ElMessage.success('已保存')
+    ElMessage.success($t('customers.messages.saved'))
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
-    ElMessage.error('保存失败：' + msg)
+    ElMessage.error(($t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg))
   } finally {
     dlg.value.loading = false
   }
@@ -145,12 +145,12 @@ async function removeInDialog() {
     const f = dlg.value.form
     const b = banks.value.find(x => x.id === f.id)
     if (!b) return
-    await ElMessageBox.confirm(`确认删除【${b.zh}】?`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning') || '提示', { type: 'warning' })
     dlg.value.loading = true
     await api.deleteBank(b.id)
     dlg.value.visible = false
     await load()
-    ElMessage.success('已删除')
+  ElMessage.success($t('customers.messages.deleted'))
   } catch {} finally {
     dlg.value.loading = false
   }

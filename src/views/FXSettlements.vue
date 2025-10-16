@@ -5,7 +5,7 @@
       <el-select v-model="qCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px">
         <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
       </el-select>
-      <el-date-picker v-model="qRange" type="daterange" range-separator="-" start-placeholder="Start" end-placeholder="End" value-format="YYYY-MM-DD" />
+  <el-date-picker v-model="qRange" type="daterange" range-separator="-" :start-placeholder="t('transactions.startDate')" :end-placeholder="t('transactions.endDate')" value-format="YYYY-MM-DD" />
       <el-button type="primary" @click="reload(1)">{{ t('common.search') }}</el-button>
       <el-button @click="resetFilters">{{ t('common.reset') }}</el-button>
       <div style="flex:1"></div>
@@ -187,7 +187,7 @@ async function openDetail(row){
     // 切换列宽记忆命名空间为该单据
     memDetail.setId && memDetail.setId(d.id)
   } catch (e) {
-    ElMessage.error(e?.message || 'Failed to load')
+    ElMessage.error(t('common.loadFailed'))
     drawerVisible.value = false
   } finally {
     detailLoading.value = false
@@ -224,7 +224,7 @@ async function downloadPdf(row){
     a.click()
     URL.revokeObjectURL(url)
   } catch(e) {
-    ElMessage.error(e?.message || 'Failed to export PDF')
+    ElMessage.error(t('common.exportFailed'))
   }
 }
 async function removeBill(row){
@@ -233,7 +233,7 @@ async function removeBill(row){
     ElMessage.success(t('common.ok'))
     reload()
   } catch (e) {
-    ElMessage.error(e?.message || 'Delete failed')
+    ElMessage.error(t('common.deleteFailed'))
   }
 }
 

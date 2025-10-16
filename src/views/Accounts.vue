@@ -204,12 +204,12 @@ async function reloadCurrencies() {
 async function onAddCurrency() {
   const code = (currencyDrawer.value.newCode || '').toUpperCase().trim()
   const name = (currencyDrawer.value.newName || '').trim()
-  if (!code) return ElMessage.warning('请输入币种代码')
-  if (!name) return ElMessage.warning('请输入币种名称')
+  if (!code) return ElMessage.warning($t('settings.currencies.addPlaceholderCode'))
+  if (!name) return ElMessage.warning($t('settings.currencies.addPlaceholderName'))
   try {
     currencyDrawer.value.adding = true
     await api.currencies.create(code, name)
-    ElMessage.success('已添加')
+  ElMessage.success($t('customers.messages.added'))
     currencyDrawer.value.newCode = ''
     currencyDrawer.value.newName = ''
     await reloadCurrencies()
@@ -223,7 +223,7 @@ async function onAddCurrency() {
 async function removeCurrency(row) {
   try {
     await api.currencies.remove(row.code)
-    ElMessage.success('已删除')
+  ElMessage.success($t('customers.messages.deleted'))
     await reloadCurrencies()
   } catch (err) {
     ElMessage.error(String(err?.message || err))
@@ -234,13 +234,13 @@ async function submit() {
   dlg.value.loading = true
   try {
     const f = dlg.value.form
-    if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning('请填写完整'); return }
+  if (!f.account_name || !f.bank_id || !f.bank_account || !f.currency_code) { ElMessage.warning($t('customers.messages.fillAllFields')); return }
     if (dlg.value.mode === 'edit' && dlg.value.id) {
       await api.accounts.update(dlg.value.id, f)
-      ElMessage.success('已保存')
+  ElMessage.success($t('customers.messages.saved'))
     } else {
       await api.accounts.create(f)
-      ElMessage.success('已添加')
+  ElMessage.success($t('customers.messages.added'))
     }
     dlg.value.visible = false
     await load()
@@ -252,7 +252,7 @@ async function submit() {
 async function remove(row) {
   await api.accounts.remove(row.id)
   await load()
-  ElMessage.success('已删除')
+  ElMessage.success($t('customers.messages.deleted'))
 }
 
 onMounted(load)
