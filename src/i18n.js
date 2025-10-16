@@ -329,14 +329,14 @@ const messages = {
       summary: {
         debitTotal: '借方合计',
         creditTotal: '贷方合计',
-        net: '净额',
+        net: '余额',
         count: '笔数'
       },
       columns: {
         count: '匹配笔数',
         debit: '借方',
         credit: '贷方',
-        net: '净额'
+        net: '余额'
       },
       drawer: {
         titleAdd: '新增费用项目',
@@ -630,14 +630,14 @@ const messages = {
       summary: {
         debitTotal: 'Debit Total',
         creditTotal: 'Credit Total',
-        net: 'Net',
+        net: 'Balance',
         count: 'Count'
       },
       columns: {
         count: 'Matched Count',
         debit: 'Debit',
         credit: 'Credit',
-        net: 'Net'
+        net: 'Balance'
       },
       drawer: {
         titleAdd: 'New Expense Item',
