@@ -17,10 +17,7 @@
           :ellipsis="false"
           router
           @select="handleSelect">
-          <el-menu-item index="home" :route="{name: 'home'}">
-            <el-icon><HomeFilled /></el-icon>
-            <span>{{ t('home.title') }}</span>
-          </el-menu-item>
+          
           <el-menu-item index="workbench" :route="{name: 'workbench'}" v-if="has('view_dashboard')">
             <el-icon><HomeFilled /></el-icon>
             <span>{{ t('workbench.title') }}</span>
@@ -145,9 +142,7 @@ watch(locale, (v) => {
 const isLogin = computed(() => route.name === 'login')
 
 // 当前选中的菜单项
-const activeMenu = computed(() => {
-  return route.name || 'home'
-})
+const activeMenu = computed(() => route.name || 'workbench')
 
 // 导航背景色
 const navBgColor = computed(() => 'transparent') // 透明背景，使用顶部导航栏的背景色
