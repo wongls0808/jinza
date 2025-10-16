@@ -53,9 +53,8 @@
         <el-select v-model="batch.platform_id" placeholder="选择平台商" size="small" style="width:240px" filterable>
           <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? `（手续费 ${Number(p.fee_percent||0).toFixed(4)}%）` : '')" />
         </el-select>
-        <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核（按平台手续费）</el-button>
+        <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">批量审核</el-button>
         <el-button size="small" type="primary" @click="loadPaymentsList">刷新</el-button>
-        <el-button size="small" @click="goPaymentsManage">去处理</el-button>
       </div>
       <!-- 余额预览（批量） -->
       <div v-if="selectedPlatform" class="preview-card">
@@ -285,7 +284,7 @@ async function loadPaymentsList(){
   }
 }
 function openPayments(){ paymentsDrawer.value = true; loadPaymentsList() }
-function goPaymentsManage(){ router.push({ name: 'fx-payments' }) }
+// 已移除“去处理”入口，保留在工作台内完成待审相关操作
 // —— 审核组件：单笔审核/日志/明细 ——
 const todoDrawer = ref(false)
 const todoDetail = ref(null)
