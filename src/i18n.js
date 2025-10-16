@@ -281,6 +281,10 @@ const messages = {
         settleHistory: '查看历史结汇记录与导出',
         payHistory: '查看付款记录与导出',
         buyHistory: '查看购汇历史与管理'
+      },
+      todos: {
+        title: '待办事项',
+        payments: '付款待审'
       }
     },
     users: {

@@ -32,6 +32,44 @@
         </div>
       </el-card>
     </div>
+    <!-- 待办模块图标区 -->
+    <div class="modules">
+      <div class="module" role="button" tabindex="0" aria-label="payments" @click="openPayments" @keydown.enter.prevent="openPayments" @keydown.space.prevent="openPayments">
+        <el-badge :value="paymentsCount" :max="99" type="danger">
+          <div class="module-card">
+            <div class="m-icon"><CreditCard /></div>
+            <div class="m-texts">
+              <div class="m-title">{{ t('workbench.todos.payments') }}</div>
+              <div class="m-desc">{{ t('workbench.todos.title') }}</div>
+            </div>
+          </div>
+        </el-badge>
+      </div>
+    </div>
+
+    <!-- 付款待审抽屉列表 -->
+    <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="60%">
+      <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
+        <el-button size="small" type="primary" @click="loadPaymentsList">刷新</el-button>
+        <el-button size="small" @click="goPaymentsManage">去处理</el-button>
+      </div>
+      <el-table :data="payments" size="small" border v-loading="paymentsLoading">
+        <el-table-column type="index" label="#" width="60" />
+        <el-table-column prop="pay_date" label="付款日期" width="120">
+          <template #default="{ row }">{{ (row.pay_date || '').slice(0,10) }}</template>
+        </el-table-column>
+        <el-table-column prop="bill_no" label="单号" width="200" />
+        <el-table-column prop="customer_name" label="客户" />
+        <el-table-column prop="total_amount" label="金额" width="140" align="right">
+          <template #default="{ row }">{{ Number(row.total_amount||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" align="center">
+          <template #default="{ row }">
+            <el-button size="small" @click="goPaymentsManage">去处理</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
   </div>
 </template>
 
@@ -39,7 +77,8 @@
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { api } from '@/api'
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -56,6 +95,38 @@ const quickActions = computed(() => [
   { key: 'payHistory', label: t('home.qaPaymentsHistory'), desc: t('workbench.cards.payHistory'), route: 'fx-payments', color: 'orange', icon: 'CreditCard' },
   { key: 'buyHistory', label: t('home.qaBuyHistory'), desc: t('workbench.cards.buyHistory'), route: 'fx-buy-history', color: 'purple', icon: 'Coin' },
 ])
+
+// 待办：付款待审数量徽标 + 抽屉列表
+const paymentsCount = ref(0)
+const paymentsDrawer = ref(false)
+const payments = ref([])
+const paymentsLoading = ref(false)
+
+async function loadPaymentsCount(){
+  try {
+    const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 1 })
+    if (res && typeof res.total === 'number') paymentsCount.value = res.total
+    else if (Array.isArray(res?.items)) paymentsCount.value = res.items.length
+    else if (Array.isArray(res)) paymentsCount.value = res.length
+    else paymentsCount.value = 0
+  } catch { paymentsCount.value = 0 }
+}
+async function loadPaymentsList(){
+  paymentsLoading.value = true
+  try {
+    const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 50 })
+    payments.value = Array.isArray(res) ? res : (res.items || [])
+  } catch (e) {
+    // 后端不可用（本地未配置数据库）时，静默为空以保证 UI 可用
+    payments.value = []
+  } finally {
+    paymentsLoading.value = false
+  }
+}
+function openPayments(){ paymentsDrawer.value = true; loadPaymentsList() }
+function goPaymentsManage(){ router.push({ name: 'fx-payments' }) }
+
+onMounted(() => { loadPaymentsCount() })
 </script>
 
 <style scoped>
@@ -101,4 +172,13 @@ const quickActions = computed(() => [
 
 /* 主题色系 */
 /* 主题占位已合并为统一白卡风格，无需额外色系 */
+
+/* 待办模块样式 */
+.modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
+.module { cursor: pointer; }
+.module-card { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color); box-shadow: 0 6px 16px rgba(0,0,0,.05); }
+.m-icon { display: flex; align-items: center; justify-content: center; color: var(--el-color-primary); }
+.m-icon :deep(svg) { width: 22px; height: 22px; }
+.m-title { font-weight: 700; }
+.m-desc { font-size: 12px; color: var(--el-text-color-secondary); }
 </style>
