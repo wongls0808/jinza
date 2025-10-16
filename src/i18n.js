@@ -43,8 +43,7 @@ const messages = {
       date: '日期',
       debit: '借',
       credit: '贷',
-      modeAutoProrate: '自动平摊',
-      exportFailed: 'Export failed',
+  modeAutoProrate: '自动平摊',
       modeFull: '全额结汇',
       baseAmount: '马币金额',
       errAmountRequired: '请输入有效的金额',
@@ -53,8 +52,7 @@ const messages = {
       errNothingToSettle: '无可结汇金额',
       errRateRequired: '请输入有效汇率',
       loadFailed: '加载失败',
-      deleteFailed: '删除失败',
-      todoPlaceholder: '功能开发中，敬请期待'
+       deleteFailed: '删除失败'
     },
     buyfx: {
       title: '购汇管理',
@@ -504,7 +502,7 @@ const messages = {
   matchTypeBuyFx: '购汇',
   matchTypeTransfer: '调拨',
   matchTypeExpense: '费用',
-  todoPlaceholder: '功能开发中，敬请期待',
+  
   selectCustomer: '选择客户',
   searchCustomerPlaceholder: '输入名称检索客户...',
   searchCustomerAbbrPlaceholder: '输入名称/简称检索客户...',
@@ -578,16 +576,6 @@ const messages = {
       promoteDone: '转入完成：处理 {total} 条，已写入 {inserted} 条',
       promoteFailed: '转入失败'
   },
-  products: {
-    title: '商品库',
-    searchPlaceholder: '搜索 商品编号/名称',
-    importCsvPlaceholder: 'CSV 导入（占位）'
-  },
-  invoices: {
-    title: '发票管理',
-    searchPlaceholder: '搜索 发票号/客户名',
-    importCsvPlaceholder: 'CSV 导入（占位）'
-  },
   en: {
     app: {
       title: 'Enterprise Management',
@@ -612,16 +600,8 @@ const messages = {
         unmatched: 'Unmatched Transactions'
       },
       preview: {
-        feePercent: 'Fee %',
-        currency: 'Currency',
-        availableBalance: 'Available',
-        orderDeduction: 'Order deduction (incl. fee)',
-        balanceAfter: 'Balance after deduction'
+        feePercent: 'Fee %'
       },
-      countTooltip: '{n} items',
-      approveDialogTitle: 'Approve Payment',
-      auditLog: 'Audit Log',
-      deductionDetails: 'Deduction Details',
       todos: {
         title: 'Todos',
         payments: 'Payments Pending'
@@ -724,18 +704,8 @@ const messages = {
       importFailed: 'Import failed',
       promoteDone: 'Promote done: processed {total}, inserted {inserted}',
       promoteFailed: 'Promote failed'
-    },
-    products: {
-      title: 'Products',
-      searchPlaceholder: 'Search Code/Name',
-      importCsvPlaceholder: 'CSV import (placeholder)'
-    },
-    invoices: {
-      title: 'Invoices',
-      searchPlaceholder: 'Search Invoice No/Customer',
-      importCsvPlaceholder: 'CSV import (placeholder)'
-    },
-    common: {
+  },
+  common: {
       backHome: 'Back to Home',
       back: 'Back',
       add: 'Add',
@@ -778,7 +748,7 @@ const messages = {
       save: 'Save',
       loadFailed: 'Load failed',
       deleteFailed: 'Delete failed',
-      todoPlaceholder: 'Coming soon. Stay tuned',
+      
     },
     buyfx: {
       title: 'Buy FX',
