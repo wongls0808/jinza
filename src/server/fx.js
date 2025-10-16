@@ -572,11 +572,16 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
              ) as debit,
              0::numeric(18,2) as credit,
              p.bill_no::text as ref_no,
-             p.customer_name::text as note,
+       p.customer_name::text as note,
              a.platform_id
         from fx_payment_audits a
         join fx_payments p on p.id = a.payment_id
-        cross join lateral jsonb_each(coalesce(a.deltas, '{}'::jsonb)) as k(key, value)
+     cross join lateral jsonb_each(
+    case when jsonb_typeof(coalesce(a.deltas, '{}'::jsonb)) = 'object'
+      then coalesce(a.deltas, '{}'::jsonb)
+      else '{}'::jsonb
+    end
+     ) as k(key, value)
        where a.platform_id = $1 and a.action = 'approve'
     ),
     all_rows as (
@@ -593,8 +598,9 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
       `select count(*) from (${sqlBase}) z ${moreSql}`,
       params
     )
+    // 为 offset/limit 追加两个占位参数号（基于前面的 idx 计数）
     const rows = await query(
-      `select * from (${sqlBase}) z ${moreSql} order by ts desc, ref_id desc offset $${idx++} limit $${idx++}`,
+      `select * from (${sqlBase}) z ${moreSql} order by ts desc, ref_id desc offset $${idx} limit $${idx+1}`,
       [ ...params, offset, Number(pageSize) ]
     )
     res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
