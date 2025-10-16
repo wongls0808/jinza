@@ -99,7 +99,7 @@
         <el-table-column label="银行" min-width="160">
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:6px;">
-              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:16px; height:16px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
+              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:48px; height:48px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
               <span>{{ row.bank_name || row.bank_code || '-' }}</span>
             </div>
           </template>
@@ -112,7 +112,6 @@
             <el-button size="small" type="primary" @click="openTodo(row)">查看</el-button>
             <el-button v-if="has('manage_fx') && row.status==='pending'" size="small" type="success" @click="openApprove(row)">审核</el-button>
             <el-button v-if="has('manage_fx') && row.status==='completed'" size="small" type="warning" @click="doUnapprove(row)">撤销</el-button>
-            <el-button size="small" @click="openAudits(row)">日志</el-button>
             <template v-if="has('delete_fx') && row.status==='pending'">
               <el-popconfirm :title="t('common.confirmDelete')" @confirm="rejectPayment(row)">
                 <template #reference>
@@ -140,7 +139,7 @@
           <el-table-column label="银行" min-width="180">
             <template #default="{ row }">
               <div style="display:flex; align-items:center; gap:8px;">
-                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:18px; height:18px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
+                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:54px; height:54px; object-fit:contain;" data-step="0" @error="onLogoError($event, row.bank_code)" />
                 <span>{{ row.bank_name || row.bank_code || '-' }}</span>
               </div>
             </template>
