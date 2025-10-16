@@ -53,7 +53,8 @@ const messages = {
       errNothingToSettle: '无可结汇金额',
       errRateRequired: '请输入有效汇率',
       loadFailed: '加载失败',
-      deleteFailed: '删除失败'
+      deleteFailed: '删除失败',
+      todoPlaceholder: '功能开发中，敬请期待'
     },
     buyfx: {
       title: '购汇管理',
@@ -577,6 +578,16 @@ const messages = {
       promoteDone: '转入完成：处理 {total} 条，已写入 {inserted} 条',
       promoteFailed: '转入失败'
   },
+  products: {
+    title: '商品库',
+    searchPlaceholder: '搜索 商品编号/名称',
+    importCsvPlaceholder: 'CSV 导入（占位）'
+  },
+  invoices: {
+    title: '发票管理',
+    searchPlaceholder: '搜索 发票号/客户名',
+    importCsvPlaceholder: 'CSV 导入（占位）'
+  },
   en: {
     app: {
       title: 'Enterprise Management',
@@ -714,6 +725,16 @@ const messages = {
       promoteDone: 'Promote done: processed {total}, inserted {inserted}',
       promoteFailed: 'Promote failed'
     },
+    products: {
+      title: 'Products',
+      searchPlaceholder: 'Search Code/Name',
+      importCsvPlaceholder: 'CSV import (placeholder)'
+    },
+    invoices: {
+      title: 'Invoices',
+      searchPlaceholder: 'Search Invoice No/Customer',
+      importCsvPlaceholder: 'CSV import (placeholder)'
+    },
     common: {
       backHome: 'Back to Home',
       back: 'Back',
@@ -757,6 +778,7 @@ const messages = {
       save: 'Save',
       loadFailed: 'Load failed',
       deleteFailed: 'Delete failed',
+      todoPlaceholder: 'Coming soon. Stay tuned',
     },
     buyfx: {
       title: 'Buy FX',

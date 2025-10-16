@@ -1,27 +1,27 @@
 <template>
   <div class="page container">
-    <div class="head"><div class="title">发票管理</div></div>
+    <div class="head"><div class="title">{{$t('invoices.title')}}</div></div>
     <el-card class="jelly">
       <template #header>
         <div class="toolbar">
-          <el-input v-model.trim="q" placeholder="搜索 发票号/客户名" size="small" style="width:220px" />
-          <el-button size="small" @click="noop">搜索</el-button>
+          <el-input v-model.trim="q" :placeholder="$t('invoices.searchPlaceholder')" size="small" style="width:220px" />
+          <el-button size="small" @click="noop">{{$t('common.search')}}</el-button>
           <div class="spacer"></div>
           <el-dropdown>
-            <el-button size="small">导入</el-button>
+            <el-button size="small">{{$t('common.import')}}</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item><span>CSV 导入（占位）</span></el-dropdown-item>
+                <el-dropdown-item><span>{{$t('invoices.importCsvPlaceholder')}}</span></el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button size="small" @click="noop">导出</el-button>
-          <el-button size="small" @click="noop">模板</el-button>
-          <el-button type="primary" size="small" @click="noop">添加</el-button>
-          <el-button type="danger" size="small" disabled>删除</el-button>
+          <el-button size="small" @click="noop">{{$t('common.export')}}</el-button>
+          <el-button size="small" @click="noop">{{$t('common.template')}}</el-button>
+          <el-button type="primary" size="small" @click="noop">{{$t('common.add')}}</el-button>
+          <el-button type="danger" size="small" disabled>{{$t('common.delete')}}</el-button>
         </div>
       </template>
-      <div class="placeholder">后续与后端接通后展示表格...</div>
+      <div class="placeholder">{{$t('common.todoPlaceholder')}}</div>
     </el-card>
   </div>
 </template>
