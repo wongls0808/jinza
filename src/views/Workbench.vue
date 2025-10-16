@@ -96,6 +96,14 @@
         </el-table-column>
         <el-table-column prop="bill_no" label="单号" width="200" />
         <el-table-column prop="customer_name" label="客户" />
+        <el-table-column label="银行" min-width="160">
+          <template #default="{ row }">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:16px; height:16px; object-fit:contain;" />
+              <span>{{ row.bank_name || row.bank_code || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="total_amount" label="金额" width="140" align="right">
           <template #default="{ row }">{{ money(row.total_amount) }}</template>
         </el-table-column>

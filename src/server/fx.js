@@ -1760,11 +1760,19 @@ fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('view_fx'), asyn
        i.bank_account,
        upper(i.currency_code) as currency_code,
        i.amount,
-       b.zh as bank_name,
-       b.code as bank_code
+       coalesce(bcra.zh, bid.zh, bacc.zh) as bank_name,
+       coalesce(bcra.code, bid.code, bacc.code) as bank_code
      from fx_payment_items i
-     left join receiving_accounts ra on ra.bank_account = i.bank_account
-     left join banks b on b.id = ra.bank_id
+     left join fx_payments p on p.id = i.payment_id
+     -- 1) 优先客户专属账户（CRA）指定的银行
+     left join customer_receiving_accounts cra on cra.bank_account = i.bank_account and cra.customer_id = p.customer_id
+     left join banks bcra on bcra.id = cra.bank_id
+     -- 2) 其次按 account_id 关联的通用账户
+     left join receiving_accounts ra_id on ra_id.id = i.account_id
+     left join banks bid on bid.id = ra_id.bank_id
+     -- 3) 最后按 bank_account 文本回退
+     left join receiving_accounts ra_acc on ra_acc.bank_account = i.bank_account
+     left join banks bacc on bacc.id = ra_acc.bank_id
      where i.payment_id = $1
      order by i.id desc`,
     [id]
