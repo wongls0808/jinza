@@ -1,5 +1,5 @@
 <template>
-  <div class="page container">
+  <div class="page container container--fluid">
     <div class="head">
       <div class="title">{{ $t('accounts.title') }}</div>
       <div class="spacer"></div>
