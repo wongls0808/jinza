@@ -389,7 +389,25 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
-            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+            <el-form label-width="100px">
+              <el-form-item label="选择费用项目">
+                <el-select
+                  v-model="matchForm.expenseId"
+                  filterable
+                  remote
+                  :remote-method="searchExpenses"
+                  :loading="expensesLoading"
+                  placeholder="搜索 项目名/分类"
+                  style="width: 100%">
+                  <el-option
+                    v-for="e in expenseOptions"
+                    :key="e.id"
+                    :label="`${e.description || '-'} · ${e.category || ''}`"
+                    :value="e.id" />
+                </el-select>
+              </el-form-item>
+              <div class="gray-text">将所选交易标记为“费用”，并关联到指定费用项目。</div>
+            </el-form>
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -963,7 +981,9 @@ const customersLoading = ref(false)
 const customerOptions = ref([])
 const platformsLoading = ref(false)
 const platformOptions = ref([])
-const matchForm = reactive({ id: null, ids: [], customerId: null, platformId: null, transferAccountId: null })
+const expensesLoading = ref(false)
+const expenseOptions = ref([])
+const matchForm = reactive({ id: null, ids: [], customerId: null, platformId: null, transferAccountId: null, expenseId: null })
 const matchType = ref('settle') // settle | buyfx | transfer | expense
 
 const handleMatchRow = (row) => {
@@ -973,8 +993,10 @@ const handleMatchRow = (row) => {
   matchForm.customerId = null
   matchForm.platformId = null
   matchForm.transferAccountId = null
+  matchForm.expenseId = null
   customerOptions.value = []
   platformOptions.value = []
+  expenseOptions.value = []
   matchType.value = 'settle'
   matchDrawerVisible.value = true
 }
@@ -986,8 +1008,10 @@ const openBatchMatch = () => {
   matchForm.customerId = null
   matchForm.platformId = null
   matchForm.transferAccountId = null
+  matchForm.expenseId = null
   customerOptions.value = []
   platformOptions.value = []
+  expenseOptions.value = []
   matchType.value = 'settle'
   matchDrawerVisible.value = true
   // 打开后立即复位表头复选框
@@ -1024,7 +1048,22 @@ watch(matchType, (nv) => {
   if (nv === 'transfer' && accounts.value.length === 0) {
     fetchAccounts()
   }
+  if (nv === 'expense' && expenseOptions.value.length === 0) {
+    searchExpenses('')
+  }
 })
+
+const searchExpenses = async (q) => {
+  expensesLoading.value = true
+  try {
+    const res = await api.expenses.list({ q: q || '', page: 1, pageSize: 20 })
+    expenseOptions.value = Array.isArray(res?.items) ? res.items : []
+  } catch (e) {
+    console.error('获取费用项目失败', e)
+  } finally {
+    expensesLoading.value = false
+  }
+}
 
 const confirmMatch = async () => {
   // 统一处理：单笔 or 批量
@@ -1107,7 +1146,30 @@ const confirmMatch = async () => {
         matching.value = false
       }
     } else {
-      ElMessage.info(t('transactions.todoPlaceholder'))
+      // expense
+      if (matchType.value === 'expense') {
+        if (!matchForm.expenseId) { ElMessage.warning('请选择费用项目'); return }
+        try {
+          matching.value = true
+          const e = (expenseOptions.value || []).find(x => x.id === matchForm.expenseId)
+          const name = e ? `${e.description || ''}${e.category ? ' · ' + e.category : ''}` : ''
+          let ok = 0
+          for (const id of ids) {
+            try { await api.transactions.match(id, { type: 'expense', targetId: matchForm.expenseId, targetName: name }); ok++ } catch {}
+          }
+          matchDrawerVisible.value = false
+          batchMode.value = false
+          ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
+          fetchTransactions()
+        } catch (e) {
+          console.error('match expense failed', e)
+          ElMessage.error(t('transactions.matchFailed'))
+        } finally {
+          matching.value = false
+        }
+      } else {
+        ElMessage.info(t('transactions.todoPlaceholder'))
+      }
     }
   }
 }

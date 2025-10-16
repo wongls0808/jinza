@@ -208,14 +208,14 @@
             <div class="chart-body">
               <svg class="donut" width="84" height="84" viewBox="0 0 84 84" aria-label="未匹配交易图表">
                 <circle class="ring-bg" cx="42" cy="42" r="34" fill="none" stroke-width="12" />
-                <circle class="ring-fg" cx="42" cy="42" r="34" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="213.63 213.63" stroke-dashoffset="0" />
+                <circle class="ring-fg" cx="42" cy="42" r="34" fill="none" stroke-width="12" stroke-linecap="round" :stroke-dasharray="circ + ' ' + circ" :stroke-dashoffset="dashOffsetPending" />
                 <text x="42" y="46" text-anchor="middle" class="donut-text">{{ unmatchedCount }}</text>
               </svg>
               <div class="chart-meta">
                 <div class="big">{{ unmatchedCount }}</div>
-                <div class="sub">条未匹配</div>
+                <div class="sub">未匹配 / 总计：{{ totalTx }} 条</div>
                 <div class="ops">
-                  <el-button size="small" text @click="loadUnmatchedCount">刷新</el-button>
+                  <el-button size="small" text @click="loadUnmatchedMetrics">刷新</el-button>
                   <el-button size="small" text type="primary" @click="go({ name: 'transactions' })">去匹配</el-button>
                 </div>
               </div>
@@ -619,18 +619,38 @@ async function loadStats(){
 
 onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats() })
 
-// —— 交易管理：未匹配条数 ——
+// —— 交易管理：未匹配统计（图形） ——
 const unmatchedCount = ref(0)
-async function loadUnmatchedCount(){
+const matchedCount = ref(0)
+const totalTx = computed(() => (unmatchedCount.value + matchedCount.value))
+const circ = 2 * Math.PI * 34 // r=34
+const dashOffsetPending = computed(() => {
+  const total = totalTx.value
+  if (!total) return circ
+  const ratio = Math.max(0, Math.min(1, unmatchedCount.value / total))
+  return circ * (1 - ratio)
+})
+async function loadUnmatchedMetrics(){
   try {
-    const res = await api.transactions.list({ status: 'pending', page: 1, pageSize: 1 })
-    if (res && typeof res.total === 'number') unmatchedCount.value = res.total
-    else if (Array.isArray(res?.items)) unmatchedCount.value = res.items.length
-    else if (Array.isArray(res)) unmatchedCount.value = res.length
-    else unmatchedCount.value = 0
-  } catch { unmatchedCount.value = 0 }
+    const p = await api.transactions.stats({ status: 'pending' })
+    const m = await api.transactions.stats({ status: 'matched' })
+    unmatchedCount.value = Number(p?.summary?.totalTransactions || 0)
+    matchedCount.value = Number(m?.summary?.totalTransactions || 0)
+  } catch (e) {
+    // 回退：使用列表接口读取 total
+    try {
+      const p2 = await api.transactions.list({ status: 'pending', page: 1, pageSize: 1 })
+      const m2 = await api.transactions.list({ status: 'matched', page: 1, pageSize: 1 })
+      const getTotal = (r) => (r?.pagination?.total) ?? (typeof r?.total === 'number' ? r.total : (Array.isArray(r?.data) ? r.data.length : 0))
+      unmatchedCount.value = Number(getTotal(p2) || 0)
+      matchedCount.value = Number(getTotal(m2) || 0)
+    } catch {
+      unmatchedCount.value = 0
+      matchedCount.value = 0
+    }
+  }
 }
-onMounted(() => { loadUnmatchedCount() })
+onMounted(() => { loadUnmatchedMetrics() })
 
 // —— 付款待审：可拖拽浮动按钮 ——
 const fabPos = ref({ x: 16, y: 160 })

@@ -188,11 +188,13 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
 
 router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
   const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc } = req.body || {}
-  if (!biz_date || !type || !amount) return res.status(400).json({ error: 'missing fields' })
+  // 放宽为仅需“项目名/分类”，金额通过银行流水匹配；若缺少日期与类型则给默认
+  const safeDate = biz_date || new Date().toISOString().slice(0,10)
+  const safeType = (type ? String(type) : 'expense').toLowerCase()
   const rs = await query(
     `insert into expenses(biz_date, type, category, amount, currency, subject_debit, subject_credit, description, created_by)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
-    [biz_date, String(type).toLowerCase(), category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null]
+    [safeDate, safeType, category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null]
   )
   res.json(rs.rows[0])
 })
