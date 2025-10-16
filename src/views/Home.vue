@@ -8,19 +8,24 @@
     <div class="quick" style="margin-top:8px;">
       <el-card shadow="never">
         <div class="quick-title">{{ t('home.quickActions') }}</div>
-        <div class="app-buttons">
-          <div 
-            v-for="it in quickActions" :key="it.key"
-            v-if="it.show"
-            class="app-btn"
-            :class="`is-${it.color}`"
-            v-tilt="{ max: 10, scale: 1.03 }"
-            @click="go({ name: it.route })"
-          >
-            <div class="app-btn__icon">{{ it.icon }}</div>
-            <div class="app-btn__label">{{ it.label }}</div>
+        <template v-if="quickActions.some(i => i.show)">
+          <div class="app-buttons">
+            <div 
+              v-for="it in quickActions" :key="it.key"
+              v-if="it.show"
+              class="app-btn"
+              :class="`is-${it.color}`"
+              v-tilt="{ max: 10, scale: 1.03 }"
+              @click="go({ name: it.route })"
+            >
+              <div class="app-btn__icon">{{ it.icon }}</div>
+              <div class="app-btn__label">{{ it.label }}</div>
+            </div>
           </div>
-        </div>
+        </template>
+        <template v-else>
+          <el-empty description="暂无可用快捷操作" />
+        </template>
       </el-card>
     </div>
     <!-- 菜单卡片区域已移除 -->

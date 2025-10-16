@@ -2,24 +2,25 @@
 
 const state = reactive({
   token: "dev-mock-token",  // 开发模式下的模拟令牌
-  user: {
-    id: 1, 
-    username: "admin", 
-    display_name: "开发者账户"
-  },  // 模拟用户
+  user: { id: 1, username: "admin", display_name: "开发者账户" },
+  // 默认给到常用权限，包含 view_fx 以便本地预览 FX 相关入口
   perms: [
-    "view_dashboard", 
-    "manage_users", 
-    "view_customers", 
-    "view_banks", 
-    "view_accounts", 
+    "view_dashboard",
+    "manage_users",
+    "view_customers",
+    "view_banks",
+    "view_accounts",
     "view_transactions",
+    "view_fx",
     "view_settings",
     "view_account_management"
-  ]  // 所有权限
+  ]
 })
 
 function load() {
+  // 使用 Vite 推荐的环境变量与本地 host 作为开发判断，不依赖 process.env
+  const isDev = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) ||
+    (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname))
   // 首先尝试从会话存储中加载用户数据（优先级最高）
   const sessionData = sessionStorage.getItem("auth_user")
   
@@ -31,17 +32,13 @@ function load() {
   const raw = sessionData || (rememberAuth ? localData : null)
   
   if (!raw) {
-    // 在开发模式下设置默认用户
-    if (process.env.NODE_ENV === "development") {
-      const devUser = {
-        token: state.token,
-        user: state.user,
-        perms: state.perms
-      }
+    // 在开发或本机预览时，注入一个本地开发账号，便于无后端查看页面
+    if (isDev) {
+      const devUser = { token: state.token, user: state.user, perms: state.perms }
       sessionStorage.setItem("auth_user", JSON.stringify(devUser))
       return
     }
-    // 生产环境中，如果没有数据，则清除状态
+    // 非开发场景：清空鉴权，交由登录页处理
     state.token = null
     state.user = null
     state.perms = []
@@ -59,11 +56,14 @@ function load() {
       sessionStorage.setItem("auth_user", raw)
     }
   } catch {
-    // 如果解析失败，重新设置为默认值
+    // 如果解析失败，兜底为本地开发账号（包含 view_fx）
     const devUser = {
       token: "dev-mock-token",
       user: { id: 1, username: "admin", display_name: "开发者账户" },
-      perms: ["view_dashboard", "manage_users", "view_customers", "view_banks", "view_accounts", "view_transactions", "view_settings", "view_account_management"]
+      perms: [
+        "view_dashboard","manage_users","view_customers","view_banks","view_accounts",
+        "view_transactions","view_fx","view_settings","view_account_management"
+      ]
     }
     sessionStorage.setItem("auth_user", JSON.stringify(devUser))
     state.token = devUser.token
@@ -93,12 +93,17 @@ function logout() {
   localStorage.removeItem("auth_user")
   localStorage.removeItem("remember_auth")
   
-  if (process.env.NODE_ENV === "development") {
-    // 开发模式：登出后重新设置为开发者账户
+  const isDev = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) ||
+    (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname))
+  if (isDev) {
+    // 开发模式：登出后重新设置为开发者账户（包含 view_fx）
     const devUser = {
       token: "dev-mock-token",
       user: { id: 1, username: "admin", display_name: "开发者账户" },
-      perms: ["view_dashboard", "manage_users", "view_customers", "view_banks", "view_accounts", "view_transactions", "view_settings", "view_account_management"]
+      perms: [
+        "view_dashboard","manage_users","view_customers","view_banks","view_accounts",
+        "view_transactions","view_fx","view_settings","view_account_management"
+      ]
     }
     sessionStorage.setItem("auth_user", JSON.stringify(devUser))
     state.token = devUser.token

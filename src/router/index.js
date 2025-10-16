@@ -57,7 +57,23 @@ const readAuth = () => {
         sessionStorage.setItem('auth_user', JSON.stringify(data))
       }
     }
-    
+
+    // 本地开发兜底：若仍无认证信息且在 localhost，则注入一个开发者账号
+    if (!data) {
+      const isLocal = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)
+      if (isLocal) {
+        data = {
+          token: 'dev-mock-token',
+          perms: [
+            'view_dashboard','manage_users','view_customers','view_banks','view_accounts',
+            'view_transactions','view_fx','view_settings','view_account_management'
+          ],
+          user: { id: 1, username: 'admin', display_name: '开发者账户' }
+        }
+        sessionStorage.setItem('auth_user', JSON.stringify(data))
+      }
+    }
+
     if (!data) return { token: null, perms: [] }
     return { token: data.token, perms: data.perms || [], must_change_password: !!data.must_change_password }
   } catch { return { token: null, perms: [] } }
