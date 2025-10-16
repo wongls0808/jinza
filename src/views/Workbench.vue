@@ -137,7 +137,7 @@
       </div>
       <el-table :data="payments" size="small" border v-loading="paymentsLoading" :default-sort="{ prop: 'pay_date', order: 'ascending' }" @selection-change="onSelectionChange" @header-dragend="onColResizePay">
         <el-table-column type="selection" column-key="__sel" :width="colWPay('__sel', 46)" />
-        <el-table-column type="index" column-key="__idx" label="#" :width="colWPay('__idx', 60)" />
+  <el-table-column type="index" column-key="__idx" label="序号" :width="colWPay('__idx', 60)" />
         <el-table-column prop="pay_date" label="付款日期" :width="colWPay('pay_date', 120)">
           <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
         </el-table-column>
@@ -180,7 +180,7 @@
           <div>日期：{{ fmtDate(todoDetail.pay_date) }}</div>
         </div>
         <el-table :data="todoDetail.items || []" border size="small" height="50vh" @header-dragend="onColResizeTodo">
-          <el-table-column type="index" column-key="__idx" label="#" :width="colWTodo('__idx', 60)" />
+          <el-table-column type="index" column-key="__idx" label="序号" :width="colWTodo('__idx', 60)" />
           <el-table-column prop="account_name" label="账户名称" :width="colWTodo('account_name', 180)" />
           <el-table-column prop="bank_account" label="银行账户" :width="colWTodo('bank_account', 200)" />
           <el-table-column label="银行" column-key="bank" :width="colWTodo('bank', 180)">
@@ -250,7 +250,7 @@
   <!-- 审核日志抽屉 -->
     <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
       <el-table :data="auditRows" size="small" border>
-        <el-table-column type="index" label="#" width="60" />
+  <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="acted_at" label="时间" width="170" />
         <el-table-column prop="action" label="动作" width="110" />
         <el-table-column prop="platform_name" label="平台" width="160" />

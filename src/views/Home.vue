@@ -73,7 +73,7 @@
 
         <el-table :data="todos" size="small" border @selection-change="onSelectionChange">
           <el-table-column type="selection" width="46" />
-          <el-table-column label="#" width="60">
+          <el-table-column label="序号" width="60">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
           <el-table-column prop="pay_date" label="付款日期" width="120">
@@ -110,7 +110,7 @@
           <div>日期：{{ fmtDate(todoDetail.pay_date) }}</div>
         </div>
         <el-table :data="todoDetail.items || []" border size="small" height="50vh">
-          <el-table-column type="index" label="#" width="60" />
+          <el-table-column type="index" label="序号" width="60" />
           <el-table-column prop="account_name" label="账户名称" />
           <el-table-column prop="bank_account" label="银行账户" />
           <el-table-column prop="currency_code" label="币种" width="120" />
@@ -173,7 +173,7 @@
     <!-- 审核日志抽屉 -->
     <el-drawer v-model="auditDrawer.visible" title="审核日志" size="40%">
       <el-table :data="auditRows" size="small" border>
-        <el-table-column type="index" label="#" width="60" />
+  <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="acted_at" label="时间" width="170" />
         <el-table-column prop="action" label="动作" width="110" />
         <el-table-column prop="platform_name" label="平台" width="160" />
