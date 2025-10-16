@@ -34,27 +34,45 @@
 
     <!-- 6 张固定指标卡：仅标题 + 合计金额，点击查看明细 -->
     <div class="kpi6-grid">
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('cusMYR')" @keydown.enter.prevent="openStat('cusMYR')" @keydown.space.prevent="openStat('cusMYR')">
+      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('cusMYR')" @keydown.enter.prevent="openStat('cusMYR')" @keydown.space.prevent="openStat('cusMYR')">
+        <el-tooltip :content="`共${stats.lists.cusMYR.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.cusMYR.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">客户余额(MYR)</div>
         <div class="kpi-value">{{ money(stats.totals.cusMYR) }}</div>
       </div>
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
+      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
+        <el-tooltip :content="`共${stats.lists.cusCNY.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.cusCNY.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">客户余额(CNY)</div>
         <div class="kpi-value">{{ money(stats.totals.cusCNY) }}</div>
       </div>
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
+      <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
+        <el-tooltip :content="`共${stats.lists.bankMYR.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.bankMYR.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">银行余额(MYR)</div>
         <div class="kpi-value">{{ money(stats.totals.bankMYR) }}</div>
       </div>
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
+      <div class="kpi-card theme-info" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
+        <el-tooltip :content="`共${stats.lists.payCNY.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.payCNY.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">可付余额(CNY)</div>
         <div class="kpi-value">{{ money(stats.totals.payCNY) }}</div>
       </div>
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
+      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
+        <el-tooltip :content="`共${stats.lists.exchMYR.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.exchMYR.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">可兑余额(MYR)</div>
         <div class="kpi-value">{{ money(stats.totals.exchMYR) }}</div>
       </div>
-      <div class="kpi-card" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
+      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
+        <el-tooltip :content="`共${stats.lists.pendingCNY.length}条`" placement="top">
+          <span class="kpi-count">{{ stats.lists.pendingCNY.length }}</span>
+        </el-tooltip>
         <div class="kpi-title">待付余额(CNY)</div>
         <div class="kpi-value">{{ money(stats.totals.pendingCNY) }}</div>
       </div>
@@ -688,8 +706,14 @@ onMounted(() => { readFab() })
 
 /* 6 指标卡布局 */
 .kpi6-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
-.kpi-card { border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color); padding: 14px 16px; box-shadow: 0 6px 16px rgba(0,0,0,.06); cursor: pointer; user-select: none; }
+.kpi-card { position: relative; border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color); padding: 14px 16px; box-shadow: 0 6px 16px rgba(0,0,0,.06); cursor: pointer; user-select: none; }
 .kpi-card:hover { box-shadow: 0 14px 30px rgba(0,0,0,.12); }
 .kpi-title { color: var(--el-text-color-secondary); font-size: 12px; margin-bottom: 6px; }
 .kpi-value { font-size: 22px; font-weight: 800; letter-spacing: .3px; }
+.kpi-count { position: absolute; right: 10px; top: 8px; font-size: 12px; border-radius: 10px; padding: 2px 6px; background: var(--el-fill-color-lighter); color: var(--el-text-color-secondary); }
+.kpi-card.theme-primary .kpi-value { color: var(--el-color-primary); }
+.kpi-card.theme-success .kpi-value { color: var(--el-color-success); }
+.kpi-card.theme-warning .kpi-value { color: var(--el-color-warning); }
+.kpi-card.theme-info .kpi-value { color: var(--el-color-info); }
+.kpi-card.theme-danger .kpi-value { color: var(--el-color-danger); }
 </style>
