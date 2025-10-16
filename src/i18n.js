@@ -235,7 +235,7 @@ const messages = {
       continueText: '以继续操作',
     },
     home: {
-      title: '首页',
+      title: '仪表盘',
       welcome: '欢迎回来',
       users: '用户管理',
       customers: '客户管理',
@@ -659,7 +659,7 @@ const messages = {
       submit: 'Login',
     },
     home: {
-      title: 'Home',
+      title: 'Dashboard',
       welcome: 'Welcome back',
       users: 'User Management',
       customers: 'Customers',
