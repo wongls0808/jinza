@@ -66,7 +66,7 @@ router.post('/auth/change-password', authMiddleware(true), async (req, res) => {
 
 // Users CRUD
 router.get('/users', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
-  const rs = await query('select id, username, display_name, is_active, created_at from users order by id')
+  const rs = await query('select id, username, display_name, is_active, is_admin, created_at from users order by id')
   res.json(rs.rows)
 })
 
@@ -286,10 +286,24 @@ router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
   const id = Number(req.params.id)
   const { perms } = req.body || {}
   if (!Array.isArray(perms)) return res.status(400).json({ error: 'Invalid perms' })
-  // Replace permissions
+
+  // 管理员账户：始终拥有全部权限，且不可修改
+  const ures = await query('select is_admin from users where id=$1', [id])
+  if (ures.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  const isAdmin = !!ures.rows[0].is_admin
+
   await query('delete from user_permissions where user_id=$1', [id])
+
+  if (isAdmin) {
+    const allPermIds = await query('select id from permissions')
+    if (allPermIds.rowCount) {
+      const vals = allPermIds.rows.map(r => `(${id}, ${r.id})`).join(',')
+      await query(`insert into user_permissions(user_id, permission_id) values ${vals} on conflict do nothing`)
+    }
+    return res.json({ ok: true, note: 'admin has all permissions' })
+  }
+
   if (perms.length) {
-    // 确保传入的权限码存在于 permissions 表（若缺失则按 code 作为 name 写入）
     await query(
       `insert into permissions(code, name)
        select x.code, x.code from unnest($1::text[]) as x(code)

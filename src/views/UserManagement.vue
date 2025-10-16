@@ -18,7 +18,7 @@
         <template #header>
           <div class="row">
             <div>
-              <div class="name">{{ u.display_name || u.username }}</div>
+              <div class="name">{{ u.display_name || u.username }} <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag></div>
               <div class="username">@{{ u.username }}</div>
             </div>
             <div class="ops">
@@ -39,7 +39,9 @@
                 class="perm-tag"
                 effect="light"
                 size="small"
-                @click="togglePerm(u, p.code)"
+                :disable-transitions="true"
+                :class="{ 'is-disabled': u.is_admin }"
+                @click="!u.is_admin && togglePerm(u, p.code)"
               >
                 {{ p.name }}
               </el-tag>
@@ -56,7 +58,9 @@
                 class="perm-tag"
                 effect="light"
                 size="small"
-                @click="togglePerm(u, p.code)"
+                :disable-transitions="true"
+                :class="{ 'is-disabled': u.is_admin }"
+                @click="!u.is_admin && togglePerm(u, p.code)"
               >
                 {{ p.name }}
               </el-tag>
@@ -71,7 +75,9 @@
             class="perm-tag"
             effect="light"
             size="small"
-            @click="togglePerm(u, p.code)"
+            :disable-transitions="true"
+            :class="{ 'is-disabled': u.is_admin }"
+            @click="!u.is_admin && togglePerm(u, p.code)"
           >
             {{ p.name }}
           </el-tag>
@@ -246,6 +252,7 @@ onMounted(load)
 .username { color: var(--el-text-color-secondary); font-size: 12px; }
 .perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .perm-tag { cursor: pointer; user-select: none; }
+.perm-tag.is-disabled { cursor: not-allowed; opacity: 0.7; }
 .ops { display: flex; gap: 8px; align-items: center; }
 .perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
 .perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
