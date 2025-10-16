@@ -274,7 +274,14 @@ const messages = {
     qaAccounts: '收款账户'
     },
     workbench: {
-      title: '工作台'
+      title: '工作台',
+      cards: {
+        tx: '导入/管理交易，匹配对象与统计',
+        settleManage: '处理结汇与核销，实时掌握进度',
+        settleHistory: '查看历史结汇记录与导出',
+        payHistory: '查看付款记录与导出',
+        buyHistory: '查看购汇历史与管理'
+      }
     },
     users: {
       usernamePlaceholder: '用户名',
