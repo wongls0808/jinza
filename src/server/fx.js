@@ -592,7 +592,10 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
       union all
       select * from exp
     )
-    select * from all_rows
+    select 
+      *,
+      sum(credit - debit) over (partition by platform_id, currency order by ts, ref_id) as balance
+    from all_rows
   `
 
     const total = await query(

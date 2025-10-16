@@ -112,7 +112,8 @@ const messages = {
     source: '来源',
     action: '动作',
     debit: '借',
-    credit: '贷'
+    credit: '贷',
+    balance: '余额'
   ,historyDate: '日期',
   platform: '平台',
   sellCurrency: '卖出币种',

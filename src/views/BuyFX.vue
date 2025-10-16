@@ -119,6 +119,9 @@
       <el-table-column prop="credit" :label="t('buyfx.credit')" width="120">
         <template #default="{ row }">{{ money6(row.credit) }}</template>
       </el-table-column>
+      <el-table-column prop="balance" :label="t('buyfx.balance')" width="140">
+        <template #default="{ row }">{{ money6(row.balance) }}</template>
+      </el-table-column>
       <el-table-column prop="ref_no" :label="t('transactions.billNo')" width="160" />
       <el-table-column prop="note" :label="t('common.details')" min-width="160" />
     </el-table>
@@ -316,9 +319,9 @@ function money6(v){ return Number(v||0).toLocaleString(undefined,{minimumFractio
 function exportLedgerCsv(){
   try {
     const rows = ledgerShown.value || []
-    const header = ['Date','Source','Action','Currency','Debit','Credit','Ref No','Note']
+    const header = ['Date','Source','Action','Currency','Debit','Credit','Balance','Ref No','Note']
     const body = rows.map(r => [
-      (r.ts||'').slice(0,19), r.source||'', r.action||'', r.currency||'', r.debit, r.credit, r.ref_no||'', r.note||''
+      (r.ts||'').slice(0,19), r.source||'', r.action||'', r.currency||'', r.debit, r.credit, r.balance, r.ref_no||'', r.note||''
     ])
     const csvRows = [header, ...body]
     const csv = csvRows.map(r => r.map(v => {
