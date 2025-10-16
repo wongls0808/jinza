@@ -129,6 +129,14 @@
           <el-table-column type="index" label="#" width="60" />
           <el-table-column prop="account_name" label="账户名称" />
           <el-table-column prop="bank_account" label="银行账户" />
+          <el-table-column label="银行" min-width="180">
+            <template #default="{ row }">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <img v-if="row.bank_code" :src="bankLogoUrl(row.bank_code)" :alt="row.bank_code" style="width:18px; height:18px; object-fit:contain;" />
+                <span>{{ row.bank_name || row.bank_code || '-' }}</span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="currency_code" label="币种" width="120" />
           <el-table-column prop="amount" label="金额" width="140" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
@@ -276,6 +284,12 @@ const todoDrawer = ref(false)
 const todoDetail = ref(null)
 function fmtDate(v){ try { if (!v) return ''; if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
+function bankLogoUrl(code){
+  const c = String(code||'').trim().toLowerCase()
+  if (!c) return ''
+  // 优先 svg，其次 png / jpg
+  return `/banks/${c}.svg` // 由浏览器与后端静态资源兜底到 png/jpg；若需更稳妥可做多图尝试
+}
 async function openTodo(row){
   try {
     const d = await api.fx.payments.detail(row.id)

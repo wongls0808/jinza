@@ -1751,7 +1751,24 @@ fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('view_fx'), asyn
   if (!id) return res.status(400).json({ error: 'invalid id' })
   const head = await query(`select p.*, coalesce(u.display_name, u.username) as created_by_name from fx_payments p left join users u on u.id=p.created_by where p.id=$1`, [id])
   if (!head.rows.length) return res.status(404).json({ error: 'not found' })
-  const items = await query(`select * from fx_payment_items where payment_id=$1 order by id desc`, [id])
+  // 联表获取银行信息（名称/代码），用于前端展示银行名称与 Logo
+  const items = await query(
+    `select 
+       i.id,
+       i.payment_id,
+       i.account_name,
+       i.bank_account,
+       upper(i.currency_code) as currency_code,
+       i.amount,
+       b.zh as bank_name,
+       b.code as bank_code
+     from fx_payment_items i
+     left join receiving_accounts ra on ra.bank_account = i.bank_account
+     left join banks b on b.id = ra.bank_id
+     where i.payment_id = $1
+     order by i.id desc`,
+    [id]
+  )
   res.json({ ...head.rows[0], items: items.rows })
 })
 
