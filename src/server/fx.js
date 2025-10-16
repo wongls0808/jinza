@@ -559,7 +559,7 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
         from xfer
     ),
     exp as (
-      select a.payment_id as ref_id,
+      select 
              a.acted_at as ts,
              'expense'::text as source,
              'expense'::text as action,
@@ -571,8 +571,9 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
                end
              ) as debit,
              0::numeric(18,2) as credit,
+             a.payment_id as ref_id,
              p.bill_no::text as ref_no,
-       p.customer_name::text as note,
+             p.customer_name::text as note,
              a.platform_id
         from fx_payment_audits a
         join fx_payments p on p.id = a.payment_id
@@ -582,7 +583,7 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
       else '{}'::jsonb
     end
      ) as k(key, value)
-       where a.platform_id = $1 and a.action = 'approve'
+     where a.platform_id = $1 and a.action = 'approve'
     ),
     all_rows as (
       select * from xfer_debit
