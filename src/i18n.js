@@ -23,29 +23,6 @@ const messages = {
       refresh: '刷新',
       currentPage: '当前页',
       filtered: '筛选结果',
-         login: {
-      title: 'Login',
-      username: 'Username',
-      password: 'Password',
-      modeAutoProrate: '自动平摊',
-      modeFull: '全额结汇',
-  baseAmount: '马币金额',
-      errAmountRequired: '请输入有效的金额',
-      errExceedBalance: '金额超过余额',
-      errExceedSelected: '金额超过已选合计',
-      errNothingToSettle: '无可结汇金额',
-      errRateRequired: '请输入有效汇率',
-      submit: 'Login',
-      tagline: 'Enterprise Financial & Management System Solution',
-      welcome: 'Welcome',
-      rememberMe: 'Remember me',
-      systemVersion: 'System Version',
-      systemName: 'Enterprise Management System',
-      feature1: 'Data Reports & Analysis',
-      feature2: 'System Settings & Management',
-      feature3: 'Customer Account Management',
-      continueText: 'to continue',
-    },h: '搜索',
       import: '导入',
       export: '导出',
       template: '模板',
@@ -60,6 +37,18 @@ const messages = {
       reject: '驳回',
       name: '名称',
       amount: '金额',
+      customer: '客户',
+      date: '日期',
+      debit: '借',
+      credit: '贷',
+      modeAutoProrate: '自动平摊',
+      modeFull: '全额结汇',
+      baseAmount: '马币金额',
+      errAmountRequired: '请输入有效的金额',
+      errExceedBalance: '金额超过余额',
+      errExceedSelected: '金额超过已选合计',
+      errNothingToSettle: '无可结汇金额',
+      errRateRequired: '请输入有效汇率'
     },
     buyfx: {
       title: '购汇管理',
@@ -128,8 +117,8 @@ const messages = {
   buyAmount: '买入金额',
   fromBalance: '卖出币种余额',
   toBalance: '买入币种余额'
-    },
-    customers: {
+  },
+  customers: {
       title: '客户管理',
       searchPlaceholder: '搜索 简称/客户名',
       importAuto: 'CSV 导入（自动解析）',
@@ -201,8 +190,8 @@ const messages = {
         fillAllFields: '请完整填写',
         accountExists: '该客户下该银行账户已存在',
       }
-    },
-    accounts: {
+  },
+  accounts: {
       title: '收款账户',
       addTitle: '新增账户',
       fields: {
@@ -222,8 +211,8 @@ const messages = {
         currency: '币种',
         openingBalance: '期初余额',
       }
-    },
-    banks: {
+  },
+  banks: {
       title: '银行列表',
       resetDefaults: '重置为默认',
       replaceLogo: '替换Logo',
@@ -231,8 +220,8 @@ const messages = {
   replaceTitle: '替换 Logo',
   labels: { code: '代码', zh: '中文名', en: '英文名', uploadFile: '上传文件（自动以代码命名）' },
   hintFile: '文件上传后将以银行代码命名保存到 /banks 目录（优先 SVG，失败回退 PNG/JPG）'
-    },
-    login: {
+  },
+  login: {
       title: '登录',
       username: '用户名',
       password: '密码',
@@ -246,8 +235,8 @@ const messages = {
       feature2: '系统设置与管理',
       feature3: '客户账户管理',
       continueText: '以继续操作',
-    },
-    home: {
+  },
+  home: {
       title: '仪表盘',
       welcome: '欢迎回来',
       users: '用户管理',
@@ -277,8 +266,8 @@ const messages = {
     qaBanks: '银行列表',
     qaCustomers: '客户管理',
     qaAccounts: '收款账户'
-    },
-    workbench: {
+  },
+  workbench: {
       title: '工作台',
       cards: {
         tx: '导入/管理交易，匹配对象与统计',
@@ -287,14 +276,81 @@ const messages = {
         payHistory: '查看付款记录与导出',
         buyHistory: '查看购汇历史与管理'
       },
+        kpis: {
+          cusMYR: '客户余额(MYR)',
+          cusCNY: '客户余额(CNY)',
+          bankMYR: '银行余额(MYR)',
+          payCNY: '可付余额(CNY)',
+          exchMYR: '可兑余额(MYR)',
+          pendingCNY: '待付余额(CNY)',
+          unmatched: '未匹配交易'
+        },
+        preview: {
+          feePercent: '平台手续费',
+          currency: '币种',
+          availableBalance: '可用余额',
+          orderDeduction: '本单应扣(含手续费)',
+          balanceAfter: '扣减后余额'
+        },
       approveDialogTitle: '审核付款单',
       auditLog: '审核日志',
+        deductionDetails: '扣减明细',
       todos: {
         title: '待办事项',
         payments: '付款待审'
       }
-    },
-    users: {
+  },
+  expenses: {
+      title: '费用管理',
+      subtitle: '常规运营收支分录 · 自动借贷科目',
+      searchPlaceholder: '搜索 项目名/分类',
+      category: '分类',
+      direction: '方向',
+      query: '查询',
+      add: '新增',
+      index: '序号',
+      description: '项目名',
+      createdAt: '创建时间',
+      actions: '操作',
+      edit: '编辑',
+      delete: '删除',
+      confirmDelete: '确定删除？',
+      reportTitle: '借贷报表',
+      startDate: '开始日期',
+      endDate: '结束日期',
+      refresh: '刷新',
+      summary: {
+        debitTotal: '借方合计',
+        creditTotal: '贷方合计',
+        net: '净额',
+        count: '笔数'
+      },
+      columns: {
+        count: '匹配笔数',
+        debit: '借方',
+        credit: '贷方',
+        net: '净额'
+      },
+      drawer: {
+        titleAdd: '新增费用项目',
+        titleEdit: '编辑费用项目',
+        fields: {
+          description: '项目名',
+          category: '分类',
+          direction: '方向'
+        },
+        cancel: '取消',
+        save: '保存'
+      },
+      messages: {
+        fillDescription: '请填写项目名',
+        saved: '已保存',
+        saveFailed: '保存失败',
+        deleted: '已删除',
+        deleteFailed: '删除失败'
+      }
+  },
+  users: {
       usernamePlaceholder: '用户名',
       passwordPlaceholder: '初始密码',
       displayNamePlaceholder: '显示名',
@@ -317,8 +373,8 @@ const messages = {
       deleteFailed: '删除失败',
       reseedSuccess: '权限已重建，共 {total} 项',
       reseedFailed: '重建失败',
-    },
-    settings: {
+  },
+  settings: {
       title: '系统设置',
       theme: '主题',
       light: '浅色',
@@ -335,8 +391,8 @@ const messages = {
         addPlaceholderName: '显示名称，如 人民币 / 美元',
         count: '共 {n} 个',
       }
-    },
-    accountManagement: {
+  },
+  accountManagement: {
       title: '入账管理',
       importCSV: '导入 CSV',
       accountNumber: '账号',
@@ -347,8 +403,8 @@ const messages = {
       reference1: '参考 1',
       reference2: '参考 2',
       reference3: '参考 3',
-    },
-    transactions: {
+  },
+  transactions: {
       title: '交易管理',
       importCSV: '导入 CSV',
       exportCSV: '导出 CSV',
@@ -452,8 +508,8 @@ const messages = {
       confirmBatchDelete: '确认批量删除所选项目？',
       batchDeleteSuccess: '批量删除成功',
       batchDeleteFailed: '批量删除失败',
-    },
-    fx: {
+  },
+  fx: {
       title: '结汇管理',
       settlementArea: '结汇区',
       paymentArea: '付款区',
@@ -477,7 +533,7 @@ const messages = {
       settledAmount: '折算后金额',
       preBalance: '结汇前余额',
       maxSelectionTip: '单次最多选择 {n} 条'
-    },
+    }
   },
   en: {
     app: {

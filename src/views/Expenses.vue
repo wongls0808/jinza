@@ -1,39 +1,39 @@
 <template>
   <div class="expenses container">
     <div class="hero">
-      <div class="welcome">费用管理</div>
-      <div class="meta">常规运营收支分录 · 自动借贷科目</div>
+      <div class="welcome">{{ $t('expenses.title') }}</div>
+      <div class="meta">{{ $t('expenses.subtitle') }}</div>
     </div>
 
     <el-card shadow="never" class="card--plain">
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
-        <el-input v-model="q" placeholder="搜索 项目名/分类" style="width:260px" clearable @clear="loadList" @keyup.enter.native="loadList" />
-        <el-select v-model="cate" placeholder="分类" clearable style="width:200px">
+        <el-input v-model="q" :placeholder="$t('expenses.searchPlaceholder')" style="width:260px" clearable @clear="loadList" @keyup.enter.native="loadList" />
+        <el-select v-model="cate" :placeholder="$t('expenses.category')" clearable style="width:200px">
           <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
         </el-select>
-        <el-select v-model="drcr" placeholder="方向" clearable style="width:140px">
-          <el-option label="借" value="debit" />
-          <el-option label="贷" value="credit" />
+        <el-select v-model="drcr" :placeholder="$t('expenses.direction')" clearable style="width:140px">
+          <el-option :label="$t('common.debit')" value="debit" />
+          <el-option :label="$t('common.credit')" value="credit" />
         </el-select>
-        <el-button type="primary" @click="loadList">查询</el-button>
-        <el-button type="success" @click="openAdd">新增</el-button>
+        <el-button type="primary" @click="loadList">{{ $t('expenses.query') }}</el-button>
+        <el-button type="success" @click="openAdd">{{ $t('expenses.add') }}</el-button>
       </div>
       <el-table :data="rows" border size="small">
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="description" label="项目名" show-overflow-tooltip />
-        <el-table-column prop="category" label="分类" width="160" />
-        <el-table-column prop="drcr" label="方向" width="100">
-          <template #default="{ row }">{{ row.drcr === 'credit' ? '贷' : (row.drcr === 'debit' ? '借' : '-') }}</template>
+        <el-table-column type="index" :label="$t('common.no')" width="60" />
+        <el-table-column prop="description" :label="$t('expenses.description')" show-overflow-tooltip />
+        <el-table-column prop="category" :label="$t('expenses.category')" width="160" />
+        <el-table-column prop="drcr" :label="$t('expenses.direction')" width="100">
+          <template #default="{ row }">{{ row.drcr === 'credit' ? $t('common.credit') : (row.drcr === 'debit' ? $t('common.debit') : '-') }}</template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="created_at" :label="$t('expenses.createdAt')" width="180">
           <template #default="{ row }">{{ (row.created_at||'').toString().slice(0,19).replace('T',' ') }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="140" align="center">
+        <el-table-column :label="$t('expenses.actions')" width="140" align="center">
           <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="edit(row)">编辑</el-button>
-            <el-popconfirm title="确定删除？" @confirm="del(row)">
+            <el-button text size="small" type="primary" @click="edit(row)">{{ $t('expenses.edit') }}</el-button>
+            <el-popconfirm :title="$t('expenses.confirmDelete')" @confirm="del(row)">
               <template #reference>
-                <el-button text size="small" type="danger">删除</el-button>
+                <el-button text size="small" type="danger">{{ $t('expenses.delete') }}</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -44,54 +44,54 @@
     <!-- 借贷报表 -->
     <el-card shadow="never" class="card--plain" style="margin-top:12px;">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-        <span style="font-weight:600;">借贷报表</span>
-        <el-date-picker v-model="reportRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:260px" />
-        <el-select v-model="reportDrcr" placeholder="方向" clearable style="width:140px">
-          <el-option label="借" value="debit" />
-          <el-option label="贷" value="credit" />
+        <span style="font-weight:600;">{{ $t('expenses.reportTitle') }}</span>
+        <el-date-picker v-model="reportRange" type="daterange" range-separator="-" :start-placeholder="$t('expenses.startDate')" :end-placeholder="$t('expenses.endDate')" value-format="YYYY-MM-DD" style="width:260px" />
+        <el-select v-model="reportDrcr" :placeholder="$t('expenses.direction')" clearable style="width:140px">
+          <el-option :label="$t('common.debit')" value="debit" />
+          <el-option :label="$t('common.credit')" value="credit" />
         </el-select>
-        <el-button @click="loadReport">刷新</el-button>
+        <el-button @click="loadReport">{{ $t('expenses.refresh') }}</el-button>
       </div>
       <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:8px;">
-        <div>借方合计：<b class="negative">{{ money(report.summary.debit_total) }}</b></div>
-        <div>贷方合计：<b class="positive">{{ money(report.summary.credit_total) }}</b></div>
-        <div>净额：<b>{{ money(report.summary.net) }}</b></div>
-        <div>笔数：<b>{{ report.summary.txn_count }}</b></div>
+        <div>{{ $t('expenses.summary.debitTotal') }}：<b class="negative">{{ money(report.summary.debit_total) }}</b></div>
+        <div>{{ $t('expenses.summary.creditTotal') }}：<b class="positive">{{ money(report.summary.credit_total) }}</b></div>
+        <div>{{ $t('expenses.summary.net') }}：<b>{{ money(report.summary.net) }}</b></div>
+        <div>{{ $t('expenses.summary.count') }}：<b>{{ report.summary.txn_count }}</b></div>
       </div>
       <el-table :data="report.items" border size="small">
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="description" label="项目名" />
-        <el-table-column prop="category" label="分类" width="180" />
-        <el-table-column prop="drcr" label="方向" width="100">
-          <template #default="{ row }">{{ row.drcr === 'credit' ? '贷' : (row.drcr === 'debit' ? '借' : '-') }}</template>
+        <el-table-column type="index" :label="$t('common.no')" width="60" />
+        <el-table-column prop="description" :label="$t('expenses.description')" />
+        <el-table-column prop="category" :label="$t('expenses.category')" width="180" />
+        <el-table-column prop="drcr" :label="$t('expenses.direction')" width="100">
+          <template #default="{ row }">{{ row.drcr === 'credit' ? $t('common.credit') : (row.drcr === 'debit' ? $t('common.debit') : '-') }}</template>
         </el-table-column>
-        <el-table-column prop="count" label="匹配笔数" width="100" />
-        <el-table-column prop="debit_total" label="借方" width="140" align="right">
+        <el-table-column prop="count" :label="$t('expenses.columns.count')" width="100" />
+        <el-table-column prop="debit_total" :label="$t('expenses.columns.debit')" width="140" align="right">
           <template #default="{ row }">{{ money(row.debit_total) }}</template>
         </el-table-column>
-        <el-table-column prop="credit_total" label="贷方" width="140" align="right">
+        <el-table-column prop="credit_total" :label="$t('expenses.columns.credit')" width="140" align="right">
           <template #default="{ row }">{{ money(row.credit_total) }}</template>
         </el-table-column>
-        <el-table-column prop="net" label="净额" width="140" align="right">
+        <el-table-column prop="net" :label="$t('expenses.columns.net')" width="140" align="right">
           <template #default="{ row }">{{ money(row.net) }}</template>
         </el-table-column>
       </el-table>
     </el-card>
 
     <!-- 新增/编辑 抽屉 -->
-    <el-drawer v-model="drawer" :title="isEdit? '编辑费用项目' : '新增费用项目'" size="420px">
+    <el-drawer v-model="drawer" :title="isEdit? $t('expenses.drawer.titleEdit') : $t('expenses.drawer.titleAdd')" size="420px">
       <el-form label-width="90px">
-        <el-form-item label="项目名"><el-input v-model="form.desc" placeholder="请输入项目名称" /></el-form-item>
-        <el-form-item label="分类"><el-select v-model="form.category" style="width:100%">
+        <el-form-item :label="$t('expenses.drawer.fields.description')"><el-input v-model="form.desc" :placeholder="$t('expenses.drawer.fields.description')" /></el-form-item>
+        <el-form-item :label="$t('expenses.drawer.fields.category')"><el-select v-model="form.category" style="width:100%">
           <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
         </el-select></el-form-item>
-        <el-form-item label="方向">
-          <el-segmented v-model="form.drcr" :options="[{label:'借',value:'debit'},{label:'贷',value:'credit'}]" />
+        <el-form-item :label="$t('expenses.drawer.fields.direction')">
+          <el-segmented v-model="form.drcr" :options="[{label:$t('common.debit'),value:'debit'},{label:$t('common.credit'),value:'credit'}]" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="drawer=false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
+        <el-button @click="drawer=false">{{ $t('expenses.drawer.cancel') }}</el-button>
+        <el-button type="primary" @click="save">{{ $t('expenses.drawer.save') }}</el-button>
       </template>
     </el-drawer>
   </div>
@@ -99,8 +99,11 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
+
+const { t } = useI18n()
 
 const rows = ref([])
 const q = ref('')
@@ -129,13 +132,13 @@ function edit(row){ isEdit.value=true; form.value = { id:row.id, category: row.c
 async function save(){
   try {
     const payload = { category: form.value.category || null, desc: (form.value.desc||'').trim() || null, drcr: form.value.drcr || null }
-    if (!payload.desc) { ElMessage.warning('请填写项目名'); return }
+  if (!payload.desc) { ElMessage.warning(t('expenses.messages.fillDescription')); return }
     if (isEdit.value) await api.expenses.update(form.value.id, payload)
     else await api.expenses.create(payload)
-    ElMessage.success('已保存')
+  ElMessage.success(t('expenses.messages.saved'))
     drawer.value=false
     await loadList()
-  } catch(e){ ElMessage.error(e?.message||'保存失败') }
+  } catch(e){ ElMessage.error(e?.message||t('expenses.messages.saveFailed')) }
 }
 
 // 报表
@@ -155,7 +158,7 @@ async function loadReport(){
 loadReport()
 
 async function del(row){
-  try { await api.expenses.remove(row.id); ElMessage.success('已删除'); await loadList() } catch(e){ ElMessage.error(e?.message||'删除失败') }
+  try { await api.expenses.remove(row.id); ElMessage.success(t('expenses.messages.deleted')); await loadList() } catch(e){ ElMessage.error(e?.message||t('expenses.messages.deleteFailed')) }
 }
 
 loadList()
