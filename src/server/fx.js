@@ -538,8 +538,8 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     xfer_debit as (
       select ts, 'transfer'::text as source, 'sell'::text as action,
              upper(from_currency) as currency,
-             round(coalesce(amount_from,0)::numeric, 2) as debit,
-             0::numeric as credit,
+             round(coalesce(amount_from,0)::numeric, 2)::numeric(18,2) as debit,
+             0::numeric(18,2) as credit,
              id as ref_id,
              null::text as ref_no,
              note,
@@ -549,8 +549,8 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
     xfer_credit as (
       select ts, 'transfer'::text as source, 'buy'::text as action,
              upper(to_currency) as currency,
-             0::numeric as debit,
-             round(coalesce(amount_to,0)::numeric, 2) as credit,
+             0::numeric(18,2) as debit,
+             round(coalesce(amount_to,0)::numeric, 2)::numeric(18,2) as credit,
              id as ref_id,
              null::text as ref_no,
              note,
@@ -563,14 +563,14 @@ fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx
              'expense'::text as source,
              'expense'::text as action,
              upper(k.key) as currency,
-             round(coalesce((k.value->>'total')::numeric,0), 2) as debit,
-             0::numeric as credit,
+             round(coalesce((k.value->>'total')::numeric,0), 2)::numeric(18,2) as debit,
+             0::numeric(18,2) as credit,
              p.bill_no::text as ref_no,
              p.customer_name::text as note,
              a.platform_id
         from fx_payment_audits a
         join fx_payments p on p.id = a.payment_id
-        cross join lateral jsonb_each(a.deltas) as k(key, value)
+        cross join lateral jsonb_each(coalesce(a.deltas, '{}'::jsonb)) as k(key, value)
        where a.platform_id = $1 and a.action = 'approve'
     ),
     all_rows as (
