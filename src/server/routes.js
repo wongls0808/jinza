@@ -11,6 +11,7 @@ import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
 import { fxRouter } from './fx.js'
 import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, getModuleViewCode, buildPermissionIndex } from './permissions.js'
+import crypto from 'crypto'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -38,12 +39,33 @@ router.post('/auth/login', async (req, res) => {
       [user.id]
     )
   const permCodes = [...new Set(perms.rows.map(r => r.code))]
-  const token = signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password })
+  // 单端登录：清理该用户已有会话，创建新会话，JWT 带上 sid
+  let sid = null
+  try {
+    if (process.env.DATABASE_URL) {
+      await query('delete from user_sessions where user_id=$1', [user.id])
+      const ip = (req.headers['x-forwarded-for']?.toString().split(',')[0] || req.ip || '').trim()
+      const ua = (req.headers['user-agent'] || '').slice(0, 300)
+      sid = (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2) + Date.now()
+      await query('insert into user_sessions(user_id, token, last_ip, user_agent) values($1, $2, $3, $4)', [user.id, sid, ip, ua])
+    }
+  } catch {}
+  const token = signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password, sid })
   res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name, is_admin: !!user.is_admin }, perms: permCodes, must_change_password: !!user.must_change_password })
 })
 
 router.get('/auth/me', authMiddleware(true), async (req, res) => {
   res.json({ user: req.user })
+})
+
+// Logout: 使当前会话失效
+router.post('/auth/logout', authMiddleware(true), async (req, res) => {
+  try {
+    if (process.env.DATABASE_URL && req.user?.sid) {
+      await query('delete from user_sessions where token=$1', [req.user.sid])
+    }
+  } catch {}
+  res.json({ ok: true })
 })
 
 // Change password (self)
@@ -65,7 +87,17 @@ router.post('/auth/change-password', authMiddleware(true), async (req, res) => {
 
 // Users CRUD
 router.get('/users', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
-  const rs = await query('select id, username, display_name, is_active, is_admin, created_at from users order by id')
+  // 联合会话返回在线状态与最近 IP/时间
+  const rs = await query(`
+    select u.id, u.username, u.display_name, u.is_active, u.is_admin, u.created_at,
+           (case when s.id is not null then true else false end) as online,
+           s.last_ip, s.last_seen
+      from users u
+      left join lateral (
+        select id, last_ip, last_seen from user_sessions us where us.user_id = u.id order by last_seen desc limit 1
+      ) s on true
+     order by u.id
+  `)
   res.json(rs.rows)
 })
 

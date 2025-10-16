@@ -37,6 +37,16 @@ export async function request(path, opts = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers })
   if (!res.ok) {
+    if (res.status === 401) {
+      try {
+        sessionStorage.removeItem('auth_user'); sessionStorage.removeItem('auth_session')
+        localStorage.removeItem('auth_user'); localStorage.removeItem('remember_auth')
+      } catch {}
+      // 避免在登录页循环
+      if (typeof window !== 'undefined' && window.location && !/\/login$/.test(window.location.pathname)) {
+        window.location.replace('/login')
+      }
+    }
     let msg = ''
     try { const j = await res.json(); msg = j?.error || j?.message || '' } catch { msg = await res.text() }
     throw new Error(msg || `HTTP ${res.status}`)

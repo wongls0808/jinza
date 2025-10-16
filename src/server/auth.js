@@ -35,7 +35,32 @@ export function authMiddleware(required = true) {
     const token = auth.replace('Bearer ', '')
     try {
       const decoded = jwt.verify(token, JWT_SECRET)
+      // 会话校验：要求 JWT 中包含会话 sid，并在 user_sessions 表中存在且未过期
       req.user = decoded
+      try {
+        // 允许缺少数据库时跳过（例如未配置 DATABASE_URL 的纯前端预览）
+        if (process.env.DATABASE_URL) {
+          if (!decoded.sid) return res.status(401).json({ error: 'Invalid session' })
+          const rs = await query(
+            `select user_id, last_seen from user_sessions where token=$1 limit 1`,
+            [decoded.sid]
+          )
+          if (rs.rowCount === 0) return res.status(401).json({ error: 'Session expired' })
+          const lastSeen = new Date(rs.rows[0].last_seen)
+          const now = new Date()
+          const idleMs = now.getTime() - lastSeen.getTime()
+          const maxIdle = Number(process.env.SESSION_IDLE_MS || 30 * 60 * 1000) // 默认 30 分钟
+          if (idleMs > maxIdle) {
+            // 过期则移除会话
+            try { await query('delete from user_sessions where token=$1', [decoded.sid]) } catch {}
+            return res.status(401).json({ error: 'Session expired' })
+          }
+          // 刷新 last_seen 与 IP/UA
+          const ip = (req.headers['x-forwarded-for']?.toString().split(',')[0] || req.ip || '').trim()
+          const ua = (req.headers['user-agent'] || '').slice(0, 300)
+          try { await query('update user_sessions set last_seen=now(), last_ip=$1, user_agent=$2 where token=$3', [ip, ua, decoded.sid]) } catch {}
+        }
+      } catch {}
       return next()
     } catch (e) {
       return res.status(401).json({ error: 'Invalid token' })
@@ -127,6 +152,20 @@ export async function ensureSchema() {
 
     create unique index if not exists ux_cus_acc_customer_bank_no
       on customer_receiving_accounts(customer_id, bank_id, bank_account);
+  `)
+  // 用户会话（单端登录 + 空闲超时）
+  await query(`
+    create table if not exists user_sessions (
+      id serial primary key,
+      user_id int not null references users(id) on delete cascade,
+      token text unique not null,
+      last_seen timestamptz not null default now(),
+      last_ip text,
+      user_agent text,
+      created_at timestamptz default now()
+    );
+    create index if not exists ix_user_sessions_user on user_sessions(user_id);
+    create index if not exists ix_user_sessions_last_seen on user_sessions(last_seen);
   `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)

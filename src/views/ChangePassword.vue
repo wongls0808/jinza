@@ -5,21 +5,21 @@
         <div></div>
         <!-- 移除了返回首页按钮 -->
       </div>
-      <h2>首次登录需修改密码</h2>
+      <h2>{{ t('changePwd.title') }}</h2>
       <form @submit.prevent="submit">
         <label>
-          旧密码
-          <input v-model.trim="oldPassword" type="password" placeholder="请输入旧密码" />
+          {{ t('changePwd.old') }}
+          <input v-model.trim="oldPassword" type="password" :placeholder="t('changePwd.oldPlaceholder')" />
         </label>
         <label>
-          新密码
-          <input v-model.trim="newPassword" type="password" placeholder="至少8位，含大小写与数字" />
+          {{ t('changePwd.new') }}
+          <input v-model.trim="newPassword" type="password" :placeholder="t('changePwd.newPlaceholder')" />
         </label>
         <label>
-          确认新密码
-          <input v-model.trim="confirm" type="password" placeholder="再次输入新密码" />
+          {{ t('changePwd.confirm') }}
+          <input v-model.trim="confirm" type="password" :placeholder="t('changePwd.confirmPlaceholder')" />
         </label>
-        <button :disabled="submitting">{{ submitting ? '提交中...' : '提交' }}</button>
+        <button :disabled="submitting">{{ submitting ? t('common.submitting') : t('common.submit') }}</button>
         <p v-if="error" class="err">{{ error }}</p>
         <ul v-if="reasons.length" class="reasons">
           <li v-for="r in reasons" :key="r">{{ r }}</li>
@@ -34,6 +34,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const oldPassword = ref('')
@@ -42,17 +43,18 @@ const confirm = ref('')
 const submitting = ref(false)
 const error = ref('')
 const reasons = ref([])
+const { t } = useI18n()
 
 async function submit() {
   error.value = ''
   reasons.value = []
   if (!oldPassword.value || !newPassword.value) {
-    error.value = '请填写完整'
+    error.value = t('changePwd.fillAll')
     ElMessage.warning(error.value)
     return
   }
   if (newPassword.value !== confirm.value) {
-    error.value = '两次输入密码不一致'
+    error.value = t('changePwd.notMatch')
     ElMessage.warning(error.value)
     return
   }
@@ -68,17 +70,17 @@ async function submit() {
         localStorage.setItem('auth_user', JSON.stringify(d))
       }
     } catch {}
-  ElMessage.success('密码已更新，请重新登录')
+  ElMessage.success(t('changePwd.updated'))
     localStorage.removeItem('auth_user')
     router.replace('/login')
   } catch (e) {
     try {
       const data = JSON.parse(e.message)
-      error.value = data.error || '更新失败'
+      error.value = data.error || t('common.updateFailed')
       reasons.value = data.reasons || []
       ElMessage.error(error.value)
     } catch {
-      error.value = e.message || '更新失败'
+      error.value = e.message || t('common.updateFailed')
       ElMessage.error(error.value)
     }
   } finally {

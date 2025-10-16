@@ -18,8 +18,19 @@
         <template #header>
           <div class="row">
             <div>
-              <div class="name">{{ u.display_name || u.username }} <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag></div>
+              <div class="name">
+                {{ u.display_name || u.username }}
+                <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag>
+                <span class="status" :class="{ online: !!u.online }">
+                  <span class="dot"></span>
+                  {{ u.online ? 'Online' : 'Offline' }}
+                </span>
+              </div>
               <div class="username">@{{ u.username }}</div>
+              <div class="meta" v-if="u.last_ip || u.last_seen">
+                <span v-if="u.last_ip">IP: {{ u.last_ip }}</span>
+                <span v-if="u.last_seen"> · {{ new Date(u.last_seen).toLocaleString() }}</span>
+              </div>
             </div>
             <div class="ops">
               <el-switch v-model="u.is_active" @change="toggleActive(u)" :active-text="$t('users.active')" />
@@ -214,6 +225,11 @@ onMounted(load)
 .row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .name { font-weight: 600; font-size: 15px; }
 .username { color: var(--el-text-color-secondary); font-size: 12px; }
+.meta { color: var(--el-text-color-secondary); font-size: 12px; }
+.status { margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 6px; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; }
+.status.online { color: var(--el-color-success); }
+.status.online .dot { background: var(--el-color-success); box-shadow: 0 0 0 2px color-mix(in oklab, var(--el-color-success) 40%, transparent); }
 .perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .perm-tag { cursor: pointer; user-select: none; }
 .perm-tag.is-disabled { cursor: not-allowed; opacity: 0.7; }

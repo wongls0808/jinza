@@ -52,7 +52,10 @@ const messages = {
       errNothingToSettle: '无可结汇金额',
       errRateRequired: '请输入有效汇率',
       loadFailed: '加载失败',
-       deleteFailed: '删除失败'
+     deleteFailed: '删除失败',
+    submit: '提交',
+    submitting: '提交中...',
+    updateFailed: '更新失败'
     },
     buyfx: {
       title: '购汇管理',
@@ -229,7 +232,8 @@ const messages = {
       title: '登录',
       username: '用户名',
       password: '密码',
-      submit: '登录',
+  submit: '登录',
+  firstLoginTip: '首次登录需修改密码，将跳转到改密页面',
       tagline: '企业财务与管理系统解决方案',
       welcome: '欢迎使用',
       rememberMe: '记住我',
@@ -381,6 +385,19 @@ const messages = {
       reseedSuccess: '权限已重建，共 {total} 项',
       reseedFailed: '重建失败',
   },
+  changePwd: {
+    title: '首次登录需修改密码',
+    old: '旧密码',
+    oldPlaceholder: '请输入旧密码',
+    new: '新密码',
+    newPlaceholder: '至少8位，避免连续/重复模式',
+    confirm: '确认新密码',
+    confirmPlaceholder: '再次输入新密码',
+    fillAll: '请填写完整',
+    notMatch: '两次输入密码不一致',
+    updated: '密码已更新，请重新登录'
+  },
+  // 将新增通用键合并到现有 common 中
   settings: {
       title: '系统设置',
       theme: '主题',
@@ -748,6 +765,9 @@ const messages = {
       save: 'Save',
       loadFailed: 'Load failed',
       deleteFailed: 'Delete failed',
+      submit: 'Submit',
+      submitting: 'Submitting...',
+      updateFailed: 'Update failed',
       
     },
     buyfx: {
@@ -912,7 +932,8 @@ const messages = {
       title: 'Sign In',
       username: 'Username',
       password: 'Password',
-      submit: 'Login',
+  submit: 'Login',
+  firstLoginTip: 'First login requires password change. Redirecting...',
     },
     home: {
       title: 'Dashboard',
@@ -970,6 +991,23 @@ const messages = {
       deleteFailed: 'Delete failed',
       reseedSuccess: 'Permission tree reseeded, total {total} items',
       reseedFailed: 'Reseed failed',
+    },
+    changePwd: {
+      title: 'Change password on first login',
+      old: 'Old Password',
+      oldPlaceholder: 'Enter old password',
+      new: 'New Password',
+      newPlaceholder: 'At least 8 chars, avoid simple patterns',
+      confirm: 'Confirm New Password',
+      confirmPlaceholder: 'Re-enter new password',
+      fillAll: 'Please complete all fields',
+      notMatch: 'Passwords do not match',
+      updated: 'Password updated. Please login again'
+    },
+    common: {
+      submit: 'Submit',
+      submitting: 'Submitting...',
+      updateFailed: 'Update failed'
     },
     settings: {
       title: 'Settings',

@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
@@ -124,6 +124,15 @@ onMounted(() => {
   validateSession()
   // 初始化 html lang，确保与当前语言一致
   try { document.documentElement.lang = locale.value === 'zh' ? 'zh-CN' : 'en' } catch {}
+  // 空闲超时：30 分钟无操作自动登出（生产环境）
+  let idleTimer = null
+  const MAX_IDLE = Number(import.meta.env?.VITE_SESSION_IDLE_MS || 30 * 60 * 1000)
+  const resetIdle = () => { if (idleTimer) clearTimeout(idleTimer); idleTimer = setTimeout(() => { try{ logout() }catch{} }, MAX_IDLE) }
+  const evts = ['click','keydown','mousemove','scroll','touchstart']
+  evts.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
+  resetIdle()
+  // 卸载时清理
+  onBeforeUnmount(() => { if (idleTimer) clearTimeout(idleTimer); evts.forEach(e => window.removeEventListener(e, resetIdle)) })
 })
 
 const { locale, t } = useI18n()

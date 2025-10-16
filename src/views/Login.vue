@@ -81,7 +81,11 @@ const onSubmit = async () => {
       localStorage.removeItem('remember_auth'); sessionStorage.setItem('auth_session','1')
     }
     const redirect = res.must_change_password ? '/change-password' : (route.query.redirect || '/')
-    ElMessage({ message:'登录成功，正在进入系统...', type:'success', duration:1500 })
+    if (res.must_change_password) {
+      ElMessage({ message: t('login.firstLoginTip'), type:'warning', duration:1800 })
+    } else {
+      ElMessage({ message:'登录成功，正在进入系统...', type:'success', duration:1500 })
+    }
     setTimeout(()=>{ window.location.href = redirect === '/' ? '/' : String(redirect) }, 500)
   } catch(e){
     try {
