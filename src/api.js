@@ -279,6 +279,8 @@ export const api = {
   listOrders: () => request('/fx/transfers'),
   // 平台内币种互换记录（最近200条）
   listTransfers: () => request('/fx/transfers'),
+  // 平台支出（付款审核时产生）
+  listPlatformExpenses: (platformId, params={}) => request(`/fx/platforms/${platformId}/expenses?${new URLSearchParams(params).toString()}`),
   updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),
   updateOrder: (id, data) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOrder: (id) => request(`/fx/transfers/${id}`, { method: 'DELETE' }),

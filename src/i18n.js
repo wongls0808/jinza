@@ -107,7 +107,10 @@ const messages = {
       convertFailed: '互换失败',
       viewOrders: '查看购汇历史',
       loanRecords: '借贷记录',
-      exportExpenses: '导出支出记录'
+    exportExpenses: '导出支出记录',
+    exportTransfers: '导出互换记录',
+    tabTransfers: '互换记录',
+    tabExpenses: '平台支出'
   ,historyDate: '日期',
   platform: '平台',
   sellCurrency: '卖出币种',
@@ -556,7 +559,10 @@ const messages = {
       convertFailed: 'Convert failed',
       viewOrders: 'View Buy Orders',
       loanRecords: 'Loan Records',
-      exportExpenses: 'Export Expenses'
+    exportExpenses: 'Export Expenses',
+    exportTransfers: 'Export Transfers',
+    tabTransfers: 'Transfers',
+    tabExpenses: 'Platform Expenses'
   ,historyDate: 'Date',
   platform: 'Platform',
   sellCurrency: 'Sell Currency',

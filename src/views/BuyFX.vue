@@ -97,32 +97,64 @@
   
   <!-- 平台商借贷/互换记录抽屉 -->
   <el-drawer v-model="loans.visible" :title="`${t('buyfx.loanRecords')} · ${loans.platform?.name||loans.platform?.code||''}`" size="60%">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
-      <el-tabs v-model="loans.currency" @tab-change="onLoanCurrencyChange">
-        <el-tab-pane label="ALL" name="ALL" />
-        <el-tab-pane label="USD" name="USD" />
-        <el-tab-pane label="MYR" name="MYR" />
-        <el-tab-pane label="CNY" name="CNY" />
-      </el-tabs>
-      <el-button type="primary" plain @click="exportLoansCsv">{{ t('buyfx.exportExpenses') }}</el-button>
-    </div>
-    <el-table :data="loansShown" size="small" border v-loading="loans.loading">
-      <el-table-column prop="created_at" :label="t('common.createdAt')" width="160">
-        <template #default="{ row }">{{ (row.created_at||'').slice(0,19) }}</template>
-      </el-table-column>
-      <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100" />
-      <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="100" />
-      <el-table-column prop="amount_from" :label="t('buyfx.sellAmount')" width="140">
-        <template #default="{ row }">{{ money6(row.amount_from) }}</template>
-      </el-table-column>
-      <el-table-column prop="rate" :label="t('buyfx.rate')" width="120" />
-      <el-table-column prop="amount_to" :label="t('buyfx.buyAmount')" width="140">
-        <template #default="{ row }">{{ money6(row.amount_to) }}</template>
-      </el-table-column>
-      <el-table-column prop="fee_percent" :label="t('buyfx.feePercent')" width="120" />
-      <el-table-column prop="fee_amount" :label="t('buyfx.fee')" width="120" />
-      <el-table-column prop="note" :label="t('common.details')" min-width="160" />
-    </el-table>
+    <el-tabs v-model="loans.active" @tab-change="onDrawerTabChange" style="margin-bottom:8px;">
+      <el-tab-pane :label="t('buyfx.tabTransfers')" name="transfers">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+          <el-tabs v-model="loans.currency" @tab-change="onLoanCurrencyChange">
+            <el-tab-pane label="ALL" name="ALL" />
+            <el-tab-pane label="USD" name="USD" />
+            <el-tab-pane label="MYR" name="MYR" />
+            <el-tab-pane label="CNY" name="CNY" />
+          </el-tabs>
+          <el-button type="primary" plain @click="exportLoansCsv">{{ t('buyfx.exportTransfers') }}</el-button>
+        </div>
+        <el-table :data="loansShown" size="small" border v-loading="loans.loading">
+          <el-table-column prop="created_at" :label="t('common.createdAt')" width="160">
+            <template #default="{ row }">{{ (row.created_at||'').slice(0,19) }}</template>
+          </el-table-column>
+          <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100" />
+          <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="100" />
+          <el-table-column prop="amount_from" :label="t('buyfx.sellAmount')" width="140">
+            <template #default="{ row }">{{ money6(row.amount_from) }}</template>
+          </el-table-column>
+          <el-table-column prop="rate" :label="t('buyfx.rate')" width="120" />
+          <el-table-column prop="amount_to" :label="t('buyfx.buyAmount')" width="140">
+            <template #default="{ row }">{{ money6(row.amount_to) }}</template>
+          </el-table-column>
+          <el-table-column prop="fee_percent" :label="t('buyfx.feePercent')" width="120" />
+          <el-table-column prop="fee_amount" :label="t('buyfx.fee')" width="120" />
+          <el-table-column prop="note" :label="t('common.details')" min-width="160" />
+        </el-table>
+      </el-tab-pane>
+      <el-tab-pane :label="t('buyfx.tabExpenses')" name="expenses">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+          <el-tabs v-model="loans.currency" @tab-change="onLoanCurrencyChange">
+            <el-tab-pane label="ALL" name="ALL" />
+            <el-tab-pane label="USD" name="USD" />
+            <el-tab-pane label="MYR" name="MYR" />
+            <el-tab-pane label="CNY" name="CNY" />
+          </el-tabs>
+          <el-button type="primary" plain @click="exportExpensesCsv">{{ t('buyfx.exportExpenses') }}</el-button>
+        </div>
+        <el-table :data="expensesShown" size="small" border v-loading="loans.loadingExpenses">
+          <el-table-column prop="acted_at" :label="t('common.createdAt')" width="160">
+            <template #default="{ row }">{{ (row.acted_at||'').slice(0,19) }}</template>
+          </el-table-column>
+          <el-table-column prop="bill_no" :label="t('transactions.billNo')" width="160" />
+          <el-table-column prop="customer_name" :label="t('customers.form.name')" min-width="140" />
+          <el-table-column prop="currency" :label="t('transactions.currency')" width="100" />
+          <el-table-column prop="amount" :label="t('transactions.amount')" width="120">
+            <template #default="{ row }">{{ money6(row.amount) }}</template>
+          </el-table-column>
+          <el-table-column prop="fee" :label="t('buyfx.fee')" width="120">
+            <template #default="{ row }">{{ money6(row.fee) }}</template>
+          </el-table-column>
+          <el-table-column prop="total" :label="t('common.total')" width="140">
+            <template #default="{ row }">{{ money6(row.total) }}</template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+    </el-tabs>
   </el-drawer>
 </template>
 
@@ -283,7 +315,7 @@ function onFromChange(){
 }
 
 // —— 平台商：借贷/互换记录抽屉 ——
-const loans = ref({ visible: false, loading: false, platform: null, currency: 'ALL', list: [] })
+const loans = ref({ visible: false, active: 'transfers', loading: false, platform: null, currency: 'ALL', list: [], loadingExpenses: false, expenses: [] })
 const currencyTabs = [
   { label: 'ALL', value: 'ALL' },
   { label: 'USD', value: 'USD' },
@@ -294,6 +326,7 @@ function openLoansDrawer(p){
   loans.value.visible = true
   loans.value.platform = p
   loans.value.currency = 'ALL'
+  loans.value.active = 'transfers'
   loadLoans()
 }
 async function loadLoans(){
@@ -350,6 +383,46 @@ function exportLoansCsv(){
     a.click()
     URL.revokeObjectURL(a.href)
   } catch {}
+}
+
+function onDrawerTabChange(name){
+  if (name === 'expenses') loadExpenses()
+}
+async function loadExpenses(){
+  if (!loans.value.platform?.id) return
+  loans.value.loadingExpenses = true
+  try{
+    const res = await api.buyfx.listPlatformExpenses(loans.value.platform.id)
+    loans.value.expenses = Array.isArray(res?.items) ? res.items : []
+  }catch(e){
+    ElMessage.error(e?.message || '加载失败')
+  }finally{
+    loans.value.loadingExpenses = false
+  }
+}
+const expensesShown = computed(() => {
+  const cur = String(loans.value.currency||'ALL').toUpperCase()
+  if (cur === 'ALL') return loans.value.expenses
+  return (loans.value.expenses||[]).filter(r => String(r.currency).toUpperCase()===cur)
+})
+function exportExpensesCsv(){
+  try{
+    const rows = expensesShown.value || []
+    const header = ['Payment ID','Bill No','Customer','Date','Currency','Amount','Fee','Total']
+    const body = rows.map(r => [r.payment_id, r.bill_no||'', r.customer_name||'', (r.acted_at||'').slice(0,19), r.currency||'', r.amount, r.fee, r.total])
+    const csvRows = [header, ...body]
+    const csv = csvRows.map(r => r.map(v => {
+      const s = v==null? '': String(v)
+      return (/[",\n]/.test(s)) ? '"'+s.replace(/"/g,'""')+'"' : s
+    }).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    const pf = loans.value.platform?.name || loans.value.platform?.code || 'Platform'
+    a.download = `${pf}-Expenses-${Date.now()}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }catch{}
 }
 </script>
 

@@ -465,6 +465,53 @@ fxRouter.delete('/transfers/:id', authMiddleware(true), requirePerm('manage_fx')
   }
 })
 
+// ---------- 平台支出（来源：付款单审批扣减日志 fx_payment_audits） ----------
+fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid platform id' })
+  const { currency, startDate, endDate, page = 1, pageSize = 50 } = req.query || {}
+  const where = [ `a.action = 'approve'`, `a.platform_id = $1` ]
+  const params = [ id ]
+  let idx = 2
+  if (currency) { where.push(`upper(k.key) = $${idx++}`); params.push(String(currency).toUpperCase()) }
+  if (startDate) { where.push(`a.acted_at >= $${idx++}`); params.push(startDate) }
+  if (endDate) { where.push(`a.acted_at <= $${idx++}`); params.push(endDate) }
+  const whereSql = 'where ' + where.join(' and ')
+  const offset = (Number(page)-1) * Number(pageSize)
+
+  const total = await query(
+    `select count(*) from (
+       select 1
+       from fx_payment_audits a
+       join fx_payments p on p.id = a.payment_id
+       cross join lateral jsonb_each(a.deltas) as k(key, value)
+       ${whereSql}
+     ) t`, params)
+  const rows = await query(
+    `select 
+       a.payment_id,
+       p.bill_no,
+       p.customer_id,
+       p.customer_name,
+       a.acted_at,
+       a.fee_percent,
+       a.fee_amount,
+       upper(k.key) as currency,
+       coalesce((k.value->>'amount')::numeric, 0) as amount,
+       coalesce((k.value->>'fee')::numeric, 0) as fee,
+       coalesce((k.value->>'total')::numeric, 0) as total
+     from fx_payment_audits a
+     join fx_payments p on p.id = a.payment_id
+     cross join lateral jsonb_each(a.deltas) as k(key, value)
+     ${whereSql}
+     order by a.acted_at desc, a.payment_id desc
+     offset $${idx++} limit $${idx++}`,
+     [ ...params, offset, Number(pageSize) ]
+  )
+  res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
+})
+
 // ---------- 中国银行挂牌价（银行买入价） ----------
 // 支持 pair: USD/CNY, MYR/CNY, MYR/USD（或使用连字符）
 fxRouter.get('/rates/boc', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
