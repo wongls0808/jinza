@@ -98,11 +98,9 @@
                 v-model="addDlg.form.opening_myr"
                 :precision="2"
                 :min="0"
-                :step="100"
+                :step="1"
                 controls-position="right"
                 :placeholder="'0.00'"
-                :formatter="moneyFormatter"
-                :parser="moneyParser"
                 style="width:100%"
               />
             </el-form-item>
@@ -113,11 +111,9 @@
                 v-model="addDlg.form.opening_cny"
                 :precision="2"
                 :min="0"
-                :step="100"
+                :step="1"
                 controls-position="right"
                 :placeholder="'0.00'"
-                :formatter="moneyFormatter"
-                :parser="moneyParser"
                 style="width:100%"
               />
             </el-form-item>
@@ -242,7 +238,7 @@ const pageSize = ref(20)
 const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
-const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null } })
+const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: 0, opening_cny: 0 } })
 const editDlg = ref({ visible: false, loading: false, id: null, form: { abbr: '', name: '', tax_rate: null } })
 const addFormRef = ref()
 const editFormRef = ref()
@@ -276,7 +272,7 @@ async function reload() {
 }
 
 function openAdd() {
-  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: null, opening_cny: null } }
+  addDlg.value = { visible: true, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: 0, opening_cny: 0 } }
 }
 async function doAdd() {
   addDlg.value.loading = true
@@ -288,8 +284,8 @@ async function doAdd() {
     }
     // 将空值规范化为数字 0 再提交
     f.tax_rate = f.tax_rate == null || f.tax_rate === '' ? 0 : f.tax_rate
-    f.opening_myr = f.opening_myr == null || f.opening_myr === '' ? 0 : f.opening_myr
-    f.opening_cny = f.opening_cny == null || f.opening_cny === '' ? 0 : f.opening_cny
+  f.opening_myr = f.opening_myr == null || f.opening_myr === '' ? 0 : Number(f.opening_myr)
+  f.opening_cny = f.opening_cny == null || f.opening_cny === '' ? 0 : Number(f.opening_cny)
   await api.customers.create({ abbr: f.abbr, name: f.name, tax_rate: f.tax_rate, opening_myr: f.opening_myr, opening_cny: f.opening_cny })
     addDlg.value.visible = false
     await reload()
