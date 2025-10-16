@@ -32,13 +32,38 @@
       </el-card>
     </div>
 
-    <!-- 统计图区域（五个独立图表，无标题/描述，只显示有数据的项） -->
+    <!-- 指标图区域（五个独立网格，无标题/描述，仅显示有数据项） -->
     <div class="charts-grid">
-      <div ref="elCusMYR" class="chart"></div>
-      <div ref="elCusCNY" class="chart"></div>
-      <div ref="elAccounts" class="chart"></div>
-      <div ref="elPending" class="chart"></div>
-      <div ref="elPlatforms" class="chart"></div>
+      <div class="indicator-grid" v-if="inds.cusMYR.length">
+        <div class="kpi" v-for="it in inds.cusMYR" :key="'myr-'+it.key">
+          <div class="val">{{ money(it.value) }}</div>
+          <div class="lbl">{{ it.label }}</div>
+        </div>
+      </div>
+      <div class="indicator-grid" v-if="inds.cusCNY.length">
+        <div class="kpi" v-for="it in inds.cusCNY" :key="'cny-'+it.key">
+          <div class="val">{{ money(it.value) }}</div>
+          <div class="lbl">{{ it.label }}</div>
+        </div>
+      </div>
+      <div class="indicator-grid" v-if="inds.accounts.length">
+        <div class="kpi" v-for="it in inds.accounts" :key="'acc-'+it.key">
+          <div class="val">{{ money(it.value) }}</div>
+          <div class="lbl">{{ it.label }}</div>
+        </div>
+      </div>
+      <div class="indicator-grid" v-if="inds.pending.length">
+        <div class="kpi" v-for="it in inds.pending" :key="'pd-'+it.key">
+          <div class="val">{{ money(it.value) }}</div>
+          <div class="lbl">{{ it.label }}</div>
+        </div>
+      </div>
+      <div class="indicator-grid" v-if="inds.platforms.length">
+        <div class="kpi" v-for="it in inds.platforms" :key="'pf-'+it.key">
+          <div class="val">{{ money(it.value) }}</div>
+          <div class="lbl">{{ it.label }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 可拖拽的“付款待审”浮动按钮（持久化位置） -->
@@ -240,7 +265,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref, onMounted } from 'vue'
 import { api, request as httpRequest } from '@/api'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
+// 指标图无需 echarts
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -456,76 +481,29 @@ async function loadPlatforms(){
     platforms.value = res.items || []
   } catch { platforms.value = [] }
 }
-
-onMounted(() => { loadPaymentsCount(); loadPlatforms(); renderCharts(); window.addEventListener('resize', () => setTimeout(() => [chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms].forEach(ch => ch && ch.resize()), 0)) })
-
-// —— 统计图：5 个独立图表 ——
-const elCusMYR = ref(null)
-const elCusCNY = ref(null)
-const elAccounts = ref(null)
-const elPending = ref(null)
-const elPlatforms = ref(null)
-let chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms
-
-function barOption(xCats, values, opts={}){
-  // 横向条形图：y 为分类轴，x 为数值轴
-  return {
-    grid: { left: 60, right: 16, top: 10, bottom: 10 },
-    animationDuration: 400,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
-    yAxis: { type: 'category', data: xCats, axisLabel: { interval: 0, color: 'var(--el-text-color-primary)', fontSize: 11 } },
-    legend: { show: !!opts.legend, bottom: 0, textStyle: { color: 'var(--el-text-color-primary)' } },
-    series: [ { name: opts.name || '', type: 'bar', data: values, itemStyle: { color: opts.color || '#409EFF' }, barMaxWidth: 30 } ]
-  }
-}
-function barStackOption(xCats, series){
-  // 横向堆叠条形图
-  return {
-    grid: { left: 60, right: 16, top: 10, bottom: 10 },
-    animationDuration: 400,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
-    yAxis: { type: 'category', data: xCats, axisLabel: { interval: 0, color: 'var(--el-text-color-primary)', fontSize: 11 } },
-    legend: { show: false },
-    series: series.map(s => ({ ...s, type: 'bar', stack: 'bal', barMaxWidth: 30 }))
-  }
-}
-
-async function renderCharts(){
-  // 1/2. 客户余额：MYR/CNY
+// 指标图数据源
+const inds = ref({ cusMYR: [], cusCNY: [], accounts: [], pending: [], platforms: [] })
+async function loadIndicators(){
+  // 1/2. 客户余额：MYR/CNY（每个客户一张指标卡，>0 才显示）
   try {
     const data = await api.customers.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
     const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
-    const cusMYR = items.filter(r => Number(r.balance_myr) > 0)
-    const cusCNY = items.filter(r => Number(r.balance_cny) > 0)
-    if (elCusMYR.value) {
-      chCusMYR ||= echarts.init(elCusMYR.value)
-      chCusMYR.setOption(barOption(cusMYR.map(r => r.name||r.abbr||''), cusMYR.map(r => Number(r.balance_myr)||0), { name: 'MYR', color: '#67C23A' }))
-    }
-    if (elCusCNY.value) {
-      chCusCNY ||= echarts.init(elCusCNY.value)
-      chCusCNY.setOption(barOption(cusCNY.map(r => r.name||r.abbr||''), cusCNY.map(r => Number(r.balance_cny)||0), { name: 'CNY', color: '#E6A23C' }))
-    }
-  } catch {}
+    inds.value.cusMYR = items.filter(r => Number(r.balance_myr) > 0).map(r => ({ key: r.id||r.name||r.abbr, label: (r.name||r.abbr||'').toString(), value: Number(r.balance_myr)||0 }))
+    inds.value.cusCNY = items.filter(r => Number(r.balance_cny) > 0).map(r => ({ key: r.id||r.name||r.abbr, label: (r.name||r.abbr||'').toString(), value: Number(r.balance_cny)||0 }))
+  } catch { inds.value.cusMYR = []; inds.value.cusCNY = [] }
 
-  // 3. 收款账户余额（按账户，名称附加币种；仅展示 balance>0）
+  // 3. 收款账户余额（每账户一张指标卡，名称附币种）
   try {
     const data = await api.accounts.list({ page: 1, pageSize: 5000, sort: 'id', order: 'asc' })
     const items = Array.isArray(data?.items) ? data.items : Array.isArray(data)? data : []
-    const rows = items.filter(r => Number(r.balance) > 0)
-    if (elAccounts.value) {
-      chAccounts ||= echarts.init(elAccounts.value)
-      chAccounts.setOption(barOption(rows.map(r => `${r.account_name||''} (${String(r.currency_code||'').toUpperCase()})`), rows.map(r => Number(r.balance)||0), { color: '#409EFF' }))
-    }
-  } catch {}
+    inds.value.accounts = items.filter(r => Number(r.balance) > 0).map(r => ({ key: r.id, label: `${r.account_name||''} (${String(r.currency_code||'').toUpperCase()})`, value: Number(r.balance)||0 }))
+  } catch { inds.value.accounts = [] }
 
-  // 4. 付款待办余额（汇总 USD/MYR/CNY）
+  // 4. 付款待办余额（USD/MYR/CNY 合计）
   try {
     const res = await api.fx.payments.list({ status: 'pending', view: 'head', page: 1, pageSize: 500 })
     const heads = Array.isArray(res) ? res : (res?.items || [])
     const sum = { USD:0, MYR:0, CNY:0 }
-    // 逐单明细合计（币种安全）
     for (const h of heads) {
       try {
         const d = await api.fx.payments.detail(h.id)
@@ -536,41 +514,25 @@ async function renderCharts(){
         }
       } catch {}
     }
-    const cats = ['USD','MYR','CNY']
-    const vals = cats.map(k => Number(sum[k]||0))
-    const cats2 = cats.filter((k,i) => vals[i] > 0)
-    const vals2 = vals.filter(v => v>0)
-    if (elPending.value) {
-      chPending ||= echarts.init(elPending.value)
-      chPending.setOption(barOption(cats2, vals2, { color: '#F56C6C' }))
-    }
-  } catch {}
+    inds.value.pending = Object.entries(sum).filter(([k,v]) => (v||0) > 0).map(([k,v]) => ({ key: k, label: k, value: Number(v)||0 }))
+  } catch { inds.value.pending = [] }
 
-  // 5. 平台余额（每个平台 3 币种堆叠，隐藏图例）
+  // 5. 平台余额（每平台+币种为一张指标卡）
   try {
     const res = await api.buyfx.listPlatforms()
     const items = res?.items || []
-    const rows = items.map(p => ({
-      name: p.name,
-      USD: Number(p.balance_usd||0),
-      MYR: Number(p.balance_myr||0),
-      CNY: Number(p.balance_cny||0)
-    })).filter(r => r.USD>0 || r.MYR>0 || r.CNY>0)
-    const x = rows.map(r => r.name)
-    const series = [
-      { name: 'USD', data: rows.map(r => r.USD), itemStyle: { color: '#409EFF' } },
-      { name: 'MYR', data: rows.map(r => r.MYR), itemStyle: { color: '#67C23A' } },
-      { name: 'CNY', data: rows.map(r => r.CNY), itemStyle: { color: '#E6A23C' } },
-    ]
-    if (elPlatforms.value) {
-      chPlatforms ||= echarts.init(elPlatforms.value)
-      chPlatforms.setOption(barStackOption(x, series))
+    const out = []
+    for (const p of items) {
+      const usd = Number(p.balance_usd||0), myr = Number(p.balance_myr||0), cny = Number(p.balance_cny||0)
+      if (usd>0) out.push({ key: `${p.id}-USD`, label: `${p.name} · USD`, value: usd })
+      if (myr>0) out.push({ key: `${p.id}-MYR`, label: `${p.name} · MYR`, value: myr })
+      if (cny>0) out.push({ key: `${p.id}-CNY`, label: `${p.name} · CNY`, value: cny })
     }
-  } catch {}
-
-  // resize
-  setTimeout(() => [chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms].forEach(ch => ch && ch.resize()), 0)
+    inds.value.platforms = out
+  } catch { inds.value.platforms = [] }
 }
+
+onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadIndicators() })
 
 // —— 付款待审：可拖拽浮动按钮 ——
 const fabPos = ref({ x: 16, y: 160 })
@@ -681,4 +643,9 @@ onMounted(() => { readFab() })
 /* 图表区域 */
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 8px; }
 .chart { height: 300px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); }
+/* 指标网格与卡片 */
+.indicator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.kpi { border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); padding: 10px 12px; display: grid; gap: 4px; }
+.kpi .val { font-weight: 800; font-size: 16px; letter-spacing: .2px; }
+.kpi .lbl { color: var(--el-text-color-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
