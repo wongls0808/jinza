@@ -467,24 +467,26 @@ const elPending = ref(null)
 const elPlatforms = ref(null)
 let chCusMYR, chCusCNY, chAccounts, chPending, chPlatforms
 
-function barOption(xData, yData, opts={}){
+function barOption(xCats, values, opts={}){
+  // 横向条形图：y 为分类轴，x 为数值轴
   return {
-    grid: { left: 30, right: 10, top: 10, bottom: 40 },
+    grid: { left: 60, right: 16, top: 10, bottom: 10 },
     animationDuration: 400,
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'category', data: xData, axisLabel: { interval: 0, rotate: 24, color: 'var(--el-text-color-primary)', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    xAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    yAxis: { type: 'category', data: xCats, axisLabel: { interval: 0, color: 'var(--el-text-color-primary)', fontSize: 11 } },
     legend: { show: !!opts.legend, bottom: 0, textStyle: { color: 'var(--el-text-color-primary)' } },
-    series: [ { name: opts.name || '', type: 'bar', data: yData, itemStyle: { color: opts.color || '#409EFF' }, barMaxWidth: 30 } ]
+    series: [ { name: opts.name || '', type: 'bar', data: values, itemStyle: { color: opts.color || '#409EFF' }, barMaxWidth: 30 } ]
   }
 }
-function barStackOption(xData, series){
+function barStackOption(xCats, series){
+  // 横向堆叠条形图
   return {
-    grid: { left: 30, right: 10, top: 10, bottom: 40 },
+    grid: { left: 60, right: 16, top: 10, bottom: 10 },
     animationDuration: 400,
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'category', data: xData, axisLabel: { interval: 0, rotate: 24, color: 'var(--el-text-color-primary)', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    xAxis: { type: 'value', axisLabel: { color: 'var(--el-text-color-secondary)', fontSize: 11 } },
+    yAxis: { type: 'category', data: xCats, axisLabel: { interval: 0, color: 'var(--el-text-color-primary)', fontSize: 11 } },
     legend: { show: false },
     series: series.map(s => ({ ...s, type: 'bar', stack: 'bal', barMaxWidth: 30 }))
   }
@@ -678,5 +680,5 @@ onMounted(() => { readFab() })
 
 /* 图表区域 */
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 8px; }
-.chart { height: 260px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); }
+.chart { height: 300px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); }
 </style>
