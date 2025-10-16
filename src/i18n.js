@@ -273,6 +273,9 @@ const messages = {
     qaCustomers: '客户管理',
     qaAccounts: '收款账户'
     },
+    workbench: {
+      title: '工作台'
+    },
     users: {
       usernamePlaceholder: '用户名',
       passwordPlaceholder: '初始密码',

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 // Views
 import Home from '@/views/Home.vue'
+const Workbench = () => import('@/views/Workbench.vue')
 const UserManagement = () => import('@/views/UserManagement.vue')
 const ChangePassword = () => import('@/views/ChangePassword.vue')
 
@@ -22,6 +23,7 @@ export const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
   { path: '/change-password', name: 'change-password', component: ChangePassword, meta: { public: false } },
   { path: '/', name: 'home', component: Home, meta: { perm: 'view_dashboard' } },
+  { path: '/workbench', name: 'workbench', component: Workbench, meta: { perm: 'view_dashboard' } },
   { path: '/users', name: 'users', component: UserManagement, meta: { perm: 'manage_users' } },
   { path: '/customers', name: 'customers', component: Customers, meta: { perm: 'view_customers' } },
   { path: '/banks', name: 'banks', component: Banks, meta: { perm: 'view_banks' } },
@@ -81,7 +83,7 @@ const readAuth = () => {
 
 // 计算一个用户可访问的首个页面，避免因权限不足跳转到自身而循环
 function firstAllowed(perms) {
-  const order = ['home','users','customers','banks','accounts','transactions']
+  const order = ['workbench','home','users','customers','banks','accounts','transactions']
   for (const name of order) {
     const r = routes.find(r => r.name === name)
     if (!r) continue

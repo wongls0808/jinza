@@ -21,6 +21,10 @@
             <el-icon><HomeFilled /></el-icon>
             <span>{{ t('home.title') }}</span>
           </el-menu-item>
+          <el-menu-item index="workbench" :route="{name: 'workbench'}" v-if="has('view_dashboard')">
+            <el-icon><HomeFilled /></el-icon>
+            <span>{{ t('workbench.title') }}</span>
+          </el-menu-item>
           <el-menu-item index="customers" :route="{name: 'customers'}" v-if="has('view_customers')">
             <el-icon><UserFilled /></el-icon>
             <span>{{ t('customers.title') }}</span>
