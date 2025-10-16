@@ -170,13 +170,16 @@ function handleSelect(key) {
 .nav-menu {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start; /* 左对齐，避免中间截断 */
+  overflow-x: auto; /* 超出时允许横向滚动，不再折叠为下拉 */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .right { 
   display: flex; 
   gap: 12px; 
   align-items: center;
-  flex: 0 0 auto; /* 根据内容自适应宽度 */
+  flex: 0 0 auto; /* 固定显示，不折叠为更多菜单 */
   justify-content: flex-end; /* 确保右对齐 */
 }
 .view { padding: 20px; }
@@ -186,12 +189,15 @@ function handleSelect(key) {
 :deep(.el-menu) {
   border-bottom: none !important;
   background-color: transparent !important;
+  flex-wrap: nowrap; /* 始终单行显示 */
 }
 :deep(.el-menu--horizontal > .el-menu-item) {
   color: rgba(255, 255, 255, 0.85);
   height: 56px;
   line-height: 56px;
   border-bottom: none;
+  padding: 0 12px; /* 收紧两侧内边距，提高可视项数量 */
+  flex: 0 0 auto; /* 禁止被收缩，配合横向滚动 */
 }
 :deep(.el-menu--horizontal > .el-menu-item:hover) {
   color: white;
