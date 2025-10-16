@@ -62,6 +62,7 @@
           <span class="sep">|</span>
           <button type="button" class="lang" :class="{ active: lang === 'en' }" @click="setLang('en')">English</button>
         </div>
+        <button v-if="authed" type="button" class="logout" @click="logout" aria-label="Logout">{{ t('app.logout') }}</button>
       </div>
     </el-header>
     <el-main class="view">
@@ -213,4 +214,16 @@ function handleSelect(key) {
 }
 .lang-switch .lang:hover { color: #fff; text-decoration: underline; }
 .lang-switch .lang.active { color: #fff; font-weight: 800; }
+
+/* 顶部栏注销按钮（与白色文字背景协调） */
+.logout {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.logout:hover { border-color: #fff; background: rgba(255,255,255,0.12); }
 </style>
