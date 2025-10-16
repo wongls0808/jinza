@@ -193,7 +193,12 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="" width="100">
+      <el-table-column label="" width="140">
+        <template #header>
+          <el-checkbox v-model="batchMatchToggle" :disabled="!multipleSelection.length" @change="onBatchMatchToggle">
+            批量匹配
+          </el-checkbox>
+        </template>
         <template #default="scope">
           <el-button type="success" text size="small" @click="handleMatchRow(scope.row)">
             <el-icon><Connection /></el-icon>
@@ -365,7 +370,23 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
-            <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
+            <el-form label-width="100px">
+              <el-form-item label="收款银行账户">
+                <el-select
+                  v-model="matchForm.transferAccountId"
+                  filterable
+                  :placeholder="'选择收款账户（按银行/账户名/账号过滤）'"
+                  style="width: 100%">
+                  <el-option
+                    v-for="a in accounts"
+                    :key="a.id"
+                    :label="`${a.bank_zh || a.bank_en || ''} · ${a.account_name || ''} · ${a.bank_account || ''}`"
+                    :value="a.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <div class="gray-text">选择内部收款账户，将未匹配的交易标记为“调拨”。</div>
+            </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
             <div class="placeholder">{{ t('transactions.todoPlaceholder') }}</div>
@@ -556,6 +577,9 @@ const loading = ref(false)
 const searchQuery = ref('')
 const searchAmountOnly = ref(true)
 const multipleSelection = ref([])
+// 批量匹配开关（放在匹配列表头）
+const batchMatchToggle = ref(false)
+const batchMode = ref(false)
 const accounts = ref([])
 const selectedBankLogo = ref('')
 const pagination = reactive({
@@ -887,6 +911,17 @@ const handleSelectionChange = (selection) => {
   multipleSelection.value = selection
 }
 
+// 触发批量匹配：从表头复选框开启
+const onBatchMatchToggle = (val) => {
+  if (!val) return
+  if (!multipleSelection.value.length) {
+    ElMessage.warning('请先勾选要匹配的交易')
+    batchMatchToggle.value = false
+    return
+  }
+  openBatchMatch()
+}
+
 // 批量删除
 const handleBatchDelete = async () => {
   if (!multipleSelection.value.length) {
@@ -928,17 +963,35 @@ const customersLoading = ref(false)
 const customerOptions = ref([])
 const platformsLoading = ref(false)
 const platformOptions = ref([])
-const matchForm = reactive({ id: null, customerId: null, platformId: null })
+const matchForm = reactive({ id: null, ids: [], customerId: null, platformId: null, transferAccountId: null })
 const matchType = ref('settle') // settle | buyfx | transfer | expense
 
 const handleMatchRow = (row) => {
+  batchMode.value = false
   matchForm.id = row?.id || null
+  matchForm.ids = []
   matchForm.customerId = null
   matchForm.platformId = null
+  matchForm.transferAccountId = null
   customerOptions.value = []
   platformOptions.value = []
   matchType.value = 'settle'
   matchDrawerVisible.value = true
+}
+
+const openBatchMatch = () => {
+  batchMode.value = true
+  matchForm.id = null
+  matchForm.ids = (multipleSelection.value || []).map(x => x.id)
+  matchForm.customerId = null
+  matchForm.platformId = null
+  matchForm.transferAccountId = null
+  customerOptions.value = []
+  platformOptions.value = []
+  matchType.value = 'settle'
+  matchDrawerVisible.value = true
+  // 打开后立即复位表头复选框
+  batchMatchToggle.value = false
 }
 
 const searchCustomers = async (q) => {
@@ -968,11 +1021,22 @@ watch(matchType, (nv) => {
   if (nv === 'buyfx' && platformOptions.value.length === 0) {
     fetchPlatforms()
   }
+  if (nv === 'transfer' && accounts.value.length === 0) {
+    fetchAccounts()
+  }
 })
 
 const confirmMatch = async () => {
+  // 统一处理：单笔 or 批量
+  const isBatch = batchMode.value
+  const ids = isBatch ? (matchForm.ids || []) : (matchForm.id ? [matchForm.id] : [])
+  if (!ids.length) {
+    ElMessage.warning('未选择需要匹配的交易')
+    return
+  }
+
   if (matchType.value === 'settle') {
-    if (!matchForm.id || !matchForm.customerId) {
+    if (!matchForm.customerId) {
       ElMessage.warning(t('transactions.selectCustomerFirst'))
       return
     }
@@ -980,9 +1044,13 @@ const confirmMatch = async () => {
       matching.value = true
       const c = customerOptions.value.find(x => x.id === matchForm.customerId)
       const name = c?.name || ''
-      await api.transactions.match(matchForm.id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
+      let ok = 0
+      for (const id of ids) {
+        try { await api.transactions.match(id, { type: 'customer', targetId: matchForm.customerId, targetName: name }); ok++ } catch {}
+      }
       matchDrawerVisible.value = false
-      ElMessage.success(t('transactions.matchSuccess'))
+      batchMode.value = false
+      ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
       fetchTransactions()
     } catch (e) {
       console.error('match failed', e)
@@ -990,22 +1058,50 @@ const confirmMatch = async () => {
     } finally {
       matching.value = false
     }
+  } else if (matchType.value === 'buyfx') {
+    if (!matchForm.platformId) {
+      ElMessage.warning(t('transactions.selectPlatformFirst'))
+      return
+    }
+    try {
+      matching.value = true
+      const p = platformOptions.value.find(x => x.id === matchForm.platformId)
+      const name = p?.name || ''
+      let ok = 0
+      for (const id of ids) {
+        try { await api.transactions.match(id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name }); ok++ } catch {}
+      }
+      matchDrawerVisible.value = false
+      batchMode.value = false
+      ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
+      fetchTransactions()
+    } catch (e) {
+      console.error('match buyfx failed', e)
+      ElMessage.error(t('transactions.matchFailed'))
+    } finally {
+      matching.value = false
+    }
   } else {
-    if (matchType.value === 'buyfx') {
-      if (!matchForm.id || !matchForm.platformId) {
-        ElMessage.warning(t('transactions.selectPlatformFirst'))
+    // transfer
+    if (matchType.value === 'transfer') {
+      if (!matchForm.transferAccountId) {
+        ElMessage.warning('请选择收款账户')
         return
       }
       try {
         matching.value = true
-        const p = platformOptions.value.find(x => x.id === matchForm.platformId)
-        const name = p?.name || ''
-        await api.transactions.match(matchForm.id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name })
+        const a = (accounts.value || []).find(x => x.id === matchForm.transferAccountId)
+        const name = a ? `${a.bank_zh || a.bank_en || ''} · ${a.account_name || ''} · ${a.bank_account || ''}` : ''
+        let ok = 0
+        for (const id of ids) {
+          try { await api.transactions.match(id, { type: 'transfer', targetId: matchForm.transferAccountId, targetName: name }); ok++ } catch {}
+        }
         matchDrawerVisible.value = false
-        ElMessage.success(t('transactions.matchSuccess'))
+        batchMode.value = false
+        ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
         fetchTransactions()
       } catch (e) {
-        console.error('match buyfx failed', e)
+        console.error('match transfer failed', e)
         ElMessage.error(t('transactions.matchFailed'))
       } finally {
         matching.value = false

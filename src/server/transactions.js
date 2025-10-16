@@ -475,7 +475,7 @@ transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('view_tr
     const { type, targetId, targetName } = req.body || {}
     if (!id || !type) return res.status(400).json({ error: 'missing fields' })
     const t = String(type).toLowerCase()
-    if (!['customer','supplier','expense','buyfx'].includes(t)) return res.status(400).json({ error: 'invalid type' })
+  if (!['customer','supplier','expense','buyfx','transfer'].includes(t)) return res.status(400).json({ error: 'invalid type' })
 
     // 特殊处理：购汇匹配到平台商，同时更新平台余额
     if (t === 'buyfx') {
