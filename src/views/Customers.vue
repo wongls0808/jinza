@@ -79,8 +79,8 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="addDlg.visible" :title="$t('customers.addTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
+    <!-- 新增客户：改为抽屉 -->
+    <el-drawer v-model="addDlg.visible" :title="$t('customers.addTitle')" :close-on-click-modal="false" :show-close="true" :with-header="true" :size="'min(720px, 92vw)'">
       <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="120px" label-position="left" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="addDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
@@ -122,10 +122,12 @@
         <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
       </el-form>
       <template #footer>
-        <el-button @click="addDlg.visible=false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :loading="addDlg.loading" @click="doAdd">{{ $t('common.ok') }}</el-button>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <el-button @click="addDlg.visible=false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="addDlg.loading" @click="doAdd">{{ $t('common.ok') }}</el-button>
+        </div>
       </template>
-    </el-dialog>
+    </el-drawer>
 
     <!-- 编辑客户对话框 -->
     <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="min(720px, 92vw)" :close-on-click-modal="false">

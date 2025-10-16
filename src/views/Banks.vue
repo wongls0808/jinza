@@ -29,7 +29,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" width="520px">
+    <el-drawer v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" :size="520" :close-on-click-modal="false">
       <el-form :model="dlg.form" label-width="140px" size="small" class="form">
         <el-form-item :label="$t('banks.labels.code')">
           <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" :disabled="dlg.mode==='edit' && !!dlg.form.id" />
@@ -47,11 +47,13 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
-        <el-button v-if="dlg.mode==='edit'" type="danger" :loading="dlg.loading" @click="removeInDialog">{{ $t('common.delete') }}</el-button>
-        <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
+          <el-button v-if="dlg.mode==='edit'" type="danger" :loading="dlg.loading" @click="removeInDialog">{{ $t('common.delete') }}</el-button>
+          <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
+        </div>
       </template>
-    </el-dialog>
+    </el-drawer>
   </div>
   </template>
 

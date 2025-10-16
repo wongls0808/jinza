@@ -97,7 +97,7 @@
       </el-table>
     </el-drawer>
 
-  <el-dialog v-model="dlg.visible" :title="$t('accounts.addTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
+  <el-drawer v-model="dlg.visible" :title="$t('accounts.addTitle')" :size="'min(720px, 92vw)'" :close-on-click-modal="false">
     <el-form :model="dlg.form" label-width="120px" label-position="left" size="small" class="form">
         <el-form-item :label="$t('accounts.form.accountName')">
           <el-input v-model.trim="dlg.form.account_name" :placeholder="$t('accounts.form.accountName')" clearable />
@@ -136,10 +136,12 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <el-button @click="dlg.visible=false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="dlg.loading" @click="submit">{{ $t('common.ok') }}</el-button>
+        </div>
       </template>
-    </el-dialog>
+    </el-drawer>
   </div>
 </template>
 
