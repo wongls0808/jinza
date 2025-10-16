@@ -5,9 +5,9 @@
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
     <!-- 快捷入口（APP式 3D 交互） -->
-    <div class="quick" style="margin-top:8px;">
+    <div class="quick" style="margin-top:8px; margin-bottom:8px;">
       <el-card shadow="never">
-        <div class="quick-title">{{ t('home.quickActions') }}</div>
+        <div class="quick-title" data-testid="qa-title">{{ t('home.quickActions') }}</div>
         <template v-if="quickActions.some(i => i.show)">
           <div class="app-buttons">
             <div 
@@ -233,6 +233,13 @@ async function loadTodos(){
   } catch {}
 }
 onMounted(() => { loadTodos(); loadPlatforms() })
+// 轻量日志，便于定位本机“快捷入口”不可见问题（生产无害）
+onMounted(() => {
+  try {
+    const visible = (quickActions.value || []).filter(i => i.show)
+    console.info('[Home] QuickActions visible count =', visible.length, 'perms=', (state?.perms||[]))
+  } catch {}
+})
 
 async function openTodo(row){
   const d = await api.fx.payments.detail(row.id)
