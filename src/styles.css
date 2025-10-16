@@ -17,6 +17,7 @@ body {
 	--app-container-width: 1200px;
 	--app-radius: 10px;
 	--app-gap: 12px;
+	--topbar-height: 56px;
 	--app-shadow-sm: 0 4px 12px rgba(0,0,0,.06);
 	--app-shadow-lg: 0 20px 50px rgba(0,0,0,.12);
 	--app-glass-bg: color-mix(in oklab, var(--el-color-primary) 6%, transparent);
@@ -128,6 +129,7 @@ input:focus, select:focus, textarea:focus {
 .status-info .dot { background: var(--el-color-info); }
 
 /* 统一 Dialog/Drawer 的样式比例（Element Plus 覆盖） */
+.el-message-box { margin-top: calc(var(--topbar-height) + 12px) !important; }
 .el-dialog__header {
 	padding: 12px 16px 10px !important;
 	border-bottom: 1px solid var(--el-border-color-light);

@@ -160,6 +160,9 @@ function handleSelect(key) {
   background: linear-gradient(90deg, var(--el-color-primary) 0%, color-mix(in oklab, var(--el-color-primary) 88%, #fff) 100%);
   color: var(--el-color-white);
   box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  position: sticky;
+  top: 0;
+  z-index: 2020; /* 高于下拉/弹层(2000)，低于对话框(2001+) */
 }
 .left-spacer {
   flex: 0 0 40px; /* 左侧留白较小 */
