@@ -7,25 +7,19 @@
 
     <div class="quick" style="margin-top:8px; margin-bottom:8px;">
       <el-card shadow="never">
-        <div class="quick-title">{{ t('home.quickActions') }}</div>
-        <template v-if="quickActions.some(i => i.show)">
-          <div class="app-buttons">
-            <div 
-              v-for="it in quickActions" :key="it.key"
-              v-if="it.show"
-              class="app-btn"
-              :class="`is-${it.color}`"
-              v-tilt="{ max: 10, scale: 1.03 }"
-              @click="go({ name: it.route })"
-            >
-              <div class="app-btn__icon">{{ it.icon }}</div>
-              <div class="app-btn__label">{{ it.label }}</div>
-            </div>
+        <div class="quick-title" data-testid="qa-title">{{ t('home.quickActions') }}</div>
+        <div class="app-buttons">
+          <div 
+            v-for="it in quickActions" :key="it.key"
+            class="app-btn"
+            :class="`is-${it.color}`"
+            v-tilt="{ max: 10, scale: 1.03 }"
+            @click="go({ name: it.route })"
+          >
+            <div class="app-btn__icon">{{ it.icon }}</div>
+            <div class="app-btn__label">{{ it.label }}</div>
           </div>
-        </template>
-        <template v-else>
-          <el-empty description="暂无可用快捷操作" />
-        </template>
+        </div>
       </el-card>
     </div>
   </div>
@@ -44,12 +38,13 @@ const { t } = useI18n()
 const username = computed(() => state.user?.display_name || state.user?.username || '')
 const today = new Date().toLocaleDateString()
 
+// 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [
-  { key: 'tx', label: t('home.qaTransactions'), route: 'transactions', perm: 'view_transactions', color: 'blue', icon: '📒', show: has('view_transactions') },
-  { key: 'settleManage', label: t('home.qaSettlements'), route: 'fx-settlements', perm: 'view_fx', color: 'green', icon: '🧾', show: has('view_fx') },
-  { key: 'settleHistory', label: t('home.qaSettlementsHistory'), route: 'fx-settlements', perm: 'view_fx', color: 'teal', icon: '🗂️', show: has('view_fx') },
-  { key: 'payHistory', label: t('home.qaPaymentsHistory'), route: 'fx-payments', perm: 'view_fx', color: 'orange', icon: '💳', show: has('view_fx') },
-  { key: 'buyHistory', label: t('home.qaBuyHistory'), route: 'fx-buy-history', perm: 'view_fx', color: 'purple', icon: '💱', show: has('view_fx') },
+  { key: 'tx', label: t('home.qaTransactions'), route: 'transactions', color: 'blue', icon: '📒' },
+  { key: 'settleManage', label: t('home.qaSettlements'), route: 'fx-settlements', color: 'green', icon: '🧾' },
+  { key: 'settleHistory', label: t('home.qaSettlementsHistory'), route: 'fx-settlements', color: 'teal', icon: '🗂️' },
+  { key: 'payHistory', label: t('home.qaPaymentsHistory'), route: 'fx-payments', color: 'orange', icon: '💳' },
+  { key: 'buyHistory', label: t('home.qaBuyHistory'), route: 'fx-buy-history', color: 'purple', icon: '💱' },
 ])
 </script>
 
