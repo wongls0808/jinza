@@ -512,6 +512,88 @@ fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requirePerm('view_
   res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
 })
 
+// ---------- 平台统一借贷账目（互换=买/卖 + 审批支出=支出） ----------
+fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+  await ensureDDL()
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid platform id' })
+  const { currency, startDate, endDate, page = 1, pageSize = 100 } = req.query || {}
+  const where = [ `platform_id = $1` ]
+  // 构建公共筛选条件：在外层再按 currency/date 过滤
+  const params = [ id ]
+  let idx = 2
+  const more = []
+  if (currency) { more.push(`upper(currency) = $${idx++}`); params.push(String(currency).toUpperCase()) }
+  if (startDate) { more.push(`ts >= $${idx++}`); params.push(startDate) }
+  if (endDate) { more.push(`ts <= $${idx++}`); params.push(endDate) }
+  const moreSql = more.length ? ('where ' + more.join(' and ')) : ''
+  const offset = (Number(page)-1) * Number(pageSize)
+
+  const sqlBase = `
+    with xfer as (
+      select id, created_at as ts, from_currency, to_currency, amount_from, amount_to, fee_amount, note, platform_id
+        from fx_platform_fx_transfers
+       where platform_id = $1
+    ),
+    xfer_debit as (
+      select ts, 'transfer'::text as source, 'sell'::text as action,
+             upper(from_currency) as currency,
+             round(coalesce(amount_from,0)::numeric, 2) as debit,
+             0::numeric as credit,
+             id as ref_id,
+             null::text as ref_no,
+             note,
+             platform_id
+        from xfer
+    ),
+    xfer_credit as (
+      select ts, 'transfer'::text as source, 'buy'::text as action,
+             upper(to_currency) as currency,
+             0::numeric as debit,
+             round(coalesce(amount_to,0)::numeric, 2) as credit,
+             id as ref_id,
+             null::text as ref_no,
+             note,
+             platform_id
+        from xfer
+    ),
+    exp as (
+      select a.payment_id as ref_id,
+             a.acted_at as ts,
+             'expense'::text as source,
+             'expense'::text as action,
+             upper(k.key) as currency,
+             round(coalesce((k.value->>'total')::numeric,0), 2) as debit,
+             0::numeric as credit,
+             p.bill_no::text as ref_no,
+             p.customer_name::text as note,
+             a.platform_id
+        from fx_payment_audits a
+        join fx_payments p on p.id = a.payment_id
+        cross join lateral jsonb_each(a.deltas) as k(key, value)
+       where a.platform_id = $1 and a.action = 'approve'
+    ),
+    all_rows as (
+      select * from xfer_debit
+      union all
+      select * from xfer_credit
+      union all
+      select * from exp
+    )
+    select * from all_rows
+  `
+
+  const total = await query(
+    `select count(*) from (${sqlBase}) z ${moreSql}`,
+    params
+  )
+  const rows = await query(
+    `select * from (${sqlBase}) z ${moreSql} order by ts desc, ref_id desc offset $${idx++} limit $${idx++}`,
+    [ ...params, offset, Number(pageSize) ]
+  )
+  res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
+})
+
 // ---------- 中国银行挂牌价（银行买入价） ----------
 // 支持 pair: USD/CNY, MYR/CNY, MYR/USD（或使用连字符）
 fxRouter.get('/rates/boc', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {

@@ -108,9 +108,11 @@ const messages = {
       viewOrders: '查看购汇历史',
       loanRecords: '借贷记录',
     exportExpenses: '导出支出记录',
-    exportTransfers: '导出互换记录',
-    tabTransfers: '互换记录',
-    tabExpenses: '平台支出'
+    exportLedger: '导出借贷账目',
+    source: '来源',
+    action: '动作',
+    debit: '借',
+    credit: '贷'
   ,historyDate: '日期',
   platform: '平台',
   sellCurrency: '卖出币种',
@@ -560,9 +562,11 @@ const messages = {
       viewOrders: 'View Buy Orders',
       loanRecords: 'Loan Records',
     exportExpenses: 'Export Expenses',
-    exportTransfers: 'Export Transfers',
-    tabTransfers: 'Transfers',
-    tabExpenses: 'Platform Expenses'
+    exportLedger: 'Export Ledger',
+    source: 'Source',
+    action: 'Action',
+    debit: 'Debit',
+    credit: 'Credit'
   ,historyDate: 'Date',
   platform: 'Platform',
   sellCurrency: 'Sell Currency',

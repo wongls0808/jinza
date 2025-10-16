@@ -281,6 +281,8 @@ export const api = {
   listTransfers: () => request('/fx/transfers'),
   // 平台支出（付款审核时产生）
   listPlatformExpenses: (platformId, params={}) => request(`/fx/platforms/${platformId}/expenses?${new URLSearchParams(params).toString()}`),
+  // 平台统一账目（买=贷、卖=借、支出=借）
+  listPlatformLedger: (platformId, params={}) => request(`/fx/platforms/${platformId}/ledger?${new URLSearchParams(params).toString()}`),
   updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),
   updateOrder: (id, data) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOrder: (id) => request(`/fx/transfers/${id}`, { method: 'DELETE' }),
