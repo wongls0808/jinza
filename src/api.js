@@ -277,6 +277,8 @@ export const api = {
     // 实时汇率接口已移除，改为手工录入汇率
   // 历史记录改用平台内互换记录
   listOrders: () => request('/fx/transfers'),
+  // 平台内币种互换记录（最近200条）
+  listTransfers: () => request('/fx/transfers'),
   updateOrderNote: (id, note) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify({ note }) }),
   updateOrder: (id, data) => request(`/fx/transfers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteOrder: (id) => request(`/fx/transfers/${id}`, { method: 'DELETE' }),

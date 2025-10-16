@@ -25,6 +25,7 @@
                       <el-button size="small" type="danger">{{ t('buyfx.delete') }}</el-button>
                     </template>
                   </el-popconfirm>
+                  <el-button size="small" type="primary" plain @click="openLoansDrawer(p)">{{ t('buyfx.loanRecords') }}</el-button>
                 </div>
               </div>
               <div class="platform-card__body">
@@ -93,6 +94,36 @@
       </template>
     </el-dialog>
   </div>
+  
+  <!-- 平台商借贷/互换记录抽屉 -->
+  <el-drawer v-model="loans.visible" :title="`${t('buyfx.loanRecords')} · ${loans.platform?.name||loans.platform?.code||''}`" size="60%">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+      <el-tabs v-model="loans.currency" @tab-change="onLoanCurrencyChange">
+        <el-tab-pane label="ALL" name="ALL" />
+        <el-tab-pane label="USD" name="USD" />
+        <el-tab-pane label="MYR" name="MYR" />
+        <el-tab-pane label="CNY" name="CNY" />
+      </el-tabs>
+      <el-button type="primary" plain @click="exportLoansCsv">{{ t('buyfx.exportExpenses') }}</el-button>
+    </div>
+    <el-table :data="loansShown" size="small" border v-loading="loans.loading">
+      <el-table-column prop="created_at" :label="t('common.createdAt')" width="160">
+        <template #default="{ row }">{{ (row.created_at||'').slice(0,19) }}</template>
+      </el-table-column>
+      <el-table-column prop="from_currency" :label="t('buyfx.sellCurrency')" width="100" />
+      <el-table-column prop="to_currency" :label="t('buyfx.buyCurrency')" width="100" />
+      <el-table-column prop="amount_from" :label="t('buyfx.sellAmount')" width="140">
+        <template #default="{ row }">{{ money6(row.amount_from) }}</template>
+      </el-table-column>
+      <el-table-column prop="rate" :label="t('buyfx.rate')" width="120" />
+      <el-table-column prop="amount_to" :label="t('buyfx.buyAmount')" width="140">
+        <template #default="{ row }">{{ money6(row.amount_to) }}</template>
+      </el-table-column>
+      <el-table-column prop="fee_percent" :label="t('buyfx.feePercent')" width="120" />
+      <el-table-column prop="fee_amount" :label="t('buyfx.fee')" width="120" />
+      <el-table-column prop="note" :label="t('common.details')" min-width="160" />
+    </el-table>
+  </el-drawer>
 </template>
 
 <script setup>
@@ -249,6 +280,76 @@ function onPlatformChange(){
 }
 function onFromChange(){
   if (!amountEdited.value || !convert.value.amount) setAmountFromBalance()
+}
+
+// —— 平台商：借贷/互换记录抽屉 ——
+const loans = ref({ visible: false, loading: false, platform: null, currency: 'ALL', list: [] })
+const currencyTabs = [
+  { label: 'ALL', value: 'ALL' },
+  { label: 'USD', value: 'USD' },
+  { label: 'MYR', value: 'MYR' },
+  { label: 'CNY', value: 'CNY' }
+]
+function openLoansDrawer(p){
+  loans.value.visible = true
+  loans.value.platform = p
+  loans.value.currency = 'ALL'
+  loadLoans()
+}
+async function loadLoans(){
+  loans.value.loading = true
+  try {
+    const res = await api.buyfx.listTransfers()
+    const all = Array.isArray(res?.items) ? res.items : []
+    // 仅取该平台记录
+    const filtered = all.filter(r => Number(r.platform_id) === Number(loans.value.platform?.id))
+    loans.value.list = filtered
+  } catch (e) {
+    ElMessage.error(e?.message || '加载失败')
+  } finally {
+    loans.value.loading = false
+  }
+}
+const loansShown = computed(() => {
+  const cur = String(loans.value.currency||'ALL').toUpperCase()
+  if (cur === 'ALL') return loans.value.list
+  return (loans.value.list||[]).filter(r => String(r.from_currency).toUpperCase()===cur || String(r.to_currency).toUpperCase()===cur)
+})
+function onLoanCurrencyChange(){ /* 即时过滤，必要时可触发后端筛选 */ }
+function money6(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:6}) }
+function exportLoansCsv(){
+  try {
+    const rows = loansShown.value || []
+    const header = ['ID','Date','From','To','Amount From','Rate','Amount To','Fee%','Fee Amount','Src Before','Src After','Dst Before','Dst After','Note']
+    const body = rows.map(r => [
+      r.id,
+      (r.created_at?.slice?.(0,19) || r.created_at || ''),
+      r.from_currency||'',
+      r.to_currency||'',
+      r.amount_from,
+      r.rate,
+      r.amount_to,
+      r.fee_percent,
+      r.fee_amount,
+      r.balance_src_before,
+      r.balance_src_after,
+      r.balance_dst_before,
+      r.balance_dst_after,
+      r.note||''
+    ])
+    const csvRows = [header, ...body]
+    const csv = csvRows.map(r => r.map(v => {
+      const s = v==null? '': String(v)
+      return (/[",\n]/.test(s)) ? '"'+s.replace(/"/g,'""')+'"' : s
+    }).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    const pf = loans.value.platform?.name || loans.value.platform?.code || 'Platform'
+    a.download = `${pf}-Loans-${Date.now()}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  } catch {}
 }
 </script>
 
