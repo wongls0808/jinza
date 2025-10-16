@@ -1,75 +1,75 @@
 <template>
   <div class="page container">
     <div class="head">
-      <div class="title">银行对账单导入</div>
+      <div class="title">{{ t('receipts.title') }}</div>
       <div class="spacer"></div>
     </div>
 
     <el-card class="jelly" shadow="hover">
       <template #header>
         <div class="toolbar">
-          <div class="hint">仅支持银行官方CSV，系统将只读取以下字段：Account Number、Trn. Date、Cheque No/Ref No、Debit Amount、Credit Amount、Reference 1-3；导入时不会更改原文件。</div>
+          <div class="hint">{{ t('receipts.hint') }}</div>
           <div class="spacer"></div>
           <el-upload
             :auto-upload="false"
             accept=".csv"
             :on-change="onFileChange"
           >
-            <el-button type="primary">选择CSV文件</el-button>
+            <el-button type="primary">{{ t('receipts.selectCsv') }}</el-button>
           </el-upload>
           <el-divider direction="vertical" />
-          <el-date-picker v-model="promoteRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 280px" />
-          <el-button :disabled="!result?.account?.account_number" @click="promote" type="success">转入交易</el-button>
+          <el-date-picker v-model="promoteRange" type="daterange" range-separator="-" :start-placeholder="t('transactions.startDate')" :end-placeholder="t('transactions.endDate')" value-format="YYYY-MM-DD" style="width: 280px" />
+          <el-button :disabled="!result?.account?.account_number" @click="promote" type="success">{{ t('receipts.promote') }}</el-button>
         </div>
       </template>
 
       <el-descriptions v-if="result" :column="3" border class="summary">
-        <el-descriptions-item label="账户号码">{{ result.account?.account_number || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="账户名称">{{ result.account?.account_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="对应客户">{{ result.account?.customer_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="银行">
+        <el-descriptions-item :label="t('accountManagement.accountNumber')">{{ result.account?.account_number || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('transactions.accountName')">{{ result.account?.account_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('common.customer')">{{ result.account?.customer_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('transactions.bankName')">
           <div class="bankcell" v-if="result.account?.bank_code">
             <img :src="bankImg(result.account.bank_code)" class="logo" @error="onBankImgErr($event)" />
             <span>{{ result.account.bank_code }}</span>
           </div>
           <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="解析条数">{{ result.totalParsed }}</el-descriptions-item>
-        <el-descriptions-item label="成功导入">{{ result.inserted }}</el-descriptions-item>
-        <el-descriptions-item label="重复跳过">{{ result.duplicates }}</el-descriptions-item>
+        <el-descriptions-item :label="t('receipts.parsedCount')">{{ result.totalParsed }}</el-descriptions-item>
+        <el-descriptions-item :label="t('receipts.insertedCount')">{{ result.inserted }}</el-descriptions-item>
+        <el-descriptions-item :label="t('receipts.duplicatesCount')">{{ result.duplicates }}</el-descriptions-item>
       </el-descriptions>
 
       <div v-if="sample.length" class="sample">
-        <div class="sample-title">样例（前5行）</div>
+        <div class="sample-title">{{ t('receipts.sampleTitle') }}</div>
         <el-table :data="sample" size="small" border>
-          <el-table-column prop="account_number" label="Account Number" />
-          <el-table-column prop="trn_date" label="Trn. Date" />
-          <el-table-column prop="cheque_ref_no" label="Cheque No/Ref No" />
-          <el-table-column prop="debit_amount" label="Debit Amount" align="right" />
-          <el-table-column prop="credit_amount" label="Credit Amount" align="right" />
-          <el-table-column prop="reference1" label="Reference 1" />
-          <el-table-column prop="reference2" label="Reference 2" />
-          <el-table-column prop="reference3" label="Reference 3" />
+          <el-table-column prop="account_number" :label="t('accountManagement.accountNumber')" />
+          <el-table-column prop="trn_date" :label="t('accountManagement.transactionDate')" />
+          <el-table-column prop="cheque_ref_no" :label="t('accountManagement.chequeRefNo')" />
+          <el-table-column prop="debit_amount" :label="t('accountManagement.debitAmount')" align="right" />
+          <el-table-column prop="credit_amount" :label="t('accountManagement.creditAmount')" align="right" />
+          <el-table-column prop="reference1" :label="t('accountManagement.reference1')" />
+          <el-table-column prop="reference2" :label="t('accountManagement.reference2')" />
+          <el-table-column prop="reference3" :label="t('accountManagement.reference3')" />
         </el-table>
       </div>
 
       <el-divider />
 
       <div class="list-head">
-        <div class="title small">导入记录</div>
+        <div class="title small">{{ t('receipts.recordsTitle') }}</div>
         <div class="spacer"></div>
-        <el-input v-model.trim="accountFilter" placeholder="按 Account Number 过滤" clearable style="width:260px" @keyup.enter="load" @clear="load" />
+        <el-input v-model.trim="accountFilter" :placeholder="t('receipts.filterByAccountNumber')" clearable style="width:260px" @keyup.enter="load" @clear="load" />
       </div>
       <el-table :data="rows" size="small" border style="width:100%">
-        <el-table-column prop="account_number" label="Account Number" width="160" />
-        <el-table-column prop="trn_date" label="Trn. Date" width="120" />
-        <el-table-column prop="cheque_ref_no" label="Cheque No/Ref No" width="160" />
-        <el-table-column prop="debit_amount" label="Debit Amount" align="right" width="140" />
-        <el-table-column prop="credit_amount" label="Credit Amount" align="right" width="140" />
-        <el-table-column prop="reference1" label="Reference 1" />
-        <el-table-column prop="reference2" label="Reference 2" />
-        <el-table-column prop="reference3" label="Reference 3" />
-        <el-table-column label="账户/客户" width="260">
+        <el-table-column prop="account_number" :label="t('accountManagement.accountNumber')" width="160" />
+        <el-table-column prop="trn_date" :label="t('accountManagement.transactionDate')" width="120" />
+        <el-table-column prop="cheque_ref_no" :label="t('accountManagement.chequeRefNo')" width="160" />
+        <el-table-column prop="debit_amount" :label="t('accountManagement.debitAmount')" align="right" width="140" />
+        <el-table-column prop="credit_amount" :label="t('accountManagement.creditAmount')" align="right" width="140" />
+        <el-table-column prop="reference1" :label="t('accountManagement.reference1')" />
+        <el-table-column prop="reference2" :label="t('accountManagement.reference2')" />
+        <el-table-column prop="reference3" :label="t('accountManagement.reference3')" />
+        <el-table-column :label="t('receipts.accountCustomer')" width="260">
           <template #default="{ row }">
             <div class="accinfo">
               <div class="line">
@@ -77,7 +77,7 @@
                 <span class="name">{{ row.account_name || '-' }}</span>
                 <span class="code">{{ row.bank_code || '' }}</span>
               </div>
-              <div class="sub">{{ row.customer_name || '未匹配客户' }}</div>
+              <div class="sub">{{ row.customer_name || t('receipts.unmatchedCustomer') }}</div>
             </div>
           </template>
         </el-table-column>
@@ -101,8 +101,11 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
+
+const { t } = useI18n()
 
 const result = ref(null)
 const sample = ref([])
@@ -139,9 +142,9 @@ async function onFileChange(file) {
     accountFilter.value = r?.account?.account_number || ''
     if (r?.period?.from_date && r?.period?.to_date) promoteRange.value = [r.period.from_date, r.period.to_date]
     await load()
-    ElMessage.success(`导入完成：成功 ${r.inserted} 条，重复 ${r.duplicates} 条`)
+    ElMessage.success(t('receipts.importDone', { inserted: r.inserted, duplicates: r.duplicates }))
   } catch (e) {
-    ElMessage.error(e?.message || '导入失败')
+    ElMessage.error(e?.message || t('receipts.importFailed'))
   }
 }
 
@@ -162,9 +165,9 @@ async function promote(){
     })
     if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j?.error || res.statusText) }
     const data = await res.json()
-    ElMessage.success(`转入完成：处理 ${data.total||0} 条，已写入 ${data.inserted||0} 条`)
+    ElMessage.success(t('receipts.promoteDone', { total: data.total||0, inserted: data.inserted||0 }))
   } catch (e) {
-    ElMessage.error(e?.message || '转入失败')
+    ElMessage.error(e?.message || t('receipts.promoteFailed'))
   }
 }
 

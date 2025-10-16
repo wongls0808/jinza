@@ -547,6 +547,24 @@ const messages = {
       maxSelectionTip: '单次最多选择 {n} 条'
     }
   },
+  receipts: {
+      title: '银行对账单导入',
+      hint: '仅支持银行官方CSV，系统将只读取以下字段：Account Number、Trn. Date、Cheque No/Ref No、Debit Amount、Credit Amount、Reference 1-3；导入时不会更改原文件。',
+      selectCsv: '选择CSV文件',
+      promote: '转入交易',
+      parsedCount: '解析条数',
+      insertedCount: '成功导入',
+      duplicatesCount: '重复跳过',
+      sampleTitle: '样例（前5行）',
+      recordsTitle: '导入记录',
+      filterByAccountNumber: '按 Account Number 过滤',
+      accountCustomer: '账户/客户',
+      unmatchedCustomer: '未匹配客户',
+      importDone: '导入完成：成功 {inserted} 条，重复 {duplicates} 条',
+      importFailed: '导入失败',
+      promoteDone: '转入完成：处理 {total} 条，已写入 {inserted} 条',
+      promoteFailed: '转入失败'
+  },
   en: {
     app: {
       title: 'Enterprise Management',
@@ -659,6 +677,24 @@ const messages = {
       settledAmount: 'Converted Amount',
       preBalance: 'Pre-Settle Balance',
       maxSelectionTip: 'Select up to {n} items per operation'
+    },
+    receipts: {
+      title: 'Bank Receipts Import',
+      hint: 'Only official bank CSV is supported. Fields read: Account Number, Trn. Date, Cheque No/Ref No, Debit Amount, Credit Amount, Reference 1-3. The original file will not be modified.',
+      selectCsv: 'Select CSV File',
+      promote: 'Promote to Transactions',
+      parsedCount: 'Parsed Rows',
+      insertedCount: 'Imported',
+      duplicatesCount: 'Duplicates',
+      sampleTitle: 'Sample (first 5 rows)',
+      recordsTitle: 'Import Records',
+      filterByAccountNumber: 'Filter by Account Number',
+      accountCustomer: 'Account / Customer',
+      unmatchedCustomer: 'Unmatched Customer',
+      importDone: 'Import done: {inserted} inserted, {duplicates} skipped',
+      importFailed: 'Import failed',
+      promoteDone: 'Promote done: processed {total}, inserted {inserted}',
+      promoteFailed: 'Promote failed'
     },
     common: {
       backHome: 'Back to Home',
