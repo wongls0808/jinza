@@ -5,13 +5,12 @@
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
 
-    <div class="quick" style="margin-top:8px; margin-bottom:8px;">
+    <div class="quick" style="margin-top:8px; margin-bottom:8px; position: relative;">
       <el-card shadow="never" class="card--plain">
-        <div class="card-grid">
+        <div class="card-grid single-row">
           <div
             v-for="it in quickActions" :key="it.key"
             class="feature-card"
-            :class="`is-${it.color}`"
             role="button"
             :aria-label="it.label"
             tabindex="0"
@@ -25,26 +24,29 @@
             </div>
             <div class="fc-texts">
               <div class="fc-title">{{ it.label }}</div>
-              <div class="fc-desc">{{ it.desc }}</div>
+              <!-- 描述词已移除 -->
             </div>
             <div class="fc-arrow">›</div>
           </div>
         </div>
       </el-card>
     </div>
-    <!-- 待办模块图标区 -->
-    <div class="modules">
-      <div class="module" role="button" tabindex="0" aria-label="payments" @click="openPayments" @keydown.enter.prevent="openPayments" @keydown.space.prevent="openPayments">
-        <el-badge :value="paymentsCount" :max="99" type="danger">
-          <div class="module-card">
-            <div class="m-icon"><CreditCard /></div>
-            <div class="m-texts">
-              <div class="m-title">{{ t('workbench.todos.payments') }}</div>
-              <div class="m-desc">{{ t('workbench.todos.title') }}</div>
-            </div>
-          </div>
-        </el-badge>
-      </div>
+
+    <!-- 可拖拽的“付款待审”浮动按钮（持久化位置） -->
+    <div
+      class="floating-payments"
+      :style="fabStyle"
+      role="button"
+      aria-label="付款待审"
+      @mousedown="onFabDown"
+      @touchstart="onFabDown"
+      @click="onFabClick"
+    >
+      <el-badge :value="paymentsCount" :max="99" type="danger">
+        <div class="fp-btn">
+          <CreditCard />
+        </div>
+      </el-badge>
     </div>
 
     <!-- 付款待审抽屉列表（含审核操作） -->
@@ -446,6 +448,56 @@ async function loadPlatforms(){
 }
 
 onMounted(() => { loadPaymentsCount(); loadPlatforms() })
+
+// —— 付款待审：可拖拽浮动按钮 ——
+const fabPos = ref({ x: 16, y: 160 })
+const fabDragging = ref(false)
+const fabStart = { x: 0, y: 0, mx: 0, my: 0 }
+const fabStyle = computed(() => ({ left: fabPos.value.x + 'px', top: fabPos.value.y + 'px' }))
+function readFab() {
+  try {
+    const raw = localStorage.getItem('fab.payments.pos')
+    if (!raw) return
+    const p = JSON.parse(raw)
+    if (typeof p.x === 'number' && typeof p.y === 'number') fabPos.value = p
+  } catch {}
+}
+function saveFab() { try { localStorage.setItem('fab.payments.pos', JSON.stringify(fabPos.value)) } catch {} }
+function onFabDown(e) {
+  fabDragging.value = true
+  const pt = 'touches' in e ? e.touches[0] : e
+  fabStart.mx = pt.clientX
+  fabStart.my = pt.clientY
+  fabStart.x = fabPos.value.x
+  fabStart.y = fabPos.value.y
+  window.addEventListener('mousemove', onFabMove)
+  window.addEventListener('mouseup', onFabUp)
+  window.addEventListener('touchmove', onFabMove, { passive: false })
+  window.addEventListener('touchend', onFabUp)
+}
+function onFabMove(e) {
+  if (!fabDragging.value) return
+  const pt = 'touches' in e ? e.touches[0] : e
+  if ('touches' in e) e.preventDefault()
+  const dx = pt.clientX - fabStart.mx
+  const dy = pt.clientY - fabStart.my
+  const nx = Math.max(8, Math.min(window.innerWidth - 60, fabStart.x + dx))
+  const ny = Math.max(80, Math.min(window.innerHeight - 60, fabStart.y + dy))
+  fabPos.value = { x: nx, y: ny }
+}
+function onFabUp() {
+  fabDragging.value = false
+  window.removeEventListener('mousemove', onFabMove)
+  window.removeEventListener('mouseup', onFabUp)
+  window.removeEventListener('touchmove', onFabMove)
+  window.removeEventListener('touchend', onFabUp)
+  saveFab()
+}
+function onFabClick() {
+  if (fabDragging.value) return
+  openPayments()
+}
+onMounted(() => { readFab() })
 </script>
 
 <style scoped>
@@ -457,11 +509,8 @@ onMounted(() => { loadPaymentsCount(); loadPlatforms() })
 .card--plain { background: transparent; border: none; box-shadow: none; }
 
 /* 卡片网格 */
-.card-grid { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
-  gap: 14px; 
-}
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.card-grid.single-row { grid-template-columns: repeat(5, minmax(180px, 1fr)); }
 .feature-card {
   position: relative;
   display: grid;
@@ -486,20 +535,16 @@ onMounted(() => { loadPaymentsCount(); loadPlatforms() })
 .fc-icon :deep(svg) { width: 24px; height: 24px; }
 .fc-texts { display: grid; gap: 4px; }
 .fc-title { font-weight: 800; letter-spacing: .2px; }
-.fc-desc { opacity: .92; font-size: 12px; color: var(--el-text-color-secondary); text-shadow: none; }
+.fc-desc { display: none; }
 .fc-arrow { font-size: 20px; opacity: .65; color: var(--el-text-color-secondary); }
 
 /* 主题色系 */
 /* 主题占位已合并为统一白卡风格，无需额外色系 */
 
-/* 待办模块样式 */
-.modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
-.module { cursor: pointer; }
-.module-card { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color); box-shadow: 0 6px 16px rgba(0,0,0,.05); }
-.m-icon { display: flex; align-items: center; justify-content: center; color: var(--el-color-primary); }
-.m-icon :deep(svg) { width: 22px; height: 22px; }
-.m-title { font-weight: 700; }
-.m-desc { font-size: 12px; color: var(--el-text-color-secondary); }
+/* 浮动按钮样式 */
+.floating-payments { position: fixed; z-index: 1000; cursor: move; user-select: none; }
+.fp-btn { width: 44px; height: 44px; border-radius: 22px; background: var(--el-color-primary); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+.fp-btn :deep(svg) { width: 20px; height: 20px; }
 /* 明细/预览样式 */
 .todo-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .todo-head > div { color: var(--el-text-color-primary); font-weight: 600; }
