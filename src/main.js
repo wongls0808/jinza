@@ -10,7 +10,7 @@ import Tilt from './directives/tilt'
 // 强制使用亮色主题
 document.documentElement.classList.remove('dark')
 localStorage.setItem('vueuse-color-scheme', 'light')
-import { User, UserFilled, Box, Document, Setting, Lock, OfficeBuilding, Search, Plus, Delete, Edit, HomeFilled, ArrowLeft, Upload, Download, Refresh } from '@element-plus/icons-vue'
+import { User, UserFilled, Box, Document, Setting, Lock, OfficeBuilding, Search, Plus, Delete, Edit, HomeFilled, ArrowLeft, Upload, Download, Refresh, Tickets, CreditCard, Coin, Collection, FolderOpened } from '@element-plus/icons-vue'
 
 const app = createApp(App)
 app.use(router)
@@ -35,4 +35,9 @@ app.component('ArrowLeft', ArrowLeft)
 app.component('Upload', Upload)
 app.component('Download', Download)
 app.component('Refresh', Refresh)
+app.component('Tickets', Tickets)
+app.component('CreditCard', CreditCard)
+app.component('Coin', Coin)
+app.component('Collection', Collection)
+app.component('FolderOpened', FolderOpened)
 app.mount('#app')

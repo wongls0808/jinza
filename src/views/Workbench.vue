@@ -20,7 +20,9 @@
             @keydown.enter.prevent="go({ name: it.route })"
             @keydown.space.prevent="go({ name: it.route })"
           >
-            <div class="fc-icon">{{ it.icon }}</div>
+            <div class="fc-icon">
+              <component :is="it.icon" />
+            </div>
             <div class="fc-texts">
               <div class="fc-title">{{ it.label }}</div>
               <div class="fc-desc">{{ it.desc }}</div>
@@ -48,11 +50,11 @@ const today = new Date().toLocaleDateString()
 
 // 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [
-  { key: 'tx', label: t('home.qaTransactions'), desc: t('workbench.cards.tx'), route: 'transactions', color: 'blue', icon: '📒' },
-  { key: 'settleManage', label: t('home.qaSettlements'), desc: t('workbench.cards.settleManage'), route: 'fx-settlements', color: 'green', icon: '🧾' },
-  { key: 'settleHistory', label: t('home.qaSettlementsHistory'), desc: t('workbench.cards.settleHistory'), route: 'fx-settlements', color: 'teal', icon: '🗂️' },
-  { key: 'payHistory', label: t('home.qaPaymentsHistory'), desc: t('workbench.cards.payHistory'), route: 'fx-payments', color: 'orange', icon: '💳' },
-  { key: 'buyHistory', label: t('home.qaBuyHistory'), desc: t('workbench.cards.buyHistory'), route: 'fx-buy-history', color: 'purple', icon: '💱' },
+  { key: 'tx', label: t('home.qaTransactions'), desc: t('workbench.cards.tx'), route: 'transactions', color: 'blue', icon: 'Tickets' },
+  { key: 'settleManage', label: t('home.qaSettlements'), desc: t('workbench.cards.settleManage'), route: 'fx-settlements', color: 'green', icon: 'Collection' },
+  { key: 'settleHistory', label: t('home.qaSettlementsHistory'), desc: t('workbench.cards.settleHistory'), route: 'fx-settlements', color: 'teal', icon: 'FolderOpened' },
+  { key: 'payHistory', label: t('home.qaPaymentsHistory'), desc: t('workbench.cards.payHistory'), route: 'fx-payments', color: 'orange', icon: 'CreditCard' },
+  { key: 'buyHistory', label: t('home.qaBuyHistory'), desc: t('workbench.cards.buyHistory'), route: 'fx-buy-history', color: 'purple', icon: 'Coin' },
 ])
 </script>
 
@@ -90,7 +92,8 @@ const quickActions = computed(() => [
 .feature-card::after { display: none; }
 .feature-card:hover { box-shadow: 0 22px 46px rgba(0,0,0,.2); filter: saturate(1.06); }
 .feature-card:focus { outline: 3px solid rgba(255,255,255,.5); outline-offset: 2px; }
-.fc-icon { font-size: 26px; line-height: 1; text-shadow: none; }
+.fc-icon { font-size: 26px; line-height: 1; text-shadow: none; display: flex; align-items: center; justify-content: center; }
+.fc-icon :deep(svg) { width: 24px; height: 24px; }
 .fc-texts { display: grid; gap: 4px; }
 .fc-title { font-weight: 800; letter-spacing: .2px; }
 .fc-desc { opacity: .92; font-size: 12px; color: var(--el-text-color-secondary); text-shadow: none; }
