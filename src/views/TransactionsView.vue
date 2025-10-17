@@ -1484,44 +1484,92 @@ const handleSimpleFileChange = (file) => {
         return cleaned;
       }
       
-      // 解析日期格式 DD/MM/YYYY 转为 YYYY-MM-DD
+      // 增强的日期解析函数
       const parseDate = (dateStr) => {
         if (!dateStr) return null
         const cleaned = cleanExcelValue(dateStr)
         
-        // 尝试解析 DD/MM/YYYY 格式
+        console.log('解析日期:', cleaned) // 调试日志
+        
+        // 如果清理后为空，返回null
+        if (!cleaned || cleaned === '' || cleaned === '-') {
+          return null
+        }
+        
+        // 尝试多种日期格式
+        const dateFormats = [
+          // DD/MM/YYYY 格式
+          /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+          // DD-MM-YYYY 格式
+          /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
+          // MM/DD/YYYY 格式
+          /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+          // YYYY-MM-DD 格式
+          /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+          // DD.MM.YYYY 格式
+          /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/
+        ];
+        
+        // 先尝试 DD/MM/YYYY 格式（银行对账单常用格式）
         const ddmmyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(cleaned)
         if (ddmmyyyy) {
-          const day = ddmmyyyy[1].padStart(2, '0')
-          const month = ddmmyyyy[2].padStart(2, '0')
-          const year = ddmmyyyy[3]
+          const day = parseInt(ddmmyyyy[1])
+          const month = parseInt(ddmmyyyy[2])
+          const year = parseInt(ddmmyyyy[3])
           
-          // 验证日期有效性
-          const testDate = new Date(year, month - 1, day)
-          if (testDate.getFullYear() == year && 
-              testDate.getMonth() == month - 1 && 
-              testDate.getDate() == day) {
-            return `${year}-${month}-${day}`
+          // 验证日期范围
+          if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            const testDate = new Date(year, month - 1, day)
+            if (testDate.getFullYear() === year && 
+                testDate.getMonth() === month - 1 && 
+                testDate.getDate() === day) {
+              return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+            }
           }
         }
         
-        // 尝试解析 YYYY-MM-DD 格式
+        // 尝试 YYYY-MM-DD 格式
         const yyyymmdd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(cleaned)
         if (yyyymmdd) {
-          const year = yyyymmdd[1]
-          const month = yyyymmdd[2].padStart(2, '0')
-          const day = yyyymmdd[3].padStart(2, '0')
+          const year = parseInt(yyyymmdd[1])
+          const month = parseInt(yyyymmdd[2])
+          const day = parseInt(yyyymmdd[3])
           
-          // 验证日期有效性
-          const testDate = new Date(year, month - 1, day)
-          if (testDate.getFullYear() == year && 
-              testDate.getMonth() == month - 1 && 
-              testDate.getDate() == day) {
-            return `${year}-${month}-${day}`
+          if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            const testDate = new Date(year, month - 1, day)
+            if (testDate.getFullYear() === year && 
+                testDate.getMonth() === month - 1 && 
+                testDate.getDate() === day) {
+              return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+            }
           }
         }
         
-        console.warn('无效日期格式:', cleaned)
+        // 尝试解析其他格式并转换
+        const otherFormats = [
+          /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // DD-MM-YYYY
+          /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/ // DD.MM.YYYY
+        ];
+        
+        for (const format of otherFormats) {
+          const match = format.exec(cleaned)
+          if (match) {
+            const day = parseInt(match[1])
+            const month = parseInt(match[2])
+            const year = parseInt(match[3])
+            
+            if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+              const testDate = new Date(year, month - 1, day)
+              if (testDate.getFullYear() === year && 
+                  testDate.getMonth() === month - 1 && 
+                  testDate.getDate() === day) {
+                return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+              }
+            }
+          }
+        }
+        
+        console.warn('无法解析日期格式:', cleaned)
         return null
       }
       
@@ -1535,24 +1583,30 @@ const handleSimpleFileChange = (file) => {
         return isNaN(amount) ? 0 : amount
       }
       
-      // 验证记录完整性
+      // 增强的记录验证函数
       const validateRecord = (record, index) => {
         const errors = []
         
-        if (!record.accountNumber) {
-          errors.push(`第${index + 1}行: 缺少账户号码`)
+        if (!record.accountNumber || record.accountNumber.trim() === '') {
+          errors.push(`第${index + headerIndex + 2}行: 缺少账户号码`)
         }
         
         if (!record.transactionDate) {
-          errors.push(`第${index + 1}行: 日期格式无效 - ${record.originalDate}`)
+          // 只有在原始日期不为空的情况下才报错
+          if (record.originalDate && record.originalDate.trim() !== '' && record.originalDate !== '-') {
+            errors.push(`第${index + headerIndex + 2}行: 日期格式无效 - "${record.originalDate}"`)
+          }
         }
         
         if (record.debitAmount === 0 && record.creditAmount === 0) {
-          errors.push(`第${index + 1}行: 借方和贷方金额都为0`)
+          // 检查是否是表头或空行
+          if (record.originalDate && record.originalDate.trim() !== '' && record.originalDate !== '-') {
+            errors.push(`第${index + headerIndex + 2}行: 借方和贷方金额都为0`)
+          }
         }
         
         if (record.debitAmount < 0 || record.creditAmount < 0) {
-          errors.push(`第${index + 1}行: 金额不能为负数`)
+          errors.push(`第${index + headerIndex + 2}行: 金额不能为负数`)
         }
         
         return errors
@@ -1564,6 +1618,15 @@ const handleSimpleFileChange = (file) => {
         if (!line.trim()) continue
         
         const cells = line.split(',')
+        
+        // 跳过明显的非数据行
+        const firstCell = cleanExcelValue(cells[0] || '')
+        if (!firstCell || firstCell === '' || firstCell === '-' || 
+            firstCell.toLowerCase().includes('total') || 
+            firstCell.toLowerCase().includes('balance') ||
+            firstCell.toLowerCase().includes('statement')) {
+          continue
+        }
         
         // 确保有足够的列数（至少包含Reference 1）
         if (cells.length >= 6) {
@@ -1599,18 +1662,21 @@ const handleSimpleFileChange = (file) => {
             rowIndex: index + headerIndex + 2 // CSV行号
           }
           
-          // 验证记录
-          const recordErrors = validateRecord(record, index)
-          if (recordErrors.length > 0) {
-            validationErrors.push(...recordErrors)
+          // 只验证看起来像真实交易的记录
+          if (originalDate && originalDate.trim() !== '' && originalDate !== '-') {
+            const recordErrors = validateRecord(record, index)
+            if (recordErrors.length > 0) {
+              validationErrors.push(...recordErrors)
+            }
           }
           
           // 只添加有效的交易记录
           if (transactionDate && (debitAmount > 0 || creditAmount > 0)) {
             rows.push(record)
           }
-        } else {
-          validationErrors.push(`第${index + headerIndex + 2}行: 列数不足，需要至少6列 (Account Number, Trn.Date, Cheque No, Description, Debit, Credit)`)
+        } else if (cells.length > 0 && cleanExcelValue(cells[0])) {
+          // 只对非空行报告列数不足
+          validationErrors.push(`第${index + headerIndex + 2}行: 列数不足，需要至少6列`)
         }
       }
       
