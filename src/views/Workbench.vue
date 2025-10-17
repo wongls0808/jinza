@@ -88,7 +88,14 @@
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
-      <el-date-picker v-model="range" type="daterange" range-separator="~" :start-placeholder="t('common.startDate')" :end-placeholder="t('common.endDate')" size="small" style="width: 320px" @change="loadSummary" />
+      <el-popover placement="bottom-start" width="auto" v-model:visible="datePopover">
+        <el-date-picker v-model="range" type="daterange" unlink-panels :editable="false" @change="onRangeChange" />
+        <template #reference>
+          <el-button size="small" circle :title="dateRangeLabel" @click="datePopover=true">
+            <el-icon><Calendar /></el-icon>
+          </el-button>
+        </template>
+      </el-popover>
       <el-radio-group v-model="quick" size="small" @change="onQuick">
         <el-radio-button label="30d">{{ t('workbench.filters.last30d') }}</el-radio-button>
         <el-radio-button label="6m">{{ t('workbench.filters.last6m') }}</el-radio-button>
@@ -391,6 +398,12 @@ const summary = ref({
 })
 const range = ref(null)
 const quick = ref('')
+const datePopover = ref(false)
+const dateRangeLabel = computed(() => {
+  if (!Array.isArray(range.value) || !range.value[0] || !range.value[1]) return `${t('common.startDate')} ~ ${t('common.endDate')}`
+  const s = fmtYmd(range.value[0]); const e = fmtYmd(range.value[1])
+  return `${s} ~ ${e}`
+})
 function fmtYmd(d){ try { return d.toISOString().slice(0,10) } catch { return '' } }
 async function loadSummary(){
   try {
@@ -411,6 +424,11 @@ function onQuick(){
   loadSummary()
 }
 function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
+function onRangeChange(){
+  datePopover.value = false
+  quick.value = ''
+  loadSummary()
+}
 function barStyle(v){
   const val = Math.abs(Number(v||0))
   const h = Math.max(2, Math.min(28, val === 0 ? 2 : 2 + Math.log10(val) * 12))
