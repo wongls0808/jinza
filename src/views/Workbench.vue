@@ -86,6 +86,49 @@
       </div>
     </div>
 
+    <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
+    <div class="filters">
+      <el-date-picker v-model="range" type="daterange" range-separator="~" :start-placeholder="t('common.startDate')" :end-placeholder="t('common.endDate')" size="small" style="width: 320px" @change="loadSummary" />
+      <el-radio-group v-model="quick" size="small" @change="onQuick">
+        <el-radio-button label="30d">{{ t('workbench.filters.last30d') }}</el-radio-button>
+        <el-radio-button label="6m">{{ t('workbench.filters.last6m') }}</el-radio-button>
+        <el-radio-button label="y">{{ t('workbench.filters.thisYear') }}</el-radio-button>
+      </el-radio-group>
+      <el-button size="small" @click="clearFilters">{{ t('workbench.filters.clear') }}</el-button>
+    </div>
+    <div class="kpi6-grid">
+      <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openChart('tx')">
+        <div class="kpi-title">{{ t('workbench.charts.transactionsDebit') }}</div>
+        <div class="kpi-value">{{ money(summary.transactions.debit) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.transactions.monthly" :key="'td-'+m.month" :style="barStyle(m.debit)"></span></div>
+      </div>
+      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openChart('tx')">
+        <div class="kpi-title">{{ t('workbench.charts.transactionsCredit') }}</div>
+        <div class="kpi-value">{{ money(summary.transactions.credit) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.transactions.monthly" :key="'tc-'+m.month" :style="barStyle(m.credit)"></span></div>
+      </div>
+      <div class="kpi-card theme-info" role="button" tabindex="0" @click="openChart('settle')">
+        <div class="kpi-title">{{ t('workbench.charts.settlementsTotal') }}</div>
+        <div class="kpi-value">{{ money(summary.settlements.settled) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.settlements.monthly" :key="'st-'+m.month" :style="barStyle(m.settled)"></span></div>
+      </div>
+      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openChart('buy')">
+        <div class="kpi-title">{{ t('workbench.charts.buyfxTotal') }}</div>
+        <div class="kpi-value">{{ money(summary.buyfx.total) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.buyfx.monthly" :key="'by-'+m.month" :style="barStyle(m.total)"></span></div>
+      </div>
+      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openChart('pay')">
+        <div class="kpi-title">{{ t('workbench.charts.paymentsTotal') }}</div>
+        <div class="kpi-value">{{ money(summary.payments.total) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.payments.monthly" :key="'py-'+m.month" :style="barStyle(m.total)"></span></div>
+      </div>
+      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openChart('exp')">
+        <div class="kpi-title">{{ t('workbench.charts.expensesTotal') }}</div>
+        <div class="kpi-value">{{ money(summary.expenses.total) }}</div>
+        <div class="mini-bars"><span v-for="m in summary.expenses.monthly" :key="'ex-'+m.month" :style="barStyle(m.total)"></span></div>
+      </div>
+    </div>
+
     <!-- 可拖拽的“付款待审”浮动按钮（持久化位置） -->
     <div
       class="floating-payments"
@@ -287,6 +330,34 @@
         </el-table-column>
       </el-table>
     </el-drawer>
+
+    <!-- 图形详情抽屉（月度列表） -->
+    <el-drawer v-model="chartDrawer.visible" :title="chartDrawer.title" size="50%">
+      <el-table :data="chartDrawer.rows" size="small" border>
+        <el-table-column prop="month" :label="t('workbench.charts.month')" width="120" />
+        <template v-if="chartDrawer.type==='tx'">
+          <el-table-column prop="debit" :label="t('common.debit')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.debit) }}</template>
+          </el-table-column>
+          <el-table-column prop="credit" :label="t('common.credit')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.credit) }}</template>
+          </el-table-column>
+        </template>
+        <template v-else-if="chartDrawer.type==='settle'">
+          <el-table-column prop="base" :label="t('workbench.charts.baseAmount')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.base) }}</template>
+          </el-table-column>
+          <el-table-column prop="settled" :label="t('workbench.charts.settledAmount')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.settled) }}</template>
+          </el-table-column>
+        </template>
+        <template v-else>
+          <el-table-column prop="total" :label="t('common.total')" width="160" align="right">
+            <template #default="{ row }">{{ money(row.total) }}</template>
+          </el-table-column>
+        </template>
+      </el-table>
+    </el-drawer>
   </div>
 </template>
 
@@ -309,6 +380,56 @@ const today = new Date().toLocaleDateString()
 // 表格列宽记忆（付款待审列表 / 付款明细表）
 const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('wb-payments')
 const { colW: colWTodo, onColResize: onColResizeTodo } = useTableMemory('wb-todo')
+
+// —— 计算图形：聚合汇总 ——
+const summary = ref({
+  transactions: { debit: 0, credit: 0, monthly: [] },
+  settlements: { base: 0, settled: 0, monthly: [] },
+  buyfx: { total: 0, monthly: [] },
+  payments: { total: 0, monthly: [] },
+  expenses: { total: 0, monthly: [] },
+})
+const range = ref(null)
+const quick = ref('')
+function fmtYmd(d){ try { return d.toISOString().slice(0,10) } catch { return '' } }
+async function loadSummary(){
+  try {
+    const params = new URLSearchParams()
+    if (Array.isArray(range.value) && range.value[0] && range.value[1]) { params.set('startDate', fmtYmd(range.value[0])); params.set('endDate', fmtYmd(range.value[1])) }
+    const res = await httpRequest(`/workbench/summary?${params.toString()}`)
+    if (res) summary.value = res
+  } catch {}
+}
+function onQuick(){
+  const now = new Date()
+  let s=null, e=null
+  if (quick.value==='30d') { e = now; s = new Date(now); s.setDate(now.getDate()-30) }
+  else if (quick.value==='6m') { e = now; s = new Date(now); s.setMonth(now.getMonth()-6) }
+  else if (quick.value==='y') { e = now; s = new Date(now.getFullYear(),0,1) }
+  else { range.value = null; return loadSummary() }
+  range.value = [s, e]
+  loadSummary()
+}
+function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
+function barStyle(v){
+  const val = Math.abs(Number(v||0))
+  const h = Math.max(2, Math.min(28, val === 0 ? 2 : 2 + Math.log10(val) * 12))
+  return { height: h + 'px' }
+}
+const chartDrawer = ref({ visible:false, title:'', type:'', rows:[] })
+function openChart(type){
+  if (type==='tx') {
+    chartDrawer.value = { visible:true, title: t('workbench.charts.transactions'), type:'tx', rows:[...summary.value.transactions.monthly] }
+  } else if (type==='settle') {
+    chartDrawer.value = { visible:true, title: t('workbench.charts.settlements'), type:'settle', rows:[...summary.value.settlements.monthly] }
+  } else if (type==='buy') {
+    chartDrawer.value = { visible:true, title: t('workbench.charts.buyfx'), type:'buy', rows:[...summary.value.buyfx.monthly] }
+  } else if (type==='pay') {
+    chartDrawer.value = { visible:true, title: t('workbench.charts.payments'), type:'pay', rows:[...summary.value.payments.monthly] }
+  } else if (type==='exp') {
+    chartDrawer.value = { visible:true, title: t('workbench.charts.expenses'), type:'exp', rows:[...summary.value.expenses.monthly] }
+  }
+}
 
 // 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [
@@ -601,7 +722,7 @@ async function loadStats(){
   }
 }
 
-onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats() })
+onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats(); loadSummary() })
 
 // —— 交易管理：未匹配统计（KPI） ——
 const unmatchedCount = ref(0)
@@ -757,6 +878,9 @@ onMounted(() => { readFab() })
 .kpi-card.theme-warning .kpi-value { color: var(--el-color-warning); }
 .kpi-card.theme-info .kpi-value { color: var(--el-color-info); }
 .kpi-card.theme-danger .kpi-value { color: var(--el-color-danger); }
+.mini-bars { display:flex; gap:4px; align-items:flex-end; height: 30px; margin-top:8px; }
+.mini-bars span { display:inline-block; width:6px; background: color-mix(in oklab, var(--el-color-primary) 70%, #fff); border-radius:3px; }
+.filters { display:flex; gap:10px; align-items:center; margin: 12px 8px; flex-wrap: wrap; }
 
 /* 迷你图表：未匹配交易 */
 .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }

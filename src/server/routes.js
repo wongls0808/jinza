@@ -68,6 +68,135 @@ router.post('/auth/logout', authMiddleware(true), async (req, res) => {
   res.json({ ok: true })
 })
 
+// 工作台汇总统计（供图形展示）
+router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboard'), async (req, res) => {
+  const { startDate, endDate } = req.query || {}
+  // 通用 where 片段生成器
+  const periodCond = (col) => {
+    const wh = []
+    const ps = []
+    if (startDate) { ps.push(startDate); wh.push(`${col} >= $${ps.length}`) }
+    if (endDate) { ps.push(endDate); wh.push(`${col} <= $${ps.length}`) }
+    return { sql: wh.length? ('where ' + wh.join(' and ')) : '', params: ps }
+  }
+  const runSafe = async (sql, params=[]) => {
+    try { const r = await query(sql, params); return r.rows } catch { return [] }
+  }
+  try {
+    // 1) 交易统计（借/贷合计 + 月度）
+    const tPer = periodCond('t.transaction_date')
+    const tSumRows = await runSafe(`
+      select sum(t.debit_amount) as debit, sum(t.credit_amount) as credit
+      from transactions t
+      ${tPer.sql}
+    `, tPer.params)
+    const tMonthlyRows = await runSafe(`
+      select to_char(t.transaction_date,'YYYY-MM') as month,
+             sum(t.debit_amount) as debit,
+             sum(t.credit_amount) as credit
+        from transactions t
+        ${tPer.sql}
+       group by to_char(t.transaction_date,'YYYY-MM')
+       order by month asc
+    `, tPer.params)
+
+    // 2) 结汇合计（基/结）与月度
+    const sPer = periodCond('s.settle_date')
+    const sSumRows = await runSafe(`
+      select sum(s.total_base) as base, sum(s.total_settled) as settled
+        from fx_settlements s
+        ${sPer.sql}
+    `, sPer.params)
+    const sMonthlyRows = await runSafe(`
+      select to_char(s.settle_date,'YYYY-MM') as month,
+             sum(s.total_base) as base,
+             sum(s.total_settled) as settled
+        from fx_settlements s
+        ${sPer.sql}
+       group by to_char(s.settle_date,'YYYY-MM')
+       order by month asc
+    `, sPer.params)
+
+    // 3) 购汇合计（按 buy 表 amount_pay 合计 + 月度）
+    const bPer = periodCond('b.created_at')
+    const bSumRows = await runSafe(`
+      select sum(b.amount_pay) as total
+        from fx_buy_orders b
+        ${bPer.sql}
+    `, bPer.params)
+    const bMonthlyRows = await runSafe(`
+      select to_char(b.created_at,'YYYY-MM') as month,
+             sum(b.amount_pay) as total
+        from fx_buy_orders b
+        ${bPer.sql}
+       group by to_char(b.created_at,'YYYY-MM')
+       order by month asc
+    `, bPer.params)
+
+    // 4) 付款合计（按 payment_items.amount 合计 + 月度）
+    const pPer = periodCond('p.pay_date')
+    const pSumRows = await runSafe(`
+      select sum(pi.amount) as total
+        from fx_payments p
+        left join fx_payment_items pi on pi.payment_id = p.id
+        ${pPer.sql}
+    `, pPer.params)
+    const pMonthlyRows = await runSafe(`
+      select to_char(p.pay_date,'YYYY-MM') as month,
+             sum(pi.amount) as total
+        from fx_payments p
+        left join fx_payment_items pi on pi.payment_id = p.id
+        ${pPer.sql}
+       group by to_char(p.pay_date,'YYYY-MM')
+       order by month asc
+    `, pPer.params)
+
+    // 5) 费用合计（expenses.amount 合计 + 月度；借贷方向由 drcr 辅助，但这里总体合计 amount）
+    const ePer = periodCond('e.biz_date')
+    const eSumRows = await runSafe(`
+      select sum(e.amount) as total
+        from expenses e
+        ${ePer.sql}
+    `, ePer.params)
+    const eMonthlyRows = await runSafe(`
+      select to_char(e.biz_date,'YYYY-MM') as month,
+             sum(e.amount) as total
+        from expenses e
+        ${ePer.sql}
+       group by to_char(e.biz_date,'YYYY-MM')
+       order by month asc
+    `, ePer.params)
+
+    res.json({
+      transactions: {
+        debit: Number(tSumRows?.[0]?.debit || 0),
+        credit: Number(tSumRows?.[0]?.credit || 0),
+        monthly: tMonthlyRows.map(r => ({ month: r.month, debit: Number(r.debit||0), credit: Number(r.credit||0) }))
+      },
+      settlements: {
+        base: Number(sSumRows?.[0]?.base || 0),
+        settled: Number(sSumRows?.[0]?.settled || 0),
+        monthly: sMonthlyRows.map(r => ({ month: r.month, base: Number(r.base||0), settled: Number(r.settled||0) }))
+      },
+      buyfx: {
+        total: Number(bSumRows?.[0]?.total || 0),
+        monthly: bMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
+      },
+      payments: {
+        total: Number(pSumRows?.[0]?.total || 0),
+        monthly: pMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
+      },
+      expenses: {
+        total: Number(eSumRows?.[0]?.total || 0),
+        monthly: eMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
+      }
+    })
+  } catch (e) {
+    console.error('workbench summary failed', e)
+    res.status(500).json({ error: 'summary failed', detail: e?.message })
+  }
+})
+
 // Change password (self)
 router.post('/auth/change-password', authMiddleware(true), async (req, res) => {
   const { old_password, new_password } = req.body || {}
