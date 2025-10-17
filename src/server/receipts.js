@@ -1,7 +1,7 @@
 import express from 'express'
 import multer from 'multer'
 import { parse as parseCsv } from 'csv-parse/sync'
-import { authMiddleware, requirePerm } from './auth.js'
+import * as auth from './auth.js'
 import { query } from './db.js'
 
 // 全量重写：收据导入与列表
@@ -180,7 +180,7 @@ async function importBankCsvText(text){
 
 // ---------- Routes (new) ----------
 // 新导入（multipart 文件）
-receiptsRouter.post('/import', authMiddleware(true), requirePerm('view_accounts'), upload.single('file'), async (req, res) => {
+receiptsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('view_accounts'), upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'missing file' })
   const fs = await import('fs')
   const raw = fs.readFileSync(req.file.path, 'utf-8')
@@ -195,7 +195,7 @@ receiptsRouter.post('/import', authMiddleware(true), requirePerm('view_accounts'
 })
 
 // 新导入（纯文本）
-receiptsRouter.post('/import-text', authMiddleware(true), requirePerm('view_accounts'), express.text({ type: '*/*', limit: '20mb' }), async (req, res) => {
+receiptsRouter.post('/import-text', auth.authMiddleware(true), auth.requirePerm('view_accounts'), express.text({ type: '*/*', limit: '20mb' }), async (req, res) => {
   const text = (req.body || '').toString()
   if (!text) return res.status(400).json({ error: 'empty body' })
   try {
@@ -207,7 +207,7 @@ receiptsRouter.post('/import-text', authMiddleware(true), requirePerm('view_acco
 })
 
 // 列表（仅返回规范字段 + 富化）
-receiptsRouter.get('/', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+receiptsRouter.get('/', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
   const { page = 1, pageSize = 20, account_number = '' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const cond = []
@@ -233,7 +233,7 @@ left join customers c on c.id = cra.customer_id
 })
 
 // 批量转入交易
-receiptsRouter.post('/promote-to-transactions', authMiddleware(true), requirePerm('view_transactions'), express.json({ limit: '10mb' }), async (req, res) => {
+receiptsRouter.post('/promote-to-transactions', auth.authMiddleware(true), auth.requirePerm('view_transactions'), express.json({ limit: '10mb' }), async (req, res) => {
   try {
     const { account_number, start_date, end_date } = req.body || {}
     if (!account_number) return res.status(400).json({ error: 'account_number required' })

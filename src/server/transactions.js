@@ -2,7 +2,7 @@
 import express from 'express';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { query } from './db.js';
-import { authMiddleware, requirePerm, requireAnyPerm } from './auth.js';
+import * as auth from './auth.js';
 import { parseCSV } from './utils.js';
 import { getMockTransactions, getMockTransactionStats } from './mockTransactions.js';
 
@@ -84,7 +84,7 @@ function sanitizeReferenceText(s) {
 }
 
 // 下载导入模板（返回JSON样例，前端将转CSV）
-transactionsRouter.get('/template', authMiddleware(true), requireAnyPerm('transactions:import','view_transactions'), async (req, res) => {
+transactionsRouter.get('/template', auth.authMiddleware(true), auth.requireAnyPerm('transactions:import','view_transactions'), async (req, res) => {
   return res.json([
     {
       accountNumber: '000123456789',
@@ -99,7 +99,7 @@ transactionsRouter.get('/template', authMiddleware(true), requireAnyPerm('transa
 })
 
 // 获取交易列表，支持分页、排序和筛选
-transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+transactionsRouter.get('/', auth.authMiddleware(true), auth.requirePerm('view_transactions'), async (req, res) => {
   try {
     // 自愈：缺表时自动创建
     await ensureTransactionsDDL()
@@ -245,7 +245,7 @@ transactionsRouter.get('/', authMiddleware(true), requirePerm('view_transactions
 });
 
 // 批量删除交易
-transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('transactions:batch_delete'), async (req, res) => {
+transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.requirePerm('transactions:batch_delete'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { ids } = req.body;
@@ -274,7 +274,7 @@ transactionsRouter.post('/batch-delete', authMiddleware(true), requirePerm('tran
 });
 
 // 获取交易统计信息
-transactionsRouter.get('/stats', authMiddleware(true), requirePerm('transactions:advanced_filter'), async (req, res) => {
+transactionsRouter.get('/stats', auth.authMiddleware(true), auth.requirePerm('transactions:advanced_filter'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { startDate, endDate, account } = req.query;
@@ -382,7 +382,7 @@ transactionsRouter.get('/stats', authMiddleware(true), requirePerm('transactions
 });
 
 // 导出交易（根据相同筛选条件返回不分页的结果，用于前端导出 CSV）
-transactionsRouter.get('/export', authMiddleware(true), requirePerm('transactions:export'), async (req, res) => {
+transactionsRouter.get('/export', auth.authMiddleware(true), auth.requirePerm('transactions:export'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { 
@@ -468,7 +468,7 @@ transactionsRouter.get('/export', authMiddleware(true), requirePerm('transaction
 });
 
 // 交易匹配：将一条交易与客户/供应商/费用对象建立关联并标记为 matched
-transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('transactions:match'), async (req, res) => {
+transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id)
@@ -527,7 +527,7 @@ transactionsRouter.post('/:id/match', authMiddleware(true), requirePerm('transac
 })
 
 // 取消交易关联：清空匹配信息并将 matched=false，使其回到未匹配状态（表1）
-transactionsRouter.post('/:id/unmatch', authMiddleware(true), requirePerm('transactions:match'), async (req, res) => {
+transactionsRouter.post('/:id/unmatch', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id)
@@ -587,7 +587,7 @@ transactionsRouter.post('/:id/unmatch', authMiddleware(true), requirePerm('trans
 // 模板由前端自行定义/或另见导出模板接口
 
 // 导入交易（接收JSON rows；前端已将CSV解析为指定字段）
-transactionsRouter.post('/import', authMiddleware(true), requirePerm('transactions:import'), async (req, res) => {
+transactionsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('transactions:import'), async (req, res) => {
   try {
     // Ensure transactions table exists (self-healing)
     await query(`
@@ -651,7 +651,7 @@ transactionsRouter.post('/import', authMiddleware(true), requirePerm('transactio
 
 // 以固定CSV文本导入交易（示例文件格式）
 // 要求：请求 Content-Type 为 text/plain 或 */*，body 为CSV纯文本
-transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('transactions:import'), async (req, res) => {
+transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb' }), auth.authMiddleware(true), auth.requirePerm('transactions:import'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const text = (req.body || '').toString()
@@ -732,7 +732,7 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
 })
 
 // 新增交易
-transactionsRouter.post('/', authMiddleware(true), requirePerm('transactions:create'), async (req, res) => {
+transactionsRouter.post('/', auth.authMiddleware(true), auth.requirePerm('transactions:create'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const {
@@ -770,7 +770,7 @@ transactionsRouter.post('/', authMiddleware(true), requirePerm('transactions:cre
 });
 
 // 更新交易
-transactionsRouter.put('/:id', authMiddleware(true), requireAnyPerm('transactions:create'), async (req, res) => {
+transactionsRouter.put('/:id', auth.authMiddleware(true), auth.requireAnyPerm('transactions:create'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);
@@ -811,7 +811,7 @@ transactionsRouter.put('/:id', authMiddleware(true), requireAnyPerm('transaction
 // 旧的重复导入端点已移除，避免行为冲突
 
 // 获取单个交易详情（供查看弹窗使用）
-transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transactions'), async (req, res) => {
+transactionsRouter.get('/:id', auth.authMiddleware(true), auth.requirePerm('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);
@@ -841,7 +841,7 @@ transactionsRouter.get('/:id', authMiddleware(true), requirePerm('view_transacti
 });
 
 // 删除单个交易（用于行操作删除）
-transactionsRouter.delete('/:id', authMiddleware(true), requirePerm('transactions:delete'), async (req, res) => {
+transactionsRouter.delete('/:id', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);
