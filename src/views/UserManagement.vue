@@ -16,8 +16,9 @@
     <div class="grid cards">
       <el-card v-for="u in users" :key="u.id" class="user-card card">
         <template #header>
-          <div class="row">
-            <div>
+          <div class="head">
+            <div class="avatar" :class="{ admin: u.is_admin }">{{ initials(u) }}</div>
+            <div class="info">
               <div class="name">
                 {{ u.display_name || u.username }}
                 <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag>
@@ -27,12 +28,13 @@
                 </span>
               </div>
               <div class="username">@{{ u.username }}</div>
-              <div class="meta" v-if="u.last_ip || u.last_seen">
+              <div class="meta">
                 <span v-if="u.last_ip" class="kv"><span class="k">IP</span><span class="v">{{ u.last_ip }}</span></span>
-                <span v-if="u.last_seen" class="kv"><span class="k">TIME</span><span class="v">{{ new Date(u.last_seen).toLocaleString() }}</span></span>
+                <span v-if="u.last_seen" class="kv"><span class="k">TIME</span><span class="v">{{ fmtMinute(u.last_seen) }}</span></span>
+                <span v-if="Array.isArray(u._perms)" class="kv"><span class="k">PERMS</span><span class="v">{{ u._perms.length }}</span></span>
               </div>
             </div>
-            <div class="ops">
+            <div class="controls">
               <div class="active-wrap">
                 <el-switch
                   v-model="u.is_active"
@@ -44,16 +46,16 @@
                 <span class="muted">{{ t('users.active') }}</span>
               </div>
               <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') || '分配权限' }}</el-button>
-              <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
-              <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
           </div>
         </template>
-        <!-- 日志改用抽屉展示，避免卡片被拉长导致排版错乱 -->
-        <div class="log-actions">
+
+        <div class="foot-actions">
           <el-button size="small" text :loading="logState.loading[u.id]" @click="openLogDrawer(u)">{{ t('users.activityLog') }}</el-button>
+          <div class="spacer"></div>
+          <el-button size="small" text type="warning" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
+          <el-button size="small" text type="danger" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
         </div>
-        
       </el-card>
     </div>
 
@@ -382,6 +384,15 @@ function openLogDrawer(u) {
   refreshLogs(u)
 }
 
+// 头像字母（显示名/用户名首字母缩写）
+function initials(u) {
+  const s = (u?.display_name || u?.username || '').trim()
+  if (!s) return '?'
+  const parts = s.split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return s.slice(0, 2).toUpperCase()
+}
+
 // 将时间格式化为 "YYYY-MM-DD HH:mm"（到分钟）
 function fmtMinute(ts) {
   try {
@@ -404,15 +415,19 @@ function fmtMinute(ts) {
 .title { font-size: 18px; font-weight: 600; }
 .spacer { flex: 1; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.cards { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
 .user-card { padding: 0; }
-.row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); }
+.avatar.admin { background: var(--el-color-danger); }
+.info { min-width: 0; }
 .name { font-weight: 600; font-size: 15px; }
 .username { color: var(--el-text-color-secondary); font-size: 12px; }
 .meta { color: var(--el-text-color-secondary); font-size: 12px; display:flex; gap:12px; flex-wrap:wrap; margin-top:2px; }
 .meta .kv { display:inline-flex; gap:6px; align-items:center; }
 .meta .kv .k { font-weight:600; opacity:0.75; }
 .meta .kv .v { font-variant-numeric: tabular-nums; }
+.controls { display:flex; align-items:center; gap: 8px; }
 .status { margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 6px; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; }
 .status.online { color: var(--el-color-success); }
@@ -432,7 +447,7 @@ function fmtMinute(ts) {
 .admin-tip { color: var(--el-color-danger); font-size: 12px; margin: 4px 0 8px; }
 .group-batch { display:flex; gap:8px; margin: 0 0 8px; flex-wrap: wrap; }
 /* 日志样式 */
-.log-actions { margin-top: 6px; display:flex; justify-content:flex-end; }
+.foot-actions { margin-top: 2px; display:flex; align-items:center; gap:8px; }
 .log-list { list-style:none; padding:0; margin:6px 0 0; display:grid; gap:6px; }
 .log-item { display:grid; grid-template-columns: 180px 150px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
 .log-item .time { color: var(--el-text-color-secondary); }
