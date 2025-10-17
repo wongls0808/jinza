@@ -561,7 +561,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Papa from 'papaparse'
-import { api } from '@/api'
+import { api, request } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 
 
@@ -882,15 +882,9 @@ const handleDelete = (row) => {
     }
   ).then(async () => {
     try {
-      const response = await fetch(`/api/transactions/${row.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+      await request(`/transactions/${row.id}`, {
+        method: 'DELETE'
       })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || response.statusText)
-      }
       
       ElMessage.success(t('transactions.deleteSuccess'))
       fetchTransactions()
@@ -1559,16 +1553,12 @@ const submitImport = async () => {
       reference2: '',
       reference3: ''
     }))
-    const response = await fetch('/api/transactions/import', {
+    const response = await request('/transactions/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows: transformedData })
     })
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || error.detail || response.statusText)
-    }
-    const result = await response.json()
+    
+    const result = response
     
     importDialogVisible.value = false
     fileList.value = []
@@ -1611,14 +1601,7 @@ const submitImport = async () => {
 
 const downloadTemplate = async () => {
   try {
-    const response = await fetch('/api/transactions/template')
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || response.statusText)
-    }
-    
-    const data = await response.json()
+    const data = await request('/transactions/template')
     
     // 使用PapaParse转换为CSV
     const csv = Papa.unparse(data, { header: true })
