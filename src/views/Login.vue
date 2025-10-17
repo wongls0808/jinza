@@ -88,12 +88,18 @@ const onSubmit = async () => {
     }
     setTimeout(()=>{ window.location.href = redirect === '/' ? '/' : String(redirect) }, 500)
   } catch(e){
-    try {
-      const data = JSON.parse(e.message)
-      ElMessage({ message:'登录失败：' + (data.error || ''), type:'error', duration:3000 })
-    } catch {
-      ElMessage({ message:'登录失败：' + (e.message || '服务器连接错误'), type:'error', duration:3000 })
+    const code = e?.code
+    let text = ''
+    if (code === 'MISSING_CREDENTIALS') text = t('login.errors.missingCredentials')
+    else if (code === 'USER_NOT_FOUND') text = t('login.errors.userNotFound')
+    else if (code === 'USER_DISABLED') text = t('login.errors.userDisabled')
+    else if (code === 'INVALID_PASSWORD') text = t('login.errors.invalidPassword')
+    else {
+      // 兼容旧服务：尝试解析 message 为 JSON 或使用原始 message
+      try { const data = JSON.parse(e.message); text = data?.error || data?.message || '' } catch { text = e?.message || '' }
     }
+    if (!text) text = t('login.errors.defaultError')
+    ElMessage({ message: '登录失败：' + text, type:'error', duration:3200 })
   } finally { submitting.value = false }
 }
 

@@ -23,13 +23,13 @@ const __dirname = path.dirname(__filename)
 // Auth
 router.post('/auth/login', async (req, res) => {
   const { username, password } = req.body || {}
-  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' })
+  if (!username || !password) return res.status(400).json({ error: 'Missing credentials', code: 'MISSING_CREDENTIALS' })
   const userRes = await query('select id, username, password_hash, display_name, is_active, must_change_password, is_admin from users where username=$1', [username])
-  if (userRes.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' })
+  if (userRes.rowCount === 0) return res.status(401).json({ error: 'User not found', code: 'USER_NOT_FOUND' })
   const user = userRes.rows[0]
-  if (!user.is_active) return res.status(403).json({ error: 'User disabled' })
+  if (!user.is_active) return res.status(403).json({ error: 'User disabled', code: 'USER_DISABLED' })
   const ok = await auth.verifyPassword(password, user.password_hash)
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials' })
+  if (!ok) return res.status(401).json({ error: 'Invalid password', code: 'INVALID_PASSWORD' })
 
   const perms = user.is_admin
     ? await query(`select code from permissions order by code`)

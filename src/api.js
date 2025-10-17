@@ -47,9 +47,14 @@ export async function request(path, opts = {}) {
         window.location.replace('/login')
       }
     }
+    let body = null
     let msg = ''
-    try { const j = await res.json(); msg = j?.error || j?.message || '' } catch { msg = await res.text() }
-    throw new Error(msg || `HTTP ${res.status}`)
+    try { body = await res.json(); msg = body?.error || body?.message || '' } catch { msg = await res.text() }
+    const err = new Error(msg || `HTTP ${res.status}`)
+    try { err.status = res.status } catch {}
+    try { err.code = body?.code } catch {}
+    try { err.raw = body || msg } catch {}
+    throw err
   }
   const ct = res.headers.get('content-type') || ''
   if (ct.includes('application/json')) return res.json()

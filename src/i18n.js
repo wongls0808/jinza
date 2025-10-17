@@ -248,6 +248,13 @@ const messages = {
       feature2: '系统设置与管理',
       feature3: '客户账户管理',
       continueText: '以继续操作',
+    errors: {
+      missingCredentials: '请输入用户名和密码',
+      userNotFound: '用户不存在',
+      userDisabled: '用户已被停用',
+      invalidPassword: '密码错误',
+      defaultError: '服务器连接错误或未知错误'
+    }
   },
   home: {
       title: '仪表盘',
@@ -666,6 +673,20 @@ const messages = {
     app: {
       title: 'BSB | BESTRADE SB',
       logout: 'Logout',
+    },
+    login: {
+      title: 'Login',
+      username: 'Username',
+      password: 'Password',
+      submit: 'Login',
+      firstLoginTip: 'First login requires password change',
+      errors: {
+        missingCredentials: 'Please enter username and password',
+        userNotFound: 'User not found',
+        userDisabled: 'User is disabled',
+        invalidPassword: 'Incorrect password',
+        defaultError: 'Server connection error or unknown error'
+      }
     },
     workbench: {
       title: 'Workbench',
