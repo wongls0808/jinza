@@ -1399,7 +1399,7 @@ const exportTransactions = async () => {
   }
 }
 
-// 银行对账单CSV文件处理
+// 银行对账单CSV文件处理 - 根据实际文件格式优化
 const handleSimpleFileChange = (file) => {
   if (!file || !file.raw) {
     return
@@ -1409,6 +1409,8 @@ const handleSimpleFileChange = (file) => {
   reader.onload = (e) => {
     try {
       const text = e.target.result
+      console.log('原始文件内容（前1000字符）:', text.substring(0, 1000))
+      
       const lines = text.split('\n').filter(line => line.trim())
       
       if (lines.length < 2) {
@@ -1416,303 +1418,206 @@ const handleSimpleFileChange = (file) => {
         return
       }
       
-      // 提取账户号码
-      let defaultAccountNumber = ''
-      const accountMatch = lines.find(line => line.includes('Account Number:'))
-      if (accountMatch) {
-        const parts = accountMatch.split(',')
-        if (parts.length >= 2) {
-          defaultAccountNumber = parts[1].trim()
+      // 精确提取账户号码 - 查找 "Account Number:,xxxxxxxx"
+      let defaultAccountNumber = 'UNKNOWN'
+      for (const line of lines.slice(0, 15)) {
+        if (line.includes('Account Number:')) {
+          const parts = line.split(',')
+          if (parts.length >= 2) {
+            defaultAccountNumber = parts[1].trim()
+            break
+          }
         }
       }
       
-      // 找到交易数据开始行
-      const headerIndex = lines.findIndex(line => 
-        line.includes('Trn. Date') && line.includes('Transaction Description')
-      )
+      console.log('提取的账户号码:', defaultAccountNumber)
+      
+      // 精确查找表头行 - 查找包含所有必要字段的行
+      let headerIndex = -1
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        if (line.includes('Trn. Date') && 
+            line.includes('Cheque No/Ref No') && 
+            line.includes('Transaction Description') &&
+            line.includes('Debit Amount') &&
+            line.includes('Credit Amount') &&
+            line.includes('Reference 1')) {
+          headerIndex = i
+          break
+        }
+      }
+      
+      console.log('找到表头行:', headerIndex, headerIndex >= 0 ? lines[headerIndex] : '未找到')
       
       if (headerIndex === -1) {
-        ElMessage.warning('未找到交易数据表头，请检查文件格式')
+        ElMessage.warning('未找到标准的银行对账单表头，请检查文件格式')
         return
       }
       
-      // 解析交易数据
+      // 获取数据行
       const dataLines = lines.slice(headerIndex + 1)
+      console.log('数据行数量:', dataLines.length)
+      console.log('前3行数据:', dataLines.slice(0, 3))
+      
       const rows = []
       
-      // 强化Excel格式清理函数 - 处理所有无效字符
-      const cleanExcelValue = (value) => {
+      // 专门处理Excel双重引号格式的清理函数
+      const cleanExcelDoubleQuotes = (value) => {
         if (!value) return ''
         let cleaned = String(value).trim()
         
-        // 移除Excel格式 ="值"
-        const excelMatch = /^="(.*)"$/.exec(cleaned)
-        if (excelMatch) {
-          cleaned = excelMatch[1]
+        console.log('清理前:', cleaned)
+        
+        // 处理 "=""value""" 格式
+        if (cleaned.startsWith('"=""') && cleaned.endsWith('"""')) {
+          cleaned = cleaned.slice(4, -3) // 移除 "="" 和 """
+        }
+        // 处理 "=""value""" 格式（少一个引号的情况）
+        else if (cleaned.startsWith('=""') && cleaned.endsWith('""')) {
+          cleaned = cleaned.slice(3, -2) // 移除 ="" 和 ""
+        }
+        // 处理 ="value" 格式
+        else if (cleaned.startsWith('="') && cleaned.endsWith('"')) {
+          cleaned = cleaned.slice(2, -1) // 移除 =" 和 "
+        }
+        // 处理普通的双引号
+        else if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+          cleaned = cleaned.slice(1, -1) // 移除首尾引号
         }
         
-        // 移除普通引号
-        if ((cleaned.startsWith('"') && cleaned.endsWith('"'))) {
-          cleaned = cleaned.slice(1, -1)
+        // 清理特殊无效字符
+        if (cleaned === '""' || cleaned === '-' || cleaned === '=' || cleaned === '') {
+          cleaned = ''
         }
         
-        // 移除你提到的无效字符模式
-        const invalidPatterns = [
-          /^=""$/,          // =""
-          /^""-$/,          // ""-
-          /^""$/,           // ""
-          /^="="$/,         // ="="
-          /^-$/,            // 单独的 -
-          /^="".*""$/,      // 以=""开头和结尾
-          /^="\s*"$/,       // =" "
-          /^"\s*"$/         // " "
-        ];
-        
-        for (const pattern of invalidPatterns) {
-          if (pattern.test(cleaned)) {
-            return '';
-          }
-        }
-        
-        // 清理其他Excel相关字符
-        cleaned = cleaned
-          .replace(/^=/, '')           // 移除开头的 =
-          .replace(/^"+|"+$/g, '')     // 移除开头结尾的引号
-          .replace(/^\s*-\s*$/, '')    // 移除只有-的内容
-          .trim();
-        
-        return cleaned;
+        console.log('清理后:', cleaned)
+        return cleaned.trim()
       }
       
-      // 增强的日期解析函数
-      const parseDate = (dateStr) => {
-        if (!dateStr) return null
-        const cleaned = cleanExcelValue(dateStr)
+      // 日期解析 - 支持 DD/MM/YYYY 格式
+      const parseTransactionDate = (dateStr) => {
+        const cleaned = cleanExcelDoubleQuotes(dateStr)
+        console.log('解析日期:', dateStr, '->', cleaned)
         
-        console.log('解析日期:', cleaned) // 调试日志
-        
-        // 如果清理后为空，返回null
-        if (!cleaned || cleaned === '' || cleaned === '-') {
+        if (!cleaned || cleaned === '') {
           return null
         }
         
-        // 尝试多种日期格式
-        const dateFormats = [
-          // DD/MM/YYYY 格式
-          /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
-          // DD-MM-YYYY 格式
-          /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
-          // MM/DD/YYYY 格式
-          /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
-          // YYYY-MM-DD 格式
-          /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
-          // DD.MM.YYYY 格式
-          /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/
-        ];
-        
-        // 先尝试 DD/MM/YYYY 格式（银行对账单常用格式）
+        // 匹配 DD/MM/YYYY 格式
         const ddmmyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(cleaned)
         if (ddmmyyyy) {
           const day = parseInt(ddmmyyyy[1])
           const month = parseInt(ddmmyyyy[2])
           const year = parseInt(ddmmyyyy[3])
           
-          // 验证日期范围
-          if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-            const testDate = new Date(year, month - 1, day)
-            if (testDate.getFullYear() === year && 
-                testDate.getMonth() === month - 1 && 
-                testDate.getDate() === day) {
-              return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-            }
+          if (year >= 2020 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            const result = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+            console.log('日期转换:', cleaned, '->', result)
+            return result
           }
         }
         
-        // 尝试 YYYY-MM-DD 格式
-        const yyyymmdd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(cleaned)
-        if (yyyymmdd) {
-          const year = parseInt(yyyymmdd[1])
-          const month = parseInt(yyyymmdd[2])
-          const day = parseInt(yyyymmdd[3])
-          
-          if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-            const testDate = new Date(year, month - 1, day)
-            if (testDate.getFullYear() === year && 
-                testDate.getMonth() === month - 1 && 
-                testDate.getDate() === day) {
-              return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-            }
-          }
-        }
-        
-        // 尝试解析其他格式并转换
-        const otherFormats = [
-          /^(\d{1,2})-(\d{1,2})-(\d{4})$/, // DD-MM-YYYY
-          /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/ // DD.MM.YYYY
-        ];
-        
-        for (const format of otherFormats) {
-          const match = format.exec(cleaned)
-          if (match) {
-            const day = parseInt(match[1])
-            const month = parseInt(match[2])
-            const year = parseInt(match[3])
-            
-            if (year >= 2000 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-              const testDate = new Date(year, month - 1, day)
-              if (testDate.getFullYear() === year && 
-                  testDate.getMonth() === month - 1 && 
-                  testDate.getDate() === day) {
-                return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-              }
-            }
-          }
-        }
-        
-        console.warn('无法解析日期格式:', cleaned)
+        console.warn('无法解析日期:', cleaned)
         return null
       }
       
-      // 验证和清理金额
-      const parseAmount = (amountStr) => {
-        if (!amountStr) return 0
-        const cleaned = cleanExcelValue(amountStr)
-        // 移除千位分隔符和货币符号
+      // 金额解析
+      const parseTransactionAmount = (amountStr) => {
+        const cleaned = cleanExcelDoubleQuotes(amountStr)
+        if (!cleaned || cleaned === '') return 0
+        
         const numStr = cleaned.replace(/[,$RM\s]/g, '')
-        const amount = parseFloat(numStr)
-        return isNaN(amount) ? 0 : amount
+        const num = parseFloat(numStr)
+        return isNaN(num) ? 0 : Math.abs(num)
       }
       
-      // 增强的记录验证函数
-      const validateRecord = (record, index) => {
-        const errors = []
-        
-        if (!record.accountNumber || record.accountNumber.trim() === '') {
-          errors.push(`第${index + headerIndex + 2}行: 缺少账户号码`)
-        }
-        
-        if (!record.transactionDate) {
-          // 只有在原始日期不为空的情况下才报错
-          if (record.originalDate && record.originalDate.trim() !== '' && record.originalDate !== '-') {
-            errors.push(`第${index + headerIndex + 2}行: 日期格式无效 - "${record.originalDate}"`)
-          }
-        }
-        
-        if (record.debitAmount === 0 && record.creditAmount === 0) {
-          // 检查是否是表头或空行
-          if (record.originalDate && record.originalDate.trim() !== '' && record.originalDate !== '-') {
-            errors.push(`第${index + headerIndex + 2}行: 借方和贷方金额都为0`)
-          }
-        }
-        
-        if (record.debitAmount < 0 || record.creditAmount < 0) {
-          errors.push(`第${index + headerIndex + 2}行: 金额不能为负数`)
-        }
-        
-        return errors
-      }
-      
-      const validationErrors = []
+      let processedCount = 0
+      let validCount = 0
+      let invalidCount = 0
       
       for (const [index, line] of dataLines.entries()) {
         if (!line.trim()) continue
         
+        processedCount++
         const cells = line.split(',')
         
-        // 跳过明显的非数据行
-        const firstCell = cleanExcelValue(cells[0] || '')
-        if (!firstCell || firstCell === '' || firstCell === '-' || 
-            firstCell.toLowerCase().includes('total') || 
-            firstCell.toLowerCase().includes('balance') ||
-            firstCell.toLowerCase().includes('statement')) {
-          continue
-        }
+        console.log(`\n处理第${index + 1}行 (${cells.length}列):`, cells.slice(0, 8))
         
-        // 确保有足够的列数（至少包含Reference 1）
-        if (cells.length >= 6) {
-          // 按照银行对账单的确切字段顺序映射
-          const originalDate = cleanExcelValue(cells[0])           // Trn. Date
-          const transactionDate = parseDate(cells[0])
-          const chequeRefNo = cleanExcelValue(cells[1])            // Cheque No/Ref No
-          const description = cleanExcelValue(cells[2])            // Transaction Description
-          const debitAmount = parseAmount(cells[3])                // Debit Amount
-          const creditAmount = parseAmount(cells[4])               // Credit Amount
+        if (cells.length >= 11) { // 确保有足够的列（包括Reference 1-6）
+          const originalDate = cells[0]
+          const transactionDate = parseTransactionDate(cells[0])
+          const chequeRefNo = cleanExcelDoubleQuotes(cells[1])
+          const description = cleanExcelDoubleQuotes(cells[2])
+          const debitAmount = parseTransactionAmount(cells[3])
+          const creditAmount = parseTransactionAmount(cells[4])
           
-          // 处理Reference 1-6字段（合并到一个reference字段）
+          // 处理 Reference 1-6 字段（列5-10）
           const references = []
-          for (let i = 5; i < Math.min(cells.length, 11); i++) {   // Reference 1-6 (最多6个)
-            const ref = cleanExcelValue(cells[i])
-            if (ref && ref !== '' && ref !== '-') {
-              references.push(ref)
+          for (let i = 5; i <= 10; i++) {
+            if (i < cells.length) {
+              const ref = cleanExcelDoubleQuotes(cells[i])
+              if (ref && ref !== '' && ref !== '-') {
+                references.push(ref)
+              }
             }
           }
-          
-          // 合并所有Reference字段，用空格分隔
           const combinedReference = references.join(' ').trim()
           
-          const record = {
-            accountNumber: defaultAccountNumber,                    // Account Number (从文件头提取)
-            transactionDate: transactionDate,                      // Trn. Date (转换为YYYY-MM-DD)
-            chequeRefNo: chequeRefNo,                              // Cheque No/Ref No
-            description: description,                              // Transaction Description
-            debitAmount: debitAmount,                             // Debit Amount
-            creditAmount: creditAmount,                           // Credit Amount
-            reference: combinedReference,                         // Reference 1-6 合并
-            originalDate: originalDate,
-            rowIndex: index + headerIndex + 2 // CSV行号
-          }
+          console.log(`第${index + 1}行解析结果:`, {
+            transactionDate,
+            chequeRefNo,
+            description: description.substring(0, 30) + '...',
+            debitAmount,
+            creditAmount,
+            referenceCount: references.length
+          })
           
-          // 只验证看起来像真实交易的记录
-          if (originalDate && originalDate.trim() !== '' && originalDate !== '-') {
-            const recordErrors = validateRecord(record, index)
-            if (recordErrors.length > 0) {
-              validationErrors.push(...recordErrors)
-            }
-          }
-          
-          // 只添加有效的交易记录
+          // 验证：必须有有效日期和金额
           if (transactionDate && (debitAmount > 0 || creditAmount > 0)) {
-            rows.push(record)
+            validCount++
+            rows.push({
+              accountNumber: defaultAccountNumber,
+              transactionDate: transactionDate,
+              chequeRefNo: chequeRefNo,
+              description: description,
+              debitAmount: debitAmount,
+              creditAmount: creditAmount,
+              reference: combinedReference,
+              originalDate: cleanExcelDoubleQuotes(originalDate),
+              rowIndex: index + headerIndex + 2
+            })
+            
+            console.log(`✅ 第${index + 1}行有效`)
+          } else {
+            invalidCount++
+            console.log(`❌ 第${index + 1}行无效: date=${transactionDate}, debit=${debitAmount}, credit=${creditAmount}`)
           }
-        } else if (cells.length > 0 && cleanExcelValue(cells[0])) {
-          // 只对非空行报告列数不足
-          validationErrors.push(`第${index + headerIndex + 2}行: 列数不足，需要至少6列`)
+        } else {
+          invalidCount++
+          console.log(`❌ 第${index + 1}行列数不足: ${cells.length}列`)
         }
+        
+        // 限制处理行数
+        if (processedCount > 100) break
       }
+      
+      console.log(`\n处理完成:`)
+      console.log(`- 总处理行数: ${processedCount}`)
+      console.log(`- 有效记录数: ${validCount}`)
+      console.log(`- 无效记录数: ${invalidCount}`)
+      console.log(`- 账户号码: ${defaultAccountNumber}`)
       
       importPreview.value = rows
       
-      // 显示解析结果和验证错误
-      if (validationErrors.length > 0) {
-        console.warn('数据验证警告:', validationErrors)
-        
-        const errorSummary = validationErrors.slice(0, 3).join('\n')
-        const moreErrors = validationErrors.length > 3 ? `\n...还有${validationErrors.length - 3}个错误` : ''
-        
-        ElMessage.warning({
-          message: `发现 ${validationErrors.length} 个数据问题:\n${errorSummary}${moreErrors}`,
-          duration: 8000,
-          showClose: true
-        })
-      }
-      
       if (rows.length === 0) {
-        ElMessage.error('未找到有效的交易数据，请检查文件格式')
+        ElMessage.error(`未找到有效的交易数据。处理了${processedCount}行，有效${validCount}行，无效${invalidCount}行。请查看控制台详细日志。`)
       } else {
-        const message = validationErrors.length > 0 
-          ? `已解析 ${rows.length} 条有效交易记录（${validationErrors.length} 条有问题）- 账户：${defaultAccountNumber}`
-          : `已解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`
-        
-        ElMessage.success({
-          message: message,
-          duration: 5000,
-          showClose: true
-        })
+        ElMessage.success(`成功解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`)
       }
       
     } catch (error) {
       console.error('解析CSV失败:', error)
-      ElMessage.error('CSV文件解析失败')
+      ElMessage.error('CSV文件解析失败: ' + error.message)
     }
   }
   
