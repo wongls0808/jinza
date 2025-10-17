@@ -1,6 +1,6 @@
 <template>
-  <div class="fx-page">
-    <div class="page-hd">
+  <div class="fx-page" :class="[{ 'drawer-compact': inDrawer }, { single: singleMode }]">
+    <div class="page-hd" v-if="!inDrawer">
       <h1>{{ t('fx.title') }}</h1>
     </div>
 
@@ -9,7 +9,7 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.settlementArea') }}</span>
-            <el-button type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.viewHistory') }}</el-button>
+            <el-button v-if="!inDrawer" type="text" @click="$router.push({ name: 'fx-settlements' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="settle-filters">
@@ -51,7 +51,7 @@
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.paymentArea') }}</span>
-            <el-button type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.viewHistory') }}</el-button>
+            <el-button v-if="!inDrawer" type="text" @click="$router.push({ name: 'fx-payments' })">{{ t('fx.viewHistory') }}</el-button>
           </div>
         </template>
         <div class="pay-filters">
@@ -112,6 +112,7 @@ import { useTableMemory } from '@/composables/useTableMemory'
 const { t } = useI18n()
 const props = defineProps({
   mode: { type: String, default: 'both' },
+  inDrawer: { type: Boolean, default: false },
   initialSettleCustomerId: { type: [Number, String], default: null },
   initialPayCustomerId: { type: [Number, String], default: null }
 })
@@ -124,6 +125,7 @@ function modeShown(section){
   if (section === 'pay') return m === 'pay'
   return true
 }
+const singleMode = computed(() => String(props.mode||'both').toLowerCase() !== 'both')
 
 // 供外部快速预填（例如从工作台打开抽屉后直接指定客户）
 function setSettleCustomerId(id){
@@ -403,8 +405,13 @@ function isSettleSelectable(row){
 
 <style scoped>
  .fx-page { padding: 8px; }
+ .fx-page.drawer-compact { padding: 4px 8px; }
  .page-hd { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px; }
  .fx-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+ .fx-page.single .fx-split { grid-template-columns: 1fr; }
+ .fx-page.drawer-compact .section :deep(.el-card__header) { padding: 10px 12px; }
+ .fx-page.drawer-compact .section :deep(.el-card__body) { padding: 10px 12px; }
+ .fx-page.drawer-compact :deep(.el-card) { border-color: var(--el-border-color-light); }
  .section-hd { font-weight: 700; }
  .settle-filters, .pay-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }
   .totals { display:flex; gap:16px; margin: 4px 0 8px; color: var(--el-text-color-secondary); font-size: 13px; }
