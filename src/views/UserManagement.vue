@@ -34,37 +34,13 @@
             </div>
             <div class="ops">
               <el-switch v-model="u.is_active" @change="toggleActive(u)" :active-text="$t('users.active')" />
+              <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') || '分配权限' }}</el-button>
               <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
               <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
           </div>
         </template>
-        <div class="perms" v-if="permTree && permTree.length">
-          <div v-if="u.is_admin" class="admin-tip">管理员拥有全部权限（不可更改）</div>
-          <div class="perm-group" v-for="group in permTree" :key="group.module">
-            <div class="perm-group-title">{{ group.name }}</div>
-            <div class="perm-group-items">
-              <el-button size="small" plain @click.stop="toggleGroup(u.id, group.module)">
-                {{ t('users.permissions') }} · {{ group.name }} {{ isOpen(u.id, group.module) ? '▼' : '▶' }}
-              </el-button>
-              <div class="inline-perms" v-show="isOpen(u.id, group.module)">
-                <el-tag
-                  v-for="p in group.items"
-                  :key="p.code"
-                  :type="userHas(u, p.code) ? 'success' : 'info'"
-                  class="perm-tag"
-                  effect="light"
-                  size="small"
-                  :disable-transitions="true"
-                  :class="{ 'is-disabled': u.is_admin }"
-                  @click="onPickPerm(u, p.code)"
-                >
-                  {{ p.name }}
-                </el-tag>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- 取消卡片内联权限，改为抽屉弹窗 -->
         
       </el-card>
     </div>
@@ -89,6 +65,49 @@
         <el-button type="danger" :loading="removeDlg.loading" @click="doRemove">{{ $t('common.delete') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 权限分配抽屉 -->
+    <el-drawer v-model="permDrawer.visible" :title="(permDrawer.user?.display_name || permDrawer.user?.username || '') + ' · ' + (t('users.assignPerms') || '分配权限')" size="min(760px, 88vw)" :close-on-click-modal="false">
+      <div v-if="permDrawer.user" class="drawer-body">
+        <div class="drawer-toolbar">
+          <el-tag v-if="permDrawer.user.is_admin" type="danger" size="small">管理员拥有全部权限（不可更改）</el-tag>
+          <div class="spacer"></div>
+          <el-button size="small" @click="expandAll(true)">{{ t('users.expandAll') || '展开全部' }}</el-button>
+          <el-button size="small" @click="expandAll(false)">{{ t('users.collapseAll') || '收起全部' }}</el-button>
+        </div>
+        <div class="drawer-perms" v-if="permTree && permTree.length">
+          <div class="perm-group" v-for="group in permTree" :key="group.module">
+            <div class="perm-group-title">{{ group.name }}</div>
+            <div class="perm-group-items">
+              <el-button size="small" plain @click.stop="toggleDrawerGroup(group.module)">
+                {{ group.name }} {{ isDrawerOpen(group.module) ? '▼' : '▶' }}
+              </el-button>
+              <div class="inline-perms" v-show="isDrawerOpen(group.module)">
+                <el-tag
+                  v-for="p in group.items"
+                  :key="p.code"
+                  :type="drawerHas(p.code) ? 'success' : 'info'"
+                  class="perm-tag"
+                  effect="light"
+                  size="small"
+                  :disable-transitions="true"
+                  :class="{ 'is-disabled': permDrawer.user.is_admin }"
+                  @click="drawerToggle(p.code)"
+                >
+                  {{ p.name }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <el-button @click="permDrawer.visible=false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :disabled="permDrawer.user?.is_admin" :loading="permDrawer.saving" @click="savePerms">{{ t('users.savePerms') || t('common.save') }}</el-button>
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -111,6 +130,7 @@ const newUser = ref({ username: '', password: '', display_name: '' })
 const reset = ref({ visible: false, user: null, password: '', loading: false })
 const removeDlg = ref({ visible: false, user: null, loading: false })
 const reseed = ref({ loading: false })
+const permDrawer = ref({ visible: false, user: null, localPerms: [], saving: false, open: {} })
 
 function userHas(u, code) {
   return (u._perms || []).includes(code)
@@ -230,6 +250,52 @@ function onPickPerm(u, code) {
 function keyFor(uid, mod) { return `${uid}-${mod}` }
 function isOpen(uid, mod) { return !!openGroups.value[keyFor(uid, mod)] }
 function toggleGroup(uid, mod) { const k = keyFor(uid, mod); openGroups.value[k] = !openGroups.value[k] }
+
+// 抽屉：打开/关闭与本地编辑
+function openPermDrawer(u) {
+  permDrawer.value.visible = true
+  permDrawer.value.user = u
+  permDrawer.value.localPerms = Array.isArray(u._perms) ? [...u._perms] : []
+  // 默认展开所有分组（非管理员更友好）
+  const map = {}
+  ;(permTree.value || []).forEach(g => { if (g?.module) map[g.module] = true })
+  permDrawer.value.open = map
+}
+function drawerHas(code) {
+  return permDrawer.value.localPerms.includes(code)
+}
+function drawerToggle(code) {
+  if (!permDrawer.value.user || permDrawer.value.user.is_admin) return
+  const arr = new Set(permDrawer.value.localPerms)
+  if (arr.has(code)) arr.delete(code); else arr.add(code)
+  permDrawer.value.localPerms = Array.from(arr)
+}
+function toggleDrawerGroup(mod) {
+  const v = permDrawer.value.open || {}
+  v[mod] = !v[mod]
+  permDrawer.value.open = { ...v }
+}
+function isDrawerOpen(mod) { return !!(permDrawer.value.open || {})[mod] }
+function expandAll(open=true) {
+  const v = {}
+  ;(permTree.value || []).forEach(g => { if (g?.module) v[g.module] = !!open })
+  permDrawer.value.open = v
+}
+async function savePerms() {
+  const u = permDrawer.value.user
+  if (!u || u.is_admin) return
+  permDrawer.value.saving = true
+  try {
+    await api.users.setPerms(u.id, permDrawer.value.localPerms)
+    u._perms = [...permDrawer.value.localPerms]
+    ElMessage.success(t('users.permsUpdated'))
+    permDrawer.value.visible = false
+  } catch (e) {
+    ElMessage.error(t('users.permsUpdateFailed'))
+  } finally {
+    permDrawer.value.saving = false
+  }
+}
 
 async function doReseed() {
   reseed.value.loading = true
