@@ -498,12 +498,15 @@
 
       <div v-if="previewData.length > 0" class="preview-section">
         <h4>{{ t('transactions.dataPreview') }}</h4>
-        <el-table :data="previewData.slice(0, 5)" border size="small" max-height="250">
-          <el-table-column 
-            v-for="header in previewHeaders" 
-            :key="header" 
-            :prop="header" 
-            :label="header" />
+        <el-table :data="previewData.slice(0, 5)" border size="small" max-height="250" @header-dragend="onColResizePreview">
+          <el-table-column
+            v-for="header in previewHeaders"
+            :key="header"
+            :prop="header"
+            :column-key="header"
+            :label="header"
+            :width="colWPreview(header, 160)"
+          />
         </el-table>
         <div class="preview-info">{{ t('transactions.showingPreview', { count: 5, total: previewData.length }) }}</div>
       </div>
@@ -640,6 +643,8 @@ const currentTransaction = ref({})
 const fileList = ref([])
 const previewData = ref([])
 const previewHeaders = ref([])
+// 导入预览表列宽记忆
+const { colW: colWPreview, onColResize: onColResizePreview } = useTableMemory('tx-import-preview')
 
 // 表单相关
 const formRef = ref(null)

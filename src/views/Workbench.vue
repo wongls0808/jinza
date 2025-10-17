@@ -303,94 +303,94 @@
 
   <!-- 审核日志抽屉 -->
     <el-drawer v-model="auditDrawer.visible" :title="t('workbench.auditLog')" size="40%">
-      <el-table :data="auditRows" size="small" border>
-        <el-table-column type="index" :label="t('common.no')" width="60" />
-  <el-table-column prop="acted_at" :label="t('common.date')" width="170" />
-  <el-table-column prop="action" :label="t('buyfx.action')" width="110" />
-  <el-table-column prop="platform_name" :label="t('buyfx.platform')" width="160" />
-  <el-table-column :label="t('workbench.preview.feePercent')" width="120" align="right">
+      <el-table :data="auditRows" size="small" border @header-dragend="onColResizeAudit">
+        <el-table-column type="index" column-key="idx" :label="t('common.no')" :width="colWAudit('idx', 60)" />
+  <el-table-column prop="acted_at" column-key="acted_at" :label="t('common.date')" :width="colWAudit('acted_at', 170)" />
+  <el-table-column prop="action" column-key="action" :label="t('buyfx.action')" :width="colWAudit('action', 110)" />
+  <el-table-column prop="platform_name" column-key="platform_name" :label="t('buyfx.platform')" :width="colWAudit('platform_name', 160)" />
+  <el-table-column column-key="fee" :label="t('workbench.preview.feePercent')" :width="colWAudit('fee', 120)" align="right">
           <template #default="{ row }">{{ money(row.fee_amount) }} ({{ row.fee_percent }}%)</template>
         </el-table-column>
-  <el-table-column :label="t('workbench.deductionDetails')">
+  <el-table-column column-key="deltas" :label="t('workbench.deductionDetails')" :width="colWAudit('deltas', 320)">
           <template #default="{ row }">
             <div v-if="row.deltas">
               <div v-for="(v, k) in row.deltas" :key="k">{{ k }}：{{ t('common.amount') }} {{ money(v.amount) }}，{{ t('buyfx.fee') }} {{ money(v.fee) }}，{{ t('common.total') }} {{ money(v.total) }}</div>
             </div>
           </template>
         </el-table-column>
-  <el-table-column prop="acted_by_name" :label="t('common.createdBy')" width="140" />
+  <el-table-column prop="acted_by_name" column-key="acted_by_name" :label="t('common.createdBy')" :width="colWAudit('acted_by_name', 140)" />
       </el-table>
     </el-drawer>
 
     <!-- 统计明细抽屉（查看被计入的数据） -->
     <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" size="60%">
-      <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading">
+      <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading" @header-dragend="onColResizeDetail">
         <!-- 交易明细(借)：交易日期/账号/账户名称/借方金额 -->
         <template v-if="detailDrawer.type==='tx-debit'">
-          <el-table-column prop="trn_date" :label="t('common.date')" width="120" />
-          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" width="180" />
-          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
-          <el-table-column prop="debit" :label="t('common.debit')" width="140" align="right">
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)" />
+          <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="colWDetail('account_number', 180)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colWDetail('account_name', 220)" />
+          <el-table-column prop="debit" column-key="debit" :label="t('common.debit')" :width="colWDetail('debit', 140)" align="right">
             <template #default="{ row }">{{ money(row.debit) }}</template>
           </el-table-column>
         </template>
         <!-- 交易明细(贷)：交易日期/账号/账户名称/贷方金额 -->
         <template v-else-if="detailDrawer.type==='tx-credit'">
-          <el-table-column prop="trn_date" :label="t('common.date')" width="120" />
-          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" width="180" />
-          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
-          <el-table-column prop="credit" :label="t('common.credit')" width="140" align="right">
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)" />
+          <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="colWDetail('account_number', 180)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colWDetail('account_name', 220)" />
+          <el-table-column prop="credit" column-key="credit" :label="t('common.credit')" :width="colWDetail('credit', 140)" align="right">
             <template #default="{ row }">{{ money(row.credit) }}</template>
           </el-table-column>
         </template>
         <!-- 结汇明细：日期/单号/客户/基金额(MYR) -->
         <template v-else-if="detailDrawer.type==='settle'">
-          <el-table-column prop="settle_date" :label="t('common.date')" width="130">
+          <el-table-column prop="settle_date" column-key="settle_date" :label="t('common.date')" :width="colWDetail('settle_date', 130)">
             <template #default="{ row }">{{ fmtDate(row.settle_date) }}</template>
           </el-table-column>
-          <el-table-column prop="bill_no" :label="t('common.billNo')" width="160" />
-          <el-table-column prop="customer_name" :label="t('common.customer')" />
-          <el-table-column prop="total_base" :label="t('workbench.charts.selectedTotalMYR')" width="160" align="right">
+          <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colWDetail('bill_no', 160)" />
+          <el-table-column prop="customer_name" column-key="customer_name" :label="t('common.customer')" :width="colWDetail('customer_name', 240)" />
+          <el-table-column prop="total_base" column-key="total_base" :label="t('workbench.charts.selectedTotalMYR')" :width="colWDetail('total_base', 160)" align="right">
             <template #default="{ row }">{{ money(row.total_base) }}</template>
           </el-table-column>
         </template>
         <!-- 购汇转换：日期/平台/卖出金额/买入金额(MYR) -->
         <template v-else-if="detailDrawer.type==='buy'">
-          <el-table-column prop="created_at" :label="t('common.date')" width="170" />
-          <el-table-column prop="platform_name" :label="t('buyfx.platform')" />
-          <el-table-column prop="amount_from" :label="t('buyfx.sellAmount')" width="160" align="right">
+          <el-table-column prop="created_at" column-key="created_at" :label="t('common.date')" :width="colWDetail('created_at', 170)" />
+          <el-table-column prop="platform_name" column-key="platform_name" :label="t('buyfx.platform')" :width="colWDetail('platform_name', 220)" />
+          <el-table-column prop="amount_from" column-key="amount_from" :label="t('buyfx.sellAmount')" :width="colWDetail('amount_from', 160)" align="right">
             <template #default="{ row }">{{ money(row.amount_from) }} {{ row.from_currency }}</template>
           </el-table-column>
-          <el-table-column prop="amount_to" :label="t('buyfx.buyAmount')" width="160" align="right">
+          <el-table-column prop="amount_to" column-key="amount_to" :label="t('buyfx.buyAmount')" :width="colWDetail('amount_to', 160)" align="right">
             <template #default="{ row }">{{ money(row.amount_to) }} {{ row.to_currency }}</template>
           </el-table-column>
         </template>
         <!-- 付款单历史明细：付款日期/单号/客户/账户名称/银行/银行账户/金额 -->
         <template v-else-if="detailDrawer.type==='pay'">
-          <el-table-column prop="pay_date" :label="t('fx.payDate')" width="130">
+          <el-table-column prop="pay_date" column-key="pay_date" :label="t('fx.payDate')" :width="colWDetail('pay_date', 130)">
             <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
           </el-table-column>
-          <el-table-column prop="bill_no" :label="t('common.billNo')" width="160" />
-          <el-table-column prop="customer_name" :label="t('common.customer')" />
-          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
-          <el-table-column prop="bank_name" :label="t('transactions.bankName')" width="160" />
-          <el-table-column prop="bank_account" :label="t('accounts.fields.bankAccount')" width="180" />
-          <el-table-column prop="amount" :label="t('common.amount')" width="140" align="right">
+          <el-table-column prop="bill_no" column-key="bill_no" :label="t('common.billNo')" :width="colWDetail('bill_no', 160)" />
+          <el-table-column prop="customer_name" column-key="customer_name" :label="t('common.customer')" :width="colWDetail('customer_name', 240)" />
+          <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colWDetail('account_name', 220)" />
+          <el-table-column prop="bank_name" column-key="bank_name" :label="t('transactions.bankName')" :width="colWDetail('bank_name', 160)" />
+          <el-table-column prop="bank_account" column-key="bank_account" :label="t('accounts.fields.bankAccount')" :width="colWDetail('bank_account', 180)" />
+          <el-table-column prop="amount" column-key="amount" :label="t('common.amount')" :width="colWDetail('amount', 140)" align="right">
             <template #default="{ row }">{{ money(row.amount) }}</template>
           </el-table-column>
         </template>
         <!-- 费用借贷报表：项目/借/贷/净额 -->
         <template v-else-if="detailDrawer.type==='exp'">
-          <el-table-column prop="description" :label="t('expenses.description')">
+          <el-table-column prop="description" column-key="description" :label="t('expenses.description')" :width="colWDetail('description', 280)">
             <template #default="{ row }">{{ row.description }}<span v-if="row.drcr">（{{ row.drcr==='debit'? t('common.debit'): t('common.credit') }}）</span></template>
           </el-table-column>
-          <el-table-column prop="debit_total" :label="t('expenses.columns.debit')" width="140" align="right">
+          <el-table-column prop="debit_total" column-key="debit_total" :label="t('expenses.columns.debit')" :width="colWDetail('debit_total', 140)" align="right">
             <template #default="{ row }">{{ money(row.debit_total) }}</template>
           </el-table-column>
-          <el-table-column prop="credit_total" :label="t('expenses.columns.credit')" width="140" align="right">
+          <el-table-column prop="credit_total" column-key="credit_total" :label="t('expenses.columns.credit')" :width="colWDetail('credit_total', 140)" align="right">
             <template #default="{ row }">{{ money(row.credit_total) }}</template>
           </el-table-column>
-          <el-table-column prop="net" :label="t('expenses.summary.net')" width="160" align="right">
+          <el-table-column prop="net" column-key="net" :label="t('expenses.summary.net')" :width="colWDetail('net', 160)" align="right">
             <template #default="{ row }">{{ money(row.net) }}</template>
           </el-table-column>
         </template>
@@ -421,6 +421,14 @@ const today = new Date().toLocaleDateString()
 // 表格列宽记忆（付款待审列表 / 付款明细表）
 const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('wb-payments')
 const { colW: colWTodo, onColResize: onColResizeTodo } = useTableMemory('wb-todo')
+// 审核日志抽屉列宽记忆
+const { colW: colWAudit, onColResize: onColResizeAudit } = useTableMemory('wb-audit')
+// 统计明细抽屉列宽记忆（按类型区分命名空间）
+function detailMemKey(){ return `wb-detail:${detailDrawer.type || 'unknown'}` }
+let _detailMem = useTableMemory(detailMemKey())
+function refreshDetailMem(){ _detailMem = useTableMemory(detailMemKey()) }
+const colWDetail = (col, def) => _detailMem.colW(col, def)
+const onColResizeDetail = (nw, ow, col, evt) => _detailMem.onColResize(nw, ow, col, evt)
 
 // —— 计算图形：聚合汇总 ——
 const summary = ref({
@@ -481,6 +489,9 @@ function onRangeChange(val){
 // 图形区域仅显示合计，不提供明细抽屉
 const detailDrawer = ref({ visible: false, title: '', type: '', loading: false, rows: [] })
 async function openDetail(type){
+  // 切换列宽记忆空间到当前明细类型
+  detailDrawer.value.type = type
+  refreshDetailMem()
   const params = new URLSearchParams()
   if (Array.isArray(range.value) && range.value[0] && range.value[1]) { params.set('startDate', fmtYmd(range.value[0])); params.set('endDate', fmtYmd(range.value[1])) }
   detailDrawer.value = { visible: true, title: '', type, loading: true, rows: [] }
