@@ -179,7 +179,13 @@ router.get('/system/health', authMiddleware(true), requirePerm('view_dashboard')
       now: null,
       version: null,
       sessions: null,
-      users: null
+      users: null,
+      sizeBytes: null,
+      sizeMB: null,
+      connUsed: null,
+      connMax: null,
+      connUsedPct: null,
+      topTables: null
     }
   }
   if (process.env.DATABASE_URL) {
@@ -200,6 +206,33 @@ router.get('/system/health', authMiddleware(true), requirePerm('view_dashboard')
       try {
         const u = await query('select count(*) from users')
         data.db.users = Number(u?.rows?.[0]?.count || 0)
+      } catch {}
+      // Database size
+      try {
+        const sz = await query(`select pg_database_size(current_database()) as size`)
+        const bytes = Number(sz?.rows?.[0]?.size || 0)
+        data.db.sizeBytes = bytes
+        data.db.sizeMB = bytes ? Math.round((bytes / (1024*1024)) * 10) / 10 : null
+      } catch {}
+      // Connection usage
+      try {
+        const mx = await query(`select current_setting('max_connections')::int as max`)
+        const used = await query(`select count(*) from pg_stat_activity where datname = current_database()`)
+        const connMax = Number(mx?.rows?.[0]?.max || 0)
+        const connUsed = Number(used?.rows?.[0]?.count || 0)
+        data.db.connMax = connMax || null
+        data.db.connUsed = connUsed || null
+        data.db.connUsedPct = (connMax && connUsed>=0) ? Math.round((connUsed/connMax)*1000)/10 : null
+      } catch {}
+      // Top tables by size (limit 5)
+      try {
+        const tt = await query(`
+          select relname as name, pg_total_relation_size(relid) as size
+          from pg_catalog.pg_statio_user_tables
+          order by size desc
+          limit 5
+        `)
+        data.db.topTables = (tt?.rows || []).map(r => ({ name: r.name, sizeMB: Math.round((Number(r.size||0)/(1024*1024))*10)/10 }))
       } catch {}
     } catch (e) {
       data.db.ok = false

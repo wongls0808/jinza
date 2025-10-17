@@ -615,6 +615,26 @@ function toRows(d){
   rows.push({ name: t('workbench.monitor.metrics.dbVersion'), value: d.db?.version || '-' })
   rows.push({ name: t('workbench.monitor.metrics.dbSessions'), value: d.db?.sessions!=null ? String(d.db.sessions) : '-' })
   rows.push({ name: t('workbench.monitor.metrics.dbUsers'), value: d.db?.users!=null ? String(d.db.users) : '-' })
+  // DB size
+  if (d.db?.sizeMB != null) {
+    rows.push({ name: t('workbench.monitor.metrics.dbSize'), value: String(d.db.sizeMB) })
+  }
+  // DB connections with colored status
+  if (d.db?.connUsed != null && d.db?.connMax != null) {
+    const pct = d.db.connUsedPct
+    let tag = ''
+    if (pct != null) {
+      if (pct >= 90) tag = 'danger'
+      else if (pct >= 70) tag = 'warning'
+      else tag = 'success'
+    }
+    rows.push({ name: t('workbench.monitor.metrics.dbConn'), value: `${d.db.connUsed}/${d.db.connMax} (${pct!=null? pct+'%':'-'})`, status: pct!=null? (pct+'%'):'-', tag })
+  }
+  // Top tables
+  if (Array.isArray(d.db?.topTables) && d.db.topTables.length) {
+    const text = d.db.topTables.map(x => `${x.name}:${x.sizeMB}MB`).join(', ')
+    rows.push({ name: t('workbench.monitor.metrics.dbTopTables'), value: text })
+  }
   return rows
 }
 async function loadMonitor(){

@@ -360,7 +360,10 @@ const messages = {
           dbNow: 'DB 时间',
           dbVersion: 'DB 版本',
           dbSessions: '在线会话',
-          dbUsers: '用户数'
+          dbUsers: '用户数',
+          dbSize: '数据库大小(MB)',
+          dbConn: '连接占用',
+          dbTopTables: '最大表(前5)'
         },
         status: { ok: '正常', fail: '异常', yes: '已配置', no: '未配置' }
       }
@@ -726,7 +729,10 @@ const messages = {
           dbNow: 'DB Time',
           dbVersion: 'DB Version',
           dbSessions: 'Active Sessions',
-          dbUsers: 'Users'
+          dbUsers: 'Users',
+          dbSize: 'DB Size (MB)',
+          dbConn: 'Connections',
+          dbTopTables: 'Top Tables (5)'
         },
         status: { ok: 'OK', fail: 'Fail', yes: 'Yes', no: 'No' }
       }
