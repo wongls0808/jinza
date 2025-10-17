@@ -5,19 +5,25 @@
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
 
-    <!-- 高频操作置顶工具栏：结汇 / 付款 / 购汇 -->
+    <!-- 高频操作置顶工具栏：匹配 / 结汇 / 付款 / 购汇（左对齐，独立卡片） -->
     <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions">
-      <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
-        <div class="hf-icon"><Collection /></div>
-        <div class="hf-label">结汇</div>
-      </div>
-      <div class="hf-item success" role="button" tabindex="0" aria-label="付款" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
-        <div class="hf-icon"><CreditCard /></div>
-        <div class="hf-label">付款</div>
-      </div>
-      <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
-        <div class="hf-icon"><Coin /></div>
-        <div class="hf-label">购汇</div>
+      <div class="hf-row">
+        <div class="hf-item info" role="button" tabindex="0" aria-label="匹配" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
+          <div class="hf-icon"><Tickets /></div>
+          <div class="hf-label">匹配</div>
+        </div>
+        <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
+          <div class="hf-icon"><Collection /></div>
+          <div class="hf-label">结汇</div>
+        </div>
+        <div class="hf-item success" role="button" tabindex="0" aria-label="付款" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
+          <div class="hf-icon"><CreditCard /></div>
+          <div class="hf-label">付款</div>
+        </div>
+        <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
+          <div class="hf-icon"><Coin /></div>
+          <div class="hf-label">购汇</div>
+        </div>
       </div>
     </div>
 
@@ -1197,7 +1203,8 @@ function onPaymentCreated(){
 .card--plain { background: transparent; border: none; box-shadow: none; }
 
 /* 高频操作置顶工具栏 */
-.hf-toolbar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(1.2) blur(4px); background: color-mix(in oklab, var(--el-bg-color) 80%, transparent); border: 1px solid var(--el-border-color); border-radius: 14px; padding: 10px; margin: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+.hf-toolbar { position: sticky; top: 0; z-index: 20; padding: 6px 8px; margin: 6px 8px; background: transparent; box-shadow: none; }
+.hf-row { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
 .hf-item { display:flex; align-items:center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--el-bg-color); border: 1px solid var(--el-border-color); cursor: pointer; user-select:none; transition: box-shadow .2s ease, transform .06s ease, background .2s ease; }
 .hf-item:hover { box-shadow: 0 16px 28px rgba(0,0,0,.12); transform: translateY(-1px); }
 .hf-item:focus { outline: 3px solid rgba(0,0,0,.12); outline-offset: 2px; }
@@ -1207,9 +1214,7 @@ function onPaymentCreated(){
 .hf-item.primary .hf-icon { background: color-mix(in oklab, var(--el-color-primary) 16%, transparent); color: var(--el-color-primary); }
 .hf-item.success .hf-icon { background: color-mix(in oklab, var(--el-color-success) 16%, transparent); color: var(--el-color-success); }
 .hf-item.warning .hf-icon { background: color-mix(in oklab, var(--el-color-warning) 16%, transparent); color: var(--el-color-warning); }
-@media (max-width: 768px){
-  .hf-toolbar { grid-template-columns: 1fr; position: sticky; top: 0; }
-}
+@media (max-width: 768px){ .hf-row { gap: 8px; } }
 
 /* 卡片网格 */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
