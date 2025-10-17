@@ -168,11 +168,11 @@ fxRouter.post('/platforms', auth.authMiddleware(true), auth.requireAnyPerm('buyf
   if (!name) return res.status(400).json({ error: 'name required' })
   // 细分校验：创建 vs 更新
   if (id) {
-    if (!(hasPerm(req,'buyfx:platforms:update') || hasPerm(req,'manage_fx'))) {
+    if (!(auth.hasPerm(req,'buyfx:platforms:update') || auth.hasPerm(req,'manage_fx'))) {
       return res.status(403).json({ error: 'Forbidden' })
     }
   } else {
-    if (!(hasPerm(req,'buyfx:platforms:create') || hasPerm(req,'manage_fx'))) {
+    if (!(auth.hasPerm(req,'buyfx:platforms:create') || auth.hasPerm(req,'manage_fx'))) {
       return res.status(403).json({ error: 'Forbidden' })
     }
   }

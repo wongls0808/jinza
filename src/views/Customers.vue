@@ -25,7 +25,7 @@
           <el-button size="small" @click="onExport">{{ $t('common.export') }}</el-button>
           <el-button size="small" @click="downloadTemplate">{{ $t('common.template') }}</el-button>
           <el-button type="primary" size="small" @click="openAdd">{{ $t('common.add') }}</el-button>
-          <el-button type="danger" size="small" :disabled="!selection.length" @click="removeSelected">{{ $t('common.delete') }}</el-button>
+          <el-button type="danger" size="small" :disabled="!hasSelection" @click="removeSelected">{{ $t('common.delete') }}</el-button>
         </div>
       </template>
       <el-table
@@ -34,7 +34,8 @@
         size="small"
         border
         style="width: 100%"
-        @selection-change="(val)=> selection.value = val"
+        row-key="id"
+        @selection-change="onSelectionChange"
         @sort-change="onSort"
         @header-dragend="onColResize"
         @row-dblclick="openEdit"
@@ -220,7 +221,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Papa from 'papaparse'
 import { ElMessage } from 'element-plus'
@@ -233,7 +234,8 @@ const { colW: colWAcc, onColResize: onColResizeAcc } = useTableMemory('customer-
 
 const tableRef = ref()
 const rows = ref([])
-let selection = ref([])
+const selection = ref([])
+const hasSelection = computed(() => Array.isArray(selection.value) && selection.value.length > 0)
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
@@ -271,6 +273,12 @@ async function reload() {
   const data = await api.customers.list({ q: q.value, page: page.value, pageSize: pageSize.value, sort: sort.value, order: order.value })
   rows.value = data.items || []
   total.value = data.total || 0
+  // 重新加载后清空选择，避免“删除”按钮状态卡住
+  selection.value = []
+}
+
+function onSelectionChange(val) {
+  selection.value = Array.isArray(val) ? val : []
 }
 
 function openAdd() {
@@ -298,7 +306,7 @@ async function doAdd() {
 }
 
 async function removeSelected() {
-  if (!selection.value.length) return
+  if (!hasSelection.value) return
   const ids = selection.value.map(r => r.id)
   await api.customers.removeBatch(ids)
   await reload()
