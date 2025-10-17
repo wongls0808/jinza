@@ -31,6 +31,8 @@ export const PERMISSION_TREE = [
     { code: 'dashboard:total:expenses', name: '费用合计' },
     // 系统监控
     { code: 'dashboard:server_monitor', name: '服务器监控（展示）' },
+    // 待审浮钮/抽屉
+    { code: 'dashboard:pending_pay_approval', name: '付款待审（展示）' },
     // 导航卡片可见性（展示）
     { code: 'dashboard:nav:transactions', name: '交易管理（入口）' },
     { code: 'dashboard:nav:fx', name: '结汇管理（入口）' },

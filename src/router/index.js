@@ -44,6 +44,13 @@ const router = createRouter({
 })
 
 // 登录与权限检查
+// 允许通过工作台的“导航独立授权”直达页面：当缺少模块查看权限时，只要具备对应的 dashboard:nav:* 也放行
+const ALT_ROUTE_PERMS = {
+  transactions: ['dashboard:nav:transactions'],
+  'fx-settlements': ['dashboard:nav:fx_history'],
+  'fx-payments': ['dashboard:nav:pay_history'],
+  'fx-buy-history': ['dashboard:nav:buyfx_history'],
+}
 const readAuth = () => {
   try {
     // 优先从会话存储中读取认证信息
@@ -103,6 +110,11 @@ router.beforeEach((to, from, next) => {
   if (must_change_password && to.name !== 'change-password') return next({ name: 'change-password' })
   const need = to.meta.perm
   if (need && !perms.includes(need)) {
+    // 若存在替代授权（工作台独立导航授权），且用户具备其中任意一个，则允许访问
+    const alt = ALT_ROUTE_PERMS[to.name]
+    if (Array.isArray(alt) && alt.some(a => perms.includes(a))) {
+      return next()
+    }
     const target = firstAllowed(perms)
     // 避免跳转到同名路由导致循环
     if (target.name === to.name) return next()

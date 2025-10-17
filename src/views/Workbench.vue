@@ -160,27 +160,27 @@
       </div>
     </div>
     <div class="kpi6-grid">
-      <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openDetail('tx-debit')" @keydown.enter.prevent="openDetail('tx-debit')" @keydown.space.prevent="openDetail('tx-debit')">
+      <div v-if="has('dashboard:total:transactions_debit')" class="kpi-card theme-primary" role="button" tabindex="0" @click="openDetail('tx-debit')" @keydown.enter.prevent="openDetail('tx-debit')" @keydown.space.prevent="openDetail('tx-debit')">
         <div class="kpi-title">{{ t('workbench.charts.transactionsDebit') }}</div>
         <div class="kpi-value">{{ money(summary.transactions.debit) }}</div>
       </div>
-      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openDetail('tx-credit')" @keydown.enter.prevent="openDetail('tx-credit')" @keydown.space.prevent="openDetail('tx-credit')">
+      <div v-if="has('dashboard:total:transactions_credit')" class="kpi-card theme-success" role="button" tabindex="0" @click="openDetail('tx-credit')" @keydown.enter.prevent="openDetail('tx-credit')" @keydown.space.prevent="openDetail('tx-credit')">
         <div class="kpi-title">{{ t('workbench.charts.transactionsCredit') }}</div>
         <div class="kpi-value">{{ money(summary.transactions.credit) }}</div>
       </div>
-      <div class="kpi-card theme-info" role="button" tabindex="0" @click="openDetail('settle')" @keydown.enter.prevent="openDetail('settle')" @keydown.space.prevent="openDetail('settle')">
+      <div v-if="has('dashboard:total:settlements')" class="kpi-card theme-info" role="button" tabindex="0" @click="openDetail('settle')" @keydown.enter.prevent="openDetail('settle')" @keydown.space.prevent="openDetail('settle')">
         <div class="kpi-title">{{ t('workbench.charts.settlementsTotal') }}</div>
         <div class="kpi-value">{{ money(summary.settlements.base) }}</div>
       </div>
-      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('buy')" @keydown.enter.prevent="openDetail('buy')" @keydown.space.prevent="openDetail('buy')">
+      <div v-if="has('dashboard:total:buyfx')" class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('buy')" @keydown.enter.prevent="openDetail('buy')" @keydown.space.prevent="openDetail('buy')">
         <div class="kpi-title">{{ t('workbench.charts.buyfxTotal') }}</div>
         <div class="kpi-value">{{ money(summary.buyfx.total) }}</div>
       </div>
-      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openDetail('pay')" @keydown.enter.prevent="openDetail('pay')" @keydown.space.prevent="openDetail('pay')">
+      <div v-if="has('dashboard:total:payments')" class="kpi-card theme-danger" role="button" tabindex="0" @click="openDetail('pay')" @keydown.enter.prevent="openDetail('pay')" @keydown.space.prevent="openDetail('pay')">
         <div class="kpi-title">{{ t('workbench.charts.paymentsTotal') }}</div>
         <div class="kpi-value">{{ money(summary.payments.total) }}</div>
       </div>
-      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('exp')" @keydown.enter.prevent="openDetail('exp')" @keydown.space.prevent="openDetail('exp')">
+      <div v-if="has('dashboard:total:expenses')" class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('exp')" @keydown.enter.prevent="openDetail('exp')" @keydown.space.prevent="openDetail('exp')">
         <div class="kpi-title">{{ t('workbench.charts.expensesTotal') }}</div>
         <div class="kpi-value">{{ money(summary.expenses.total) }}</div>
       </div>
@@ -786,10 +786,12 @@ const cpuColor = computed(() => colorByPct(monitorCpuPct.value))
 const memColor = computed(() => colorByPct(monitorMemPct.value))
 const dbColor = computed(() => colorByPct(monitorDbPct.value))
 
-// 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
+// 工作台页面：入口按类别排序（管理 -> 历史），每个入口独立授权
 const quickActions = computed(() => [
+  // 管理类
   { key: 'tx', label: t('home.qaTransactions'), desc: t('workbench.cards.tx'), route: 'transactions', color: 'blue', icon: 'Tickets' },
   { key: 'settleManage', label: t('home.qaSettlements'), desc: t('workbench.cards.settleManage'), route: 'fx-settlements', color: 'green', icon: 'Collection' },
+  // 历史类
   { key: 'settleHistory', label: t('home.qaSettlementsHistory'), desc: t('workbench.cards.settleHistory'), route: 'fx-settlements', color: 'teal', icon: 'FolderOpened' },
   { key: 'payHistory', label: t('home.qaPaymentsHistory'), desc: t('workbench.cards.payHistory'), route: 'fx-payments', color: 'orange', icon: 'CreditCard' },
   { key: 'buyHistory', label: t('home.qaBuyHistory'), desc: t('workbench.cards.buyHistory'), route: 'fx-buy-history', color: 'purple', icon: 'Coin' },
