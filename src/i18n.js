@@ -666,6 +666,10 @@ const messages = {
       unmatchedCustomer: '未匹配客户',
       importDone: '导入完成：成功 {inserted} 条，重复 {duplicates} 条',
       importFailed: '导入失败',
+      parseError: 'CSV文件解析失败',
+      fileProcessError: '文件处理失败',
+      emptyFile: '文件为空或格式错误',
+      noDataToImport: '没有可导入的数据',
       promoteDone: '转入完成：处理 {total} 条，已写入 {inserted} 条',
       promoteFailed: '转入失败'
   },
