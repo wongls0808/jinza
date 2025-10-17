@@ -546,7 +546,7 @@ router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
 })
 
 // Customers
-router.get('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.get('/customers', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
   const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const term = `%${q}%`
