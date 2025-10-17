@@ -634,7 +634,7 @@ transactionsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('
             account_number, transaction_date, cheque_ref_no, description,
             debit_amount, credit_amount, balance, category, reference_1, reference_2, reference_3, created_by
           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-          on conflict (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) do nothing`,
+          on conflict (account_number, transaction_date, cheque_ref_no) do nothing`,
           [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, category, mergedRef, null, null, req.user?.id || null]
         )
         if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++
@@ -715,7 +715,7 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
             account_number, transaction_date, cheque_ref_no, description,
             debit_amount, credit_amount, balance, reference_1, reference_2, reference_3, created_by
           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-          on conflict (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) do nothing`,
+          on conflict (account_number, transaction_date, cheque_ref_no) do nothing`,
           [account, trn, cheque, desc, Number(debit||0), Number(credit||0), balance, mergedRef, null, null, req.user?.id || null]
         )
         if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++

@@ -270,7 +270,7 @@ receiptsRouter.post('/promote-to-transactions', auth.authMiddleware(true), auth.
         await query(
           `insert into transactions(account_number, transaction_date, cheque_ref_no, description, debit_amount, credit_amount, balance, category, reference_1, reference_2, reference_3, created_by)
            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-           on conflict (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) do nothing`,
+           on conflict (account_number, transaction_date, cheque_ref_no) do nothing`,
           [r.account_number, r.trn_date, r.cheque_ref_no || null, null, r.debit_amount||0, r.credit_amount||0, balance, null, r.reference1||null, r.reference2||null, r.reference3||null, null]
         )
         inserted++
