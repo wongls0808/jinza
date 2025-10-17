@@ -29,10 +29,6 @@
               <el-icon><Plus /></el-icon>
               {{ t('transactions.addTransaction') }}
             </el-button>
-            <el-button @click="showSimpleImportDialog">
-              <el-icon><Upload /></el-icon>
-              导入交易
-            </el-button>
             <el-button @click="exportTransactions">
               <el-icon><Download /></el-icon>
               {{ t('transactions.exportTransactions') }}
@@ -470,59 +466,6 @@
       </template>
     </el-dialog>
     
-    <!-- 简单导入对话框 -->
-    <el-dialog
-      v-model="simpleImportVisible"
-      title="导入交易"
-      width="600px">
-      <el-upload
-        class="simple-upload"
-        drag
-        action=""
-        :auto-upload="false"
-        :on-change="handleSimpleFileChange"
-        accept=".csv"
-        :show-file-list="false">
-        <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">
-          拖拽CSV文件到此处 <em>或点击选择文件</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            支持基本CSV格式：账户号码,交易日期,参考号,描述,借方金额,贷方金额
-          </div>
-        </template>
-      </el-upload>
-      
-      <div v-if="importPreview.length > 0" class="import-preview">
-        <div class="preview-header">
-          <h4>预览前5条记录</h4>
-          <span>共 {{ importPreview.length }} 条记录</span>
-        </div>
-        <el-table :data="importPreview.slice(0, 5)" border size="small">
-          <el-table-column label="账户号码" prop="accountNumber" width="120" />
-          <el-table-column label="交易日期" prop="transactionDate" width="100" />
-          <el-table-column label="参考号" prop="chequeRefNo" width="100" />
-          <el-table-column label="描述" prop="description" show-overflow-tooltip />
-          <el-table-column label="借方" prop="debitAmount" width="80" align="right" />
-          <el-table-column label="贷方" prop="creditAmount" width="80" align="right" />
-        </el-table>
-      </div>
-      
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="simpleImportVisible = false">取消</el-button>
-          <el-button 
-            type="primary" 
-            @click="submitSimpleImport" 
-            :loading="importing"
-            :disabled="importPreview.length === 0">
-            导入 ({{ importPreview.length }} 条)
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
-    
     <!-- 查看交易详情对话框 -->
     <el-dialog
       v-model="viewDialogVisible"
@@ -579,8 +522,10 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import Papa from 'papaparse'
 import { api, request } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+
 
 const { t } = useI18n()
 const router = useRouter()
@@ -629,12 +574,12 @@ const hasActiveFilters = computed(() => {
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const filtersDialogVisible = ref(false)
-const simpleImportVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
-const importing = ref(false)
 const currentTransaction = ref({})
-const importPreview = ref([])
+
+// 新导入流程：去预览，改为“可导入 + 重复/疑似重复”列表
+
 
 // 表单相关
 const formRef = ref(null)
@@ -665,6 +610,8 @@ const rules = {
     { type: 'number', min: 0, message: t('transactions.creditAmountMin'), trigger: 'change' }
   ]
 }
+
+// 已移除图表
 
 // 类别选项
 const categoryOptions = ref([
@@ -735,10 +682,10 @@ const fetchTransactions = async () => {
       params.maxAmount = filters.maxAmount
     }
     
-    // 仅拉取未匹配（表1语义）
-    params.status = 'pending'
-    // 使用API获取数据
-    const data = await api.transactions.list(params)
+  // 仅拉取未匹配（表1语义）
+  params.status = 'pending'
+  // 使用API获取数据
+  const data = await api.transactions.list(params)
     
     transactions.value = data.data
     pagination.total = data.pagination.total
@@ -760,6 +707,7 @@ const fetchTransactions = async () => {
     } else {
       ElMessage.error(t('transactions.fetchFailed'))
     }
+    // 移除了开发环境的测试数据
   } finally {
     loading.value = false
   }
@@ -790,11 +738,14 @@ const fetchStats = async () => {
     const data = await api.transactions.stats(params)
     stats.value = data
     
+    // 图表已移除，无需渲染
   } catch (error) {
     console.error('获取统计数据失败:', error)
     ElMessage.error(t('transactions.statsFetchFailed'))
   }
 }
+
+// 已移除 renderCharts 图表渲染逻辑
 
 const handleSearch = () => {
   pagination.page = 1
@@ -818,11 +769,6 @@ const showAddDialog = () => {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
-}
-
-const showSimpleImportDialog = () => {
-  importPreview.value = []
-  simpleImportVisible.value = true
 }
 
 const resetForm = () => {
@@ -908,6 +854,7 @@ const handleRowDblClick = (row) => {
 const handleSelectionChange = (selection) => {
   multipleSelection.value = selection
 }
+// 预览与批量勾选逻辑已移除
 
 // 触发批量匹配：从表头复选框开启
 const onBatchMatchToggle = (val) => {
@@ -938,8 +885,8 @@ const handleBatchDelete = async () => {
     
     const ids = multipleSelection.value.map(item => item.id)
     
-    // 调用批量删除 API
-    await api.transactions.deleteTransactions(ids)
+  // 调用批量删除 API
+  await api.transactions.deleteTransactions(ids)
     
     ElMessage.success(t('transactions.batchDeleteSuccess'))
     fetchTransactions()
@@ -1325,28 +1272,16 @@ const exportTransactions = async () => {
     }
     
     // 使用API获取导出数据
-    const data = await api.transactions.export({ ...params, searchAmountOnly: searchAmountOnly.value ? '1' : '0' })
+  const data = await api.transactions.export({ ...params, searchAmountOnly: searchAmountOnly.value ? '1' : '0' })
     
     if (!data || data.length === 0) {
       ElMessage.warning(t('transactions.noDataToExport'))
       return
     }
     
-    // 简单的CSV导出，不依赖Papa Parse
-    const headers = ['账户号码', '交易日期', '参考号', '描述', '借方金额', '贷方金额']
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => [
-        row.account_number || '',
-        row.transaction_date || '',
-        row.cheque_ref_no || '',
-        `"${(row.transaction_description || '').replace(/"/g, '""')}"`,
-        row.debit_amount || 0,
-        row.credit_amount || 0
-      ].join(','))
-    ].join('\n')
-    
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8' })
+    // 使用PapaParse转换为CSV
+    const csv = Papa.unparse(data, { header: true })
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     
     const link = document.createElement('a')
@@ -1364,8 +1299,8 @@ const exportTransactions = async () => {
   }
 }
 
-// 简单CSV文件处理
-const handleSimpleFileChange = (file) => {
+
+const handleFileChange = (file) => {
   if (!file || !file.raw) {
     return
   }
@@ -1373,93 +1308,267 @@ const handleSimpleFileChange = (file) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
-      const text = e.target.result
-      const lines = text.split('\n').filter(line => line.trim())
+      const fullText = String(e.target.result || '')
+      originalCsvText.value = fullText
       
-      if (lines.length < 2) {
-        ElMessage.warning('CSV文件格式错误或数据为空')
-        return
-      }
+      // 从文件头提取默认账户号码
+      const accountMatch = /(^|\n)\s*Account\s+Number\s*:\s*,\s*([^\r\n,]+)/i.exec(fullText)
+      const defaultAccountNumber = accountMatch ? accountMatch[2].trim() : ''
       
-      // 跳过标题行，解析数据
-      const dataLines = lines.slice(1)
-      const rows = []
-      
-      for (const line of dataLines) {
-        const cells = line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
-        
-        if (cells.length >= 4) {
-          rows.push({
-            accountNumber: cells[0] || '',
-            transactionDate: cells[1] || '',
-            chequeRefNo: cells[2] || '',
-            description: cells[3] || '',
-            debitAmount: parseFloat(cells[4]) || 0,
-            creditAmount: parseFloat(cells[5]) || 0,
-            reference: cells[6] || ''
-          })
+      // 仅解析从表头 Trn. Date 开始的数据区，以适配固定银行格式
+      const lines = fullText.replace(/\r\n/g, '\n').split('\n')
+      const headerIdx = lines.findIndex(l => /^\s*Trn\.\s*Date\s*,/i.test(l))
+      const textToParse = headerIdx >= 0 ? lines.slice(headerIdx).join('\n') : fullText
+
+      Papa.parse(textToParse, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.data && results.data.length) {
+            // 清理Excel格式的函数
+            const cleanExcelValue = (v) => {
+              if (!v) return ''
+              let s = String(v).trim()
+              // 处理Excel导出的 ="value" 格式
+              const excelMatch = /^=\"(.*)\"$/.exec(s)
+              if (excelMatch) {
+                s = excelMatch[1]
+              }
+              // 处理普通引号
+              if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+                s = s.slice(1, -1)
+              }
+              return s.trim()
+            }
+            
+            // 转为统一结构
+            const rows = results.data.map(row => {
+              const rowAccountNumber = cleanExcelValue(row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '')
+              return {
+                accountNumber: rowAccountNumber || defaultAccountNumber,
+                transactionDate: cleanExcelValue(row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || ''),
+                chequeRefNo: cleanExcelValue(row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || ''),
+                description: cleanExcelValue(row.description || row.描述 || row.Description || row['Transaction Description'] || ''),
+                debitAmount: Number(cleanExcelValue(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0).replace(/,/g, '')) || 0,
+                creditAmount: Number(cleanExcelValue(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0).replace(/,/g, '')) || 0,
+                reference1: cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+                reference2: cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+                reference3: cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+                reference4: cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+                reference5: cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+                reference6: cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || ''),
+                // 合并所有参考字段为单一referenceText
+                referenceText: [
+                  cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+                  cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+                  cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+                  cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+                  cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+                  cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || '')
+                ].filter(r => r && r !== '-').join(' ').trim()
+              }
+            })
+            buildDedup(rows)
+          } else {
+            importRows.value = []
+            ElMessage.warning(t('transactions.emptyFile'))
+          }
+        },
+        error: (error) => {
+          console.error('解析CSV文件出错:', error)
+          ElMessage.error(t('transactions.parseError'))
         }
-      }
-      
-      importPreview.value = rows
-      
-      if (rows.length === 0) {
-        ElMessage.warning('未找到有效的交易数据')
-      } else {
-        ElMessage.success(`已解析 ${rows.length} 条交易记录`)
-      }
-      
+      })
     } catch (error) {
-      console.error('解析CSV失败:', error)
-      ElMessage.error('CSV文件解析失败')
+      console.error('处理文件时出错:', error)
+      ElMessage.error(t('transactions.fileProcessError'))
     }
   }
-  
   reader.readAsText(file.raw)
 }
 
-// 提交简单导入
-const submitSimpleImport = async () => {
-  if (importPreview.value.length === 0) {
-    ElMessage.warning('没有可导入的数据')
+function buildDedup(rows){
+  // 临时移除去重逻辑，允许所有数据导入进行测试
+  // 定义必要的变量以避免运行时错误
+  const key = (r) => `${r.accountNumber}|${r.transactionDate}|${r.chequeRefNo || ''}`
+  const map = new Map()
+  const out = []
+
+  for (const r of rows) {
+    const k = key(r)
+    const entry = {
+      accountNumber: r.accountNumber,
+      transactionDate: r.transactionDate,
+      chequeRefNo: r.chequeRefNo,
+      description: r.description,
+      debitAmount: r.debitAmount,
+      creditAmount: r.creditAmount,
+      referenceText: String(r.referenceText || '').trim(),
+      amountValue: Math.round((Number(r.creditAmount||0) - Number(r.debitAmount||0)) * 100) / 100,
+      status: 'normal',
+      include: true
+    }
+    if (!map.has(k)) {
+      map.set(k, { first: r, count: 1 })
+      // 若参考号为空，仍作为正常记录（后续与相同键值比较判定疑似重复）
+      out.push(entry)
+    } else {
+      const blk = map.get(k)
+      blk.count++
+      // 完全一致：时间、参考（或为空则空串）与金额一致，认定“重复”
+      entry.status = 'duplicate'
+      entry.include = false
+      out.push(entry)
+    }
+  }
+
+  // “疑似重复”的定义：参考为空，但所有字段完全相同（我们这里的 key 已覆盖日期+参考文本+金额；若还需校验 account/cheque/desc，也可拼入 key）
+  // 进一步区分：当参考为空但金额/日期/摘要等完全一致时，保留首条为 normal，后续为 suspect（但若已被 duplicate 标记则保持）
+  const groups = new Map()
+  const fullKey = (e) => `${e.transactionDate}|${e.referenceText}|${e.amountValue}|${e.accountNumber}|${e.chequeRefNo}|${e.description}`
+  for (const e of out) {
+    if (e.referenceText) continue
+    const fk = fullKey(e)
+    if (!groups.has(fk)) groups.set(fk, [])
+    groups.get(fk).push(e)
+  }
+  for (const list of groups.values()) {
+    if (list.length > 1) {
+      // 第一条保留原状态（通常 normal），后续若仍为 normal 则标记为 suspect
+      for (let i=1;i<list.length;i++) {
+        if (list[i].status === 'normal') {
+          list[i].status = 'suspect'
+          list[i].include = false
+        }
+      }
+    }
+  }
+  importRows.value = out
+  // 自动导入：仅当存在需要导入的记录时（include=true）
+  try {
+    const toImport = importRows.value.filter(r => r.include)
+    const skipped = importRows.value.length - toImport.length
+    if (toImport.length > 0) {
+      ElMessage.info(`检测到可导入 ${toImport.length} 条，跳过 ${skipped} 条（重复/疑似重复）`) 
+      // 延迟一个tick，确保状态更新后再提交
+      setTimeout(() => {
+        submitImport()
+      }, 0)
+    } else {
+      ElMessage.info('全部为重复或疑似重复，已自动跳过。')
+    }
+  } catch (e) {
+    console.error('自动导入触发失败:', e)
+  }
+}
+
+const submitImport = async () => {
+  if (!importRows.value.length || importRows.value.filter(r=>r.include).length===0) {
+    // 自动导入场景：没有可导入的数据，直接提示并退出
+    ElMessage.info(t('transactions.noDataToImport'))
     return
   }
   
-  importing.value = true
+  importSubmitting.value = true
   
   try {
-    const response = await request('/transactions/simple-import', {
-      method: 'POST',
-      body: JSON.stringify({ rows: importPreview.value })
+    // 新逻辑：仅导入勾选的行，统一走 JSON 导入接口
+    const selected = importRows.value.filter(r => r.include)
+    
+    // 验证必要字段
+    const validRows = selected.filter(row => {
+      if (!row.accountNumber || !row.transactionDate) {
+        console.warn('跳过无效行（缺少账户号或交易日期）:', row)
+        return false
+      }
+      return true
     })
     
-    const { inserted, skipped, failed, errors } = response
+    if (validRows.length === 0) {
+      ElMessage.warning('没有有效的数据可以导入')
+      return
+    }
     
-    simpleImportVisible.value = false
-    importPreview.value = []
+    const transformedData = validRows.map(row => ({
+      accountNumber: row.accountNumber,
+      transactionDate: row.transactionDate,
+      chequeRefNo: row.chequeRefNo,
+      description: row.description,
+      debitAmount: row.debitAmount,
+      creditAmount: row.creditAmount,
+      category: '',
+      referenceText: row.referenceText,
+      reference1: row.referenceText,
+      reference2: '',
+      reference3: ''
+    }))
+    const response = await request('/transactions/import', {
+      method: 'POST',
+      body: JSON.stringify({ rows: transformedData })
+    })
     
+    const result = response
+    
+    importDialogVisible.value = false
+    fileList.value = []
+    importRows.value = []
+    
+    const ins = result?.inserted || 0
+    const skipped = result?.skipped || 0
+    const failed = result?.failed || 0
     const summary = [
-      `导入成功: ${inserted}`,
-      skipped > 0 ? `跳过重复: ${skipped}` : '',
-      failed > 0 ? `失败: ${failed}` : ''
-    ].filter(Boolean).join(' | ')
-    
-    if (inserted > 0) {
+      `${t('transactions.imported')}: ${ins}`,
+      skipped > 0 ? `${t('transactions.skipped')}: ${skipped}` : '',
+      failed > 0 ? `${t('transactions.failed')}: ${failed}` : ''
+    ].filter(Boolean).join(' ｜ ')
+
+    if (ins > 0) {
       ElMessage.success(summary)
-      fetchTransactions() // 刷新列表
+    } else if (skipped > 0 && failed === 0) {
+      ElMessage.warning(`${t('transactions.noNewRecords')} ｜ ${summary}`)
+    } else if (failed > 0) {
+      ElMessage.error(summary)
     } else {
       ElMessage.info(summary)
     }
-    
-    if (failed > 0 && errors.length > 0) {
-      console.warn('导入错误:', errors)
-    }
-    
+
+  // 导入完返回第一页并刷新（避免当前筛选导致“看起来没数据”）
+    pagination.page = 1
+    fetchTransactions()
   } catch (error) {
-    console.error('导入失败:', error)
-    ElMessage.error(`导入失败: ${error.message || '未知错误'}`)
+    console.error('导入交易数据失败:', error)
+    // 显示更详细的错误信息
+    let errorMessage = t('transactions.importFailed')
+    if (error.message) {
+      errorMessage += `: ${error.message}`
+    }
+    ElMessage.error(errorMessage)
   } finally {
-    importing.value = false
+    importSubmitting.value = false
+  }
+}
+
+const downloadTemplate = async () => {
+  try {
+    const data = await request('/transactions/template')
+    
+    // 使用PapaParse转换为CSV
+    const csv = Papa.unparse(data, { header: true })
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'transactions_template.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('transactions.templateDownloaded'))
+  } catch (error) {
+    console.error('下载模板失败:', error)
+    ElMessage.error(t('transactions.templateDownloadFailed'))
   }
 }
 
@@ -1541,6 +1650,10 @@ function onBankImgErr(e){
 </script>
 
 <style scoped>
+.dedup-section { margin-top: 12px; display: grid; gap: 8px; }
+.dedup-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dedup-toolbar .stats { display: flex; gap: 12px; color: var(--el-text-color-secondary); font-size: 12px; }
+.dedup-toolbar .ops { display: flex; gap: 8px; }
 .transactions-view {
   padding: 20px;
 }
@@ -1669,22 +1782,34 @@ function onBankImgErr(e){
   justify-content: center;
 }
 
-.import-preview {
+.upload-area {
+  margin-bottom: 20px;
+}
+
+.preview-section {
   margin-top: 20px;
 }
 
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.preview-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.template-info {
+  margin-bottom: 20px;
+}
+
+.template-format {
+  margin-top: 20px;
+}
+
+.template-format h4 {
   margin-bottom: 10px;
 }
 
-.preview-header h4 {
-  margin: 0;
-}
-
-.simple-upload {
-  margin-bottom: 20px;
+.template-format ul {
+  padding-left: 20px;
+  margin-bottom: 15px;
 }
 </style>

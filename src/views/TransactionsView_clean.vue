@@ -29,10 +29,6 @@
               <el-icon><Plus /></el-icon>
               {{ t('transactions.addTransaction') }}
             </el-button>
-            <el-button @click="showSimpleImportDialog">
-              <el-icon><Upload /></el-icon>
-              导入交易
-            </el-button>
             <el-button @click="exportTransactions">
               <el-icon><Download /></el-icon>
               {{ t('transactions.exportTransactions') }}
@@ -470,59 +466,6 @@
       </template>
     </el-dialog>
     
-    <!-- 简单导入对话框 -->
-    <el-dialog
-      v-model="simpleImportVisible"
-      title="导入交易"
-      width="600px">
-      <el-upload
-        class="simple-upload"
-        drag
-        action=""
-        :auto-upload="false"
-        :on-change="handleSimpleFileChange"
-        accept=".csv"
-        :show-file-list="false">
-        <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">
-          拖拽CSV文件到此处 <em>或点击选择文件</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            支持基本CSV格式：账户号码,交易日期,参考号,描述,借方金额,贷方金额
-          </div>
-        </template>
-      </el-upload>
-      
-      <div v-if="importPreview.length > 0" class="import-preview">
-        <div class="preview-header">
-          <h4>预览前5条记录</h4>
-          <span>共 {{ importPreview.length }} 条记录</span>
-        </div>
-        <el-table :data="importPreview.slice(0, 5)" border size="small">
-          <el-table-column label="账户号码" prop="accountNumber" width="120" />
-          <el-table-column label="交易日期" prop="transactionDate" width="100" />
-          <el-table-column label="参考号" prop="chequeRefNo" width="100" />
-          <el-table-column label="描述" prop="description" show-overflow-tooltip />
-          <el-table-column label="借方" prop="debitAmount" width="80" align="right" />
-          <el-table-column label="贷方" prop="creditAmount" width="80" align="right" />
-        </el-table>
-      </div>
-      
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="simpleImportVisible = false">取消</el-button>
-          <el-button 
-            type="primary" 
-            @click="submitSimpleImport" 
-            :loading="importing"
-            :disabled="importPreview.length === 0">
-            导入 ({{ importPreview.length }} 条)
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
-    
     <!-- 查看交易详情对话框 -->
     <el-dialog
       v-model="viewDialogVisible"
@@ -629,12 +572,9 @@ const hasActiveFilters = computed(() => {
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const filtersDialogVisible = ref(false)
-const simpleImportVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
-const importing = ref(false)
 const currentTransaction = ref({})
-const importPreview = ref([])
 
 // 表单相关
 const formRef = ref(null)
@@ -818,11 +758,6 @@ const showAddDialog = () => {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
-}
-
-const showSimpleImportDialog = () => {
-  importPreview.value = []
-  simpleImportVisible.value = true
 }
 
 const resetForm = () => {
@@ -1364,105 +1299,6 @@ const exportTransactions = async () => {
   }
 }
 
-// 简单CSV文件处理
-const handleSimpleFileChange = (file) => {
-  if (!file || !file.raw) {
-    return
-  }
-  
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const text = e.target.result
-      const lines = text.split('\n').filter(line => line.trim())
-      
-      if (lines.length < 2) {
-        ElMessage.warning('CSV文件格式错误或数据为空')
-        return
-      }
-      
-      // 跳过标题行，解析数据
-      const dataLines = lines.slice(1)
-      const rows = []
-      
-      for (const line of dataLines) {
-        const cells = line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
-        
-        if (cells.length >= 4) {
-          rows.push({
-            accountNumber: cells[0] || '',
-            transactionDate: cells[1] || '',
-            chequeRefNo: cells[2] || '',
-            description: cells[3] || '',
-            debitAmount: parseFloat(cells[4]) || 0,
-            creditAmount: parseFloat(cells[5]) || 0,
-            reference: cells[6] || ''
-          })
-        }
-      }
-      
-      importPreview.value = rows
-      
-      if (rows.length === 0) {
-        ElMessage.warning('未找到有效的交易数据')
-      } else {
-        ElMessage.success(`已解析 ${rows.length} 条交易记录`)
-      }
-      
-    } catch (error) {
-      console.error('解析CSV失败:', error)
-      ElMessage.error('CSV文件解析失败')
-    }
-  }
-  
-  reader.readAsText(file.raw)
-}
-
-// 提交简单导入
-const submitSimpleImport = async () => {
-  if (importPreview.value.length === 0) {
-    ElMessage.warning('没有可导入的数据')
-    return
-  }
-  
-  importing.value = true
-  
-  try {
-    const response = await request('/transactions/simple-import', {
-      method: 'POST',
-      body: JSON.stringify({ rows: importPreview.value })
-    })
-    
-    const { inserted, skipped, failed, errors } = response
-    
-    simpleImportVisible.value = false
-    importPreview.value = []
-    
-    const summary = [
-      `导入成功: ${inserted}`,
-      skipped > 0 ? `跳过重复: ${skipped}` : '',
-      failed > 0 ? `失败: ${failed}` : ''
-    ].filter(Boolean).join(' | ')
-    
-    if (inserted > 0) {
-      ElMessage.success(summary)
-      fetchTransactions() // 刷新列表
-    } else {
-      ElMessage.info(summary)
-    }
-    
-    if (failed > 0 && errors.length > 0) {
-      console.warn('导入错误:', errors)
-    }
-    
-  } catch (error) {
-    console.error('导入失败:', error)
-    ElMessage.error(`导入失败: ${error.message || '未知错误'}`)
-  } finally {
-    importing.value = false
-  }
-}
-
 // 格式化方法
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return '0.00'
@@ -1667,24 +1503,5 @@ function onBankImgErr(e){
   margin-top: 20px;
   display: flex;
   justify-content: center;
-}
-
-.import-preview {
-  margin-top: 20px;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.preview-header h4 {
-  margin: 0;
-}
-
-.simple-upload {
-  margin-bottom: 20px;
 }
 </style>
