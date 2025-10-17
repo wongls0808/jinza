@@ -5,7 +5,7 @@
     </div>
 
     <div class="fx-split">
-      <el-card class="section left" shadow="never">
+      <el-card v-if="modeShown('settle')" class="section left" shadow="never">
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.settlementArea') }}</span>
@@ -47,7 +47,7 @@
         </el-table>
       </el-card>
 
-      <el-card class="section right" shadow="never">
+  <el-card v-if="modeShown('pay')" class="section right" shadow="never">
         <template #header>
           <div class="section-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <span>{{ t('fx.paymentArea') }}</span>
@@ -110,6 +110,33 @@ import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 
 const { t } = useI18n()
+const props = defineProps({
+  mode: { type: String, default: 'both' },
+  initialSettleCustomerId: { type: [Number, String], default: null },
+  initialPayCustomerId: { type: [Number, String], default: null }
+})
+const emit = defineEmits(['settlementCreated','paymentCreated'])
+
+function modeShown(section){
+  const m = String(props.mode||'both').toLowerCase()
+  if (m === 'both') return true
+  if (section === 'settle') return m === 'settle'
+  if (section === 'pay') return m === 'pay'
+  return true
+}
+
+// 供外部快速预填（例如从工作台打开抽屉后直接指定客户）
+function setSettleCustomerId(id){
+  if (id == null || id === '') return
+  customerId.value = Number(id)
+  loadMatched()
+}
+function setPayCustomerId(id){
+  if (id == null || id === '') return
+  payCustomerId.value = Number(id)
+  loadAccounts()
+}
+defineExpose({ setSettleCustomerId, setPayCustomerId })
 
 const customers = ref([])
 const settleDate = ref('')
@@ -233,6 +260,7 @@ async function createSettlement(){
     items
   })
   ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))
+  try { emit('settlementCreated', { n: items.length, base: selectedBaseTotal.value, settled: selectedSettledTotal.value, customerId: customerId.value }) } catch {}
   // 清空并刷新
   selMatched.value = []
   // 重新加载列表并排除已结汇交易
@@ -273,6 +301,7 @@ async function createPayment(){
   })
   const n = Array.isArray(resp?.ids) ? resp.ids.length : accounts.value.filter(a => Number(a._amount) > 0).length
   ElMessage.success(t('fx.paymentCreated', { n, total: money(paymentTotal.value) }))
+  try { emit('paymentCreated', { n, total: paymentTotal.value, customerId: payCustomerId.value }) } catch {}
   // 清空并刷新
   payDate.value = formatToday()
   accounts.value = accounts.value.map(a => ({ ...a, _amount: null }))
@@ -286,6 +315,11 @@ onMounted(() => {
   payDate.value = formatToday()
   loadCustomers()
 })
+
+// 监听外部传入的预填客户 ID
+import { watch } from 'vue'
+watch(() => props.initialSettleCustomerId, (v) => { if (v!=null && v!=='') setSettleCustomerId(v) }, { immediate: true })
+watch(() => props.initialPayCustomerId, (v) => { if (v!=null && v!=='') setPayCustomerId(v) }, { immediate: true })
 
 function onSelMatchedChange(val){
   const MAX = 8

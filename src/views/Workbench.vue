@@ -90,6 +90,9 @@
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
+      <el-button size="small" type="success" @click="openSettleDrawer">结汇</el-button>
+      <el-button size="small" type="primary" @click="openPayDrawer">付款</el-button>
+      <el-button size="small" type="warning" @click="openBuyDrawer">购汇</el-button>
       <el-popover
         v-model:visible="datePopover"
         placement="bottom-start"
@@ -255,6 +258,19 @@
           </template>
         </el-table-column>
       </el-table>
+    </el-drawer>
+
+    <!-- 快捷操作：结汇抽屉 -->
+    <el-drawer v-model="settleDrawer.visible" title="结汇" size="70%">
+      <FXManagement ref="settleRef" mode="settle" :initial-settle-customer-id="settlePrefillCustomerId" @settlementCreated="onSettlementCreated" />
+    </el-drawer>
+    <!-- 快捷操作：付款抽屉 -->
+    <el-drawer v-model="payDrawer.visible" title="付款" size="70%">
+      <FXManagement ref="payRef" mode="pay" :initial-pay-customer-id="payPrefillCustomerId" @paymentCreated="onPaymentCreated" />
+    </el-drawer>
+    <!-- 快捷操作：购汇抽屉 -->
+    <el-drawer v-model="buyDrawer.visible" title="购汇" size="70%">
+      <BuyFX />
     </el-drawer>
 
     <!-- 付款单明细抽屉 -->
@@ -475,6 +491,8 @@ import { api, request as httpRequest } from '@/api'
 import { ElMessage } from 'element-plus'
 // 指标图无需 echarts
 import { useTableMemory } from '@/composables/useTableMemory'
+import FXManagement from './FXManagement.vue'
+import BuyFX from './BuyFX.vue'
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -1111,6 +1129,50 @@ function onFabClick() {
   openPayments()
 }
 onMounted(() => { readFab() })
+
+// —— 快捷操作抽屉：结汇/付款/购汇 ——
+const settleDrawer = ref({ visible: false })
+const payDrawer = ref({ visible: false })
+const buyDrawer = ref({ visible: false })
+const settleRef = ref(null)
+const payRef = ref(null)
+const settlePrefillCustomerId = ref(null)
+const payPrefillCustomerId = ref(null)
+function openSettleDrawer(customerId){
+  settlePrefillCustomerId.value = customerId || null
+  settleDrawer.value.visible = true
+  // 若组件已挂载，直接设置
+  try { if (customerId && settleRef.value?.setSettleCustomerId) settleRef.value.setSettleCustomerId(customerId) } catch {}
+}
+function openPayDrawer(customerId){
+  payPrefillCustomerId.value = customerId || null
+  payDrawer.value.visible = true
+  try { if (customerId && payRef.value?.setPayCustomerId) payRef.value.setPayCustomerId(customerId) } catch {}
+}
+function openBuyDrawer(){ buyDrawer.value.visible = true }
+function onSettlementCreated(evt){
+  // 创建结汇后，询问是否打开付款抽屉（并预填客户）
+  const cid = evt?.customerId || null
+  try {
+    // 轻量提示 + 二次确认
+    // 使用浏览器 confirm 简化依赖；如需更友好可换成 ElMessageBox
+    const ok = window.confirm('结汇已创建，是否继续打开付款？')
+    if (ok) {
+      settleDrawer.value.visible = false
+      openPayDrawer(cid)
+    }
+  } catch {
+    // 回退：直接打开付款
+    settleDrawer.value.visible = false
+    openPayDrawer(cid)
+  }
+  // 刷新顶部统计
+  loadStats(); loadSummary(); loadPaymentsCount()
+}
+function onPaymentCreated(){
+  // 支付创建后刷新统计
+  loadStats(); loadSummary(); loadPaymentsCount()
+}
 </script>
 
 <style scoped>
