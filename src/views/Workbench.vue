@@ -86,27 +86,36 @@
       </div>
     </div>
 
-    <!-- 服务器监控入口按钮 -->
-    <div style="display:flex; justify-content:flex-end; margin: 8px 0; gap:8px;">
-      <el-button size="small" type="info" @click="openMonitor">{{ t('workbench.monitor.title') }}</el-button>
-    </div>
+    <!-- 服务器监控入口从独立区域移动到任务栏（filters）右侧，保留抽屉详情 -->
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
-      <el-popover placement="bottom-start" width="auto" trigger="manual" :persistent="true" v-model:visible="datePopover">
+      <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel" @click="datePopover=true">
+        <el-icon><Calendar /></el-icon>
+      </el-button>
+      <el-dialog v-model="datePopover" :show-close="true" width="auto" append-to-body destroy-on-close>
         <el-date-picker v-model="range" type="daterange" unlink-panels :editable="false" @change="onRangeChange" />
-        <template #reference>
-          <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel" @click="datePopover=true">
-            <el-icon><Calendar /></el-icon>
-          </el-button>
-        </template>
-      </el-popover>
+      </el-dialog>
       <el-radio-group v-model="quick" size="small" @change="onQuick">
         <el-radio-button label="30d">{{ t('workbench.filters.last30d') }}</el-radio-button>
         <el-radio-button label="6m">{{ t('workbench.filters.last6m') }}</el-radio-button>
         <el-radio-button label="y">{{ t('workbench.filters.thisYear') }}</el-radio-button>
       </el-radio-group>
       <el-button size="small" @click="clearFilters">{{ t('workbench.filters.clear') }}</el-button>
+      <div class="monitor-bar" role="button" @click="openMonitor" :title="t('workbench.monitor.title')">
+        <div class="mb-item">
+          <span class="mb-label">CPU</span>
+          <el-progress :percentage="monitorCpuPct" :stroke-width="6" :color="cpuColor" :text-inside="false" />
+        </div>
+        <div class="mb-item">
+          <span class="mb-label">MEM</span>
+          <el-progress :percentage="monitorMemPct" :stroke-width="6" :color="memColor" :text-inside="false" />
+        </div>
+        <div class="mb-item">
+          <span class="mb-label">DB</span>
+          <el-progress :percentage="monitorDbPct" :stroke-width="6" :color="dbColor" :text-inside="false" />
+        </div>
+      </div>
     </div>
     <div class="kpi6-grid">
       <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openDetail('tx-debit')" @keydown.enter.prevent="openDetail('tx-debit')" @keydown.space.prevent="openDetail('tx-debit')">
@@ -508,11 +517,13 @@ function onQuick(){
 }
 function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
 function onRangeChange(val){
-  // 仅在选择了完整的起止日期后才收起弹窗并加载
+  // 仅在选择了完整的起止日期后才收起弹窗并加载（增加微小延迟，避免中间事件）
   if (Array.isArray(val) && val[0] && val[1]) {
-    datePopover.value = false
-    quick.value = ''
-    loadSummary()
+    setTimeout(() => {
+      datePopover.value = false
+      quick.value = ''
+      loadSummary()
+    }, 0)
   }
 }
 // 图形区域仅显示合计，不提供明细抽屉（声明已提前放置于顶部以供列宽记忆使用）
@@ -585,6 +596,7 @@ async function openDetail(type){
 // —— 服务器监控 ——
 const monitor = ref({ visible: false, loading: false, auto: false, timer: null })
 const monitorRows = ref([])
+const monitorSnapshot = ref({ cpuPct: 0, memPct: 0, dbPct: 0 })
 function humanUptime(sec){
   try { sec = Number(sec||0) } catch { sec = 0 }
   const d = Math.floor(sec/86400); sec%=86400
@@ -642,6 +654,18 @@ async function loadMonitor(){
   try {
     const d = await api.system.health()
     monitorRows.value = toRows(d)
+    // 更新顶部监控条快照
+    try {
+      const memPct = Number(d?.system?.memUsedPct || 0)
+      // 没有跨平台 cpu 的即时报表，借助 loadavg(1) ≈ 相对压力（0-#CPU），折算百分比
+      let cpuPct = 0
+      if (Array.isArray(d?.system?.load) && typeof d?.system?.cpus === 'number' && d.system.cpus > 0) {
+        const la1 = Number(d.system.load[0] || 0)
+        cpuPct = Math.max(0, Math.min(100, Math.round((la1 / d.system.cpus) * 100)))
+      }
+      let dbPct = (d?.db?.connUsedPct != null) ? Number(d.db.connUsedPct) : 0
+      monitorSnapshot.value = { cpuPct, memPct, dbPct }
+    } catch {}
   } catch (e) {
     ElMessage.error(e?.message || 'Failed')
   } finally {
@@ -663,7 +687,22 @@ watch(() => monitor.value.auto, (on) => {
 onMounted(() => {
   // 清理定时器（页面关闭或刷新）
   window.addEventListener('beforeunload', () => { if (monitor.value.timer) clearInterval(monitor.value.timer) })
+  // 轻量自动刷新顶部监控条（不打开抽屉也更新），每 15 秒拉一次
+  try {
+    setInterval(() => { loadMonitor() }, 15000)
+    // 首次取一遍
+    loadMonitor()
+  } catch {}
 })
+
+// 顶部监控条显示（百分比与配色）
+const monitorCpuPct = computed(() => Number(monitorSnapshot.value.cpuPct || 0))
+const monitorMemPct = computed(() => Number(monitorSnapshot.value.memPct || 0))
+const monitorDbPct = computed(() => Number(monitorSnapshot.value.dbPct || 0))
+function colorByPct(p){ if (p>=90) return '#f56c6c'; if (p>=70) return '#e6a23c'; return '#67c23a' }
+const cpuColor = computed(() => colorByPct(monitorCpuPct.value))
+const memColor = computed(() => colorByPct(monitorMemPct.value))
+const dbColor = computed(() => colorByPct(monitorDbPct.value))
 
 // 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [
@@ -1115,6 +1154,9 @@ onMounted(() => { readFab() })
 .mini-bars { display:flex; gap:4px; align-items:flex-end; height: 30px; margin-top:8px; }
 .mini-bars span { display:inline-block; width:6px; background: color-mix(in oklab, var(--el-color-primary) 70%, #fff); border-radius:3px; }
 .filters { display:flex; gap:10px; align-items:center; margin: 12px 8px; flex-wrap: wrap; }
+.monitor-bar { display:flex; align-items:center; gap:10px; margin-left:auto; padding: 6px 10px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); box-shadow: 0 2px 8px rgba(0,0,0,.04); cursor: pointer; }
+.mb-item { display:grid; grid-template-columns: 34px 120px; align-items:center; gap:6px; }
+.mb-label { color: var(--el-text-color-secondary); font-size: 12px; }
 
 /* 迷你图表：未匹配交易 */
 .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }

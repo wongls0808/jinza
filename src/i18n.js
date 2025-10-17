@@ -3,7 +3,7 @@ import { createI18n } from 'vue-i18n'
 const messages = {
   zh: {
     app: {
-      title: '企业管理系统',
+      title: 'BSB | BESTRADE SB',
       logout: '退出登录',
     },
     common: {
@@ -240,7 +240,7 @@ const messages = {
       welcome: '欢迎使用',
       rememberMe: '记住我',
       systemVersion: '系统版本',
-      systemName: '企业管理系统',
+    systemName: 'BSB | BESTRADE SB',
       feature1: '数据报表与分析',
       feature2: '系统设置与管理',
       feature3: '客户账户管理',
@@ -653,7 +653,7 @@ const messages = {
   },
   en: {
     app: {
-      title: 'Enterprise Management',
+      title: 'BSB | BESTRADE SB',
       logout: 'Logout',
     },
     workbench: {

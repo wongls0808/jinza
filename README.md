@@ -1,4 +1,4 @@
-# jinza - 企业管理系统
+# jinza - BSB | BESTRADE SB
 
 企业级管理系统（Vue 3 + Element Plus + Vite 前端，Express + PostgreSQL 后端）。包含客户、银行、收款账户、交易等模块，支持中英文切换与 CSV 导入/导出。
 
