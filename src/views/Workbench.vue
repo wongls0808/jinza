@@ -448,6 +448,8 @@ const { colW: colWTodo, onColResize: onColResizeTodo } = useTableMemory('wb-todo
 // 审核日志抽屉列宽记忆
 const { colW: colWAudit, onColResize: onColResizeAudit } = useTableMemory('wb-audit')
 // 统计明细抽屉列宽记忆（按类型区分命名空间）
+// 注意：detailDrawer 需在下方函数首次访问前定义，避免 TDZ 错误
+const detailDrawer = ref({ visible: false, title: '', type: '', loading: false, rows: [] })
 function detailMemKey(){ return `wb-detail:${detailDrawer.type || 'unknown'}` }
 let _detailMem = useTableMemory(detailMemKey())
 function refreshDetailMem(){ _detailMem = useTableMemory(detailMemKey()) }
@@ -513,8 +515,7 @@ function onRangeChange(val){
     loadSummary()
   }
 }
-// 图形区域仅显示合计，不提供明细抽屉
-const detailDrawer = ref({ visible: false, title: '', type: '', loading: false, rows: [] })
+// 图形区域仅显示合计，不提供明细抽屉（声明已提前放置于顶部以供列宽记忆使用）
 async function openDetail(type){
   // 切换列宽记忆空间到当前明细类型
   detailDrawer.value.type = type
