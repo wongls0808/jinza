@@ -1,7 +1,6 @@
 import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
-import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema } from './auth.js'
-import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema, requireAnyPerm } from './auth.js'
+import * as auth from './auth.js'
 import { query } from './db.js'
 import fs from 'fs'
 import path from 'path'
@@ -29,7 +28,7 @@ router.post('/auth/login', async (req, res) => {
   if (userRes.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' })
   const user = userRes.rows[0]
   if (!user.is_active) return res.status(403).json({ error: 'User disabled' })
-  const ok = await verifyPassword(password, user.password_hash)
+  const ok = await auth.verifyPassword(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: 'Invalid credentials' })
 
   const perms = user.is_admin
@@ -52,16 +51,16 @@ router.post('/auth/login', async (req, res) => {
       await query('insert into user_sessions(user_id, token, last_ip, user_agent) values($1, $2, $3, $4)', [user.id, sid, ip, ua])
     }
   } catch {}
-  const token = signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password, sid })
+  const token = auth.signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password, sid })
   res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name, is_admin: !!user.is_admin }, perms: permCodes, must_change_password: !!user.must_change_password })
 })
 
-router.get('/auth/me', authMiddleware(true), async (req, res) => {
+router.get('/auth/me', auth.authMiddleware(true), async (req, res) => {
   res.json({ user: req.user })
 })
 
 // Logout: 使当前会话失效
-router.post('/auth/logout', authMiddleware(true), async (req, res) => {
+router.post('/auth/logout', auth.authMiddleware(true), async (req, res) => {
   try {
     if (process.env.DATABASE_URL && req.user?.sid) {
       await query('delete from user_sessions where token=$1', [req.user.sid])
@@ -71,7 +70,7 @@ router.post('/auth/logout', authMiddleware(true), async (req, res) => {
 })
 
 // 工作台汇总统计（供图形展示）
-router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboard'), async (req, res) => {
+router.get('/workbench/summary', auth.authMiddleware(true), auth.requirePerm('view_dashboard'), async (req, res) => {
   const { startDate, endDate } = req.query || {}
   // 确保 FX 相关表存在（兼容首次部署或迁移后）
   try { await ensureFxDDL() } catch {}
@@ -150,7 +149,7 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
 })
 
 // 系统健康监控（服务器监控表数据）
-router.get('/system/health', authMiddleware(true), requirePerm('view_dashboard'), async (req, res) => {
+router.get('/system/health', auth.authMiddleware(true), auth.requirePerm('view_dashboard'), async (req, res) => {
   const now = new Date()
   const toMB = (n) => Math.round((Number(n || 0) / (1024 * 1024)) * 10) / 10
   const mem = process.memoryUsage()
@@ -246,24 +245,24 @@ router.get('/system/health', authMiddleware(true), requirePerm('view_dashboard')
 })
 
 // Change password (self)
-router.post('/auth/change-password', authMiddleware(true), async (req, res) => {
+router.post('/auth/change-password', auth.authMiddleware(true), async (req, res) => {
   const { old_password, new_password } = req.body || {}
   if (!old_password || !new_password) return res.status(400).json({ error: 'Missing fields' })
   const meId = req.user.id
   const rs = await query('select id, username, password_hash from users where id=$1', [meId])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'User not found' })
   const user = rs.rows[0]
-  const ok = await verifyPassword(old_password, user.password_hash)
+  const ok = await auth.verifyPassword(old_password, user.password_hash)
   if (!ok) return res.status(400).json({ error: '旧密码不正确' })
-  const strength = validatePasswordStrength(new_password)
+  const strength = auth.validatePasswordStrength(new_password)
   if (!strength.ok) return res.status(400).json({ error: '密码强度不足', reasons: strength.reasons })
-  const hash = await hashPassword(new_password)
+  const hash = await auth.hashPassword(new_password)
   await query('update users set password_hash=$1, must_change_password=false, password_updated_at=now() where id=$2', [hash, meId])
   res.json({ ok: true })
 })
 
 // Users CRUD
-router.get('/users', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.get('/users', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   // 联合会话返回在线状态与最近 IP/时间
   const rs = await query(`
     select u.id, u.username, u.display_name, u.is_active, u.is_admin, u.created_at,
@@ -278,10 +277,10 @@ router.get('/users', authMiddleware(true), requirePerm('manage_users'), async (r
   res.json(rs.rows)
 })
 
-router.post('/users', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.post('/users', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const { username, password, display_name, is_active = true } = req.body || {}
   if (!username || !password) return res.status(400).json({ error: 'Missing fields' })
-  const hash = await hashPassword(password)
+  const hash = await auth.hashPassword(password)
   try {
     const rs = await query(
       'insert into users(username, password_hash, display_name, is_active, must_change_password) values($1,$2,$3,$4,$5) returning id, username, display_name, is_active',
@@ -294,7 +293,7 @@ router.post('/users', authMiddleware(true), requirePerm('manage_users'), async (
   }
 })
 
-router.put('/users/:id', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.put('/users/:id', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const { display_name, is_active } = req.body || {}
   const id = Number(req.params.id)
   const rs = await query(
@@ -305,7 +304,7 @@ router.put('/users/:id', authMiddleware(true), requirePerm('manage_users'), asyn
   res.json(rs.rows[0])
 })
 
-router.delete('/users/:id', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.delete('/users/:id', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
   await query('delete from user_permissions where user_id=$1', [id])
   const rs = await query('delete from users where id=$1', [id])
@@ -314,29 +313,29 @@ router.delete('/users/:id', authMiddleware(true), requirePerm('manage_users'), a
 })
 
 // Admin reset user password (no complexity check), force change on next login
-router.post('/users/:id/reset-password', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.post('/users/:id/reset-password', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
   const { password } = req.body || {}
   if (!password) return res.status(400).json({ error: 'Missing password' })
-  const hash = await hashPassword(password)
+  const hash = await auth.hashPassword(password)
   const rs = await query('update users set password_hash=$1, must_change_password=true, password_updated_at=null where id=$2 returning id', [hash, id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
 })
 
 // Permissions
-router.get('/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.get('/permissions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const rs = await query('select id, code, name from permissions order by id')
   res.json(rs.rows)
 })
 
 // 新：获取系统权限树（用于前端展示分组）
-router.get('/permissions/tree', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.get('/permissions/tree', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   res.json({ tree: PERMISSION_TREE, flat: flattenPermissionCodes(PERMISSION_TREE) })
 })
 
 // 新：重建/重写入权限树（可选 reset=true 清理不在清单中的旧权限）
-router.post('/permissions/reseed', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.post('/permissions/reseed', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const { reset = false } = req.body || {}
   try {
     const result = await reseedPermissions({ reset: !!reset })
@@ -346,7 +345,7 @@ router.post('/permissions/reseed', authMiddleware(true), requirePerm('manage_use
   }
 })
 
-router.get('/users/:id/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.get('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query(
     `select p.code from permissions p
@@ -358,7 +357,7 @@ router.get('/users/:id/permissions', authMiddleware(true), requirePerm('manage_u
 })
 
 // Expenses（费用管理）
-router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), async (req, res) => {
+router.get('/expenses', auth.authMiddleware(true), auth.requirePerm('expenses:list'), async (req, res) => {
   const { q = '', category = '', startDate = '', endDate = '', drcr = '', page = 1, pageSize = 50 } = req.query
   try {
     await query(`
@@ -396,8 +395,7 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
   res.json({ total: Number(total.rows?.[0]?.count || 0), items: rows.rows })
 })
 
-router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
-router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
+router.post('/expenses', auth.authMiddleware(true), auth.requirePerm('expenses:create'), async (req, res) => {
   const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc, drcr } = req.body || {}
   // 放宽为仅需“项目名/分类”，金额通过银行流水匹配；若缺少日期与类型则给默认
   const safeDate = biz_date || new Date().toISOString().slice(0,10)
@@ -410,8 +408,7 @@ router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), a
   res.json(rs.rows[0])
 })
 
-router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
-router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
+router.put('/expenses/:id', auth.authMiddleware(true), auth.requirePerm('expenses:update'), async (req, res) => {
   const id = Number(req.params.id)
   const { biz_date, type, category, amount, currency, subject_debit, subject_credit, desc, drcr } = req.body || {}
   const fields = []
@@ -433,8 +430,7 @@ router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update')
   res.json(rs.rows[0])
 })
 
-router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delete'), async (req, res) => {
-router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delete'), async (req, res) => {
+router.delete('/expenses/:id', auth.authMiddleware(true), auth.requirePerm('expenses:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from expenses where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
@@ -442,7 +438,7 @@ router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delet
 })
 
 // 费用借贷报表：基于已匹配到费用项的银行流水
-router.get('/expenses/report', authMiddleware(true), requirePerm('expenses:list'), async (req, res) => {
+router.get('/expenses/report', auth.authMiddleware(true), auth.requirePerm('expenses:list'), async (req, res) => {
   try {
     const { startDate = '', endDate = '', category = '', drcr = '' } = req.query || {}
     const wh = []
@@ -493,7 +489,7 @@ router.get('/expenses/report', authMiddleware(true), requirePerm('expenses:list'
     res.status(500).json({ error: 'report failed', detail: e?.message })
   }
 })
-router.put('/users/:id/permissions', authMiddleware(true), requirePerm('manage_users'), async (req, res) => {
+router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
   const { perms } = req.body || {}
   if (!Array.isArray(perms)) return res.status(400).json({ error: 'Invalid perms' })
@@ -642,7 +638,7 @@ router.get('/customers', authMiddleware(true), requirePerm('view_customers'), as
   res.json({ total: Number(total.rows[0].count), items: rows.rows })
 })
 
-router.post('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.post('/customers', auth.authMiddleware(true), auth.requirePerm('customers:create'), async (req, res) => {
   const { abbr, name, tax_rate = 0, opening_myr = 0, opening_cny = 0 } = req.body || {}
   if (!name) return res.status(400).json({ error: '客户名必填' })
   // Detect submitter from token (display_name preferred)
@@ -656,7 +652,7 @@ router.post('/customers', authMiddleware(true), requirePerm('view_customers'), a
 })
 
 // Update customer (abbr/name/tax_rate)
-router.put('/customers/:id', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.put('/customers/:id', auth.authMiddleware(true), auth.requirePerm('customers:update'), async (req, res) => {
   const id = Number(req.params.id)
   const { abbr, name, tax_rate } = req.body || {}
   const fields = []
@@ -678,7 +674,7 @@ router.put('/customers/:id', authMiddleware(true), requirePerm('view_customers')
   res.json(rs.rows[0])
 })
 
-router.delete('/customers', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.delete('/customers', auth.authMiddleware(true), auth.requirePerm('customers:delete'), async (req, res) => {
   const { ids } = req.body || {}
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
   await query('delete from customers where id = any($1::int[])', [ids])
@@ -686,14 +682,14 @@ router.delete('/customers', authMiddleware(true), requirePerm('view_customers'),
 })
 
 // Alternative batch delete (POST) to avoid issues with DELETE body in some proxies
-router.post('/customers/batch-delete', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.post('/customers/batch-delete', auth.authMiddleware(true), auth.requirePerm('customers:delete'), async (req, res) => {
   const { ids } = req.body || {}
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
   await query('delete from customers where id = any($1::int[])', [ids])
   res.json({ ok: true })
 })
 
-router.post('/customers/import', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.post('/customers/import', auth.authMiddleware(true), auth.requirePerm('customers:import'), async (req, res) => {
   if (!process.env.DATABASE_URL) {
     return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' })
   }
@@ -756,7 +752,7 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
       // 如果表不存在（42P01），尝试自动初始化 schema 后重试一次当前批次
       if (e && (e.code === '42P01' || /relation\s+"?customers"?\s+does not exist/i.test(e.message))) {
         try {
-          await ensureSchema()
+          await auth.ensureSchema()
           await query(sql, flat)
           inserted += chunk.length
           continue
@@ -781,7 +777,7 @@ router.post('/customers/import', authMiddleware(true), requirePerm('view_custome
 })
 
 // Import customers via raw CSV content
-router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }), auth.authMiddleware(true), auth.requirePerm('customers:import'), async (req, res) => {
   if (!process.env.DATABASE_URL) {
     return res.status(503).json({ error: 'Service Unavailable', detail: 'DATABASE_URL not configured' })
   }
@@ -873,7 +869,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
   }
 })
 
-router.get('/customers/export', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.get('/customers/export', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
   const rs = await query('select abbr,name,tax_rate,opening_myr,opening_cny,submitter from customers order by id desc')
   const lines = rs.rows.map(r => [r.abbr||'', r.name||'', Number(r.tax_rate||0).toFixed(3), r.opening_myr||0, r.opening_cny||0, r.submitter||''].join(','))
   const csv = lines.join('\n')
@@ -884,24 +880,24 @@ router.get('/customers/export', authMiddleware(true), requirePerm('view_customer
 })
 
 // Currencies CRUD (simple)
-router.get('/currencies', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.get('/currencies', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
   const rs = await query('select code, name from currencies order by code')
   res.json(rs.rows)
 })
-router.post('/currencies', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.post('/currencies', auth.authMiddleware(true), auth.requirePerm('currencies:manage'), async (req, res) => {
   const { code, name } = req.body || {}
   if (!code || !name) return res.status(400).json({ error: 'Missing fields' })
   await query('insert into currencies(code, name) values($1,$2) on conflict do nothing', [code.toUpperCase(), name])
   res.json({ ok: true })
 })
-router.delete('/currencies/:code', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.delete('/currencies/:code', auth.authMiddleware(true), auth.requirePerm('currencies:manage'), async (req, res) => {
   const code = (req.params.code || '').toUpperCase()
   await query('delete from currencies where code=$1', [code])
   res.json({ ok: true })
 })
 
 // Receiving accounts
-router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.get('/accounts', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
   const { page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const sortMap = {
@@ -936,15 +932,13 @@ router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), asyn
   )
   res.json({ total: Number(totalRs.rows[0].count), items: rs.rows })
 })
-router.post('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
-router.post('/accounts', authMiddleware(true), requirePerm('accounts:create'), async (req, res) => {
+router.post('/accounts', auth.authMiddleware(true), auth.requirePerm('accounts:create'), async (req, res) => {
   const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
   const rs = await query('insert into receiving_accounts(account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5) returning *', [account_name, Number(bank_id), bank_account, currency_code.toUpperCase(), Number(opening_balance)||0])
   res.json(rs.rows[0])
 })
-router.put('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
-router.put('/accounts/:id', authMiddleware(true), requirePerm('accounts:update'), async (req, res) => {
+router.put('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('accounts:update'), async (req, res) => {
   const id = Number(req.params.id)
   const { account_name, bank_id, bank_account, currency_code, opening_balance } = req.body || {}
   const fields = []
@@ -961,8 +955,7 @@ router.put('/accounts/:id', authMiddleware(true), requirePerm('accounts:update')
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json(rs.rows[0])
 })
-router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
-router.delete('/accounts/:id', authMiddleware(true), requirePerm('accounts:delete'), async (req, res) => {
+router.delete('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('accounts:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from receiving_accounts where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
@@ -970,7 +963,7 @@ router.delete('/accounts/:id', authMiddleware(true), requirePerm('accounts:delet
 })
 
 // Customer specific receiving accounts
-router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.get('/customers/:id/accounts', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
   const cid = Number(req.params.id)
   const rs = await query(`
     select a.id, a.account_name, a.bank_account, a.currency_code,
@@ -982,9 +975,7 @@ router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_cu
   `, [cid])
   res.json(rs.rows)
 })
-
-router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
-router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('accounts:create'), async (req, res) => {
+router.post('/customers/:id/accounts', auth.authMiddleware(true), auth.requirePerm('accounts:create'), async (req, res) => {
   const cid = Number(req.params.id)
   const { account_name, bank_id, bank_account, currency_code } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
@@ -999,18 +990,14 @@ router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('accoun
     throw e
   }
 })
-
-router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
-router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('accounts:delete'), async (req, res) => {
+router.delete('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requirePerm('accounts:delete'), async (req, res) => {
   const cid = Number(req.params.id)
   const aid = Number(req.params.aid)
   const rs = await query('delete from customer_receiving_accounts where id=$1 and customer_id=$2', [aid, cid])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
 })
-
-router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
-router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('accounts:update'), async (req, res) => {
+router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requirePerm('accounts:update'), async (req, res) => {
   const cid = Number(req.params.id)
   const aid = Number(req.params.aid)
   const { account_name, bank_id, bank_account, currency_code } = req.body || {}
@@ -1034,7 +1021,7 @@ router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('ac
 })
 
 // Banks CRUD (server-managed)
-router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+router.get('/banks', auth.authMiddleware(true), auth.requirePerm('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')
   // 规范化 logo 路径：若数据库中的 logo_url 不存在或文件缺失，则按 svg/png/jpg 顺序寻找现有文件
   const publicDirCandidates = [
@@ -1065,8 +1052,7 @@ router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req
 })
 
 // Accept either {code, zh, en, logo_url} or {logo_data_url} (data:image/svg+xml;base64,...)
-router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
-router.post('/banks', authMiddleware(true), requirePerm('banks:create'), express.json({ limit: '10mb' }), async (req, res) => {
+router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'), express.json({ limit: '10mb' }), async (req, res) => {
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}
   if (!code || !zh || !en) return res.status(400).json({ error: 'Missing fields' })
   // Normalize to uppercase for consistency (as requested)
@@ -1112,16 +1098,14 @@ router.post('/banks', authMiddleware(true), requirePerm('banks:create'), express
   }
 })
 
-router.delete('/banks/:id', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
-router.delete('/banks/:id', authMiddleware(true), requirePerm('banks:delete'), async (req, res) => {
+router.delete('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from banks where id=$1 returning id', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
   res.json({ ok: true })
 })
 
-router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
-router.put('/banks/:id', authMiddleware(true), requirePerm('banks:update'), express.json({ limit: '10mb' }), async (req, res) => {
+router.put('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:update'), express.json({ limit: '10mb' }), async (req, res) => {
   const id = Number(req.params.id)
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}
   // Optional upload
@@ -1183,14 +1167,7 @@ router.put('/banks/:id', authMiddleware(true), requirePerm('banks:update'), expr
 })
 
 // Reset to a default set
-router.post('/banks/reset-defaults', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
-router.post('/banks/reset-defaults', authMiddleware(true), requireAnyPerm('banks:create','banks:update'), async (req, res) => {
-router.post('/customers', authMiddleware(true), requirePerm('customers:create'), async (req, res) => {
-router.put('/customers/:id', authMiddleware(true), requirePerm('customers:update'), async (req, res) => {
-router.delete('/customers', authMiddleware(true), requirePerm('customers:delete'), async (req, res) => {
-router.post('/customers/batch-delete', authMiddleware(true), requirePerm('customers:delete'), async (req, res) => {
-router.post('/customers/import', authMiddleware(true), requirePerm('customers:import'), async (req, res) => {
-router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('customers:import'), async (req, res) => {
+router.post('/banks/reset-defaults', auth.authMiddleware(true), auth.requireAnyPerm('banks:create','banks:update'), async (req, res) => {
   const defaults = [
     ['ICBC','中国工商银行','Industrial and Commercial Bank of China','/banks/icbc.svg'],
     ['ABC','中国农业银行','Agricultural Bank of China','/banks/abc.svg'],
@@ -1209,10 +1186,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
   res.json({ ok: true, count: defaults.length })
 })
 
-router.get('/customers/template', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
-router.get('/customers/template', authMiddleware(true), requireAnyPerm('customers:template','customers:import'), async (req, res) => {
-router.post('/currencies', authMiddleware(true), requirePerm('currencies:manage'), async (req, res) => {
-router.delete('/currencies/:code', authMiddleware(true), requirePerm('currencies:manage'), async (req, res) => {
+router.get('/customers/template', auth.authMiddleware(true), auth.requireAnyPerm('customers:template','customers:import'), async (req, res) => {
   const header = 'abbr,name,tax_rate,opening_myr,opening_cny,submitter' // 简称,客户名,税率,马币期初,人民币期初,提交人
   const sample = ['ABC,深圳市某某公司,6,1000,2000,王五', 'DEF,广州某某集团,0,0,3500,李四'].join('\n')
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
