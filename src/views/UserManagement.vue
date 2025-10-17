@@ -134,10 +134,9 @@
         <ul class="log-list">
           <li v-if="(logs[logDrawer.user.id]||[]).length===0" class="log-empty">{{ t('common.noData') }}</li>
           <li v-for="(it,idx) in (logs[logDrawer.user.id]||[])" :key="idx" class="log-item">
-            <span class="time">{{ new Date(it.last_seen || Date.now()).toLocaleString() }}</span>
-            <span class="ip">{{ it.last_ip }}</span>
-            <span class="kind">{{ it.kind || '' }}{{ it.action ? (' / ' + it.action) : '' }}</span>
-            <span class="ua" :title="it.user_agent">{{ it.user_agent?.slice(0, 80) || '' }}</span>
+            <span class="time">{{ fmtMinute(it.ts) }}</span>
+            <span class="ip">{{ it.ip }}</span>
+            <span class="action">{{ it.action || '' }}</span>
           </li>
         </ul>
       </div>
@@ -167,7 +166,7 @@ const removeDlg = ref({ visible: false, user: null, loading: false })
 const reseed = ref({ loading: false })
 const permDrawer = ref({ visible: false, user: null, localPerms: [], saving: false, open: {} })
 // 日志数据与展开状态
-const logs = ref({}) // { [userId]: Array<{ last_ip, last_seen, user_agent, kind, action, meta }> }
+const logs = ref({}) // { [userId]: Array<{ ts, ip, action, meta }> }
 const logState = ref({ loading: {} })
 const logDrawer = ref({ visible: false, user: null })
 
@@ -382,6 +381,21 @@ function openLogDrawer(u) {
   logDrawer.value = { visible: true, user: u }
   refreshLogs(u)
 }
+
+// 将时间格式化为 "YYYY-MM-DD HH:mm"（到分钟）
+function fmtMinute(ts) {
+  try {
+    const d = ts ? new Date(ts) : new Date()
+    if (isNaN(d.getTime())) return ''
+    const pad = (n) => (n < 10 ? '0' + n : '' + n)
+    const y = d.getFullYear()
+    const m = pad(d.getMonth() + 1)
+    const day = pad(d.getDate())
+    const hh = pad(d.getHours())
+    const mm = pad(d.getMinutes())
+    return `${y}-${m}-${day} ${hh}:${mm}`
+  } catch { return '' }
+}
 </script>
 
 <style scoped>
@@ -420,9 +434,9 @@ function openLogDrawer(u) {
 /* 日志样式 */
 .log-actions { margin-top: 6px; display:flex; justify-content:flex-end; }
 .log-list { list-style:none; padding:0; margin:6px 0 0; display:grid; gap:6px; }
-.log-item { display:grid; grid-template-columns: 160px 120px 120px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
+.log-item { display:grid; grid-template-columns: 180px 150px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
 .log-item .time { color: var(--el-text-color-secondary); }
 .log-item .ip { font-variant-numeric: tabular-nums; }
-.log-item .kind { color: var(--el-text-color-secondary); }
+.log-item .action { color: var(--el-text-color-secondary); }
 .log-empty { font-size:12px; color: var(--el-text-color-secondary); padding:4px 0; }
 </style>
