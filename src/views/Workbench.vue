@@ -5,6 +5,22 @@
       <div class="meta">{{ username }} · {{ today }}</div>
     </div>
 
+    <!-- 高频操作置顶工具栏：结汇 / 付款 / 购汇 -->
+    <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions">
+      <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
+        <div class="hf-icon"><Collection /></div>
+        <div class="hf-label">结汇</div>
+      </div>
+      <div class="hf-item success" role="button" tabindex="0" aria-label="付款" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
+        <div class="hf-icon"><CreditCard /></div>
+        <div class="hf-label">付款</div>
+      </div>
+      <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
+        <div class="hf-icon"><Coin /></div>
+        <div class="hf-label">购汇</div>
+      </div>
+    </div>
+
     <div class="quick" style="margin-top:8px; margin-bottom:8px; position: relative;">
       <el-card shadow="never" class="card--plain">
         <div class="card-grid single-row">
@@ -90,9 +106,6 @@
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
-      <el-button size="small" type="success" @click="openSettleDrawer">结汇</el-button>
-      <el-button size="small" type="primary" @click="openPayDrawer">付款</el-button>
-      <el-button size="small" type="warning" @click="openBuyDrawer">购汇</el-button>
       <el-popover
         v-model:visible="datePopover"
         placement="bottom-start"
@@ -1182,6 +1195,21 @@ function onPaymentCreated(){
 .meta { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 12px; }
 .quick-title { display:none; }
 .card--plain { background: transparent; border: none; box-shadow: none; }
+
+/* 高频操作置顶工具栏 */
+.hf-toolbar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(1.2) blur(4px); background: color-mix(in oklab, var(--el-bg-color) 80%, transparent); border: 1px solid var(--el-border-color); border-radius: 14px; padding: 10px; margin: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+.hf-item { display:flex; align-items:center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--el-bg-color); border: 1px solid var(--el-border-color); cursor: pointer; user-select:none; transition: box-shadow .2s ease, transform .06s ease, background .2s ease; }
+.hf-item:hover { box-shadow: 0 16px 28px rgba(0,0,0,.12); transform: translateY(-1px); }
+.hf-item:focus { outline: 3px solid rgba(0,0,0,.12); outline-offset: 2px; }
+.hf-icon { width: 36px; height: 36px; border-radius: 10px; display:flex; align-items:center; justify-content:center; font-size: 26px; }
+.hf-icon :deep(svg) { width: 26px; height: 26px; }
+.hf-label { font-weight: 800; letter-spacing: .2px; }
+.hf-item.primary .hf-icon { background: color-mix(in oklab, var(--el-color-primary) 16%, transparent); color: var(--el-color-primary); }
+.hf-item.success .hf-icon { background: color-mix(in oklab, var(--el-color-success) 16%, transparent); color: var(--el-color-success); }
+.hf-item.warning .hf-icon { background: color-mix(in oklab, var(--el-color-warning) 16%, transparent); color: var(--el-color-warning); }
+@media (max-width: 768px){
+  .hf-toolbar { grid-template-columns: 1fr; position: sticky; top: 0; }
+}
 
 /* 卡片网格 */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
