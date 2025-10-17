@@ -204,7 +204,7 @@
     </div>
 
     <!-- 付款待审抽屉列表（含审核操作） -->
-    <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="60%">
+  <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="960px">
       <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
   <el-select v-model="batch.platform_id" :placeholder="t('transactions.selectPlatform')" size="small" style="width:240px" filterable>
           <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? ` (${t('workbench.preview.feePercent')} ${Number(p.fee_percent||0).toFixed(4)}%)` : '')" />
@@ -293,7 +293,7 @@
     </el-drawer>
 
     <!-- 付款单明细抽屉 -->
-  <el-drawer v-model="todoDrawer" :title="t('workbench.todos.payments')" size="60%">
+  <el-drawer v-model="todoDrawer" :title="t('workbench.todos.payments')" size="900px">
       <div v-if="todoDetail">
         <div class="todo-head">
           <div>{{ t('common.billNo') }}：{{ todoDetail.bill_no || ('Payment-' + todoDetail.id) }}</div>
@@ -371,7 +371,7 @@
     </el-dialog>
 
   <!-- 审核日志抽屉 -->
-    <el-drawer v-model="auditDrawer.visible" :title="t('workbench.auditLog')" size="40%">
+  <el-drawer v-model="auditDrawer.visible" :title="t('workbench.auditLog')" size="720px">
       <el-table :data="auditRows" size="small" border @header-dragend="onColResizeAudit">
         <el-table-column type="index" column-key="idx" :label="t('common.no')" :width="colWAudit('idx', 60)" />
   <el-table-column prop="acted_at" column-key="acted_at" :label="t('common.date')" :width="colWAudit('acted_at', 170)" />
@@ -392,7 +392,7 @@
     </el-drawer>
 
     <!-- 统计明细抽屉（查看被计入的数据） -->
-    <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" size="60%">
+  <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" size="980px">
       <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading" @header-dragend="onColResizeDetail">
         <!-- 交易明细(借)：交易日期/账号/账户名称/借方金额 -->
         <template v-if="detailDrawer.type==='tx-debit'">
@@ -468,7 +468,7 @@
     </el-drawer>
 
     <!-- KPI 列表抽屉（客户余额/银行余额/平台余额/待付余额等） -->
-    <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="40%">
+  <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="560px">
       <el-table :data="statDrawer.rows" size="small" border>
         <el-table-column type="index" :label="t('common.no')" width="60" />
         <el-table-column prop="label" :label="t('common.name')" />
@@ -479,7 +479,7 @@
     </el-drawer>
 
     <!-- 服务器监控抽屉 -->
-    <el-drawer v-model="monitor.visible" :title="t('workbench.monitor.title')" size="40%">
+  <el-drawer v-model="monitor.visible" :title="t('workbench.monitor.title')" size="560px">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
         <el-button size="small" type="primary" @click="loadMonitor">{{ t('workbench.monitor.refresh') }}</el-button>
         <el-switch v-model="monitor.auto" :active-text="t('workbench.monitor.autoRefresh')" />
