@@ -2262,7 +2262,7 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
   doc.moveDown(0.6)
 
 
-  // ===== 金额分节条 + 金额（整体居中） =====
+  // ===== 金额分节条 + 金额（左对齐，保持上下间距更均匀） =====
   const padX = left + 12
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
   // 分节彩条
@@ -2271,13 +2271,13 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
     const hBar = 22
     doc.save()
     doc.roundedRect(left, y, contentWidth, hBar, 6).fill(LIGHT_ACCENT)
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', left, y + 4, { width: contentWidth, align: 'center' })
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', padX, y + 4)
     doc.restore()
-    doc.y = y + hBar + 6
+    doc.y = y + hBar + 8
   })()
-  // 居中显示金额
+  // 左对齐显示金额
   const currencyLabel = 'CNY: ' + money(total)
-  doc.font(fontBold).fontSize(20).fillColor(ACCENT).text(currencyLabel, left, doc.y, { width: contentWidth, align: 'center' })
+  doc.font(fontBold).fontSize(20).fillColor(ACCENT).text(currencyLabel, padX, doc.y)
   doc.moveDown(0.8)
 
   // 工具：分节彩条 + 双语标题
@@ -2286,9 +2286,9 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
     const hBar = 22
     doc.save()
     doc.roundedRect(left, y, contentWidth, hBar, 6).fill(LIGHT_ACCENT)
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, left, y + 4, { width: contentWidth, align: 'center' })
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, padX, y + 4)
     doc.restore()
-    doc.y = y + hBar + 6
+    doc.y = y + hBar + 8
   }
   // 工具：双语标签-值
   const drawLabelValue = (zh, en, value) => {

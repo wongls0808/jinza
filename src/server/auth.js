@@ -167,6 +167,20 @@ export async function ensureSchema() {
     create index if not exists ix_user_sessions_user on user_sessions(user_id);
     create index if not exists ix_user_sessions_last_seen on user_sessions(last_seen);
   `)
+  // 用户行为日志（保留 60 天）
+  await query(`
+    create table if not exists user_activity (
+      id serial primary key,
+      user_id int not null references users(id) on delete cascade,
+      action text not null,
+      meta jsonb,
+      ip text,
+      user_agent text,
+      created_at timestamptz default now()
+    );
+    create index if not exists ix_user_activity_user on user_activity(user_id);
+    create index if not exists ix_user_activity_created on user_activity(created_at);
+  `)
   // Add columns if the table pre-existed
   await query(`alter table users add column if not exists must_change_password boolean default false`)
   await query(`alter table users add column if not exists password_updated_at timestamptz`)
@@ -176,6 +190,27 @@ export async function ensureSchema() {
   // 迁移：若历史数据以系数(0..1)存储，则转换为百分比 p=(1 - f)*100；保证幂等：仅转换 0<=tax_rate<=1 的行
   try {
     await query(`update customers set tax_rate = round((1 - coalesce(tax_rate,0)) * 100, 3) where coalesce(tax_rate,0) >= 0 and coalesce(tax_rate,0) <= 1`)
+  } catch {}
+}
+
+// 记录行为（忽略错误），用于重要操作审计；action 如 'login','logout','users.update','permissions.update'
+export async function logActivity(userId, action, meta = {}, reqLike = null) {
+  try {
+    if (!process.env.DATABASE_URL) return
+    const ip = (reqLike?.headers?.['x-forwarded-for']?.toString().split(',')[0] || reqLike?.ip || '').trim()
+    const ua = (reqLike?.headers?.['user-agent'] || '').slice(0, 300)
+    await query(
+      `insert into user_activity(user_id, action, meta, ip, user_agent) values($1,$2,$3,$4,$5)`,
+      [Number(userId)||null, String(action)||'', meta ? JSON.stringify(meta) : null, ip || null, ua || null]
+    )
+  } catch {}
+}
+
+// 清理过期行为日志（>60天），忽略错误；可在定时任务或登录时机调用
+export async function cleanupOldActivity(days = 60) {
+  try {
+    if (!process.env.DATABASE_URL) return
+    await query(`delete from user_activity where created_at < now() - ($1::int || ' days')::interval`, [Number(days)||60])
   } catch {}
 }
 

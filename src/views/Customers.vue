@@ -99,6 +99,10 @@
                 v-model="addDlg.form.opening_myr"
                 :precision="2"
                 :step="0.01"
+                :controls="false"
+                :value-on-clear="0"
+                :formatter="numFormatter"
+                :parser="numParser"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -111,6 +115,10 @@
                 v-model="addDlg.form.opening_cny"
                 :precision="2"
                 :step="0.01"
+                :controls="false"
+                :value-on-clear="0"
+                :formatter="numFormatter"
+                :parser="numParser"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -147,6 +155,10 @@
                 v-model="editDlg.form.opening_myr"
                 :precision="2"
                 :step="0.01"
+                :controls="false"
+                :value-on-clear="0"
+                :formatter="numFormatter"
+                :parser="numParser"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -159,6 +171,10 @@
                 v-model="editDlg.form.opening_cny"
                 :precision="2"
                 :step="0.01"
+                :controls="false"
+                :value-on-clear="0"
+                :formatter="numFormatter"
+                :parser="numParser"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -284,6 +300,18 @@ const addRules = {
       trigger: 'change'
     }
   ]
+}
+// 数值解析与展示（可选：允许输入含逗号的数值）
+const numParser = (v) => {
+  if (v === null || v === undefined || v === '') return 0
+  const s = String(v).replace(/,/g, '')
+  const n = Number(s)
+  return isNaN(n) ? 0 : n
+}
+const numFormatter = (v) => {
+  const n = Number(v)
+  if (isNaN(n)) return '0.00'
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 const filePicker = ref(null)
 const importMode = ref('auto')

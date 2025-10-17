@@ -52,6 +52,9 @@ router.post('/auth/login', async (req, res) => {
     }
   } catch {}
   const token = auth.signToken({ id: user.id, username: user.username, is_admin: !!user.is_admin, perms: permCodes, must_change_password: !!user.must_change_password, sid })
+  // 行为：登录 & 背景清理
+  try { await auth.logActivity(user.id, 'login', {}, req) } catch {}
+  try { auth.cleanupOldActivity(60) } catch {}
   res.json({ token, user: { id: user.id, username: user.username, display_name: user.display_name, is_admin: !!user.is_admin }, perms: permCodes, must_change_password: !!user.must_change_password })
 })
 
@@ -66,6 +69,7 @@ router.post('/auth/logout', auth.authMiddleware(true), async (req, res) => {
       await query('delete from user_sessions where token=$1', [req.user.sid])
     }
   } catch {}
+  try { await auth.logActivity(req.user?.id, 'logout', {}, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -301,6 +305,7 @@ router.put('/users/:id', auth.authMiddleware(true), auth.requirePerm('manage_use
     [display_name, is_active, id]
   )
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'users.update', { target: id, display_name, is_active }, req) } catch {}
   res.json(rs.rows[0])
 })
 
@@ -320,21 +325,36 @@ router.post('/users/:id/reset-password', auth.authMiddleware(true), auth.require
   const hash = await auth.hashPassword(password)
   const rs = await query('update users set password_hash=$1, must_change_password=true, password_updated_at=null where id=$2 returning id', [hash, id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'users.reset_password', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 
 // 用户会话日志（最近 10 条登录/活动记录）
 router.get('/users/:id/sessions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const id = Number(req.params.id)
-  const rs = await query(
-    `select last_ip, last_seen, user_agent
-       from user_sessions
-      where user_id=$1
-      order by coalesce(last_seen, now()) desc
-      limit 10`,
-    [id]
-  )
-  res.json(rs.rows)
+  const limit = Math.min(Number(req.query.limit)||50, 200)
+  if (!process.env.DATABASE_URL) return res.json([])
+  try {
+    const rows = await query(`
+      with s as (
+        select last_seen as ts, last_ip as ip, user_agent as ua, 'session' as kind, null::text as action, null::jsonb as meta
+          from user_sessions
+         where user_id=$1
+      ), a as (
+        select created_at as ts, ip, user_agent as ua, 'activity' as kind, action, meta
+          from user_activity
+         where user_id=$1 and created_at >= now() - interval '60 days'
+      ), u as (
+        select * from s
+        union all
+        select * from a
+      )
+      select * from u order by ts desc limit $2
+    `, [id, limit])
+    res.json(rows.rows.map(r => ({ last_seen: r.ts, last_ip: r.ip, user_agent: r.ua, kind: r.kind, action: r.action, meta: r.meta })))
+  } catch (e) {
+    res.json([])
+  }
 })
 
 // Permissions
@@ -560,6 +580,7 @@ router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
       await query(`insert into user_permissions(user_id, permission_id) values ${values} on conflict do nothing`)
     }
   }
+  try { await auth.logActivity(req.user?.id, 'permissions.update', { target: id, count: Array.isArray(perms)? perms.length : 0 }, req) } catch {}
   res.json({ ok: true })
 })
 
