@@ -49,15 +49,45 @@ function cleanCell(v) {
   if (m) s = m[1]
   return s.trim()
 }
+
+// 专门处理银行CSV格式的Excel式单元格清理
+function cleanExcelCell(v) {
+  if (v === null || v === undefined) return ''
+  let s = String(v).trim()
+  
+  // 处理Excel导出的 ="value" 格式
+  const excelMatch = /^=\"(.*)\"$/.exec(s)
+  if (excelMatch) {
+    s = excelMatch[1]
+  }
+  
+  // 处理普通引号
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1)
+  }
+  
+  return s.trim()
+}
+
+// 合并多个参考字段为单个字符串
+function mergeReferenceFields(refs) {
+  const cleanRefs = refs
+    .map(ref => cleanExcelCell(ref))
+    .filter(ref => ref && ref !== '-' && ref !== '""')
+    .join(' ')
+  
+  return sanitizeReferenceText(cleanRefs)
+}
+
 function parseAmount(v) {
-  const s = cleanCell(v).replace(/,/g, '').replace(/\s+/g, '')
+  const s = cleanExcelCell(v).replace(/,/g, '').replace(/\s+/g, '')
   if (!s) return 0
   const n = Number(s)
   return isNaN(n) ? 0 : n
 }
 function parseDateYYYYMMDD(v) {
   // already YYYY-MM-DD -> passthrough
-  const s = cleanCell(v)
+  const s = cleanExcelCell(v)
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
   // dd/mm/yyyy -> convert
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
@@ -87,13 +117,32 @@ function sanitizeReferenceText(s) {
 transactionsRouter.get('/template', auth.authMiddleware(true), auth.readOpenOr('transactions:import','view_transactions'), async (req, res) => {
   return res.json([
     {
-      accountNumber: '000123456789',
-      transactionDate: '2025-10-01',
-      chequeRefNo: 'CHK20251001',
-      transactionDescription: 'Salary payment',
-      debitAmount: 0,
-      creditAmount: 8500,
-      reference: 'REF123456'
+      accountNumber: '3212261428',
+      transactionDate: '02/09/2025',
+      chequeRefNo: '165507',
+      transactionDescription: 'DUITNOW TRSF CR',
+      debitAmount: '',
+      creditAmount: '6150.00',
+      reference1: 'LIDO STEEL EQUIPMENT     ORDER',
+      reference2: '',
+      reference3: '',
+      reference4: '',
+      reference5: '',
+      reference6: ''
+    },
+    {
+      accountNumber: '3212261428',
+      transactionDate: '03/09/2025',
+      chequeRefNo: '923820',
+      transactionDescription: 'DUITNOW TRSF DR',
+      debitAmount: '16000.00',
+      creditAmount: '',
+      reference1: 'XENDIT SDN. BHD.         PAYMENT',
+      reference2: 'TIONG',
+      reference3: '',
+      reference4: '',
+      reference5: '',
+      reference6: ''
     }
   ])
 })
@@ -615,19 +664,30 @@ transactionsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('
     let inserted = 0, failed = 0, skipped = 0
     for (const r of rows) {
       try {
-        const account = cleanCell(r.accountNumber || r.account_number)
+        const account = cleanExcelCell(r.accountNumber || r.account_number)
         const trn = parseDateYYYYMMDD(r.transactionDate || r.transaction_date)
         if (!account || !trn) { failed++; continue }
-        const cheque = cleanCell(r.chequeRefNo || r.cheque_ref_no) || null
-        const desc = cleanCell(r.description) || null
+        const cheque = cleanExcelCell(r.chequeRefNo || r.cheque_ref_no) || null
+        const desc = cleanExcelCell(r.description || r.transactionDescription) || null
         const debit = parseAmount(r.debitAmount || r.debit_amount)
         const credit = parseAmount(r.creditAmount || r.credit_amount)
         const balance = Number(credit || 0) - Number(debit || 0)
-        const category = r.category ? cleanCell(r.category) : null
-        const r1 = cleanCell(r.reference1 || r.reference_1) || ''
-        const r2 = cleanCell(r.reference2 || r.reference_2) || ''
-        const r3 = cleanCell(r.reference3 || r.reference_3) || ''
-          const mergedRef = sanitizeReferenceText([r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' '))
+        const category = r.category ? cleanExcelCell(r.category) : null
+        
+        // 支持多种参考字段格式
+        const referenceFields = [
+          r.reference1, r.reference_1, r['Reference 1'],
+          r.reference2, r.reference_2, r['Reference 2'],
+          r.reference3, r.reference_3, r['Reference 3'],
+          r.reference4, r.reference_4, r['Reference 4'],
+          r.reference5, r.reference_5, r['Reference 5'],
+          r.reference6, r.reference_6, r['Reference 6'],
+          r.reference, r.referenceText
+        ].filter(Boolean)
+        
+        const mergedRef = referenceFields.length > 0 
+          ? mergeReferenceFields(referenceFields)
+          : null
 
         const ins = await query(
           `insert into transactions(
@@ -695,19 +755,25 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
     for (const r of records) {
       try {
         // 优先使用行内账号，其次使用文件头默认账号
-        const rowAcc = accCol ? cleanCell(r[accCol]) : ''
+        const rowAcc = accCol ? cleanExcelCell(r[accCol]) : ''
         const account = rowAcc || defaultAccount
         if (!account) { failed++; continue }
-        const trn = parseDateYYYYMMDD(r['Trn. Date'])
-        const cheque = cleanCell(r['Cheque No/Ref No']) || null
-        const desc = cleanCell(r['Transaction Description']) || null
-        const debit = parseAmount(r['Debit Amount'])
-        const credit = parseAmount(r['Credit Amount'])
+        
+        // 使用专门的Excel格式清理函数
+        const trn = parseDateYYYYMMDD(cleanExcelCell(r['Trn. Date']))
+        const cheque = cleanExcelCell(r['Cheque No/Ref No']) || null
+        const desc = cleanExcelCell(r['Transaction Description']) || null
+        const debit = parseAmount(cleanExcelCell(r['Debit Amount']))
+        const credit = parseAmount(cleanExcelCell(r['Credit Amount']))
         const balance = Number(credit || 0) - Number(debit || 0)
-        const r1 = cleanCell(r['Reference 1']) || ''
-        const r2 = cleanCell(r['Reference 2']) || ''
-  const r3 = cleanCell(r['Reference 3']) || ''
-  const mergedRef = sanitizeReferenceText([r1, r2, r3].map(s=>s.trim()).filter(Boolean).join(' '))
+        
+        // 合并所有Reference字段
+        const referenceFields = [
+          r['Reference 1'], r['Reference 2'], r['Reference 3'],
+          r['Reference 4'], r['Reference 5'], r['Reference 6']
+        ]
+        const mergedRef = mergeReferenceFields(referenceFields)
+        
         if (!trn) { failed++; continue }
 
         const ins = await query(

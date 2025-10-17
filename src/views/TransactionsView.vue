@@ -1375,17 +1375,45 @@ const handleFileChange = (file) => {
         skipEmptyLines: true,
         complete: (results) => {
           if (results.data && results.data.length) {
+            // 清理Excel格式的函数
+            const cleanExcelValue = (v) => {
+              if (!v) return ''
+              let s = String(v).trim()
+              // 处理Excel导出的 ="value" 格式
+              const excelMatch = /^=\"(.*)\"$/.exec(s)
+              if (excelMatch) {
+                s = excelMatch[1]
+              }
+              // 处理普通引号
+              if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+                s = s.slice(1, -1)
+              }
+              return s.trim()
+            }
+            
             // 转为统一结构
             const rows = results.data.map(row => ({
-              accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
-              transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || '',
-              chequeRefNo: row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || '',
-              description: row.description || row.描述 || row.Description || row['Transaction Description'] || '',
-              debitAmount: Number(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0) || 0,
-              creditAmount: Number(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0) || 0,
-              reference1: row.reference1 || row.参考1 || row['Reference 1'] || '',
-              reference2: row.reference2 || row.参考2 || row['Reference 2'] || '',
-              reference3: row.reference3 || row.参考3 || row['Reference 3'] || ''
+              accountNumber: cleanExcelValue(row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || ''),
+              transactionDate: cleanExcelValue(row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || ''),
+              chequeRefNo: cleanExcelValue(row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || ''),
+              description: cleanExcelValue(row.description || row.描述 || row.Description || row['Transaction Description'] || ''),
+              debitAmount: Number(cleanExcelValue(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0).replace(/,/g, '')) || 0,
+              creditAmount: Number(cleanExcelValue(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0).replace(/,/g, '')) || 0,
+              reference1: cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+              reference2: cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+              reference3: cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+              reference4: cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+              reference5: cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+              reference6: cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || ''),
+              // 合并所有参考字段为单一referenceText
+              referenceText: [
+                cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+                cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+                cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+                cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+                cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+                cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || '')
+              ].filter(r => r && r !== '-').join(' ').trim()
             }))
             buildDedup(rows)
           } else {
@@ -1408,7 +1436,7 @@ const handleFileChange = (file) => {
 
 function buildDedup(rows){
   // 统一引用文本与金额，用于重复判断
-  const normRef = (r) => String([r.reference1, r.reference2, r.reference3].filter(Boolean).join(' ')).trim()
+  const normRef = (r) => String(r.referenceText || '').trim()
   const amount = (r) => Math.round((Number(r.creditAmount||0) - Number(r.debitAmount||0)) * 100) / 100
   const key = (r) => `${r.transactionDate}|${normRef(r)}|${amount(r)}`
 
