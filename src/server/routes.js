@@ -1074,16 +1074,33 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   function resolveLogoUrl(code, url) {
     try {
       const codeLower = String(code || 'public').toLowerCase()
+      // 常见银行文件名别名映射（项目 public/banks 中已存在的文件名）
+      const alias = {
+        // 交通银行：部分资源用 bocom
+        'bcm': ['bocom', 'bocm'],
+        // 丰隆银行：常见缩写 hlbb/hlb
+        'hongleong': ['hlbb', 'hlb'],
+        // 大众银行：常见缩写 pbb
+        'public': ['pbb'],
+        // 容错：已规范文件名同名回退不生效时，这些键也会自然命中
+        'uob': ['uob'],
+        'ocbc': ['ocbc'],
+        'maybank': ['maybank', 'mbb', 'abmb'],
+        'cimb': ['cimb']
+      }
+      const candidates = [codeLower, ...(alias[codeLower] || [])]
       // 若 url 存在且文件也存在，则直接使用
       if (url && typeof url === 'string') {
         const p = path.join(publicDir, decodeURIComponent(url).replace(/^\//, ''))
         if (fs.existsSync(p)) return url
       }
-      // 否则按优先顺序查找实际存在的文件
+      // 否则按候选名与后缀优先顺序查找实际存在的文件
       const exts = ['svg', 'png', 'jpg']
-      for (const ext of exts) {
-        const p = path.join(banksDir, `${codeLower}.${ext}`)
-        if (fs.existsSync(p)) return `/banks/${codeLower}.${ext}`
+      for (const key of candidates) {
+        for (const ext of exts) {
+          const p = path.join(banksDir, `${key}.${ext}`)
+          if (fs.existsSync(p)) return `/banks/${key}.${ext}`
+        }
       }
       return '/banks/public.svg'
     } catch { return '/banks/public.svg' }

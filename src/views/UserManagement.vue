@@ -17,15 +17,23 @@
       <el-card v-for="u in users" :key="u.id" class="user-card card">
         <template #header>
           <div class="head">
+            <!-- 右上角：启用开关 -->
+            <div class="switch-top-right">
+              <el-switch
+                v-model="u.is_active"
+                @change="toggleActive(u)"
+                inline-prompt
+                :active-icon="Check"
+                :inactive-icon="Close"
+              />
+              <span class="muted">{{ t('users.active') }}</span>
+            </div>
+
+            <!-- 主信息区 -->
             <div class="avatar" :class="{ admin: u.is_admin }">{{ initials(u) }}</div>
             <div class="info">
               <div class="name">
                 {{ u.display_name || u.username }}
-                <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag>
-                <span class="status" :class="{ online: !!u.online }">
-                  <span class="dot"></span>
-                  {{ u.online ? 'Online' : 'Offline' }}
-                </span>
               </div>
               <div class="username">@{{ u.username }}</div>
               <div class="meta">
@@ -35,17 +43,16 @@
               </div>
             </div>
             <div class="controls">
-              <div class="active-wrap">
-                <el-switch
-                  v-model="u.is_active"
-                  @change="toggleActive(u)"
-                  inline-prompt
-                  :active-icon="Check"
-                  :inactive-icon="Close"
-                />
-                <span class="muted">{{ t('users.active') }}</span>
-              </div>
               <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') || '分配权限' }}</el-button>
+            </div>
+
+            <!-- 右下角：管理员与在线标识 -->
+            <div class="badges-bottom-right">
+              <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag>
+              <span class="status" :class="{ online: !!u.online }">
+                <span class="dot"></span>
+                {{ u.online ? 'Online' : 'Offline' }}
+              </span>
             </div>
           </div>
         </template>
@@ -417,7 +424,7 @@ function fmtMinute(ts) {
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cards { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
 .user-card { padding: 0; }
-.head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; padding-right: 140px; min-height: 64px; }
 .avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); }
 .avatar.admin { background: var(--el-color-danger); }
 .info { min-width: 0; }
@@ -428,6 +435,9 @@ function fmtMinute(ts) {
 .meta .kv .k { font-weight:600; opacity:0.75; }
 .meta .kv .v { font-variant-numeric: tabular-nums; }
 .controls { display:flex; align-items:center; gap: 8px; }
+/* 右上角启用开关容器 */
+.switch-top-right { position: absolute; top: 8px; right: 12px; display:flex; align-items:center; gap:6px; }
+.switch-top-right .muted { font-size:12px; color: var(--el-text-color-secondary); }
 .status { margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 6px; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; }
 .status.online { color: var(--el-color-success); }
@@ -438,6 +448,8 @@ function fmtMinute(ts) {
 .ops { display: flex; gap: 8px; align-items: center; }
 .active-wrap { display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .active-wrap .muted { font-size:12px; color: var(--el-text-color-secondary); }
+/* 右下角徽标容器（ADMIN/在线） */
+.badges-bottom-right { position: absolute; right: 12px; bottom: 8px; display:flex; align-items:center; gap:8px; }
 .perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
 .perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
 .perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -42,7 +42,7 @@
         </el-form-item>
         <!-- 取消 URL 输入，统一使用本地 /banks/<code>.(svg|png|jpg) -->
         <el-form-item :label="$t('banks.labels.uploadFile')">
-          <input type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
+          <input ref="fileInputRef" type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
           <div class="hint">{{ $t('banks.hintFile') }}</div>
         </el-form-item>
       </el-form>
@@ -64,6 +64,7 @@ import { api } from '@/api'
 
 const banks = ref([])
 const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } })
+const fileInputRef = ref(null)
 
 async function load() {
   banks.value = await api.requestBanks()
@@ -88,9 +89,12 @@ async function reset() {
 
 function openAdd() {
   dlg.value = { visible: true, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } }
+  // 打开时清空文件选择
+  try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
 }
 function openEdit(b) {
   dlg.value = { visible: true, mode: 'edit', loading: false, form: { id: b.id, code: b.code, zh: b.zh, en: b.en, logo_data_url: '' } }
+  try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
 }
 
 async function fileToDataUrl(file) {
@@ -105,6 +109,8 @@ async function pickFile(e) {
   const f = e.target.files && e.target.files[0]
   if (!f) return
   dlg.value.form.logo_data_url = await fileToDataUrl(f)
+  // 选中一次后立刻清空 input，避免下次对话框再打开时保留历史选择
+  try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
 }
 
 async function submit() {
@@ -128,7 +134,10 @@ async function submit() {
   if (f.logo_data_url) body.logo_data_url = f.logo_data_url
   await api.updateBank(f.id, body)
     }
-    dlg.value.visible = false
+  dlg.value.visible = false
+  // 提交成功后清空临时数据，防止下次编辑残留
+  dlg.value.form.logo_data_url = ''
+  try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
     await load()
     ElMessage.success($t('customers.messages.saved'))
   } catch (e) {
