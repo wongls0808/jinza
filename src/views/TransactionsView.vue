@@ -48,9 +48,9 @@
           </el-button-group>
         </div>
         <div class="toolbar-right">
-          <el-button type="default" @click="goToStats">
-            <el-icon><DataAnalysis /></el-icon>
-            {{ t('transactions.showStats') }}
+          <el-button type="success" class="match-list-btn" round @click="goToStats">
+            <el-icon><List /></el-icon>
+            {{ t('transactions.matchList') }}
           </el-button>
         </div>
       </div>
@@ -1664,6 +1664,13 @@ function onBankImgErr(e){
   margin-left: auto; /* 将开关推到最右侧 */
   display: flex;
   align-items: center;
+}
+
+/* 匹配列表按钮美化 */
+.match-list-btn {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
 }
 
 .text-right {

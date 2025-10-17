@@ -104,35 +104,29 @@
       <el-button size="small" @click="clearFilters">{{ t('workbench.filters.clear') }}</el-button>
     </div>
     <div class="kpi6-grid">
-      <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openChart('tx')">
+      <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openDetail('tx-debit')" @keydown.enter.prevent="openDetail('tx-debit')" @keydown.space.prevent="openDetail('tx-debit')">
         <div class="kpi-title">{{ t('workbench.charts.transactionsDebit') }}</div>
         <div class="kpi-value">{{ money(summary.transactions.debit) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.transactions.monthly" :key="'td-'+m.month" :style="barStyle(m.debit)"></span></div>
       </div>
-      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openChart('tx')">
+      <div class="kpi-card theme-success" role="button" tabindex="0" @click="openDetail('tx-credit')" @keydown.enter.prevent="openDetail('tx-credit')" @keydown.space.prevent="openDetail('tx-credit')">
         <div class="kpi-title">{{ t('workbench.charts.transactionsCredit') }}</div>
         <div class="kpi-value">{{ money(summary.transactions.credit) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.transactions.monthly" :key="'tc-'+m.month" :style="barStyle(m.credit)"></span></div>
       </div>
-      <div class="kpi-card theme-info" role="button" tabindex="0" @click="openChart('settle')">
+      <div class="kpi-card theme-info" role="button" tabindex="0" @click="openDetail('settle')" @keydown.enter.prevent="openDetail('settle')" @keydown.space.prevent="openDetail('settle')">
         <div class="kpi-title">{{ t('workbench.charts.settlementsTotal') }}</div>
         <div class="kpi-value">{{ money(summary.settlements.settled) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.settlements.monthly" :key="'st-'+m.month" :style="barStyle(m.settled)"></span></div>
       </div>
-      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openChart('buy')">
+      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('buy')" @keydown.enter.prevent="openDetail('buy')" @keydown.space.prevent="openDetail('buy')">
         <div class="kpi-title">{{ t('workbench.charts.buyfxTotal') }}</div>
         <div class="kpi-value">{{ money(summary.buyfx.total) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.buyfx.monthly" :key="'by-'+m.month" :style="barStyle(m.total)"></span></div>
       </div>
-      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openChart('pay')">
+      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openDetail('pay')" @keydown.enter.prevent="openDetail('pay')" @keydown.space.prevent="openDetail('pay')">
         <div class="kpi-title">{{ t('workbench.charts.paymentsTotal') }}</div>
         <div class="kpi-value">{{ money(summary.payments.total) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.payments.monthly" :key="'py-'+m.month" :style="barStyle(m.total)"></span></div>
       </div>
-      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openChart('exp')">
+      <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('exp')" @keydown.enter.prevent="openDetail('exp')" @keydown.space.prevent="openDetail('exp')">
         <div class="kpi-title">{{ t('workbench.charts.expensesTotal') }}</div>
         <div class="kpi-value">{{ money(summary.expenses.total) }}</div>
-        <div class="mini-bars"><span v-for="m in summary.expenses.monthly" :key="'ex-'+m.month" :style="barStyle(m.total)"></span></div>
       </div>
     </div>
 
@@ -328,43 +322,83 @@
       </el-table>
     </el-drawer>
 
-    <!-- 统计明细抽屉（通用） -->
-    <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="50%">
-      <el-table :data="statDrawer.rows" size="small" border>
-        <el-table-column prop="label" :label="t('common.name')" />
-        <el-table-column prop="value" :label="t('common.amount')" width="160" align="right">
-          <template #default="{ row }">{{ money(row.value) }}</template>
-        </el-table-column>
-      </el-table>
-    </el-drawer>
-
-    <!-- 图形详情抽屉（月度列表） -->
-    <el-drawer v-model="chartDrawer.visible" :title="chartDrawer.title" size="50%">
-      <el-table :data="chartDrawer.rows" size="small" border>
-        <el-table-column prop="month" :label="t('workbench.charts.month')" width="120" />
-        <template v-if="chartDrawer.type==='tx'">
+    <!-- 统计明细抽屉（查看被计入的数据） -->
+    <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" size="60%">
+      <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading">
+        <!-- 交易明细(借)：交易日期/账号/账户名称/借方金额 -->
+        <template v-if="detailDrawer.type==='tx-debit'">
+          <el-table-column prop="trn_date" :label="t('common.date')" width="120" />
+          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" width="180" />
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
           <el-table-column prop="debit" :label="t('common.debit')" width="140" align="right">
             <template #default="{ row }">{{ money(row.debit) }}</template>
           </el-table-column>
+        </template>
+        <!-- 交易明细(贷)：交易日期/账号/账户名称/贷方金额 -->
+        <template v-else-if="detailDrawer.type==='tx-credit'">
+          <el-table-column prop="trn_date" :label="t('common.date')" width="120" />
+          <el-table-column prop="account_number" :label="t('accounts.fields.bankAccount')" width="180" />
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
           <el-table-column prop="credit" :label="t('common.credit')" width="140" align="right">
             <template #default="{ row }">{{ money(row.credit) }}</template>
           </el-table-column>
         </template>
-        <template v-else-if="chartDrawer.type==='settle'">
-          <el-table-column prop="base" :label="t('workbench.charts.baseAmount')" width="140" align="right">
-            <template #default="{ row }">{{ money(row.base) }}</template>
+        <!-- 结汇明细：日期/单号/客户/基金额(MYR) -->
+        <template v-else-if="detailDrawer.type==='settle'">
+          <el-table-column prop="settle_date" :label="t('common.date')" width="130">
+            <template #default="{ row }">{{ fmtDate(row.settle_date) }}</template>
           </el-table-column>
-          <el-table-column prop="settled" :label="t('workbench.charts.settledAmount')" width="140" align="right">
-            <template #default="{ row }">{{ money(row.settled) }}</template>
+          <el-table-column prop="bill_no" :label="t('common.billNo')" width="160" />
+          <el-table-column prop="customer_name" :label="t('common.customer')" />
+          <el-table-column prop="total_base" :label="t('workbench.charts.selectedTotalMYR')" width="160" align="right">
+            <template #default="{ row }">{{ money(row.total_base) }}</template>
           </el-table-column>
         </template>
-        <template v-else>
-          <el-table-column prop="total" :label="t('common.total')" width="160" align="right">
-            <template #default="{ row }">{{ money(row.total) }}</template>
+        <!-- 购汇转换：日期/平台/卖出金额/买入金额(MYR) -->
+        <template v-else-if="detailDrawer.type==='buy'">
+          <el-table-column prop="created_at" :label="t('common.date')" width="170" />
+          <el-table-column prop="platform_name" :label="t('buyfx.platform')" />
+          <el-table-column prop="amount_from" :label="t('buyfx.sellAmount')" width="160" align="right">
+            <template #default="{ row }">{{ money(row.amount_from) }} {{ row.from_currency }}</template>
+          </el-table-column>
+          <el-table-column prop="amount_to" :label="t('buyfx.buyAmount')" width="160" align="right">
+            <template #default="{ row }">{{ money(row.amount_to) }} {{ row.to_currency }}</template>
+          </el-table-column>
+        </template>
+        <!-- 付款单历史明细：付款日期/单号/客户/账户名称/银行/银行账户/金额 -->
+        <template v-else-if="detailDrawer.type==='pay'">
+          <el-table-column prop="pay_date" :label="t('fx.payDate')" width="130">
+            <template #default="{ row }">{{ fmtDate(row.pay_date) }}</template>
+          </el-table-column>
+          <el-table-column prop="bill_no" :label="t('common.billNo')" width="160" />
+          <el-table-column prop="customer_name" :label="t('common.customer')" />
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" />
+          <el-table-column prop="bank_name" :label="t('transactions.bankName')" width="160" />
+          <el-table-column prop="bank_account" :label="t('accounts.fields.bankAccount')" width="180" />
+          <el-table-column prop="amount" :label="t('common.amount')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.amount) }}</template>
+          </el-table-column>
+        </template>
+        <!-- 费用借贷报表：项目/借/贷/净额 -->
+        <template v-else-if="detailDrawer.type==='exp'">
+          <el-table-column prop="description" :label="t('expenses.description')">
+            <template #default="{ row }">{{ row.description }}<span v-if="row.drcr">（{{ row.drcr==='debit'? t('common.debit'): t('common.credit') }}）</span></template>
+          </el-table-column>
+          <el-table-column prop="debit_total" :label="t('expenses.columns.debit')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.debit_total) }}</template>
+          </el-table-column>
+          <el-table-column prop="credit_total" :label="t('expenses.columns.credit')" width="140" align="right">
+            <template #default="{ row }">{{ money(row.credit_total) }}</template>
+          </el-table-column>
+          <el-table-column prop="net" :label="t('expenses.summary.net')" width="160" align="right">
+            <template #default="{ row }">{{ money(row.net) }}</template>
           </el-table-column>
         </template>
       </el-table>
+      <div v-if="detailDrawer.type==='pay'" class="kpi-sub" style="margin-top:8px;">{{ t('workbench.notePaymentsDetail') }}</div>
     </el-drawer>
+
+    
   </div>
 </template>
 
@@ -390,11 +424,11 @@ const { colW: colWTodo, onColResize: onColResizeTodo } = useTableMemory('wb-todo
 
 // —— 计算图形：聚合汇总 ——
 const summary = ref({
-  transactions: { debit: 0, credit: 0, monthly: [] },
-  settlements: { base: 0, settled: 0, monthly: [] },
-  buyfx: { total: 0, monthly: [] },
-  payments: { total: 0, monthly: [] },
-  expenses: { total: 0, monthly: [] },
+  transactions: { debit: 0, credit: 0 },
+  settlements: { base: 0, settled: 0 },
+  buyfx: { total: 0 },
+  payments: { total: 0 },
+  expenses: { total: 0 },
 })
 const range = ref(null)
 const quick = ref('')
@@ -415,8 +449,14 @@ async function loadSummary(){
   try {
     const params = new URLSearchParams()
     if (Array.isArray(range.value) && range.value[0] && range.value[1]) { params.set('startDate', fmtYmd(range.value[0])); params.set('endDate', fmtYmd(range.value[1])) }
-    const res = await httpRequest(`/workbench/summary?${params.toString()}`)
-    if (res) summary.value = res
+    const r = await httpRequest(`/workbench/summary?${params.toString()}`)
+    summary.value = {
+      transactions: { debit: Number(r?.transactions?.debit||0), credit: Number(r?.transactions?.credit||0) },
+      settlements: { base: Number(r?.settlements?.base||0), settled: Number(r?.settlements?.settled||0) },
+      buyfx: { total: Number(r?.buyfx?.total||0) },
+      payments: { total: Number(r?.payments?.total||0) },
+      expenses: { total: Number(r?.expenses?.total||0) },
+    }
   } catch {}
 }
 function onQuick(){
@@ -430,28 +470,76 @@ function onQuick(){
   loadSummary()
 }
 function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
-function onRangeChange(){
-  datePopover.value = false
-  quick.value = ''
-  loadSummary()
+function onRangeChange(val){
+  // 仅在选择了完整的起止日期后才收起弹窗并加载
+  if (Array.isArray(val) && val[0] && val[1]) {
+    datePopover.value = false
+    quick.value = ''
+    loadSummary()
+  }
 }
-function barStyle(v){
-  const val = Math.abs(Number(v||0))
-  const h = Math.max(2, Math.min(28, val === 0 ? 2 : 2 + Math.log10(val) * 12))
-  return { height: h + 'px' }
-}
-const chartDrawer = ref({ visible:false, title:'', type:'', rows:[] })
-function openChart(type){
-  if (type==='tx') {
-    chartDrawer.value = { visible:true, title: t('workbench.charts.transactions'), type:'tx', rows:[...summary.value.transactions.monthly] }
-  } else if (type==='settle') {
-    chartDrawer.value = { visible:true, title: t('workbench.charts.settlements'), type:'settle', rows:[...summary.value.settlements.monthly] }
-  } else if (type==='buy') {
-    chartDrawer.value = { visible:true, title: t('workbench.charts.buyfx'), type:'buy', rows:[...summary.value.buyfx.monthly] }
-  } else if (type==='pay') {
-    chartDrawer.value = { visible:true, title: t('workbench.charts.payments'), type:'pay', rows:[...summary.value.payments.monthly] }
-  } else if (type==='exp') {
-    chartDrawer.value = { visible:true, title: t('workbench.charts.expenses'), type:'exp', rows:[...summary.value.expenses.monthly] }
+// 图形区域仅显示合计，不提供明细抽屉
+const detailDrawer = ref({ visible: false, title: '', type: '', loading: false, rows: [] })
+async function openDetail(type){
+  const params = new URLSearchParams()
+  if (Array.isArray(range.value) && range.value[0] && range.value[1]) { params.set('startDate', fmtYmd(range.value[0])); params.set('endDate', fmtYmd(range.value[1])) }
+  detailDrawer.value = { visible: true, title: '', type, loading: true, rows: [] }
+  try {
+    if (type === 'tx-debit' || type === 'tx-credit') {
+      detailDrawer.value.title = type==='tx-debit' ? t('workbench.charts.transactionsDebit') : t('workbench.charts.transactionsCredit')
+      // 根据筛选时间拉取部分数据（不分页，前500条）
+      const list = await api.transactions.list({ startDate: params.get('startDate')||'', endDate: params.get('endDate')||'', page: 1, pageSize: 500, sort: 'transaction_date', order: 'asc' })
+      const rows = Array.isArray(list?.data) ? list.data : (Array.isArray(list?.items) ? list.items : Array.isArray(list) ? list : [])
+      const shaped = rows.map(r => ({
+        trn_date: r.trn_date || r.transaction_date,
+        account_number: r.account_number,
+        account_name: r.account_name,
+        debit: Number(r.debit_amount||r.debit||0),
+        credit: Number(r.credit_amount||r.credit||0)
+      }))
+      detailDrawer.value.rows = (type==='tx-debit')
+        ? shaped.filter(x => x.debit > 0).map(x => ({ trn_date: x.trn_date, account_number: x.account_number, account_name: x.account_name, debit: x.debit }))
+        : shaped.filter(x => x.credit > 0).map(x => ({ trn_date: x.trn_date, account_number: x.account_number, account_name: x.account_name, credit: x.credit }))
+    } else if (type === 'settle') {
+      detailDrawer.value.title = t('workbench.charts.settlements')
+      const res = await api.fx.settlements.list({ startDate: params.get('startDate')||'', endDate: params.get('endDate')||'' })
+      const items = res?.items || []
+      detailDrawer.value.rows = items.map(x => ({ settle_date: x.settle_date, bill_no: x.bill_no, customer_name: x.customer_name, total_base: Number(x.total_base||0) }))
+    } else if (type === 'buy') {
+      detailDrawer.value.title = t('workbench.charts.buyfx')
+      const res = await api.buyfx.listTransfers()
+      const items = res?.items || []
+      // 若有时间筛选，前端进行 created_at 过滤
+      const [s, e] = (Array.isArray(range.value) && range.value[0] && range.value[1]) ? [new Date(range.value[0]), new Date(range.value[1])] : [null, null]
+      const inRange = (d) => {
+        if (!s || !e) return true
+        try { const dt = new Date(d); return dt >= s && dt <= e } catch { return true }
+      }
+      const filtered = items.filter(it => inRange(it.created_at))
+      detailDrawer.value.rows = filtered.map(x => ({ created_at: (x.created_at||'').slice(0,19).replace('T',' '), platform_name: x.platform_name, amount_from: Number(x.amount_from||0), from_currency: x.from_currency, amount_to: Number(x.amount_to||0), to_currency: x.to_currency }))
+    } else if (type === 'pay') {
+      detailDrawer.value.title = t('workbench.charts.payments')
+      const res = await api.fx.payments.list({ view: 'item', startDate: params.get('startDate')||'', endDate: params.get('endDate')||'', page: 1, pageSize: 500 })
+      const items = Array.isArray(res) ? res : (res?.items || [])
+      detailDrawer.value.rows = items.map(it => ({
+        pay_date: it.pay_date,
+        bill_no: it.bill_no,
+        customer_name: it.customer_name,
+        account_name: it.account_name,
+        bank_name: it.bank_name,
+        bank_account: it.bank_account,
+        amount: Number(it.amount||0)
+      }))
+    } else if (type === 'exp') {
+      detailDrawer.value.title = t('workbench.charts.expenses')
+      const res = await api.expenses.report({ startDate: params.get('startDate')||'', endDate: params.get('endDate')||'' })
+      const items = res?.items || []
+      detailDrawer.value.rows = items.map(x => ({ description: x.description, drcr: x.drcr, debit_total: Number(x.debit_total||0), credit_total: Number(x.credit_total||0), net: Number(x.net||0) }))
+    }
+  } catch (e) {
+    detailDrawer.value.rows = []
+  } finally {
+    detailDrawer.value.loading = false
   }
 }
 

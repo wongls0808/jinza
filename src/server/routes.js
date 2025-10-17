@@ -83,41 +83,23 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
     try { const r = await query(sql, params); return r.rows } catch { return [] }
   }
   try {
-    // 1) 交易统计（借/贷合计 + 月度）
+    // 1) 交易统计（仅借/贷合计）
     const tPer = periodCond('t.transaction_date')
     const tSumRows = await runSafe(`
       select sum(t.debit_amount) as debit, sum(t.credit_amount) as credit
       from transactions t
       ${tPer.sql}
     `, tPer.params)
-    const tMonthlyRows = await runSafe(`
-      select to_char(t.transaction_date,'YYYY-MM') as month,
-             sum(t.debit_amount) as debit,
-             sum(t.credit_amount) as credit
-        from transactions t
-        ${tPer.sql}
-       group by to_char(t.transaction_date,'YYYY-MM')
-       order by month asc
-    `, tPer.params)
 
-    // 2) 结汇合计（基/结）与月度
+    // 2) 结汇合计（基/结）
     const sPer = periodCond('s.settle_date')
     const sSumRows = await runSafe(`
       select sum(s.total_base) as base, sum(s.total_settled) as settled
         from fx_settlements s
         ${sPer.sql}
     `, sPer.params)
-    const sMonthlyRows = await runSafe(`
-      select to_char(s.settle_date,'YYYY-MM') as month,
-             sum(s.total_base) as base,
-             sum(s.total_settled) as settled
-        from fx_settlements s
-        ${sPer.sql}
-       group by to_char(s.settle_date,'YYYY-MM')
-       order by month asc
-    `, sPer.params)
 
-    // 3) 购汇合计（以平台内币种互换记录为准：to_currency = 'MYR' 的 amount_to 合计 + 月度）
+    // 3) 购汇合计（平台互换 to_currency=MYR 的 amount_to 合计）
     const bPer = periodCond('t.created_at')
     const bSqlWhere = bPer.sql ? `${bPer.sql} and upper(t.to_currency) = 'MYR'` : `where upper(t.to_currency) = 'MYR'`
     const bSumRows = await runSafe(`
@@ -125,16 +107,8 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
         from fx_platform_fx_transfers t
         ${bSqlWhere}
     `, bPer.params)
-    const bMonthlyRows = await runSafe(`
-      select to_char(t.created_at,'YYYY-MM') as month,
-             sum(t.amount_to) as total
-        from fx_platform_fx_transfers t
-        ${bSqlWhere}
-       group by to_char(t.created_at,'YYYY-MM')
-       order by month asc
-    `, bPer.params)
 
-    // 4) 付款合计（按 payment_items.amount 合计 + 月度）
+    // 4) 付款合计（payment_items.amount 合计）
     const pPer = periodCond('p.pay_date')
     const pSumRows = await runSafe(`
       select sum(pi.amount) as total
@@ -142,59 +116,23 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
         left join fx_payment_items pi on pi.payment_id = p.id
         ${pPer.sql}
     `, pPer.params)
-    const pMonthlyRows = await runSafe(`
-      select to_char(p.pay_date,'YYYY-MM') as month,
-             sum(pi.amount) as total
-        from fx_payments p
-        left join fx_payment_items pi on pi.payment_id = p.id
-        ${pPer.sql}
-       group by to_char(p.pay_date,'YYYY-MM')
-       order by month asc
-    `, pPer.params)
 
-    // 5) 费用合计（借贷后的净额：credit 为正、debit 为负）
-    const ePer = periodCond('e.biz_date')
+    // 5) 费用合计（借贷报表口径：净额 = credit - debit）
+    const ePer = periodCond('t.transaction_date')
     const eSumRows = await runSafe(`
-      select sum(case when lower(coalesce(e.drcr,'')) = 'credit' then e.amount
-                      when lower(coalesce(e.drcr,'')) = 'debit' then -e.amount
-                      else 0 end) as total
-        from expenses e
-        ${ePer.sql}
-    `, ePer.params)
-    const eMonthlyRows = await runSafe(`
-      select to_char(e.biz_date,'YYYY-MM') as month,
-             sum(case when lower(coalesce(e.drcr,'')) = 'credit' then e.amount
-                      when lower(coalesce(e.drcr,'')) = 'debit' then -e.amount
-                      else 0 end) as total
-        from expenses e
-        ${ePer.sql}
-       group by to_char(e.biz_date,'YYYY-MM')
-       order by month asc
+      select (sum(coalesce(t.credit_amount,0)) - sum(coalesce(t.debit_amount,0))) as net
+        from transactions t
+        left join expenses e on e.id = t.match_target_id
+        where coalesce(t.matched,false) = true and t.match_type = 'expense'
+        ${ePer.sql ? ' and ' + ePer.sql.replace(/^where\s+/,'') : ''}
     `, ePer.params)
 
     res.json({
-      transactions: {
-        debit: Number(tSumRows?.[0]?.debit || 0),
-        credit: Number(tSumRows?.[0]?.credit || 0),
-        monthly: tMonthlyRows.map(r => ({ month: r.month, debit: Number(r.debit||0), credit: Number(r.credit||0) }))
-      },
-      settlements: {
-        base: Number(sSumRows?.[0]?.base || 0),
-        settled: Number(sSumRows?.[0]?.settled || 0),
-        monthly: sMonthlyRows.map(r => ({ month: r.month, base: Number(r.base||0), settled: Number(r.settled||0) }))
-      },
-      buyfx: {
-        total: Number(bSumRows?.[0]?.total || 0),
-        monthly: bMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
-      },
-      payments: {
-        total: Number(pSumRows?.[0]?.total || 0),
-        monthly: pMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
-      },
-      expenses: {
-        total: Number(eSumRows?.[0]?.total || 0),
-        monthly: eMonthlyRows.map(r => ({ month: r.month, total: Number(r.total||0) }))
-      }
+      transactions: { debit: Number(tSumRows?.[0]?.debit || 0), credit: Number(tSumRows?.[0]?.credit || 0) },
+      settlements: { base: Number(sSumRows?.[0]?.base || 0), settled: Number(sSumRows?.[0]?.settled || 0) },
+      buyfx: { total: Number(bSumRows?.[0]?.total || 0) },
+      payments: { total: Number(pSumRows?.[0]?.total || 0) },
+      expenses: { total: Number(eSumRows?.[0]?.net || 0) }
     })
   } catch (e) {
     console.error('workbench summary failed', e)
