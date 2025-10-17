@@ -2275,12 +2275,12 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
     doc.restore()
     doc.y = y + hBar + 8
   })()
-  // 左对齐显示金额（仅视觉下移 0.5 个字符 ≈ 6pt，不推进 doc.y）
+  // 左对齐显示金额（仅视觉上移 1 个字符 ≈ 12pt，不推进 doc.y）
   const currencyLabel = 'CNY: ' + money(total)
   doc.font(fontBold).fontSize(20).fillColor(ACCENT)
   const amountBaseY = doc.y
-  // 仅把绘制位置下移 +6pt，但不改变文档流位置
-  doc.text(currencyLabel, padX, amountBaseY + 6, { lineBreak: false })
+  // 仅把绘制位置上移 -6pt（相对此前 +6 的实现净上移约 12pt），但不改变文档流位置
+  doc.text(currencyLabel, padX, amountBaseY - 6, { lineBreak: false })
   // 恢复为“未下移”情况下应有的流式高度，避免影响后续分节布局
   const amountH = doc.heightOfString(currencyLabel, { width: (right - padX), lineBreak: false })
   doc.y = amountBaseY + amountH
