@@ -4,30 +4,33 @@ import { query } from './db.js'
 export const PERMISSION_TREE = [
   // 工作台（查看 + 展示/操作粒度）
   { module: 'workbench', name: '工作台', items: [
+    // 按页面展示顺序：查看 -> 功能入口 -> 快捷操作 -> KPI -> 统计合计 -> 未匹配 -> 服务器监控 -> 导航卡片
     { code: 'view_dashboard', name: '查看' },
-    // 展示：小组件/板块
-    { code: 'dashboard:pending_pay_approval', name: '付款待审（展示）' },
-    { code: 'dashboard:quick_actions', name: '快捷操作区（展示）' },
     { code: 'dashboard:navigation', name: '功能入口（展示）' },
+    { code: 'dashboard:quick_actions', name: '快捷操作区（展示）' },
+    // 操作按钮
+    { code: 'dashboard:action:match', name: '匹配（操作）' },
+    { code: 'dashboard:action:settle', name: '结汇（操作）' },
+    { code: 'dashboard:action:pay', name: '付款（操作）' },
+    { code: 'dashboard:action:buyfx', name: '购汇（操作）' },
+    // KPI 六卡（与页面顺序一致）
     { code: 'dashboard:kpi:customer_balance_myr', name: '客户余额(MYR)' },
     { code: 'dashboard:kpi:customer_balance_cny', name: '客户余额(CNY)' },
     { code: 'dashboard:kpi:bank_balance_myr', name: '银行余额(MYR)' },
     { code: 'dashboard:kpi:payable_cny', name: '可付余额(CNY)' },
     { code: 'dashboard:kpi:exchangeable_myr', name: '可兑余额(MYR)' },
     { code: 'dashboard:kpi:paying_cny', name: '待付余额(CNY)' },
+    // 其他指标/条目
     { code: 'dashboard:kpi:unmatched_txn', name: '未匹配交易' },
+    // 汇总数值（图表顶部）
     { code: 'dashboard:total:transactions_debit', name: '交易合计（借）' },
     { code: 'dashboard:total:transactions_credit', name: '交易合计（贷）' },
     { code: 'dashboard:total:settlements', name: '结汇合计' },
     { code: 'dashboard:total:buyfx', name: '购汇合计' },
     { code: 'dashboard:total:payments', name: '付款合计' },
     { code: 'dashboard:total:expenses', name: '费用合计' },
+    // 系统监控
     { code: 'dashboard:server_monitor', name: '服务器监控（展示）' },
-    // 操作：快捷操作按钮
-    { code: 'dashboard:action:match', name: '匹配（操作）' },
-    { code: 'dashboard:action:settle', name: '结汇（操作）' },
-    { code: 'dashboard:action:pay', name: '付款（操作）' },
-    { code: 'dashboard:action:buyfx', name: '购汇（操作）' },
     // 导航卡片可见性（展示）
     { code: 'dashboard:nav:transactions', name: '交易管理（入口）' },
     { code: 'dashboard:nav:fx', name: '结汇管理（入口）' },
@@ -96,8 +99,7 @@ export const PERMISSION_TREE = [
 
   // 购汇管理
   { module: 'buyfx', name: '购汇管理', items: [
-    // 仍沿用 FX 查看权限；后续如拆分接口可替换为 buyfx:view
-    { code: 'view_fx', name: '查看' },
+    { code: 'buyfx:view', name: '查看' },
     { code: 'buyfx:platforms:create', name: '新增平台商' },
     { code: 'buyfx:platforms:update', name: '编辑平台商' },
     { code: 'buyfx:platforms:delete', name: '删除平台商' },
@@ -132,7 +134,7 @@ export function flattenPermissionCodes(tree = PERMISSION_TREE) {
 export function getModuleViewCode(module) {
   if (module === 'workbench') return 'view_dashboard'
   if (module === 'expenses') return 'expenses:list'
-  if (module === 'buyfx') return 'view_fx'
+  if (module === 'buyfx') return 'buyfx:view'
   if (module === 'users') return 'manage_users'
   return `view_${module}`
 }

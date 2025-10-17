@@ -42,7 +42,7 @@
             <el-icon><Document /></el-icon>
             <span>{{ t('fx.title') }}</span>
           </el-menu-item>
-          <el-menu-item index="fx-buy" :route="{name: 'fx-buy'}" v-if="has('view_fx')">
+          <el-menu-item index="fx-buy" :route="{name: 'fx-buy'}" v-if="has('buyfx:view')">
             <el-icon><Document /></el-icon>
             <span>{{ t('buyfx.title') }}</span>
           </el-menu-item>

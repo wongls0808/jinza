@@ -32,8 +32,8 @@ export const routes = [
   { path: '/fx', name: 'fx', component: FXManagement, meta: { perm: 'view_fx' } },
   { path: '/fx/settlements', name: 'fx-settlements', component: FXSettlements, meta: { perm: 'view_fx' } },
   { path: '/fx/payments', name: 'fx-payments', component: FXPayments, meta: { perm: 'view_fx' } },
-  { path: '/fx/buy', name: 'fx-buy', component: BuyFX, meta: { perm: 'view_fx' } },
-  { path: '/fx/buy/history', name: 'fx-buy-history', component: BuyFXHistory, meta: { perm: 'view_fx' } },
+  { path: '/fx/buy', name: 'fx-buy', component: BuyFX, meta: { perm: 'buyfx:view' } },
+  { path: '/fx/buy/history', name: 'fx-buy-history', component: BuyFXHistory, meta: { perm: 'buyfx:view' } },
   { path: '/expenses', name: 'expenses', component: Expenses, meta: { perm: 'expenses:list' } },
   { path: '/no-access', name: 'no-access', component: NoAccess, meta: { public: false } },
 ]

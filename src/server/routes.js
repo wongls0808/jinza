@@ -515,7 +515,7 @@ router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
     const { modToCodes, codeToModule } = buildPermissionIndex(PERMISSION_TREE)
     const selected = new Set(perms)
     const moduleView = new Map()
-    for (const m of PERMISSION_TREE) moduleView.set(m.module, getModuleViewCode(m.module))
+  for (const m of PERMISSION_TREE) moduleView.set(m.module, getModuleViewCode(m.module))
 
     // 先补齐查看码
     for (const m of PERMISSION_TREE) {

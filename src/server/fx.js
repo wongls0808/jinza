@@ -157,7 +157,7 @@ export async function ensureDDL() {
 }
 
 // ---------- 平台商管理 ----------
-fxRouter.get('/platforms', auth.authMiddleware(true), auth.requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/platforms', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:view','view_fx'), async (req, res) => {
   await ensureDDL()
   const rs = await query(`select * from fx_platforms order by id desc`)
   res.json({ items: rs.rows })
@@ -232,7 +232,7 @@ fxRouter.delete('/platforms/:id', auth.authMiddleware(true), auth.requireAnyPerm
 })
 
 // ---------- 汇率（已停用） ----------
-fxRouter.get('/rates', auth.authMiddleware(true), auth.requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/rates', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:view','view_fx'), async (req, res) => {
   return res.status(410).json({ error: 'rates disabled' })
 })
 fxRouter.post('/rates', auth.authMiddleware(true), auth.requireAnyPerm('manage_fx'), async (req, res) => {
@@ -240,7 +240,7 @@ fxRouter.post('/rates', auth.authMiddleware(true), auth.requireAnyPerm('manage_f
 })
 
 // ---------- 购汇下单（记录） ----------
-fxRouter.get('/buy', auth.authMiddleware(true), auth.requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/buy', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:view','view_fx'), async (req, res) => {
   await ensureDDL()
   const rs = await query(`select b.*, p.name as platform_name from fx_buy_orders b left join fx_platforms p on p.id=b.platform_id order by id desc limit 200`)
   res.json({ items: rs.rows })
@@ -320,13 +320,13 @@ fxRouter.post('/platforms/:id/convert', auth.authMiddleware(true), auth.requireA
 })
 
 // ---------- Huaji 汇率服务（已停用） ----------
-fxRouter.get('/rates/huaji', auth.authMiddleware(true), auth.requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/rates/huaji', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:view','view_fx'), async (req, res) => {
   return res.status(410).json({ error: 'rates disabled' })
 })
 
 // ---------- 平台购汇历史（转换记录） ----------
 // 列表（最近200条）
-fxRouter.get('/transfers', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
+fxRouter.get('/transfers', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','buyfx:view','view_fx'), async (req, res) => {
   await ensureDDL()
   const rs = await query(`
     select t.*, p.name as platform_name, coalesce(u.display_name,u.username) as created_by_name
@@ -476,7 +476,7 @@ fxRouter.delete('/transfers/:id', auth.authMiddleware(true), auth.requireAnyPerm
 })
 
 // ---------- 平台支出（来源：付款单审批扣减日志 fx_payment_audits） ----------
-fxRouter.get('/platforms/:id/expenses', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
+fxRouter.get('/platforms/:id/expenses', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','buyfx:view','view_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid platform id' })
@@ -523,7 +523,7 @@ fxRouter.get('/platforms/:id/expenses', auth.authMiddleware(true), auth.requireA
 })
 
 // ---------- 平台统一借贷账目（互换=买/卖 + 审批支出=支出） ----------
-fxRouter.get('/platforms/:id/ledger', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
+fxRouter.get('/platforms/:id/ledger', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:platforms:ledger','buyfx:view','view_fx'), async (req, res) => {
   try {
     await ensureDDL()
     const id = Number(req.params.id)
@@ -648,7 +648,7 @@ fxRouter.get('/platforms/:id/ledger', auth.authMiddleware(true), auth.requireAny
 
 // ---------- 中国银行挂牌价（银行买入价） ----------
 // 支持 pair: USD/CNY, MYR/CNY, MYR/USD（或使用连字符）
-fxRouter.get('/rates/boc', auth.authMiddleware(true), auth.requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/rates/boc', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:view','view_fx'), async (req, res) => {
   const raw = String(req.query.pair || '').toUpperCase().replace('-', '/')
   const allowed = new Set(['USD/CNY','MYR/CNY','MYR/USD','USD/MYR'])
   if (!allowed.has(raw)) return res.status(400).json({ error: 'invalid pair' })
