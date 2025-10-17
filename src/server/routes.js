@@ -12,6 +12,7 @@ import { createTransactionsController } from './transactionsFallback.js'
 import { fxRouter, ensureDDL as ensureFxDDL } from './fx.js'
 import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, getModuleViewCode, buildPermissionIndex } from './permissions.js'
 import crypto from 'crypto'
+import os from 'os'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -143,6 +144,69 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
     console.error('workbench summary failed', e)
     res.status(500).json({ error: 'summary failed', detail: e?.message })
   }
+})
+
+// 系统健康监控（服务器监控表数据）
+router.get('/system/health', authMiddleware(true), requirePerm('view_dashboard'), async (req, res) => {
+  const now = new Date()
+  const toMB = (n) => Math.round((Number(n || 0) / (1024 * 1024)) * 10) / 10
+  const mem = process.memoryUsage()
+  const sysTotal = os.totalmem()
+  const sysFree = os.freemem()
+  const cpus = os.cpus() || []
+  const load = os.loadavg?.() || []
+  const data = {
+    time: now.toISOString(),
+    uptimeSec: Math.round(process.uptime()),
+    node: { version: process.version, pid: process.pid, platform: process.platform, arch: process.arch },
+    memory: {
+      rssMB: toMB(mem.rss),
+      heapUsedMB: toMB(mem.heapUsed),
+      heapTotalMB: toMB(mem.heapTotal)
+    },
+    system: {
+      totalMemMB: toMB(sysTotal),
+      freeMemMB: toMB(sysFree),
+      usedMemMB: toMB(sysTotal - sysFree),
+      memUsedPct: sysTotal ? Math.round(((sysTotal - sysFree) / sysTotal) * 1000) / 10 : null,
+      cpus: cpus.length,
+      load: load
+    },
+    db: {
+      configured: !!process.env.DATABASE_URL,
+      ok: false,
+      latencyMs: null,
+      now: null,
+      version: null,
+      sessions: null,
+      users: null
+    }
+  }
+  if (process.env.DATABASE_URL) {
+    try {
+      const t0 = Date.now()
+      const r = await query('select now() as now')
+      data.db.latencyMs = Date.now() - t0
+      data.db.ok = true
+      data.db.now = r?.rows?.[0]?.now
+      try {
+        const v = await query('select version()')
+        data.db.version = v?.rows?.[0]?.version || null
+      } catch {}
+      try {
+        const s = await query('select count(*) from user_sessions')
+        data.db.sessions = Number(s?.rows?.[0]?.count || 0)
+      } catch {}
+      try {
+        const u = await query('select count(*) from users')
+        data.db.users = Number(u?.rows?.[0]?.count || 0)
+      } catch {}
+    } catch (e) {
+      data.db.ok = false
+      data.db.error = e?.message || String(e)
+    }
+  }
+  res.json(data)
 })
 
 // Change password (self)

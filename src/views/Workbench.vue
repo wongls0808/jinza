@@ -86,6 +86,11 @@
       </div>
     </div>
 
+    <!-- 服务器监控入口按钮 -->
+    <div style="display:flex; justify-content:flex-end; margin: 8px 0; gap:8px;">
+      <el-button size="small" type="info" @click="openMonitor">{{ t('workbench.monitor.title') }}</el-button>
+    </div>
+
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
       <el-popover placement="bottom-start" width="auto" v-model:visible="datePopover">
@@ -398,6 +403,25 @@
       <div v-if="detailDrawer.type==='pay'" class="kpi-sub" style="margin-top:8px;">{{ t('workbench.notePaymentsDetail') }}</div>
     </el-drawer>
 
+    <!-- 服务器监控抽屉 -->
+    <el-drawer v-model="monitor.visible" :title="t('workbench.monitor.title')" size="40%">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+        <el-button size="small" type="primary" @click="loadMonitor">{{ t('workbench.monitor.refresh') }}</el-button>
+        <el-switch v-model="monitor.auto" :active-text="t('workbench.monitor.autoRefresh')" />
+      </div>
+      <el-table :data="monitorRows" size="small" border v-loading="monitor.loading" @header-dragend="onColResizeMonitor">
+        <el-table-column type="index" column-key="__idx" :label="t('common.no')" :width="colWMonitor('__idx', 60)" />
+        <el-table-column prop="name" column-key="name" :label="t('workbench.monitor.labelMetric')" :width="colWMonitor('name', 220)" />
+        <el-table-column prop="value" column-key="value" :label="t('workbench.monitor.labelValue')" :width="colWMonitor('value', 240)" />
+        <el-table-column prop="status" column-key="status" :label="t('workbench.monitor.statusLabel')" :width="colWMonitor('status', 140)">
+          <template #default="{ row }">
+            <el-tag v-if="row.tag" :type="row.tag">{{ row.status }}</el-tag>
+            <span v-else>{{ row.status || '-' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
+
     
   </div>
 </template>
@@ -406,7 +430,7 @@
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useI18n } from 'vue-i18n'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { api, request as httpRequest } from '@/api'
 import { ElMessage } from 'element-plus'
 // 指标图无需 echarts
@@ -429,6 +453,9 @@ let _detailMem = useTableMemory(detailMemKey())
 function refreshDetailMem(){ _detailMem = useTableMemory(detailMemKey()) }
 const colWDetail = (col, def) => _detailMem.colW(col, def)
 const onColResizeDetail = (nw, ow, col, evt) => _detailMem.onColResize(nw, ow, col, evt)
+
+// 服务器监控列宽记忆
+const { colW: colWMonitor, onColResize: onColResizeMonitor } = useTableMemory('wb-monitor')
 
 // —— 计算图形：聚合汇总 ——
 const summary = ref({
@@ -553,6 +580,69 @@ async function openDetail(type){
     detailDrawer.value.loading = false
   }
 }
+
+// —— 服务器监控 ——
+const monitor = ref({ visible: false, loading: false, auto: false, timer: null })
+const monitorRows = ref([])
+function humanUptime(sec){
+  try { sec = Number(sec||0) } catch { sec = 0 }
+  const d = Math.floor(sec/86400); sec%=86400
+  const h = Math.floor(sec/3600); sec%=3600
+  const m = Math.floor(sec/60); const s = Math.floor(sec%60)
+  const parts = []
+  if (d) parts.push(d+'d'); if (h) parts.push(h+'h'); if (m) parts.push(m+'m'); parts.push(s+'s')
+  return parts.join(' ')
+}
+function toRows(d){
+  const rows = []
+  rows.push({ name: t('workbench.monitor.metrics.time'), value: d.time })
+  rows.push({ name: t('workbench.monitor.metrics.uptime'), value: humanUptime(d.uptimeSec) })
+  rows.push({ name: t('workbench.monitor.metrics.node'), value: d.node?.version })
+  rows.push({ name: t('workbench.monitor.metrics.pid'), value: String(d.node?.pid) })
+  rows.push({ name: t('workbench.monitor.metrics.platform'), value: `${d.node?.platform}/${d.node?.arch}` })
+  rows.push({ name: t('workbench.monitor.metrics.rss'), value: String(d.memory?.rssMB) })
+  rows.push({ name: t('workbench.monitor.metrics.heapUsed'), value: String(d.memory?.heapUsedMB) })
+  rows.push({ name: t('workbench.monitor.metrics.heapTotal'), value: String(d.memory?.heapTotalMB) })
+  rows.push({ name: t('workbench.monitor.metrics.sysMem'), value: `${d.system?.usedMemMB}/${d.system?.totalMemMB}` })
+  rows.push({ name: t('workbench.monitor.metrics.memUsedPct'), value: d.system?.memUsedPct!=null ? `${d.system.memUsedPct}%` : '-' })
+  rows.push({ name: t('workbench.monitor.metrics.cpus'), value: String(d.system?.cpus) })
+  rows.push({ name: t('workbench.monitor.metrics.load'), value: Array.isArray(d.system?.load) ? d.system.load.map(x=> (Math.round(Number(x||0)*100)/100)).join(' / ') : '-' })
+  rows.push({ name: t('workbench.monitor.metrics.dbConfigured'), value: d.db?.configured ? t('workbench.monitor.status.yes') : t('workbench.monitor.status.no') })
+  rows.push({ name: t('workbench.monitor.metrics.dbOk'), value: d.db?.ok ? t('workbench.monitor.status.ok') : t('workbench.monitor.status.fail'), status: d.db?.ok ? t('workbench.monitor.status.ok') : t('workbench.monitor.status.fail'), tag: d.db?.ok ? 'success' : 'danger' })
+  rows.push({ name: t('workbench.monitor.metrics.dbLatency'), value: d.db?.latencyMs!=null ? String(d.db.latencyMs) : '-' })
+  rows.push({ name: t('workbench.monitor.metrics.dbNow'), value: d.db?.now ? String(d.db.now) : '-' })
+  rows.push({ name: t('workbench.monitor.metrics.dbVersion'), value: d.db?.version || '-' })
+  rows.push({ name: t('workbench.monitor.metrics.dbSessions'), value: d.db?.sessions!=null ? String(d.db.sessions) : '-' })
+  rows.push({ name: t('workbench.monitor.metrics.dbUsers'), value: d.db?.users!=null ? String(d.db.users) : '-' })
+  return rows
+}
+async function loadMonitor(){
+  monitor.value.loading = true
+  try {
+    const d = await api.system.health()
+    monitorRows.value = toRows(d)
+  } catch (e) {
+    ElMessage.error(e?.message || 'Failed')
+  } finally {
+    monitor.value.loading = false
+  }
+}
+function openMonitor(){
+  monitor.value.visible = true
+  loadMonitor()
+}
+watch(() => monitor.value.auto, (on) => {
+  if (on) {
+    if (monitor.value.timer) clearInterval(monitor.value.timer)
+    monitor.value.timer = setInterval(loadMonitor, 5000)
+  } else {
+    if (monitor.value.timer) { clearInterval(monitor.value.timer); monitor.value.timer = null }
+  }
+})
+onMounted(() => {
+  // 清理定时器（页面关闭或刷新）
+  window.addEventListener('beforeunload', () => { if (monitor.value.timer) clearInterval(monitor.value.timer) })
+})
 
 // 工作台页面：为保证可见性，这里取消权限 gating，始终展示入口
 const quickActions = computed(() => [

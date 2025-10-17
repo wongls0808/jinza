@@ -333,6 +333,36 @@ const messages = {
       todos: {
         title: '待办事项',
         payments: '付款待审'
+      },
+      monitor: {
+        title: '服务器监控',
+        refresh: '刷新',
+        autoRefresh: '自动刷新',
+        labelMetric: '指标',
+        labelValue: '数值',
+        statusLabel: '状态',
+        metrics: {
+          time: '服务器时间',
+          uptime: '运行时长',
+          node: 'Node 版本',
+          pid: '进程ID',
+          platform: '平台/架构',
+          rss: 'RSS 内存(MB)',
+          heapUsed: 'Heap 使用(MB)',
+          heapTotal: 'Heap 总量(MB)',
+          sysMem: '系统内存(MB)',
+          memUsedPct: '系统内存占用% ',
+          cpus: 'CPU 核心数',
+          load: '系统负载(1/5/15)',
+          dbConfigured: '数据库配置',
+          dbOk: '数据库连接',
+          dbLatency: 'DB 延迟(ms)',
+          dbNow: 'DB 时间',
+          dbVersion: 'DB 版本',
+          dbSessions: '在线会话',
+          dbUsers: '用户数'
+        },
+        status: { ok: '正常', fail: '异常', yes: '已配置', no: '未配置' }
       }
   },
   expenses: {
@@ -669,6 +699,36 @@ const messages = {
       todos: {
         title: 'Todos',
         payments: 'Payments Pending'
+      },
+      monitor: {
+        title: 'Server Monitor',
+        refresh: 'Refresh',
+        autoRefresh: 'Auto Refresh',
+        labelMetric: 'Metric',
+        labelValue: 'Value',
+        statusLabel: 'Status',
+        metrics: {
+          time: 'Server Time',
+          uptime: 'Uptime',
+          node: 'Node Version',
+          pid: 'Process ID',
+          platform: 'Platform/Arch',
+          rss: 'RSS (MB)',
+          heapUsed: 'Heap Used (MB)',
+          heapTotal: 'Heap Total (MB)',
+          sysMem: 'System Mem (MB)',
+          memUsedPct: 'System Mem %',
+          cpus: 'CPU Cores',
+          load: 'Load (1/5/15)',
+          dbConfigured: 'DB Configured',
+          dbOk: 'DB Connected',
+          dbLatency: 'DB Latency (ms)',
+          dbNow: 'DB Time',
+          dbVersion: 'DB Version',
+          dbSessions: 'Active Sessions',
+          dbUsers: 'Users'
+        },
+        status: { ok: 'OK', fail: 'Fail', yes: 'Yes', no: 'No' }
       }
     },
     expenses: {

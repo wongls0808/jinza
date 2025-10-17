@@ -68,6 +68,9 @@ export const api = {
     getPerms: (id) => request(`/users/${id}/permissions`),
     setPerms: (id, perms) => request(`/users/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ perms }) }),
   },
+  system: {
+    health: () => request('/system/health')
+  },
   perms: {
     list: () => request('/permissions'),
     tree: () => request('/permissions/tree'),
