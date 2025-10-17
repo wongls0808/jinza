@@ -280,11 +280,11 @@
     </el-drawer>
 
     <!-- 快捷操作：结汇抽屉 -->
-    <el-drawer v-model="settleDrawer.visible" title="结汇" size="40%">
+    <el-drawer v-model="settleDrawer.visible" title="结汇" size="50%">
       <FXManagement ref="settleRef" mode="settle" :in-drawer="true" :initial-settle-customer-id="settlePrefillCustomerId" @settlementCreated="onSettlementCreated" />
     </el-drawer>
     <!-- 快捷操作：付款抽屉 -->
-    <el-drawer v-model="payDrawer.visible" title="付款" size="40%">
+    <el-drawer v-model="payDrawer.visible" title="付款" size="50%">
       <FXManagement ref="payRef" mode="pay" :in-drawer="true" :initial-pay-customer-id="payPrefillCustomerId" @paymentCreated="onPaymentCreated" />
     </el-drawer>
     <!-- 快捷操作：购汇抽屉 -->
