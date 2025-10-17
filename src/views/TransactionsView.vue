@@ -1438,15 +1438,13 @@ const handleFileChange = (file) => {
 
 function buildDedup(rows){
   // 统一引用文本与金额，用于重复判断
-  const normRef = (r) => String(r.referenceText || '').trim()
-  const amount = (r) => Math.round((Number(r.creditAmount||0) - Number(r.debitAmount||0)) * 100) / 100
-  const key = (r) => `${r.transactionDate}|${normRef(r)}|${amount(r)}`
+  // 使用与数据库唯一约束一致的字段：account_number, transaction_date, cheque_ref_no
+  const key = (r) => `${r.accountNumber}|${r.transactionDate}|${r.chequeRefNo || ''}`
 
   const map = new Map()
   const out = []
   for (const r of rows) {
     const k = key(r)
-    const isRefEmpty = normRef(r) === ''
     const entry = {
       accountNumber: r.accountNumber,
       transactionDate: r.transactionDate,
@@ -1454,8 +1452,8 @@ function buildDedup(rows){
       description: r.description,
       debitAmount: r.debitAmount,
       creditAmount: r.creditAmount,
-      referenceText: normRef(r),
-      amountValue: amount(r),
+      referenceText: String(r.referenceText || '').trim(),
+      amountValue: Math.round((Number(r.creditAmount||0) - Number(r.debitAmount||0)) * 100) / 100,
       status: 'normal',
       include: true
     }

@@ -667,7 +667,7 @@ transactionsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('
         const account = cleanExcelCell(r.accountNumber || r.account_number)
         const trn = parseDateYYYYMMDD(r.transactionDate || r.transaction_date)
         if (!account || !trn) { failed++; continue }
-        const cheque = cleanExcelCell(r.chequeRefNo || r.cheque_ref_no) || null
+        const cheque = cleanExcelCell(r.chequeRefNo || r.cheque_ref_no) || ''  // 空字符串而非null
         const desc = cleanExcelCell(r.description || r.transactionDescription) || null
         const debit = parseAmount(r.debitAmount || r.debit_amount)
         const credit = parseAmount(r.creditAmount || r.credit_amount)
@@ -699,6 +699,7 @@ transactionsRouter.post('/import', auth.authMiddleware(true), auth.requirePerm('
         )
         if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++
       } catch (e) {
+        console.error('JSON导入单行失败:', e.message, 'Row data:', JSON.stringify(r))
         failed++
       }
     }
@@ -761,7 +762,7 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
         
         // 使用专门的Excel格式清理函数
         const trn = parseDateYYYYMMDD(cleanExcelCell(r['Trn. Date']))
-        const cheque = cleanExcelCell(r['Cheque No/Ref No']) || null
+        const cheque = cleanExcelCell(r['Cheque No/Ref No']) || ''  // 空字符串而非null
         const desc = cleanExcelCell(r['Transaction Description']) || null
         const debit = parseAmount(cleanExcelCell(r['Debit Amount']))
         const credit = parseAmount(cleanExcelCell(r['Credit Amount']))
@@ -786,6 +787,7 @@ transactionsRouter.post('/import-csv', express.text({ type: '*/*', limit: '10mb'
         )
         if (ins.rowCount && ins.rowCount > 0) inserted++; else skipped++
       } catch (e) {
+        console.error('CSV导入单行失败:', e.message, 'Row data:', JSON.stringify(r))
         failed++
       }
     }
