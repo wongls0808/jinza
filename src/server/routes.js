@@ -102,14 +102,14 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
         ${sPer.sql}
     `, sPer.params)
 
-    // 3) 购汇合计（平台互换 to_currency=MYR 的 amount_to 合计）
-    // 注意 created_at 为 timestamptz，原 <= endDate 可能遗漏当日稍晚数据；改为 [start, end+1) 半开区间
-    let bWhere = `where upper(t.to_currency) = 'MYR'`
+    // 3) 购汇合计（以弹窗表单“卖出金额”口径：sum(amount_from)）
+    // 注意 created_at 为 timestamptz；用 [start, end+1) 半开区间
+    let bWhere = `where 1=1`
     const bParams = []
     if (startDate) { bParams.push(startDate); bWhere += ` and t.created_at >= $${bParams.length}::date` }
     if (endDate) { bParams.push(endDate); bWhere += ` and t.created_at < ($${bParams.length}::date + interval '1 day')` }
     const bSumRows = await runSafe(`
-      select sum(t.amount_to) as total
+      select sum(t.amount_from) as total
         from fx_platform_fx_transfers t
         ${bWhere}
     `, bParams)
@@ -135,7 +135,9 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
 
     res.json({
       transactions: { debit: Number(tSumRows?.[0]?.debit || 0), credit: Number(tSumRows?.[0]?.credit || 0) },
+      // settlements.base（MYR）用于前端 KPI 展示，保持 settled 字段用于明细/对照
       settlements: { base: Number(sSumRows?.[0]?.base || 0), settled: Number(sSumRows?.[0]?.settled || 0) },
+      // buyfx.total 采用卖出金额（与弹窗口径一致）
       buyfx: { total: Number(bSumRows?.[0]?.total || 0) },
       payments: { total: Number(pSumRows?.[0]?.total || 0) },
       expenses: { total: Number(eSumRows?.[0]?.net || 0) }

@@ -93,7 +93,7 @@
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
-      <el-popover placement="bottom-start" width="auto" v-model:visible="datePopover">
+      <el-popover placement="bottom-start" width="auto" trigger="manual" :persistent="true" v-model:visible="datePopover">
         <el-date-picker v-model="range" type="daterange" unlink-panels :editable="false" @change="onRangeChange" />
         <template #reference>
           <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel" @click="datePopover=true">
@@ -119,7 +119,7 @@
       </div>
       <div class="kpi-card theme-info" role="button" tabindex="0" @click="openDetail('settle')" @keydown.enter.prevent="openDetail('settle')" @keydown.space.prevent="openDetail('settle')">
         <div class="kpi-title">{{ t('workbench.charts.settlementsTotal') }}</div>
-        <div class="kpi-value">{{ money(summary.settlements.settled) }}</div>
+        <div class="kpi-value">{{ money(summary.settlements.base) }}</div>
       </div>
       <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openDetail('buy')" @keydown.enter.prevent="openDetail('buy')" @keydown.space.prevent="openDetail('buy')">
         <div class="kpi-title">{{ t('workbench.charts.buyfxTotal') }}</div>
