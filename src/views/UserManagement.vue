@@ -43,19 +43,34 @@
           <div class="perm-group" v-for="group in permTree" :key="group.module">
             <div class="perm-group-title">{{ group.name }}</div>
             <div class="perm-group-items">
-              <el-tag
-                v-for="p in group.items"
-                :key="p.code"
-                :type="userHas(u, p.code) ? 'success' : 'info'"
-                class="perm-tag"
-                effect="light"
-                size="small"
-                :disable-transitions="true"
-                :class="{ 'is-disabled': u.is_admin }"
-                @click="!u.is_admin && togglePerm(u, p.code)"
+              <el-popover
+                placement="bottom-start"
+                trigger="click"
+                width="360px"
+                :hide-after="0"
+                v-model:visible="popVisible[u.id + '-' + group.module]"
               >
-                {{ p.name }}
-              </el-tag>
+                <template #reference>
+                  <el-button size="small" plain @click.stop="popVisible[u.id + '-' + group.module] = !popVisible[u.id + '-' + group.module]">
+                    {{ t('users.permissions') }} · {{ group.name }}
+                  </el-button>
+                </template>
+                <div class="popover-perms">
+                  <el-tag
+                    v-for="p in group.items"
+                    :key="p.code"
+                    :type="userHas(u, p.code) ? 'success' : 'info'"
+                    class="perm-tag"
+                    effect="light"
+                    size="small"
+                    :disable-transitions="true"
+                    :class="{ 'is-disabled': u.is_admin }"
+                    @click="onPickPerm(u, p.code); popVisible[u.id + '-' + group.module] = false"
+                  >
+                    {{ p.name }}
+                  </el-tag>
+                </div>
+              </el-popover>
             </div>
           </div>
         </div>
@@ -97,6 +112,7 @@ const { t } = useI18n()
 const users = ref([])
 const perms = ref([]) // 后端完整清单（直接用于校验去重或显示 meta）
 const permTree = ref(null) // 新的权限树（分组展示）
+const popVisible = ref({}) // { `${userId}-${module}`: boolean }
 const extraPerms = ref([]) // 兼容逻辑已移除，保留变量但不使用
 const creating = ref(false)
 const newUser = ref({ username: '', password: '', display_name: '' })
@@ -198,6 +214,13 @@ function togglePerm(u, code) {
   setUserPerm(u, code, !has)
 }
 
+// 下弹式选择后收回：切换权限并收起弹层
+function onPickPerm(u, code) {
+  if (u.is_admin) return
+  const has = userHas(u, code)
+  setUserPerm(u, code, !has)
+}
+
 async function doReseed() {
   reseed.value.loading = true
   try {
@@ -237,4 +260,6 @@ onMounted(load)
 .perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
 .perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
 .perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
+.popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
 </style>

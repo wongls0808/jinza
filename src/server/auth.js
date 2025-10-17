@@ -304,3 +304,23 @@ export function requirePerm(code) {
     next()
   }
 }
+
+// 判断是否拥有指定权限码
+export function hasPerm(req, code) {
+  if (!req || !req.user) return false
+  if (req.user.is_admin) return true
+  const perms = Array.isArray(req.user.perms) ? req.user.perms : []
+  return perms.includes(code)
+}
+
+// 至少满足任意一个权限码
+export function requireAnyPerm(...codes) {
+  const flat = codes.flat().filter(Boolean)
+  return (req, res, next) => {
+    if (req.user && req.user.is_admin) return next()
+    const perms = (req.user && req.user.perms) || []
+    const ok = flat.some(c => perms.includes(c))
+    if (!ok) return res.status(403).json({ error: 'Forbidden' })
+    next()
+  }
+}

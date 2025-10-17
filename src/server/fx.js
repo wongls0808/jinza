@@ -6,7 +6,7 @@ import SVGtoPDF from 'svg-to-pdfkit'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { authMiddleware, requirePerm } from './auth.js'
+import { authMiddleware, requirePerm, requireAnyPerm, hasPerm } from './auth.js'
 import { query } from './db.js'
 
 export const fxRouter = express.Router()
@@ -162,10 +162,20 @@ fxRouter.get('/platforms', authMiddleware(true), requirePerm('view_fx'), async (
   const rs = await query(`select * from fx_platforms order by id desc`)
   res.json({ items: rs.rows })
 })
-fxRouter.post('/platforms', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/platforms', authMiddleware(true), requireAnyPerm('buyfx:platforms:create','buyfx:platforms:update','manage_fx'), async (req, res) => {
   await ensureDDL()
   const { id, code, name, contact, active, login_url, balance_usd, balance_myr, balance_cny, fee_percent } = req.body || {}
   if (!name) return res.status(400).json({ error: 'name required' })
+  // 细分校验：创建 vs 更新
+  if (id) {
+    if (!(hasPerm(req,'buyfx:platforms:update') || hasPerm(req,'manage_fx'))) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+  } else {
+    if (!(hasPerm(req,'buyfx:platforms:create') || hasPerm(req,'manage_fx'))) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+  }
   if (id) {
     const rs = await query(`
       update fx_platforms
@@ -213,7 +223,7 @@ fxRouter.post('/platforms', authMiddleware(true), requirePerm('manage_fx'), asyn
     return res.json(rs.rows[0])
   }
 })
-fxRouter.delete('/platforms/:id', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.delete('/platforms/:id', authMiddleware(true), requireAnyPerm('buyfx:platforms:delete','manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -225,7 +235,7 @@ fxRouter.delete('/platforms/:id', authMiddleware(true), requirePerm('manage_fx')
 fxRouter.get('/rates', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
   return res.status(410).json({ error: 'rates disabled' })
 })
-fxRouter.post('/rates', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/rates', authMiddleware(true), requireAnyPerm('manage_fx'), async (req, res) => {
   return res.status(410).json({ error: 'rates disabled' })
 })
 
@@ -235,7 +245,7 @@ fxRouter.get('/buy', authMiddleware(true), requirePerm('view_fx'), async (req, r
   const rs = await query(`select b.*, p.name as platform_name from fx_buy_orders b left join fx_platforms p on p.id=b.platform_id order by id desc limit 200`)
   res.json({ items: rs.rows })
 })
-fxRouter.post('/buy', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/buy', authMiddleware(true), requireAnyPerm('buyfx:operate','manage_fx'), async (req, res) => {
   await ensureDDL()
   const { platform_id, customer_id, customer_name, pay_currency='CNY', buy_currency='MYR', amount_pay, expected_rate } = req.body || {}
   if (!amount_pay || Number(amount_pay) <= 0) return res.status(400).json({ error: 'amount_pay required' })
@@ -249,7 +259,7 @@ fxRouter.post('/buy', authMiddleware(true), requirePerm('manage_fx'), async (req
 })
 
 // ---------- 平台内币种互换（余额相互购汇） ----------
-fxRouter.post('/platforms/:id/convert', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/platforms/:id/convert', authMiddleware(true), requireAnyPerm('buyfx:operate','manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   const { from_currency, to_currency, amount_from, rate, note } = req.body || {}
@@ -316,7 +326,7 @@ fxRouter.get('/rates/huaji', authMiddleware(true), requirePerm('view_fx'), async
 
 // ---------- 平台购汇历史（转换记录） ----------
 // 列表（最近200条）
-fxRouter.get('/transfers', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/transfers', authMiddleware(true), requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
   await ensureDDL()
   const rs = await query(`
     select t.*, p.name as platform_name, coalesce(u.display_name,u.username) as created_by_name
@@ -330,7 +340,7 @@ fxRouter.get('/transfers', authMiddleware(true), requirePerm('view_fx'), async (
 })
 
 // 更新备注（安全起见，仅允许编辑备注）
-fxRouter.put('/transfers/:id', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.put('/transfers/:id', authMiddleware(true), requireAnyPerm('buyfx:operate','manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -428,7 +438,7 @@ fxRouter.put('/transfers/:id', authMiddleware(true), requirePerm('manage_fx'), a
 })
 
 // 删除记录并回滚平台余额
-fxRouter.delete('/transfers/:id', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.delete('/transfers/:id', authMiddleware(true), requireAnyPerm('buyfx:operate','manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -466,7 +476,7 @@ fxRouter.delete('/transfers/:id', authMiddleware(true), requirePerm('manage_fx')
 })
 
 // ---------- 平台支出（来源：付款单审批扣减日志 fx_payment_audits） ----------
-fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid platform id' })
@@ -513,7 +523,7 @@ fxRouter.get('/platforms/:id/expenses', authMiddleware(true), requirePerm('view_
 })
 
 // ---------- 平台统一借贷账目（互换=买/卖 + 审批支出=支出） ----------
-fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/platforms/:id/ledger', authMiddleware(true), requireAnyPerm('buyfx:platforms:ledger','view_fx'), async (req, res) => {
   try {
     await ensureDDL()
     const id = Number(req.params.id)
@@ -723,7 +733,7 @@ fxRouter.get('/rates/boc', authMiddleware(true), requirePerm('view_fx'), async (
 })
 
 // 创建结汇单
-fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/settlements', authMiddleware(true), requirePerm('fx:settlement:create'), async (req, res) => {
   await ensureDDL()
   const { customer_id, customer_name, settle_date, rate, items = [] } = req.body || {}
   if (!customer_id || !settle_date || !rate || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'invalid payload' })
@@ -784,7 +794,7 @@ fxRouter.post('/settlements', authMiddleware(true), requirePerm('manage_fx'), as
   res.json({ id: sid })
 })
 
-fxRouter.get('/settlements', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/settlements', authMiddleware(true), requirePerm('fx:settlement:view'), async (req, res) => {
   await ensureDDL()
   const { customerId, startDate, endDate, page = 1, pageSize = 20 } = req.query
   const where = []
@@ -830,7 +840,7 @@ fxRouter.get('/settlements', authMiddleware(true), requirePerm('view_fx'), async
 })
 
 // 结汇单：列表导出（按筛选），scope=all|page（默认 all）
-fxRouter.get('/settlements/export', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/settlements/export', authMiddleware(true), requirePerm('fx:export'), async (req, res) => {
   await ensureDDL()
   const { customerId, startDate, endDate, page = 1, pageSize = 20, scope = 'all' } = req.query
   const where = []
@@ -866,7 +876,7 @@ fxRouter.get('/settlements/export', authMiddleware(true), requirePerm('view_fx')
 })
 
 // 结汇单：明细
-fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('fx:settlement:view'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -933,7 +943,7 @@ fxRouter.get('/settlements/:id', authMiddleware(true), requirePerm('view_fx'), a
 })
 
 // 结汇单：导出 CSV
-fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('fx:export'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -969,7 +979,7 @@ fxRouter.get('/settlements/:id/export', authMiddleware(true), requirePerm('view_
 })
 
 // 结汇单：导出 PDF（账单预览）
-fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('fx:pdf'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -1499,7 +1509,7 @@ fxRouter.get('/settlements/:id/pdf', authMiddleware(true), requirePerm('view_fx'
 })
 
 // 创建付款单
-fxRouter.post('/payments', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/payments', authMiddleware(true), requirePerm('fx:payment:create'), async (req, res) => {
   await ensureDDL()
   const { customer_id, customer_name, pay_date, items = [], split = true } = req.body || {}
   if (!customer_id || !pay_date || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'invalid payload' })
@@ -1578,7 +1588,7 @@ fxRouter.post('/payments', authMiddleware(true), requirePerm('manage_fx'), async
   res.json({ ids: createdIds })
 })
 
-fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments', authMiddleware(true), requirePerm('fx:payment:view'), async (req, res) => {
   await ensureDDL()
   const { customerId, startDate, endDate, page = 1, pageSize = 20, status, view = 'item' } = req.query
   const where = []
@@ -1714,7 +1724,7 @@ fxRouter.get('/payments', authMiddleware(true), requirePerm('view_fx'), async (r
 })
 
 // 付款单：列表导出（按筛选），scope=all|page（默认 all）
-fxRouter.get('/payments/export', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments/export', authMiddleware(true), requirePerm('fx:export'), async (req, res) => {
   await ensureDDL()
   const { customerId, startDate, endDate, page = 1, pageSize = 20, scope = 'all' } = req.query
   const where = []
@@ -1754,7 +1764,7 @@ fxRouter.get('/payments/export', authMiddleware(true), requirePerm('view_fx'), a
 })
 
 // 付款单：明细
-fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('fx:payment:view'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -1790,7 +1800,7 @@ fxRouter.get('/payments/:id', authMiddleware(true), requirePerm('view_fx'), asyn
 })
 
 // 付款单：导出 CSV
-fxRouter.get('/payments/:id/export', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments/:id/export', authMiddleware(true), requirePerm('fx:export'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -1986,7 +1996,7 @@ fxRouter.post('/payments/batch-approve', authMiddleware(true), requirePerm('mana
 })
 
 // 付款单：撤销审批（回滚平台余额扣减，状态回到 pending）
-fxRouter.post('/payments/:id/unapprove', authMiddleware(true), requirePerm('manage_fx'), async (req, res) => {
+fxRouter.post('/payments/:id/unapprove', authMiddleware(true), requireAnyPerm('fx:revoke','manage_fx'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -2037,7 +2047,7 @@ fxRouter.post('/payments/:id/unapprove', authMiddleware(true), requirePerm('mana
 })
 
 // 审核日志列表
-fxRouter.get('/payments/:id/audits', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments/:id/audits', authMiddleware(true), requirePerm('fx:payment:view'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
@@ -2053,7 +2063,7 @@ fxRouter.get('/payments/:id/audits', authMiddleware(true), requirePerm('view_fx'
 })
 
 // 付款单：导出 PDF（凭证）
-fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('view_fx'), async (req, res) => {
+fxRouter.get('/payments/:id/pdf', authMiddleware(true), requirePerm('fx:pdf'), async (req, res) => {
   await ensureDDL()
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })

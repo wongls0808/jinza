@@ -1,6 +1,7 @@
 import express from 'express'
 import { parse as parseCsv } from 'csv-parse/sync'
 import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema } from './auth.js'
+import { authMiddleware, signToken, verifyPassword, hashPassword, validatePasswordStrength, requirePerm, ensureSchema, requireAnyPerm } from './auth.js'
 import { query } from './db.js'
 import fs from 'fs'
 import path from 'path'
@@ -396,6 +397,7 @@ router.get('/expenses', authMiddleware(true), requirePerm('expenses:list'), asyn
 })
 
 router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
+router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), async (req, res) => {
   const { biz_date, type, category, amount, currency='MYR', subject_debit, subject_credit, desc, drcr } = req.body || {}
   // 放宽为仅需“项目名/分类”，金额通过银行流水匹配；若缺少日期与类型则给默认
   const safeDate = biz_date || new Date().toISOString().slice(0,10)
@@ -408,6 +410,7 @@ router.post('/expenses', authMiddleware(true), requirePerm('expenses:create'), a
   res.json(rs.rows[0])
 })
 
+router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
 router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update'), async (req, res) => {
   const id = Number(req.params.id)
   const { biz_date, type, category, amount, currency, subject_debit, subject_credit, desc, drcr } = req.body || {}
@@ -430,6 +433,7 @@ router.put('/expenses/:id', authMiddleware(true), requirePerm('expenses:update')
   res.json(rs.rows[0])
 })
 
+router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delete'), async (req, res) => {
 router.delete('/expenses/:id', authMiddleware(true), requirePerm('expenses:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from expenses where id=$1', [id])
@@ -933,12 +937,14 @@ router.get('/accounts', authMiddleware(true), requirePerm('view_accounts'), asyn
   res.json({ total: Number(totalRs.rows[0].count), items: rs.rows })
 })
 router.post('/accounts', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.post('/accounts', authMiddleware(true), requirePerm('accounts:create'), async (req, res) => {
   const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
   const rs = await query('insert into receiving_accounts(account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5) returning *', [account_name, Number(bank_id), bank_account, currency_code.toUpperCase(), Number(opening_balance)||0])
   res.json(rs.rows[0])
 })
 router.put('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.put('/accounts/:id', authMiddleware(true), requirePerm('accounts:update'), async (req, res) => {
   const id = Number(req.params.id)
   const { account_name, bank_id, bank_account, currency_code, opening_balance } = req.body || {}
   const fields = []
@@ -956,6 +962,7 @@ router.put('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), 
   res.json(rs.rows[0])
 })
 router.delete('/accounts/:id', authMiddleware(true), requirePerm('view_accounts'), async (req, res) => {
+router.delete('/accounts/:id', authMiddleware(true), requirePerm('accounts:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from receiving_accounts where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
@@ -977,6 +984,7 @@ router.get('/customers/:id/accounts', authMiddleware(true), requirePerm('view_cu
 })
 
 router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('accounts:create'), async (req, res) => {
   const cid = Number(req.params.id)
   const { account_name, bank_id, bank_account, currency_code } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
@@ -993,6 +1001,7 @@ router.post('/customers/:id/accounts', authMiddleware(true), requirePerm('view_c
 })
 
 router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('accounts:delete'), async (req, res) => {
   const cid = Number(req.params.id)
   const aid = Number(req.params.aid)
   const rs = await query('delete from customer_receiving_accounts where id=$1 and customer_id=$2', [aid, cid])
@@ -1001,6 +1010,7 @@ router.delete('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm(
 })
 
 router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.put('/customers/:id/accounts/:aid', authMiddleware(true), requirePerm('accounts:update'), async (req, res) => {
   const cid = Number(req.params.id)
   const aid = Number(req.params.aid)
   const { account_name, bank_id, bank_account, currency_code } = req.body || {}
@@ -1056,6 +1066,7 @@ router.get('/banks', authMiddleware(true), requirePerm('view_banks'), async (req
 
 // Accept either {code, zh, en, logo_url} or {logo_data_url} (data:image/svg+xml;base64,...)
 router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
+router.post('/banks', authMiddleware(true), requirePerm('banks:create'), express.json({ limit: '10mb' }), async (req, res) => {
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}
   if (!code || !zh || !en) return res.status(400).json({ error: 'Missing fields' })
   // Normalize to uppercase for consistency (as requested)
@@ -1102,6 +1113,7 @@ router.post('/banks', authMiddleware(true), requirePerm('view_banks'), express.j
 })
 
 router.delete('/banks/:id', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+router.delete('/banks/:id', authMiddleware(true), requirePerm('banks:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from banks where id=$1 returning id', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
@@ -1109,6 +1121,7 @@ router.delete('/banks/:id', authMiddleware(true), requirePerm('view_banks'), asy
 })
 
 router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), express.json({ limit: '10mb' }), async (req, res) => {
+router.put('/banks/:id', authMiddleware(true), requirePerm('banks:update'), express.json({ limit: '10mb' }), async (req, res) => {
   const id = Number(req.params.id)
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}
   // Optional upload
@@ -1171,6 +1184,13 @@ router.put('/banks/:id', authMiddleware(true), requirePerm('view_banks'), expres
 
 // Reset to a default set
 router.post('/banks/reset-defaults', authMiddleware(true), requirePerm('view_banks'), async (req, res) => {
+router.post('/banks/reset-defaults', authMiddleware(true), requireAnyPerm('banks:create','banks:update'), async (req, res) => {
+router.post('/customers', authMiddleware(true), requirePerm('customers:create'), async (req, res) => {
+router.put('/customers/:id', authMiddleware(true), requirePerm('customers:update'), async (req, res) => {
+router.delete('/customers', authMiddleware(true), requirePerm('customers:delete'), async (req, res) => {
+router.post('/customers/batch-delete', authMiddleware(true), requirePerm('customers:delete'), async (req, res) => {
+router.post('/customers/import', authMiddleware(true), requirePerm('customers:import'), async (req, res) => {
+router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }), authMiddleware(true), requirePerm('customers:import'), async (req, res) => {
   const defaults = [
     ['ICBC','中国工商银行','Industrial and Commercial Bank of China','/banks/icbc.svg'],
     ['ABC','中国农业银行','Agricultural Bank of China','/banks/abc.svg'],
@@ -1190,6 +1210,9 @@ router.post('/banks/reset-defaults', authMiddleware(true), requirePerm('view_ban
 })
 
 router.get('/customers/template', authMiddleware(true), requirePerm('view_customers'), async (req, res) => {
+router.get('/customers/template', authMiddleware(true), requireAnyPerm('customers:template','customers:import'), async (req, res) => {
+router.post('/currencies', authMiddleware(true), requirePerm('currencies:manage'), async (req, res) => {
+router.delete('/currencies/:code', authMiddleware(true), requirePerm('currencies:manage'), async (req, res) => {
   const header = 'abbr,name,tax_rate,opening_myr,opening_cny,submitter' // 简称,客户名,税率,马币期初,人民币期初,提交人
   const sample = ['ABC,深圳市某某公司,6,1000,2000,王五', 'DEF,广州某某集团,0,0,3500,李四'].join('\n')
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')

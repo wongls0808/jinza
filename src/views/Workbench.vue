@@ -6,32 +6,32 @@
     </div>
 
     <!-- 高频操作置顶工具栏：匹配 / 结汇 / 付款 / 购汇（左对齐，独立卡片） -->
-    <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions">
+    <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions" v-if="has('dashboard:quick_actions')">
       <div class="hf-row">
-        <div class="hf-item info" role="button" tabindex="0" aria-label="匹配" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
+        <div class="hf-item info" role="button" tabindex="0" aria-label="匹配" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
           <div class="hf-icon"><Tickets /></div>
           <div class="hf-label">匹配</div>
         </div>
-        <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
+        <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" v-if="has('dashboard:action:settle')" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
           <div class="hf-icon"><Collection /></div>
           <div class="hf-label">结汇</div>
         </div>
-        <div class="hf-item success" role="button" tabindex="0" aria-label="付款" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
+        <div class="hf-item success" role="button" tabindex="0" aria-label="付款" v-if="has('dashboard:action:pay')" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
           <div class="hf-icon"><CreditCard /></div>
           <div class="hf-label">付款</div>
         </div>
-        <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
+        <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" v-if="has('dashboard:action:buyfx')" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
           <div class="hf-icon"><Coin /></div>
           <div class="hf-label">购汇</div>
         </div>
       </div>
     </div>
 
-    <div class="quick" style="margin-top:8px; margin-bottom:8px; position: relative;">
+    <div class="quick" style="margin-top:8px; margin-bottom:8px; position: relative;" v-if="has('dashboard:navigation')">
       <el-card shadow="never" class="card--plain">
         <div class="card-grid single-row">
           <div
-            v-for="it in quickActions" :key="it.key"
+            v-for="it in quickActionsFiltered" :key="it.key"
             class="feature-card"
             role="button"
             :aria-label="it.label"
@@ -55,51 +55,51 @@
     </div>
 
     <!-- 6 张固定指标卡：仅标题 + 合计金额，点击查看明细 -->
-    <div class="kpi6-grid">
+    <div class="kpi6-grid" v-if="has('view_dashboard')">
       <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('cusMYR')" @keydown.enter.prevent="openStat('cusMYR')" @keydown.space.prevent="openStat('cusMYR')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.cusMYR.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:customer_balance_myr')" :content="t('workbench.countTooltip', { n: stats.lists.cusMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.cusMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.cusMYR') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.cusMYR) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:customer_balance_myr')">{{ money(stats.totals.cusMYR) }}</div>
       </div>
       <div class="kpi-card theme-warning" role="button" tabindex="0" @click="openStat('cusCNY')" @keydown.enter.prevent="openStat('cusCNY')" @keydown.space.prevent="openStat('cusCNY')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.cusCNY.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:customer_balance_cny')" :content="t('workbench.countTooltip', { n: stats.lists.cusCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.cusCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.cusCNY') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.cusCNY) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:customer_balance_cny')">{{ money(stats.totals.cusCNY) }}</div>
       </div>
       <div class="kpi-card theme-primary" role="button" tabindex="0" @click="openStat('bankMYR')" @keydown.enter.prevent="openStat('bankMYR')" @keydown.space.prevent="openStat('bankMYR')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.bankMYR.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:bank_balance_myr')" :content="t('workbench.countTooltip', { n: stats.lists.bankMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.bankMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.bankMYR') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.bankMYR) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:bank_balance_myr')">{{ money(stats.totals.bankMYR) }}</div>
       </div>
       <div class="kpi-card theme-info" role="button" tabindex="0" @click="openStat('payCNY')" @keydown.enter.prevent="openStat('payCNY')" @keydown.space.prevent="openStat('payCNY')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.payCNY.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:payable_cny')" :content="t('workbench.countTooltip', { n: stats.lists.payCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.payCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.payCNY') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.payCNY) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:payable_cny')">{{ money(stats.totals.payCNY) }}</div>
       </div>
       <div class="kpi-card theme-success" role="button" tabindex="0" @click="openStat('exchMYR')" @keydown.enter.prevent="openStat('exchMYR')" @keydown.space.prevent="openStat('exchMYR')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.exchMYR.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:exchangeable_myr')" :content="t('workbench.countTooltip', { n: stats.lists.exchMYR.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.exchMYR.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.exchMYR') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.exchMYR) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:exchangeable_myr')">{{ money(stats.totals.exchMYR) }}</div>
       </div>
       <div class="kpi-card theme-danger" role="button" tabindex="0" @click="openStat('pendingCNY')" @keydown.enter.prevent="openStat('pendingCNY')" @keydown.space.prevent="openStat('pendingCNY')">
-        <el-tooltip :content="t('workbench.countTooltip', { n: stats.lists.pendingCNY.length })" placement="top">
+        <el-tooltip v-if="has('dashboard:kpi:paying_cny')" :content="t('workbench.countTooltip', { n: stats.lists.pendingCNY.length })" placement="top">
           <span class="kpi-count">{{ stats.lists.pendingCNY.length }}</span>
         </el-tooltip>
   <div class="kpi-title">{{ t('workbench.kpis.pendingCNY') }}</div>
-        <div class="kpi-value">{{ money(stats.totals.pendingCNY) }}</div>
+        <div class="kpi-value" v-if="has('dashboard:kpi:paying_cny')">{{ money(stats.totals.pendingCNY) }}</div>
       </div>
       <!-- 新增：未匹配交易（统一为KPI卡片，加入同一网格） -->
-      <div class="kpi-card theme-danger" role="button" tabindex="0" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
+      <div class="kpi-card theme-danger" role="button" tabindex="0" v-if="has('dashboard:kpi:unmatched_txn')" @click="goToPendingTx" @keydown.enter.prevent="goToPendingTx" @keydown.space.prevent="goToPendingTx">
   <el-tooltip :content="`${t('workbench.kpis.unmatched')} ${unmatchedCount} / ${t('common.total')} ${totalTx}`" placement="top">
           <span class="kpi-count">{{ unmatchedCount }}</span>
         </el-tooltip>
@@ -111,7 +111,7 @@
     <!-- 服务器监控入口从独立区域移动到任务栏（filters）右侧，保留抽屉详情 -->
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
-    <div class="filters">
+  <div class="filters" v-if="has('dashboard:navigation')">
       <el-popover
         v-model:visible="datePopover"
         placement="bottom-start"
@@ -144,7 +144,7 @@
         <el-radio-button label="y">{{ t('workbench.filters.thisYear') }}</el-radio-button>
       </el-radio-group>
       <el-button size="small" @click="clearFilters">{{ t('workbench.filters.clear') }}</el-button>
-      <div class="monitor-bar" role="button" @click="openMonitor" :title="t('workbench.monitor.title')">
+  <div class="monitor-bar" v-if="has('dashboard:server_monitor')" role="button" @click="openMonitor" :title="t('workbench.monitor.title')">
         <div class="mb-item">
           <span class="mb-label">CPU</span>
           <el-progress :percentage="monitorCpuPct" :stroke-width="6" :color="cpuColor" :text-inside="false" />
@@ -191,7 +191,8 @@
       class="floating-payments"
       :style="fabStyle"
       role="button"
-  :aria-label="t('workbench.todos.payments')"
+      :aria-label="t('workbench.todos.payments')"
+      v-if="has('dashboard:pending_pay_approval')"
       @mousedown="onFabDown"
       @touchstart="onFabDown"
       @click="onFabClick"
@@ -793,6 +794,20 @@ const quickActions = computed(() => [
   { key: 'payHistory', label: t('home.qaPaymentsHistory'), desc: t('workbench.cards.payHistory'), route: 'fx-payments', color: 'orange', icon: 'CreditCard' },
   { key: 'buyHistory', label: t('home.qaBuyHistory'), desc: t('workbench.cards.buyHistory'), route: 'fx-buy-history', color: 'purple', icon: 'Coin' },
 ])
+
+// 细粒度入口可见性：根据 dashboard:nav:* 权限过滤 quick actions
+const quickActionsFiltered = computed(() => {
+  const items = quickActions.value
+  const ok = (key) => {
+    if (key === 'tx') return has('dashboard:nav:transactions')
+    if (key === 'settleManage') return has('dashboard:nav:fx')
+    if (key === 'settleHistory') return has('dashboard:nav:fx_history')
+    if (key === 'payHistory') return has('dashboard:nav:pay_history')
+    if (key === 'buyHistory') return has('dashboard:nav:buyfx_history')
+    return true
+  }
+  return items.filter(it => ok(it.key))
+})
 
 // 待办：付款待审数量徽标 + 抽屉列表
 const paymentsCount = ref(0)
