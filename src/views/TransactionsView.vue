@@ -490,37 +490,16 @@
           </div>
           <template #tip>
             <div class="el-upload__tip">
-              {{ t('transactions.supportedFormats') }}
+              {{ t('transactions.supportedFormats') }} · 选择文件后自动导入，已存在/疑似重复将自动跳过
             </div>
           </template>
         </el-upload>
       </div>
-
-      <div v-if="previewData.length > 0" class="preview-section">
-        <h4>{{ t('transactions.dataPreview') }}</h4>
-        <el-table :data="previewData.slice(0, 5)" border size="small" max-height="250" @header-dragend="onColResizePreview">
-          <el-table-column
-            v-for="header in previewHeaders"
-            :key="header"
-            :prop="header"
-            :column-key="header"
-            :label="header"
-            :width="colWPreview(header, 160)"
-          />
-        </el-table>
-        <div class="preview-info">{{ t('transactions.showingPreview', { count: 5, total: previewData.length }) }}</div>
-      </div>
+      <!-- 预览表已移除：解析后将自动导入非重复数据 -->
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="importDialogVisible = false">{{ t('common.cancel') }}</el-button>
-          <el-button 
-            type="primary" 
-            @click="submitImport" 
-            :disabled="!previewData.length || importSubmitting"
-            :loading="importSubmitting">
-            {{ importSubmitting ? t('transactions.importing') : t('transactions.importNow') }}
-          </el-button>
+          <el-button :disabled="importSubmitting" @click="importDialogVisible = false">{{ t('common.cancel') }}</el-button>
         </span>
       </template>
     </el-dialog>
@@ -641,10 +620,8 @@ const importSubmitting = ref(false)
 const originalCsvText = ref('')
 const currentTransaction = ref({})
 const fileList = ref([])
-const previewData = ref([])
-const previewHeaders = ref([])
-// 导入预览表列宽记忆
-const { colW: colWPreview, onColResize: onColResizePreview } = useTableMemory('tx-import-preview')
+// 新导入流程：去预览，改为“可导入 + 重复/疑似重复”列表
+const importRows = ref([]) // { accountNumber, transactionDate, chequeRefNo, description, debitAmount, creditAmount, referenceText, amountValue, status: 'normal'|'duplicate'|'suspect', include: boolean }
 
 // 表单相关
 const formRef = ref(null)
@@ -838,8 +815,7 @@ const showAddDialog = () => {
 
 const showImportDialog = () => {
   fileList.value = []
-  previewData.value = []
-  previewHeaders.value = []
+  importRows.value = []
   originalCsvText.value = ''
   importDialogVisible.value = true
 }
@@ -933,6 +909,7 @@ const handleRowDblClick = (row) => {
 const handleSelectionChange = (selection) => {
   multipleSelection.value = selection
 }
+// 预览与批量勾选逻辑已移除
 
 // 触发批量匹配：从表头复选框开启
 const onBatchMatchToggle = (val) => {
@@ -1377,6 +1354,7 @@ const exportTransactions = async () => {
   }
 }
 
+// 解析上传文件：兼容固定表头（Trn. Date 等）与通用CSV
 const handleFileChange = (file) => {
   if (!file || !file.raw) {
     return
@@ -1397,17 +1375,21 @@ const handleFileChange = (file) => {
         skipEmptyLines: true,
         complete: (results) => {
           if (results.data && results.data.length) {
-            previewData.value = results.data
-            previewHeaders.value = results.meta.fields
-            
-            // 检查是否包含必要字段
-            const hasRequiredFields = checkRequiredFields(results.meta.fields)
-            if (!hasRequiredFields) {
-              ElMessage.warning(t('transactions.missingRequiredFields'))
-            }
+            // 转为统一结构
+            const rows = results.data.map(row => ({
+              accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
+              transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || '',
+              chequeRefNo: row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || '',
+              description: row.description || row.描述 || row.Description || row['Transaction Description'] || '',
+              debitAmount: Number(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0) || 0,
+              creditAmount: Number(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0) || 0,
+              reference1: row.reference1 || row.参考1 || row['Reference 1'] || '',
+              reference2: row.reference2 || row.参考2 || row['Reference 2'] || '',
+              reference3: row.reference3 || row.参考3 || row['Reference 3'] || ''
+            }))
+            buildDedup(rows)
           } else {
-            previewData.value = []
-            previewHeaders.value = []
+            importRows.value = []
             ElMessage.warning(t('transactions.emptyFile'))
           }
         },
@@ -1424,69 +1406,121 @@ const handleFileChange = (file) => {
   reader.readAsText(file.raw)
 }
 
-const checkRequiredFields = (fields) => {
-  if (!Array.isArray(fields)) return false
-  const lower = fields.map(f => String(f || '').toLowerCase())
-  // 固定银行格式：必须同时包含以下表头
-  const fixedOk = ['trn. date','cheque no/ref no','transaction description','debit amount','credit amount']
-    .every(h => lower.includes(h))
-  // 通用格式：至少包含 账号/Account Number 与 交易日期/Transaction Date
-  const genericOk = (
-    lower.includes('accountnumber') || lower.includes('账号') || lower.includes('account number')
-  ) && (
-    lower.includes('transactiondate') || lower.includes('交易日期') || lower.includes('transaction date')
-  )
-  return fixedOk || genericOk
+function buildDedup(rows){
+  // 统一引用文本与金额，用于重复判断
+  const normRef = (r) => String([r.reference1, r.reference2, r.reference3].filter(Boolean).join(' ')).trim()
+  const amount = (r) => Math.round((Number(r.creditAmount||0) - Number(r.debitAmount||0)) * 100) / 100
+  const key = (r) => `${r.transactionDate}|${normRef(r)}|${amount(r)}`
+
+  const map = new Map()
+  const out = []
+  for (const r of rows) {
+    const k = key(r)
+    const isRefEmpty = normRef(r) === ''
+    const entry = {
+      accountNumber: r.accountNumber,
+      transactionDate: r.transactionDate,
+      chequeRefNo: r.chequeRefNo,
+      description: r.description,
+      debitAmount: r.debitAmount,
+      creditAmount: r.creditAmount,
+      referenceText: normRef(r),
+      amountValue: amount(r),
+      status: 'normal',
+      include: true
+    }
+    if (!map.has(k)) {
+      map.set(k, { first: r, count: 1 })
+      // 若参考号为空，仍作为正常记录（后续与相同键值比较判定疑似重复）
+      out.push(entry)
+    } else {
+      const blk = map.get(k)
+      blk.count++
+      // 完全一致：时间、参考（或为空则空串）与金额一致，认定“重复”
+      entry.status = 'duplicate'
+      entry.include = false
+      out.push(entry)
+    }
+  }
+  // 对于参考号为空的组，若出现相同键值则以上逻辑已将第二条起标记 duplicate；
+  // “疑似重复”的定义：参考为空，但所有字段完全相同（我们这里的 key 已覆盖日期+参考文本+金额；若还需校验 account/cheque/desc，也可拼入 key）
+  // 进一步区分：当参考为空但金额/日期/摘要等完全一致时，保留首条为 normal，后续为 suspect（但若已被 duplicate 标记则保持）
+  const groups = new Map()
+  const fullKey = (e) => `${e.transactionDate}|${e.referenceText}|${e.amountValue}|${e.accountNumber}|${e.chequeRefNo}|${e.description}`
+  for (const e of out) {
+    if (e.referenceText) continue
+    const fk = fullKey(e)
+    if (!groups.has(fk)) groups.set(fk, [])
+    groups.get(fk).push(e)
+  }
+  for (const list of groups.values()) {
+    if (list.length > 1) {
+      // 第一条保留原状态（通常 normal），后续若仍为 normal 则标记为 suspect
+      for (let i=1;i<list.length;i++) {
+        if (list[i].status === 'normal') {
+          list[i].status = 'suspect'
+          list[i].include = false
+        }
+      }
+    }
+  }
+  importRows.value = out
+  // 自动导入：仅当存在需要导入的记录时（include=true）
+  try {
+    const toImport = importRows.value.filter(r => r.include)
+    const skipped = importRows.value.length - toImport.length
+    if (toImport.length > 0) {
+      ElMessage.info(`检测到可导入 ${toImport.length} 条，跳过 ${skipped} 条（重复/疑似重复）`) 
+      // 延迟一个tick，确保状态更新后再提交
+      setTimeout(() => {
+        submitImport()
+      }, 0)
+    } else {
+      ElMessage.info('全部为重复或疑似重复，已自动跳过。')
+    }
+  } catch (e) {
+    console.error('自动导入触发失败:', e)
+  }
 }
 
 const submitImport = async () => {
-  if (!previewData.value.length) {
-    ElMessage.warning(t('transactions.noDataToImport'))
+  if (!importRows.value.length || importRows.value.filter(r=>r.include).length===0) {
+    // 自动导入场景：没有可导入的数据，直接提示并退出
+    ElMessage.info(t('transactions.noDataToImport'))
     return
   }
   
   importSubmitting.value = true
   
   try {
-    // 如果识别到固定表头（Trn. Date 等），优先走固定CSV导入接口
-    const headersLower = previewHeaders.value.map(h => String(h || '').toLowerCase())
-    const fixedHeaders = ['trn. date','cheque no/ref no','transaction description','debit amount','credit amount']
-    const looksLikeFixed = fixedHeaders.every(h => headersLower.includes(h))
-
-    let result
-    if (looksLikeFixed) {
-      // 直接发送原始CSV文本，保留文件头中的 Account Number 等信息
-      if (!originalCsvText.value) throw new Error('empty csv text')
-      result = await api.transactions.importCsvText(originalCsvText.value)
-    } else {
-      // 回退到通用 JSON 导入
-      const transformedData = previewData.value.map(row => ({
-        accountNumber: row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '',
-        transactionDate: row.transactionDate || row.交易日期 || row['Transaction Date'] || '',
-        chequeRefNo: row.chequeRefNo || row['参考号'] || row['Ref No'] || '',
-        description: row.description || row.描述 || row.Description || '',
-        debitAmount: row.debitAmount || row.借方金额 || row['Debit Amount'] || 0,
-        creditAmount: row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0,
-        category: row.category || row.类别 || row.Category || '',
-        reference1: row.reference1 || row.参考1 || row['Reference 1'] || '',
-        reference2: row.reference2 || row.参考2 || row['Reference 2'] || '',
-        reference3: row.reference3 || row.参考3 || row['Reference 3'] || ''
-      }))
-      const response = await fetch('/api/transactions/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: transformedData })
-      })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || error.detail || response.statusText)
-      }
-      result = await response.json()
+    // 新逻辑：仅导入勾选的行，统一走 JSON 导入接口
+    const selected = importRows.value.filter(r => r.include)
+    const transformedData = selected.map(row => ({
+      accountNumber: row.accountNumber,
+      transactionDate: row.transactionDate,
+      chequeRefNo: row.chequeRefNo,
+      description: row.description,
+      debitAmount: row.debitAmount,
+      creditAmount: row.creditAmount,
+      category: '',
+      reference1: row.referenceText,
+      reference2: '',
+      reference3: ''
+    }))
+    const response = await fetch('/api/transactions/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: transformedData })
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || error.detail || response.statusText)
     }
+    const result = await response.json()
     
     importDialogVisible.value = false
     fileList.value = []
-    previewData.value = []
+    importRows.value = []
     
     const ins = result?.inserted || 0
     const skipped = result?.skipped || 0
@@ -1507,7 +1541,7 @@ const submitImport = async () => {
       ElMessage.info(summary)
     }
 
-    // 导入完返回第一页并刷新（避免当前筛选导致“看起来没数据”）
+  // 导入完返回第一页并刷新（避免当前筛选导致“看起来没数据”）
     pagination.page = 1
     fetchTransactions()
   } catch (error) {
@@ -1627,6 +1661,10 @@ function onBankImgErr(e){
 </script>
 
 <style scoped>
+.dedup-section { margin-top: 12px; display: grid; gap: 8px; }
+.dedup-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dedup-toolbar .stats { display: flex; gap: 12px; color: var(--el-text-color-secondary); font-size: 12px; }
+.dedup-toolbar .ops { display: flex; gap: 8px; }
 .transactions-view {
   padding: 20px;
 }

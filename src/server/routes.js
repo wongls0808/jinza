@@ -1074,21 +1074,32 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   function resolveLogoUrl(code, url) {
     try {
       const codeLower = String(code || 'public').toLowerCase()
+      const normalized = codeLower.replace(/[^a-z0-9]/g, '') // 去掉空格和非字母数字
       // 常见银行文件名别名映射（项目 public/banks 中已存在的文件名）
       const alias = {
         // 交通银行：部分资源用 bocom
         'bcm': ['bocom', 'bocm'],
+        'bankofcommunications': ['bocom', 'bcm', 'bocm'],
         // 丰隆银行：常见缩写 hlbb/hlb
         'hongleong': ['hlbb', 'hlb'],
+        'hongleongbank': ['hlbb', 'hlb'],
         // 大众银行：常见缩写 pbb
         'public': ['pbb'],
-        // 容错：已规范文件名同名回退不生效时，这些键也会自然命中
+        'publicbank': ['pbb'],
+        // 大华银行：常见缩写 uob
         'uob': ['uob'],
+        'unitedoverseasbank': ['uob'],
+        // 容错：已规范文件名同名回退不生效时，这些键也会自然命中
         'ocbc': ['ocbc'],
         'maybank': ['maybank', 'mbb', 'abmb'],
         'cimb': ['cimb']
       }
-      const candidates = [codeLower, ...(alias[codeLower] || [])]
+      const candidates = Array.from(new Set([
+        codeLower,
+        normalized,
+        ...((alias[codeLower] || [])),
+        ...((alias[normalized] || []))
+      ]))
       // 若 url 存在且文件也存在，则直接使用
       if (url && typeof url === 'string') {
         const p = path.join(publicDir, decodeURIComponent(url).replace(/^\//, ''))

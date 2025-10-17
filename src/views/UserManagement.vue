@@ -434,7 +434,7 @@ function fmtMinute(ts) {
 .meta .kv { display:inline-flex; gap:6px; align-items:center; }
 .meta .kv .k { font-weight:600; opacity:0.75; }
 .meta .kv .v { font-variant-numeric: tabular-nums; }
-.controls { display:flex; align-items:center; gap: 8px; }
+.controls { display:flex; align-items:center; gap: 8px; justify-self: end; }
 /* 右上角启用开关容器 */
 .switch-top-right { position: absolute; top: 8px; right: 12px; display:flex; align-items:center; gap:6px; }
 .switch-top-right .muted { font-size:12px; color: var(--el-text-color-secondary); }
