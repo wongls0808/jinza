@@ -26,7 +26,11 @@ async function ensureTransactionsDDL() {
       created_at timestamptz default now(),
       updated_at timestamptz default now()
     );
-    create unique index if not exists ux_transactions_unique on transactions(account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount);
+    -- 删除可能有问题的旧约束
+    DROP INDEX IF EXISTS ux_transactions_unique;
+    -- 创建新的唯一约束，处理NULL值
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_unique_fixed 
+    ON transactions(account_number, transaction_date, COALESCE(cheque_ref_no, ''), debit_amount, credit_amount);
     -- 扩展匹配相关字段（幂等）
     alter table transactions
       add column if not exists matched boolean default false,
@@ -518,7 +522,12 @@ transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePer
 // 简单的CSV导入功能
 transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requirePerm('transactions:import'), async (req, res) => {
   try {
+    // 验证数据库连接和表结构
     await ensureTransactionsDDL()
+    
+    // 测试数据库连接
+    await query('SELECT 1 as test');
+    
     const { rows } = req.body;
     
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
@@ -530,7 +539,10 @@ transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requir
     let failed = 0;
     const errors = [];
     
-    for (const row of rows) {
+    console.log('开始导入', rows.length, '条记录');
+    console.log('用户:', req.user?.username || req.user?.id || 'unknown');
+    
+    for (const [index, row] of rows.entries()) {
       try {
         const {
           accountNumber,
@@ -539,12 +551,137 @@ transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requir
           description = '',
           debitAmount = 0,
           creditAmount = 0,
-          reference = ''
+          reference = ''  // 这是前端合并的Reference 1-6
         } = row;
+        
+        console.log(`处理第 ${index + 1} 条记录:`, {
+          accountNumber,
+          transactionDate,
+          chequeRefNo,
+          debitAmount,
+          creditAmount,
+          referenceLength: reference?.length || 0
+        });
+        
+        // 服务端二次清理数据（防止前端遗漏）
+        const serverCleanValue = (value) => {
+          if (!value) return '';
+          return String(value)
+            .replace(/^=".*"$/, '')     // 移除Excel格式
+            .replace(/^"+|"+$/g, '')    // 移除前后引号
+            .replace(/^\s*-\s*$/, '')   // 移除只有-的内容
+            .trim();
+        };
         
         if (!accountNumber || !transactionDate) {
           failed++;
-          errors.push(`缺少必要字段: 账户号或交易日期`);
+          const error = `第 ${index + 1} 条记录缺少必要字段: 账户号(${accountNumber}) 或交易日期(${transactionDate})`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 验证和清理金额数据
+        let debitAmt = 0;
+        let creditAmt = 0;
+        
+        try {
+          debitAmt = Number(debitAmount) || 0;
+          creditAmt = Number(creditAmount) || 0;
+        } catch (e) {
+          failed++;
+          const error = `第 ${index + 1} 条记录金额格式错误`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 验证金额范围 (numeric(18,2) 最大值约为 10^16)
+        const MAX_AMOUNT = 999999999999999.99;
+        if (debitAmt < 0 || creditAmt < 0) {
+          failed++;
+          const error = `第 ${index + 1} 条记录金额不能为负数`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        if (debitAmt > MAX_AMOUNT || creditAmt > MAX_AMOUNT) {
+          failed++;
+          const error = `第 ${index + 1} 条记录金额超出范围`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        if (debitAmt === 0 && creditAmt === 0) {
+          failed++;
+          const error = `第 ${index + 1} 条记录借方和贷方金额都为0`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 业务逻辑验证：通常借方和贷方不能同时有值
+        if (debitAmt > 0 && creditAmt > 0) {
+          console.warn(`第 ${index + 1} 条记录借方和贷方同时有值，这可能不符合会计准则`);
+        }
+        
+        // 严格按照数据库字段规则清理数据（应用服务端二次清理）
+        const cleanAccountNumber = serverCleanValue(accountNumber).substring(0, 64);
+        const cleanChequeRefNo = serverCleanValue(chequeRefNo).substring(0, 128);
+        const cleanDescription = serverCleanValue(description); // text类型无长度限制
+        const cleanReference = serverCleanValue(reference).substring(0, 128); // Reference 1-6合并后的内容
+        
+        // 验证NOT NULL字段
+        if (!cleanAccountNumber) {
+          failed++;
+          const error = `第 ${index + 1} 条记录账户号码为空`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 验证日期格式 (必须是有效的 YYYY-MM-DD 格式)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(transactionDate)) {
+          failed++;
+          const error = `第 ${index + 1} 条记录日期格式无效: ${transactionDate}`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 验证日期是否为有效日期
+        const testDate = new Date(transactionDate);
+        if (isNaN(testDate.getTime()) || testDate.toISOString().substring(0, 10) !== transactionDate) {
+          failed++;
+          const error = `第 ${index + 1} 条记录日期无效: ${transactionDate}`;
+          errors.push(error);
+          console.warn(error);
+          continue;
+        }
+        
+        // 处理cheque_ref_no：空字符串转为NULL，与约束逻辑保持一致
+        const dbChequeRefNo = cleanChequeRefNo || null;
+        
+        // 按照唯一约束的确切逻辑检查重复
+        const checkQuery = `
+          SELECT id FROM transactions 
+          WHERE account_number = $1 
+            AND transaction_date = $2 
+            AND COALESCE(cheque_ref_no, '') = COALESCE($3, '')
+            AND debit_amount = $4 
+            AND credit_amount = $5
+        `;
+        
+        const existingRecord = await query(checkQuery, [
+          cleanAccountNumber, transactionDate, dbChequeRefNo, debitAmt, creditAmt
+        ]);
+        
+        if (existingRecord.rows.length > 0) {
+          skipped++;
+          console.log(`第 ${index + 1} 条记录已存在，跳过 (ID: ${existingRecord.rows[0].id})`);
           continue;
         }
         
@@ -553,30 +690,61 @@ transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requir
             account_number, transaction_date, cheque_ref_no, description, 
             debit_amount, credit_amount, reference_1, created_by
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          ON CONFLICT (account_number, transaction_date, cheque_ref_no, debit_amount, credit_amount) 
-          DO NOTHING
           RETURNING id
         `;
         
-        const result = await query(insertQuery, [
-          accountNumber, 
+        const params = [
+          cleanAccountNumber, 
           transactionDate, 
-          chequeRefNo, 
-          description,
-          Number(debitAmount) || 0, 
-          Number(creditAmount) || 0, 
-          reference, 
+          dbChequeRefNo,  // 使用NULL而不是空字符串 
+          cleanDescription,
+          debitAmt, 
+          creditAmt, 
+          cleanReference, 
           req.user?.id || null
-        ]);
+        ];
+        
+        console.log(`第 ${index + 1} 条记录 - 执行SQL参数:`, {
+          account_number: params[0],
+          transaction_date: params[1],
+          cheque_ref_no: params[2],
+          description: params[3]?.substring(0, 50) + (params[3]?.length > 50 ? '...' : ''),
+          debit_amount: params[4],
+          credit_amount: params[5],
+          reference_1: params[6]
+        });
+        
+        const result = await query(insertQuery, params);
         
         if (result.rows.length > 0) {
           inserted++;
+          console.log(`第 ${index + 1} 条记录插入成功, ID: ${result.rows[0].id}`);
         } else {
-          skipped++;
+          // 这种情况理论上不应该发生，因为我们已经检查了重复
+          console.warn(`第 ${index + 1} 条记录插入无返回，可能的并发问题`);
         }
       } catch (error) {
         failed++;
-        errors.push(`导入失败: ${error.message}`);
+        let errorMsg = `第 ${index + 1} 条记录导入失败: ${error.message}`;
+        
+        // 检测具体的数据库错误类型
+        if (error.code === '23505') {  // 唯一约束违反
+          errorMsg = `第 ${index + 1} 条记录重复（唯一约束冲突）`;
+        } else if (error.code === '22001') {  // 字符串长度超出
+          errorMsg = `第 ${index + 1} 条记录数据长度超出限制`;
+        } else if (error.code === '23502') {  // NOT NULL约束违反
+          errorMsg = `第 ${index + 1} 条记录缺少必要字段`;
+        } else if (error.code === '22P02') {  // 数据格式错误
+          errorMsg = `第 ${index + 1} 条记录数据格式错误`;
+        }
+        
+        errors.push(errorMsg);
+        console.error(errorMsg, {
+          code: error.code,
+          detail: error.detail,
+          constraint: error.constraint,
+          rowData: { cleanAccountNumber, transactionDate, safeRecordChequeRefNo, debitAmt, creditAmt }
+        });
       }
     }
     

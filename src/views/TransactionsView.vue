@@ -500,25 +500,46 @@
           <span>共 {{ importPreview.length }} 条交易记录</span>
         </div>
         <el-table :data="importPreview.slice(0, 5)" border size="small" stripe>
-          <el-table-column label="账户号码" prop="accountNumber" width="140" />
-          <el-table-column label="交易日期" prop="transactionDate" width="110" />
-          <el-table-column label="支票号/参考号" prop="chequeRefNo" width="130" show-overflow-tooltip />
-          <el-table-column label="交易描述" prop="description" min-width="180" show-overflow-tooltip />
-          <el-table-column label="借方金额" prop="debitAmount" width="90" align="right">
+          <el-table-column label="行号" width="60" align="center">
+            <template #default="scope">
+              {{ scope.row.rowIndex }}
+            </template>
+          </el-table-column>
+          <el-table-column label="账户号码" prop="accountNumber" width="120" />
+          <el-table-column label="交易日期" width="110">
+            <template #default="scope">
+              <span :class="{ 'invalid-date': !scope.row.transactionDate }">
+                {{ scope.row.transactionDate || scope.row.originalDate }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="支票号/参考号" prop="chequeRefNo" width="120" show-overflow-tooltip />
+          <el-table-column label="交易描述" prop="description" min-width="150" show-overflow-tooltip />
+          <el-table-column label="借方金额" prop="debitAmount" width="85" align="right">
             <template #default="scope">
               <span v-if="scope.row.debitAmount > 0" class="debit-amount">
                 {{ scope.row.debitAmount.toFixed(2) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="贷方金额" prop="creditAmount" width="90" align="right">
+          <el-table-column label="贷方金额" prop="creditAmount" width="85" align="right">
             <template #default="scope">
               <span v-if="scope.row.creditAmount > 0" class="credit-amount">
                 {{ scope.row.creditAmount.toFixed(2) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="附加信息" prop="reference" width="120" show-overflow-tooltip />
+          <el-table-column label="状态" width="60" align="center">
+            <template #default="scope">
+              <el-icon v-if="scope.row.transactionDate && (scope.row.debitAmount > 0 || scope.row.creditAmount > 0)" 
+                       color="green" size="16">
+                <Check />
+              </el-icon>
+              <el-icon v-else color="red" size="16">
+                <Close />
+              </el-icon>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       
@@ -592,6 +613,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Check, Close } from '@element-plus/icons-vue'
 import { api, request } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 
@@ -1418,79 +1440,208 @@ const handleSimpleFileChange = (file) => {
       const dataLines = lines.slice(headerIndex + 1)
       const rows = []
       
-      // Excel CSV格式清理函数
+      // 强化Excel格式清理函数 - 处理所有无效字符
       const cleanExcelValue = (value) => {
         if (!value) return ''
         let cleaned = String(value).trim()
+        
         // 移除Excel格式 ="值"
         const excelMatch = /^="(.*)"$/.exec(cleaned)
         if (excelMatch) {
           cleaned = excelMatch[1]
         }
+        
         // 移除普通引号
         if ((cleaned.startsWith('"') && cleaned.endsWith('"'))) {
           cleaned = cleaned.slice(1, -1)
         }
-        return cleaned.trim()
+        
+        // 移除你提到的无效字符模式
+        const invalidPatterns = [
+          /^=""$/,          // =""
+          /^""-$/,          // ""-
+          /^""$/,           // ""
+          /^="="$/,         // ="="
+          /^-$/,            // 单独的 -
+          /^="".*""$/,      // 以=""开头和结尾
+          /^="\s*"$/,       // =" "
+          /^"\s*"$/         // " "
+        ];
+        
+        for (const pattern of invalidPatterns) {
+          if (pattern.test(cleaned)) {
+            return '';
+          }
+        }
+        
+        // 清理其他Excel相关字符
+        cleaned = cleaned
+          .replace(/^=/, '')           // 移除开头的 =
+          .replace(/^"+|"+$/g, '')     // 移除开头结尾的引号
+          .replace(/^\s*-\s*$/, '')    // 移除只有-的内容
+          .trim();
+        
+        return cleaned;
       }
       
       // 解析日期格式 DD/MM/YYYY 转为 YYYY-MM-DD
       const parseDate = (dateStr) => {
-        if (!dateStr) return ''
+        if (!dateStr) return null
         const cleaned = cleanExcelValue(dateStr)
-        const parts = cleaned.split('/')
-        if (parts.length === 3) {
-          const day = parts[0].padStart(2, '0')
-          const month = parts[1].padStart(2, '0')
-          const year = parts[2]
-          return `${year}-${month}-${day}`
+        
+        // 尝试解析 DD/MM/YYYY 格式
+        const ddmmyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(cleaned)
+        if (ddmmyyyy) {
+          const day = ddmmyyyy[1].padStart(2, '0')
+          const month = ddmmyyyy[2].padStart(2, '0')
+          const year = ddmmyyyy[3]
+          
+          // 验证日期有效性
+          const testDate = new Date(year, month - 1, day)
+          if (testDate.getFullYear() == year && 
+              testDate.getMonth() == month - 1 && 
+              testDate.getDate() == day) {
+            return `${year}-${month}-${day}`
+          }
         }
-        return cleaned
+        
+        // 尝试解析 YYYY-MM-DD 格式
+        const yyyymmdd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(cleaned)
+        if (yyyymmdd) {
+          const year = yyyymmdd[1]
+          const month = yyyymmdd[2].padStart(2, '0')
+          const day = yyyymmdd[3].padStart(2, '0')
+          
+          // 验证日期有效性
+          const testDate = new Date(year, month - 1, day)
+          if (testDate.getFullYear() == year && 
+              testDate.getMonth() == month - 1 && 
+              testDate.getDate() == day) {
+            return `${year}-${month}-${day}`
+          }
+        }
+        
+        console.warn('无效日期格式:', cleaned)
+        return null
       }
       
-      for (const line of dataLines) {
+      // 验证和清理金额
+      const parseAmount = (amountStr) => {
+        if (!amountStr) return 0
+        const cleaned = cleanExcelValue(amountStr)
+        // 移除千位分隔符和货币符号
+        const numStr = cleaned.replace(/[,$RM\s]/g, '')
+        const amount = parseFloat(numStr)
+        return isNaN(amount) ? 0 : amount
+      }
+      
+      // 验证记录完整性
+      const validateRecord = (record, index) => {
+        const errors = []
+        
+        if (!record.accountNumber) {
+          errors.push(`第${index + 1}行: 缺少账户号码`)
+        }
+        
+        if (!record.transactionDate) {
+          errors.push(`第${index + 1}行: 日期格式无效 - ${record.originalDate}`)
+        }
+        
+        if (record.debitAmount === 0 && record.creditAmount === 0) {
+          errors.push(`第${index + 1}行: 借方和贷方金额都为0`)
+        }
+        
+        if (record.debitAmount < 0 || record.creditAmount < 0) {
+          errors.push(`第${index + 1}行: 金额不能为负数`)
+        }
+        
+        return errors
+      }
+      
+      const validationErrors = []
+      
+      for (const [index, line] of dataLines.entries()) {
         if (!line.trim()) continue
         
         const cells = line.split(',')
         
-        if (cells.length >= 5) {
+        // 确保有足够的列数（至少包含Reference 1）
+        if (cells.length >= 6) {
+          // 按照银行对账单的确切字段顺序映射
+          const originalDate = cleanExcelValue(cells[0])           // Trn. Date
           const transactionDate = parseDate(cells[0])
-          const chequeRefNo = cleanExcelValue(cells[1])
-          const description = cleanExcelValue(cells[2])
-          const debitAmount = parseFloat(cleanExcelValue(cells[3]).replace(/,/g, '')) || 0
-          const creditAmount = parseFloat(cleanExcelValue(cells[4]).replace(/,/g, '')) || 0
+          const chequeRefNo = cleanExcelValue(cells[1])            // Cheque No/Ref No
+          const description = cleanExcelValue(cells[2])            // Transaction Description
+          const debitAmount = parseAmount(cells[3])                // Debit Amount
+          const creditAmount = parseAmount(cells[4])               // Credit Amount
           
-          // 合并所有参考字段
+          // 处理Reference 1-6字段（合并到一个reference字段）
           const references = []
-          for (let i = 5; i < Math.min(cells.length, 11); i++) {
+          for (let i = 5; i < Math.min(cells.length, 11); i++) {   // Reference 1-6 (最多6个)
             const ref = cleanExcelValue(cells[i])
-            if (ref && ref !== '-') {
+            if (ref && ref !== '' && ref !== '-') {
               references.push(ref)
             }
           }
-          const reference = references.join(' ').trim()
+          
+          // 合并所有Reference字段，用空格分隔
+          const combinedReference = references.join(' ').trim()
+          
+          const record = {
+            accountNumber: defaultAccountNumber,                    // Account Number (从文件头提取)
+            transactionDate: transactionDate,                      // Trn. Date (转换为YYYY-MM-DD)
+            chequeRefNo: chequeRefNo,                              // Cheque No/Ref No
+            description: description,                              // Transaction Description
+            debitAmount: debitAmount,                             // Debit Amount
+            creditAmount: creditAmount,                           // Credit Amount
+            reference: combinedReference,                         // Reference 1-6 合并
+            originalDate: originalDate,
+            rowIndex: index + headerIndex + 2 // CSV行号
+          }
+          
+          // 验证记录
+          const recordErrors = validateRecord(record, index)
+          if (recordErrors.length > 0) {
+            validationErrors.push(...recordErrors)
+          }
           
           // 只添加有效的交易记录
           if (transactionDate && (debitAmount > 0 || creditAmount > 0)) {
-            rows.push({
-              accountNumber: defaultAccountNumber,
-              transactionDate: transactionDate,
-              chequeRefNo: chequeRefNo,
-              description: description,
-              debitAmount: debitAmount,
-              creditAmount: creditAmount,
-              reference: reference
-            })
+            rows.push(record)
           }
+        } else {
+          validationErrors.push(`第${index + headerIndex + 2}行: 列数不足，需要至少6列 (Account Number, Trn.Date, Cheque No, Description, Debit, Credit)`)
         }
       }
       
       importPreview.value = rows
       
+      // 显示解析结果和验证错误
+      if (validationErrors.length > 0) {
+        console.warn('数据验证警告:', validationErrors)
+        
+        const errorSummary = validationErrors.slice(0, 3).join('\n')
+        const moreErrors = validationErrors.length > 3 ? `\n...还有${validationErrors.length - 3}个错误` : ''
+        
+        ElMessage.warning({
+          message: `发现 ${validationErrors.length} 个数据问题:\n${errorSummary}${moreErrors}`,
+          duration: 8000,
+          showClose: true
+        })
+      }
+      
       if (rows.length === 0) {
-        ElMessage.warning('未找到有效的交易数据')
+        ElMessage.error('未找到有效的交易数据，请检查文件格式')
       } else {
-        ElMessage.success(`已解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`)
+        const message = validationErrors.length > 0 
+          ? `已解析 ${rows.length} 条有效交易记录（${validationErrors.length} 条有问题）- 账户：${defaultAccountNumber}`
+          : `已解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`
+        
+        ElMessage.success({
+          message: message,
+          duration: 5000,
+          showClose: true
+        })
       }
       
     } catch (error) {
@@ -1517,11 +1668,29 @@ const submitSimpleImport = async () => {
       body: JSON.stringify({ rows: importPreview.value })
     })
     
-    const { inserted, skipped, failed, errors } = response
+    const { inserted, skipped, failed, errors, devMode, message } = response
     
     simpleImportVisible.value = false
     importPreview.value = []
     
+    // 处理开发模式响应
+    if (devMode) {
+      const devSummary = [
+        `数据验证: ${inserted} 条有效`,
+        failed > 0 ? `${failed} 条无效` : ''
+      ].filter(Boolean).join(' | ')
+      
+      ElMessage.success({
+        message: `${devSummary} - ${message}`,
+        duration: 5000,
+        showClose: true
+      })
+      
+      console.log('[DEV MODE] 导入测试完成:', { inserted, failed, message })
+      return
+    }
+    
+    // 正常数据库模式的处理
     const summary = [
       `导入成功: ${inserted}`,
       skipped > 0 ? `跳过重复: ${skipped}` : '',
@@ -1780,5 +1949,28 @@ function onBankImgErr(e){
 .credit-amount {
   color: #67C23A;
   font-weight: 500;
+}
+
+.invalid-date {
+  color: #F56C6C;
+  text-decoration: line-through;
+}
+
+.import-preview .el-table {
+  font-size: 12px;
+}
+
+.import-preview .preview-header {
+  margin-bottom: 15px;
+}
+
+.import-preview .preview-header h4 {
+  color: #303133;
+  margin: 0;
+}
+
+.import-preview .preview-header span {
+  color: #909399;
+  font-size: 14px;
 }
 </style>
