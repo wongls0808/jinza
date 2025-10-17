@@ -257,7 +257,7 @@
         
         <el-form-item :label="t('transactions.bankName')" prop="bank_name">
           <div class="bank-display">
-            <img v-if="selectedBankLogo" :src="selectedBankLogo" alt="Bank Logo" class="bank-logo" />
+            <img v-if="selectedBankLogo" :src="selectedBankLogo" alt="Bank Logo" class="bank-logo" @error="onBankImgErr" />
             <span v-else>{{ form.bank_name }}</span>
           </div>
         </el-form-item>
@@ -1621,7 +1621,7 @@ function onBankImgErr(e){
     const cur = el.getAttribute('src') || ''
     if (/\.svg$/i.test(cur)) el.src = cur.replace(/\.svg$/i, '.png')
     else if (/\.png$/i.test(cur)) el.src = cur.replace(/\.png$/i, '.jpg')
-    else el.style.display = 'none'
+    else el.src = '/banks/public.svg'
   }
 }
 </script>
