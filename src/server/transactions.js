@@ -135,30 +135,32 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     // 排序条件
     const orderClause = `ORDER BY ${sort} ${order.toUpperCase()}`;
     
-    // 查询数据
+    // 查询数据，关联银行账户信息
     const dataQuery = `
       SELECT 
-        id,
-        account_number,
-        transaction_date as trn_date,
-        cheque_ref_no,
-        description as transaction_description,
-        debit_amount,
-        credit_amount,
-        balance,
-        category,
-        reference_1 as reference,
-        reference_2,
-        reference_3,
-        matched,
-        match_type,
-        match_target_name,
-        created_by,
-        created_at,
-        '' as bank_name,
-        '' as account_name,
-        '' as bank_code
-      FROM transactions 
+        t.id,
+        t.account_number,
+        t.transaction_date as trn_date,
+        t.cheque_ref_no,
+        t.description as transaction_description,
+        t.debit_amount,
+        t.credit_amount,
+        t.balance,
+        t.category,
+        t.reference_1 as reference,
+        t.reference_2,
+        t.reference_3,
+        t.matched,
+        t.match_type,
+        t.match_target_name,
+        t.created_by,
+        t.created_at,
+        COALESCE(b.zh, b.en, '') as bank_name,
+        COALESCE(a.account_name, '') as account_name,
+        COALESCE(b.code, '') as bank_code
+      FROM transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
+      LEFT JOIN banks b ON b.id = a.bank_id
       ${whereClause} 
       ${orderClause} 
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -166,8 +168,14 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     
     queryParams.push(limit, offset);
     
-    // 统计查询
-    const countQuery = `SELECT COUNT(*) as total FROM transactions ${whereClause}`;
+    // 统计查询，需要使用相同的关联表结构
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
+      LEFT JOIN banks b ON b.id = a.bank_id
+      ${whereClause}
+    `;
     const countParams = queryParams.slice(0, -2);
     
     // 执行查询
@@ -426,7 +434,29 @@ transactionsRouter.post('/', auth.authMiddleware(true), auth.requirePerm('transa
       debit_amount, credit_amount, category, reference, req.user?.id || null
     ]);
     
-    res.json({ id: rs.rows[0].id });
+    // 返回创建的交易记录及其银行信息
+    const createdTransaction = await query(`
+      SELECT 
+        t.id,
+        t.account_number,
+        t.transaction_date as trn_date,
+        t.cheque_ref_no,
+        t.description as transaction_description,
+        t.debit_amount,
+        t.credit_amount,
+        t.balance,
+        t.category,
+        t.reference_1 as reference,
+        COALESCE(b.zh, b.en, '') as bank_name,
+        COALESCE(a.account_name, '') as account_name,
+        COALESCE(b.code, '') as bank_code
+      FROM transactions t
+      LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
+      LEFT JOIN banks b ON b.id = a.bank_id
+      WHERE t.id = $1
+    `, [rs.rows[0].id]);
+
+    res.json(createdTransaction.rows[0]);
   } catch (e) {
     console.error('create transaction failed', e)
     res.status(500).json({ error: '新增交易失败', detail: e?.message });
