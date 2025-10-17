@@ -289,7 +289,7 @@
     </el-drawer>
     <!-- 快捷操作：购汇抽屉 -->
     <el-drawer v-model="buyDrawer.visible" title="购汇" size="70%">
-      <BuyFX />
+      <BuyFX :manage="false" />
     </el-drawer>
 
     <!-- 付款单明细抽屉 -->

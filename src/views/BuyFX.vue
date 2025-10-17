@@ -2,12 +2,14 @@
   <div class="fx-buy">
   <h1>{{ t('buyfx.title') }}</h1>
     <el-row :gutter="16">
-      <el-col :span="10">
+      <el-col v-if="manage" :span="10">
         <el-card shadow="never">
           <template #header>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span>{{ t('buyfx.platformSection') }}</span>
-              <el-button size="small" type="primary" @click="openPlatformDialog()">{{ t('buyfx.addPlatform') }}</el-button>
+              <template v-if="manage">
+                <el-button size="small" type="primary" @click="openPlatformDialog()">{{ t('buyfx.addPlatform') }}</el-button>
+              </template>
             </div>
           </template>
           <div class="platform-list">
@@ -19,13 +21,15 @@
                   <span class="name">{{ p.name }}</span>
                 </div>
                 <div class="ops">
-                  <el-button size="small" @click="openPlatformDialog(p)">{{ t('buyfx.edit') }}</el-button>
-                  <el-popconfirm :title="t('buyfx.confirmDelete')" @confirm="removePlatform(p)">
-                    <template #reference>
-                      <el-button size="small" type="danger">{{ t('buyfx.delete') }}</el-button>
-                    </template>
-                  </el-popconfirm>
-                  <el-button size="small" type="primary" plain @click="openLoansDrawer(p)">{{ t('buyfx.loanRecords') }}</el-button>
+                  <template v-if="manage">
+                    <el-button size="small" @click="openPlatformDialog(p)">{{ t('buyfx.edit') }}</el-button>
+                    <el-popconfirm :title="t('buyfx.confirmDelete')" @confirm="removePlatform(p)">
+                      <template #reference>
+                        <el-button size="small" type="danger">{{ t('buyfx.delete') }}</el-button>
+                      </template>
+                    </el-popconfirm>
+                    <el-button size="small" type="primary" plain @click="openLoansDrawer(p)">{{ t('buyfx.loanRecords') }}</el-button>
+                  </template>
                 </div>
               </div>
               <div class="platform-card__body">
@@ -40,7 +44,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="14">
+      <el-col :span="manage?14:24">
         <el-card shadow="never">
           <template #header>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
@@ -76,7 +80,7 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="platformDialog.visible" :title="t('buyfx.dialogTitle')" width="560px">
+  <el-dialog v-if="manage" v-model="platformDialog.visible" :title="t('buyfx.dialogTitle')" width="560px">
       <el-form label-width="100px" :model="platformDialog.model">
         <el-form-item :label="t('buyfx.code')"><el-input v-model="platformDialog.model.code" /></el-form-item>
         <el-form-item :label="t('buyfx.name')"><el-input v-model="platformDialog.model.name" /></el-form-item>
@@ -96,7 +100,7 @@
   </div>
   
   <!-- 平台商借贷/互换记录抽屉 -->
-  <el-drawer v-model="loans.visible" :title="`${t('buyfx.loanRecords')} · ${loans.platform?.name||loans.platform?.code||''}`" size="60%">
+  <el-drawer v-if="manage" v-model="loans.visible" :title="`${t('buyfx.loanRecords')} · ${loans.platform?.name||loans.platform?.code||''}`" size="60%">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
       <el-tabs v-model="loans.currency" @tab-change="onLoanCurrencyChange">
         <el-tab-pane label="ALL" name="ALL" />
@@ -137,6 +141,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const router = useRouter()
+const props = defineProps({ manage: { type: Boolean, default: true } })
 
 const platforms = ref([])
 
