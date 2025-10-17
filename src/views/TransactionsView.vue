@@ -489,23 +489,36 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持基本CSV格式：账户号码,交易日期,参考号,描述,借方金额,贷方金额
+            支持银行对账单CSV格式（如从Excel导出的对账单文件）
           </div>
         </template>
       </el-upload>
       
       <div v-if="importPreview.length > 0" class="import-preview">
         <div class="preview-header">
-          <h4>预览前5条记录</h4>
-          <span>共 {{ importPreview.length }} 条记录</span>
+          <h4>银行对账单预览（前5条记录）</h4>
+          <span>共 {{ importPreview.length }} 条交易记录</span>
         </div>
-        <el-table :data="importPreview.slice(0, 5)" border size="small">
-          <el-table-column label="账户号码" prop="accountNumber" width="120" />
-          <el-table-column label="交易日期" prop="transactionDate" width="100" />
-          <el-table-column label="参考号" prop="chequeRefNo" width="100" />
-          <el-table-column label="描述" prop="description" show-overflow-tooltip />
-          <el-table-column label="借方" prop="debitAmount" width="80" align="right" />
-          <el-table-column label="贷方" prop="creditAmount" width="80" align="right" />
+        <el-table :data="importPreview.slice(0, 5)" border size="small" stripe>
+          <el-table-column label="账户号码" prop="accountNumber" width="140" />
+          <el-table-column label="交易日期" prop="transactionDate" width="110" />
+          <el-table-column label="支票号/参考号" prop="chequeRefNo" width="130" show-overflow-tooltip />
+          <el-table-column label="交易描述" prop="description" min-width="180" show-overflow-tooltip />
+          <el-table-column label="借方金额" prop="debitAmount" width="90" align="right">
+            <template #default="scope">
+              <span v-if="scope.row.debitAmount > 0" class="debit-amount">
+                {{ scope.row.debitAmount.toFixed(2) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="贷方金额" prop="creditAmount" width="90" align="right">
+            <template #default="scope">
+              <span v-if="scope.row.creditAmount > 0" class="credit-amount">
+                {{ scope.row.creditAmount.toFixed(2) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="附加信息" prop="reference" width="120" show-overflow-tooltip />
         </el-table>
       </div>
       
@@ -1364,7 +1377,7 @@ const exportTransactions = async () => {
   }
 }
 
-// 简单CSV文件处理
+// 银行对账单CSV文件处理
 const handleSimpleFileChange = (file) => {
   if (!file || !file.raw) {
     return
@@ -1381,23 +1394,94 @@ const handleSimpleFileChange = (file) => {
         return
       }
       
-      // 跳过标题行，解析数据
-      const dataLines = lines.slice(1)
+      // 提取账户号码
+      let defaultAccountNumber = ''
+      const accountMatch = lines.find(line => line.includes('Account Number:'))
+      if (accountMatch) {
+        const parts = accountMatch.split(',')
+        if (parts.length >= 2) {
+          defaultAccountNumber = parts[1].trim()
+        }
+      }
+      
+      // 找到交易数据开始行
+      const headerIndex = lines.findIndex(line => 
+        line.includes('Trn. Date') && line.includes('Transaction Description')
+      )
+      
+      if (headerIndex === -1) {
+        ElMessage.warning('未找到交易数据表头，请检查文件格式')
+        return
+      }
+      
+      // 解析交易数据
+      const dataLines = lines.slice(headerIndex + 1)
       const rows = []
       
+      // Excel CSV格式清理函数
+      const cleanExcelValue = (value) => {
+        if (!value) return ''
+        let cleaned = String(value).trim()
+        // 移除Excel格式 ="值"
+        const excelMatch = /^="(.*)"$/.exec(cleaned)
+        if (excelMatch) {
+          cleaned = excelMatch[1]
+        }
+        // 移除普通引号
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"'))) {
+          cleaned = cleaned.slice(1, -1)
+        }
+        return cleaned.trim()
+      }
+      
+      // 解析日期格式 DD/MM/YYYY 转为 YYYY-MM-DD
+      const parseDate = (dateStr) => {
+        if (!dateStr) return ''
+        const cleaned = cleanExcelValue(dateStr)
+        const parts = cleaned.split('/')
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0')
+          const month = parts[1].padStart(2, '0')
+          const year = parts[2]
+          return `${year}-${month}-${day}`
+        }
+        return cleaned
+      }
+      
       for (const line of dataLines) {
-        const cells = line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+        if (!line.trim()) continue
         
-        if (cells.length >= 4) {
-          rows.push({
-            accountNumber: cells[0] || '',
-            transactionDate: cells[1] || '',
-            chequeRefNo: cells[2] || '',
-            description: cells[3] || '',
-            debitAmount: parseFloat(cells[4]) || 0,
-            creditAmount: parseFloat(cells[5]) || 0,
-            reference: cells[6] || ''
-          })
+        const cells = line.split(',')
+        
+        if (cells.length >= 5) {
+          const transactionDate = parseDate(cells[0])
+          const chequeRefNo = cleanExcelValue(cells[1])
+          const description = cleanExcelValue(cells[2])
+          const debitAmount = parseFloat(cleanExcelValue(cells[3]).replace(/,/g, '')) || 0
+          const creditAmount = parseFloat(cleanExcelValue(cells[4]).replace(/,/g, '')) || 0
+          
+          // 合并所有参考字段
+          const references = []
+          for (let i = 5; i < Math.min(cells.length, 11); i++) {
+            const ref = cleanExcelValue(cells[i])
+            if (ref && ref !== '-') {
+              references.push(ref)
+            }
+          }
+          const reference = references.join(' ').trim()
+          
+          // 只添加有效的交易记录
+          if (transactionDate && (debitAmount > 0 || creditAmount > 0)) {
+            rows.push({
+              accountNumber: defaultAccountNumber,
+              transactionDate: transactionDate,
+              chequeRefNo: chequeRefNo,
+              description: description,
+              debitAmount: debitAmount,
+              creditAmount: creditAmount,
+              reference: reference
+            })
+          }
         }
       }
       
@@ -1406,7 +1490,7 @@ const handleSimpleFileChange = (file) => {
       if (rows.length === 0) {
         ElMessage.warning('未找到有效的交易数据')
       } else {
-        ElMessage.success(`已解析 ${rows.length} 条交易记录`)
+        ElMessage.success(`已解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`)
       }
       
     } catch (error) {
@@ -1686,5 +1770,15 @@ function onBankImgErr(e){
 
 .simple-upload {
   margin-bottom: 20px;
+}
+
+.debit-amount {
+  color: #F56C6C;
+  font-weight: 500;
+}
+
+.credit-amount {
+  color: #67C23A;
+  font-weight: 500;
 }
 </style>
