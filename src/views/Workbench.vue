@@ -90,12 +90,32 @@
 
     <!-- 统计图形区域：时间筛选 + 6 张图形卡（迷你柱状条） -->
     <div class="filters">
-      <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel" @click="datePopover=true">
-        <el-icon><Calendar /></el-icon>
-      </el-button>
-      <el-dialog v-model="datePopover" :show-close="true" width="auto" append-to-body destroy-on-close>
-        <el-date-picker v-model="range" type="daterange" unlink-panels :editable="false" @change="onRangeChange" />
-      </el-dialog>
+      <el-popover
+        v-model:visible="datePopover"
+        placement="bottom-start"
+        :width="360"
+        trigger="click"
+        popper-class="wb-date-popover"
+        :teleported="false">
+        <div class="date-pop-content" @click.stop>
+          <el-date-picker
+            v-model="range"
+            type="daterange"
+            unlink-panels
+            :editable="false"
+            :teleported="false"
+          />
+          <div class="date-pop-ops">
+            <el-button size="small" @click="onDateClear">{{ t('workbench.filters.clear') }}</el-button>
+            <el-button size="small" type="primary" @click="onDateApply">应用</el-button>
+          </div>
+        </div>
+        <template #reference>
+          <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel">
+            <el-icon><Calendar /></el-icon>
+          </el-button>
+        </template>
+      </el-popover>
       <el-radio-group v-model="quick" size="small" @change="onQuick">
         <el-radio-button label="30d">{{ t('workbench.filters.last30d') }}</el-radio-button>
         <el-radio-button label="6m">{{ t('workbench.filters.last6m') }}</el-radio-button>
@@ -412,6 +432,17 @@
       <div v-if="detailDrawer.type==='pay'" class="kpi-sub" style="margin-top:8px;">{{ t('workbench.notePaymentsDetail') }}</div>
     </el-drawer>
 
+    <!-- KPI 列表抽屉（客户余额/银行余额/平台余额/待付余额等） -->
+    <el-drawer v-model="statDrawer.visible" :title="statDrawer.title" size="40%">
+      <el-table :data="statDrawer.rows" size="small" border>
+        <el-table-column type="index" :label="t('common.no')" width="60" />
+        <el-table-column prop="label" :label="t('common.name')" />
+        <el-table-column prop="value" :label="t('common.amount')" width="160" align="right">
+          <template #default="{ row }">{{ money(row.value) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-drawer>
+
     <!-- 服务器监控抽屉 -->
     <el-drawer v-model="monitor.visible" :title="t('workbench.monitor.title')" size="40%">
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
@@ -516,15 +547,21 @@ function onQuick(){
   loadSummary()
 }
 function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
-function onRangeChange(val){
-  // 仅在选择了完整的起止日期后才收起弹窗并加载（增加微小延迟，避免中间事件）
-  if (Array.isArray(val) && val[0] && val[1]) {
-    setTimeout(() => {
-      datePopover.value = false
-      quick.value = ''
-      loadSummary()
-    }, 0)
+function onDateApply(){
+  if (Array.isArray(range.value) && range.value[0] && range.value[1]) {
+    datePopover.value = false
+    quick.value = ''
+    loadSummary()
+    // 同步刷新统计区
+    loadStats()
   }
+}
+function onDateClear(){
+  range.value = null
+  quick.value = ''
+  datePopover.value = false
+  loadSummary()
+  loadStats()
 }
 // 图形区域仅显示合计，不提供明细抽屉（声明已提前放置于顶部以供列宽记忆使用）
 async function openDetail(type){
@@ -926,7 +963,8 @@ function openStat(key){
     exchMYR: '可兑余额(MYR)',
     pendingCNY: '待付余额(CNY)'
   }
-  statDrawer.value = { visible: true, title: titles[key] || '', key, rows: stats.value.lists[key] || [] }
+  const rows = Array.isArray(stats.value.lists[key]) ? stats.value.lists[key] : []
+  statDrawer.value = { visible: true, title: titles[key] || '', key, rows }
 }
 
 async function loadStats(){
@@ -1157,6 +1195,11 @@ onMounted(() => { readFab() })
 .monitor-bar { display:flex; align-items:center; gap:10px; margin-left:auto; padding: 6px 10px; border: 1px solid var(--el-border-color); border-radius: 10px; background: var(--el-bg-color); box-shadow: 0 2px 8px rgba(0,0,0,.04); cursor: pointer; }
 .mb-item { display:grid; grid-template-columns: 34px 120px; align-items:center; gap:6px; }
 .mb-label { color: var(--el-text-color-secondary); font-size: 12px; }
+
+/* 日期选择的小弹窗样式 */
+:deep(.wb-date-popover) { padding: 8px 8px 10px; }
+.date-pop-content { display: grid; gap: 8px; }
+.date-pop-ops { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* 迷你图表：未匹配交易 */
 .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
