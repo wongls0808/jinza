@@ -49,24 +49,9 @@
             </div>
           </div>
         </template>
-        <!-- 日志预览（最近会话活动） -->
-        <div class="log-preview">
-          <div class="log-head">
-            <div class="log-title">{{ t('users.activityLog') || '用户日志' }}</div>
-            <div class="spacer"></div>
-            <el-button size="small" text @click="toggleLogs(u)">{{ isLogOpen(u) ? (t('common.collapse')||'收起') : (t('common.expand')||'展开') }}</el-button>
-            <el-button size="small" text :loading="logState.loading[u.id]" @click="refreshLogs(u)">{{ t('common.refresh') || '刷新' }}</el-button>
-          </div>
-          <el-collapse-transition>
-            <ul v-show="isLogOpen(u)" class="log-list">
-              <li v-if="(logs[u.id]||[]).length===0" class="log-empty">{{ t('common.noData') || '暂无数据' }}</li>
-              <li v-for="(it,idx) in (logs[u.id]||[])" :key="idx" class="log-item">
-                <span class="time">{{ new Date(it.last_seen || Date.now()).toLocaleString() }}</span>
-                <span class="ip">{{ it.last_ip }}</span>
-                <span class="ua" :title="it.user_agent">{{ it.user_agent?.slice(0, 60) || '' }}</span>
-              </li>
-            </ul>
-          </el-collapse-transition>
+        <!-- 日志改用抽屉展示，避免卡片被拉长导致排版错乱 -->
+        <div class="log-actions">
+          <el-button size="small" text :loading="logState.loading[u.id]" @click="openLogDrawer(u)">{{ t('users.activityLog') }}</el-button>
         </div>
         
       </el-card>
@@ -139,6 +124,24 @@
         </div>
       </template>
     </el-drawer>
+
+    <!-- 活动日志抽屉 -->
+    <el-drawer v-model="logDrawer.visible" :title="(logDrawer.user?.display_name || logDrawer.user?.username || '') + ' · ' + (t('users.activityLog') || '活动日志')" size="min(720px, 92vw)" :close-on-click-modal="true">
+      <div v-if="logDrawer.user">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <el-button size="small" :loading="logState.loading[logDrawer.user.id]" @click="refreshLogs(logDrawer.user)">{{ t('common.refresh') }}</el-button>
+        </div>
+        <ul class="log-list">
+          <li v-if="(logs[logDrawer.user.id]||[]).length===0" class="log-empty">{{ t('common.noData') }}</li>
+          <li v-for="(it,idx) in (logs[logDrawer.user.id]||[])" :key="idx" class="log-item">
+            <span class="time">{{ new Date(it.last_seen || Date.now()).toLocaleString() }}</span>
+            <span class="ip">{{ it.last_ip }}</span>
+            <span class="kind">{{ it.kind || '' }}{{ it.action ? (' / ' + it.action) : '' }}</span>
+            <span class="ua" :title="it.user_agent">{{ it.user_agent?.slice(0, 80) || '' }}</span>
+          </li>
+        </ul>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -164,9 +167,9 @@ const removeDlg = ref({ visible: false, user: null, loading: false })
 const reseed = ref({ loading: false })
 const permDrawer = ref({ visible: false, user: null, localPerms: [], saving: false, open: {} })
 // 日志数据与展开状态
-const logs = ref({}) // { [userId]: Array<{ last_ip, last_seen, user_agent }> }
-const logOpen = ref({}) // { [userId]: boolean }
+const logs = ref({}) // { [userId]: Array<{ last_ip, last_seen, user_agent, kind, action, meta }> }
 const logState = ref({ loading: {} })
+const logDrawer = ref({ visible: false, user: null })
 
 function userHas(u, code) {
   return (u._perms || []).includes(code)
@@ -363,8 +366,6 @@ async function doReseed() {
 
 onMounted(load)
 
-function isLogOpen(u) { return !!logOpen.value[u.id] }
-function toggleLogs(u) { logOpen.value[u.id] = !logOpen.value[u.id] }
 async function refreshLogs(u) {
   if (!u?.id) return
   logState.value.loading[u.id] = true
@@ -376,6 +377,10 @@ async function refreshLogs(u) {
   } finally {
     logState.value.loading[u.id] = false
   }
+}
+function openLogDrawer(u) {
+  logDrawer.value = { visible: true, user: u }
+  refreshLogs(u)
 }
 </script>
 
@@ -413,12 +418,11 @@ async function refreshLogs(u) {
 .admin-tip { color: var(--el-color-danger); font-size: 12px; margin: 4px 0 8px; }
 .group-batch { display:flex; gap:8px; margin: 0 0 8px; flex-wrap: wrap; }
 /* 日志样式 */
-.log-preview { margin-top: 8px; }
-.log-head { display:flex; align-items:center; gap:8px; }
-.log-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); }
+.log-actions { margin-top: 6px; display:flex; justify-content:flex-end; }
 .log-list { list-style:none; padding:0; margin:6px 0 0; display:grid; gap:6px; }
-.log-item { display:grid; grid-template-columns: 160px 140px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
+.log-item { display:grid; grid-template-columns: 160px 120px 120px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
 .log-item .time { color: var(--el-text-color-secondary); }
 .log-item .ip { font-variant-numeric: tabular-nums; }
+.log-item .kind { color: var(--el-text-color-secondary); }
 .log-empty { font-size:12px; color: var(--el-text-color-secondary); padding:4px 0; }
 </style>

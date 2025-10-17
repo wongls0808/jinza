@@ -2277,7 +2277,8 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
   })()
   // 左对齐显示金额
   const currencyLabel = 'CNY: ' + money(total)
-  doc.font(fontBold).fontSize(20).fillColor(ACCENT).text(currencyLabel, padX, doc.y)
+  // 金额整体下移约 0.5 个字符高度（≈ 6pt），以获得更平衡的垂直留白
+  doc.font(fontBold).fontSize(20).fillColor(ACCENT).text(currencyLabel, padX, doc.y + 6)
   doc.moveDown(0.8)
 
   // 工具：分节彩条 + 双语标题

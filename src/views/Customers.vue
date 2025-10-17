@@ -92,40 +92,35 @@
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
           <el-input-number v-model="addDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item :label="$t('customers.form.openingMYR')">
-              <el-input-number
-                v-model="addDlg.form.opening_myr"
-                :precision="2"
-                :step="0.01"
-                :controls="false"
-                :value-on-clear="0"
-                :formatter="numFormatter"
-                :parser="numParser"
-                controls-position="right"
-                :placeholder="'0.00'"
-                style="width:100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item :label="$t('customers.form.openingCNY')">
-              <el-input-number
-                v-model="addDlg.form.opening_cny"
-                :precision="2"
-                :step="0.01"
-                :controls="false"
-                :value-on-clear="0"
-                :formatter="numFormatter"
-                :parser="numParser"
-                controls-position="right"
-                :placeholder="'0.00'"
-                style="width:100%"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- 将期初金额改为单列展示，避免列宽挤压导致输入异常 -->
+        <el-form-item :label="$t('customers.form.openingMYR')">
+          <el-input-number
+            v-model="addDlg.form.opening_myr"
+            :precision="2"
+            :step="0.01"
+            :controls="false"
+            :value-on-clear="0"
+            :formatter="numFormatter"
+            :parser="numParser"
+            controls-position="right"
+            :placeholder="'0.00'"
+            style="width:100%"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('customers.form.openingCNY')">
+          <el-input-number
+            v-model="addDlg.form.opening_cny"
+            :precision="2"
+            :step="0.01"
+            :controls="false"
+            :value-on-clear="0"
+            :formatter="numFormatter"
+            :parser="numParser"
+            controls-position="right"
+            :placeholder="'0.00'"
+            style="width:100%"
+          />
+        </el-form-item>
         <!-- 提交人由后端从 token 自动识别，这里不再手动填写 -->
       </el-form>
       <template #footer>
@@ -148,40 +143,35 @@
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
           <el-input-number v-model="editDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item :label="$t('customers.form.openingMYR')">
-              <el-input-number
-                v-model="editDlg.form.opening_myr"
-                :precision="2"
-                :step="0.01"
-                :controls="false"
-                :value-on-clear="0"
-                :formatter="numFormatter"
-                :parser="numParser"
-                controls-position="right"
-                :placeholder="'0.00'"
-                style="width:100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item :label="$t('customers.form.openingCNY')">
-              <el-input-number
-                v-model="editDlg.form.opening_cny"
-                :precision="2"
-                :step="0.01"
-                :controls="false"
-                :value-on-clear="0"
-                :formatter="numFormatter"
-                :parser="numParser"
-                controls-position="right"
-                :placeholder="'0.00'"
-                style="width:100%"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- 同理，编辑对话框也改为单列展示，保证输入稳定 -->
+        <el-form-item :label="$t('customers.form.openingMYR')">
+          <el-input-number
+            v-model="editDlg.form.opening_myr"
+            :precision="2"
+            :step="0.01"
+            :controls="false"
+            :value-on-clear="0"
+            :formatter="numFormatter"
+            :parser="numParser"
+            controls-position="right"
+            :placeholder="'0.00'"
+            style="width:100%"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('customers.form.openingCNY')">
+          <el-input-number
+            v-model="editDlg.form.opening_cny"
+            :precision="2"
+            :step="0.01"
+            :controls="false"
+            :value-on-clear="0"
+            :formatter="numFormatter"
+            :parser="numParser"
+            controls-position="right"
+            :placeholder="'0.00'"
+            style="width:100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDlg.visible=false">{{ $t('common.cancel') }}</el-button>
