@@ -2144,8 +2144,9 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
   const utf8Name = encodeURIComponent(`${baseName}.pdf`)
   res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
 
-  const ACCENT = '#2F4858' // 深色强调
-  const LIGHT_ACCENT = '#e4edf1'
+  // 色彩优化：更高对比但不刺眼
+  const ACCENT = '#1f4b7a' // 深蓝主色（标题/强调）
+  const LIGHT_ACCENT = '#eaf2f9' // 分节底色（更浅）
   const BRAND = process.env.BRAND_NAME || (lang==='zh' ? '公司收付系统' : 'Payment System')
   const doc = new PDFDocument({ size: 'A5', layout: 'landscape', margins: { top: 20, bottom: 56, left: 28, right: 28 } })
   doc.pipe(res)
@@ -2261,41 +2262,42 @@ fxRouter.get('/payments/:id/pdf', auth.authMiddleware(true), auth.readOpenOr('fx
   doc.moveDown(0.6)
 
 
-  // ===== 金额分节条 + 金额下方左对齐展示 =====
+  // ===== 金额分节条 + 金额（整体居中） =====
   const padX = left + 12
   const total = items.rows.reduce((s, r) => s + Number(r.amount||0), 0)
   // 分节彩条
   ;(function amountSection(){
     const y = doc.y
-    const hBar = 20
+    const hBar = 22
     doc.save()
-    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#e4edf1')
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', padX, y + 4)
+    doc.roundedRect(left, y, contentWidth, hBar, 6).fill(LIGHT_ACCENT)
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text('支付金额 / Payment Amount', left, y + 4, { width: contentWidth, align: 'center' })
     doc.restore()
-    doc.y = y + hBar + 4
+    doc.y = y + hBar + 6
   })()
-  // 位于彩条下方显示金额
+  // 居中显示金额
   const currencyLabel = 'CNY: ' + money(total)
-  doc.font(fontBold).fontSize(18).fillColor(ACCENT).text(currencyLabel, padX, doc.y)
-  doc.moveDown(0.6)
+  doc.font(fontBold).fontSize(20).fillColor(ACCENT).text(currencyLabel, left, doc.y, { width: contentWidth, align: 'center' })
+  doc.moveDown(0.8)
 
   // 工具：分节彩条 + 双语标题
   const sectionBar = (zh, en) => {
     const y = doc.y
-    const hBar = 20
+    const hBar = 22
     doc.save()
-    doc.roundedRect(left, y, contentWidth, hBar, 4).fill('#e4edf1')
-    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, padX, y + 4)
+    doc.roundedRect(left, y, contentWidth, hBar, 6).fill(LIGHT_ACCENT)
+    doc.fillColor(ACCENT).font(fontBold).fontSize(11).text(`${zh} / ${en}`, left, y + 4, { width: contentWidth, align: 'center' })
     doc.restore()
-    doc.y = y + hBar + 4
+    doc.y = y + hBar + 6
   }
   // 工具：双语标签-值
   const drawLabelValue = (zh, en, value) => {
     const label = `${zh} / ${en}: `
     const y = doc.y
-    doc.font(fontBold).fontSize(10).fillColor('#5a5f63').text(label, padX, y, { continued: true })
-    doc.font(font).fontSize(12).fillColor('#111').text(value==null?'':String(value))
-    doc.moveDown(0.2)
+    // 左侧适度内缩，值保持近中性深色
+    doc.font(fontBold).fontSize(10).fillColor('#51606e').text(label, padX, y, { continued: true })
+    doc.font(font).fontSize(12).fillColor('#111111').text(value==null?'':String(value))
+    doc.moveDown(0.25)
   }
 
   // ===== 收款人信息 / Payee Info =====

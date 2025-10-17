@@ -67,6 +67,7 @@ export const api = {
     resetPassword: (id, password) => request(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
     getPerms: (id) => request(`/users/${id}/permissions`),
     setPerms: (id, perms) => request(`/users/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ perms }) }),
+    sessions: (id) => request(`/users/${id}/sessions`),
   },
   system: {
     health: () => request('/system/health')

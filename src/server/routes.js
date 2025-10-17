@@ -323,6 +323,20 @@ router.post('/users/:id/reset-password', auth.authMiddleware(true), auth.require
   res.json({ ok: true })
 })
 
+// 用户会话日志（最近 10 条登录/活动记录）
+router.get('/users/:id/sessions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
+  const id = Number(req.params.id)
+  const rs = await query(
+    `select last_ip, last_seen, user_agent
+       from user_sessions
+      where user_id=$1
+      order by coalesce(last_seen, now()) desc
+      limit 10`,
+    [id]
+  )
+  res.json(rs.rows)
+})
+
 // Permissions
 router.get('/permissions', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
   const rs = await query('select id, code, name from permissions order by id')
@@ -658,7 +672,7 @@ router.post('/customers', auth.authMiddleware(true), auth.requirePerm('customers
 // Update customer (abbr/name/tax_rate)
 router.put('/customers/:id', auth.authMiddleware(true), auth.requirePerm('customers:update'), async (req, res) => {
   const id = Number(req.params.id)
-  const { abbr, name, tax_rate } = req.body || {}
+  const { abbr, name, tax_rate, opening_myr, opening_cny } = req.body || {}
   const fields = []
   const values = []
   let idx = 1
@@ -671,6 +685,8 @@ router.put('/customers/:id', auth.authMiddleware(true), auth.requirePerm('custom
     const r3 = Math.round(n * 1000) / 1000
     fields.push(`tax_rate=$${idx++}`); values.push(r3)
   }
+  if (opening_myr !== undefined) { fields.push(`opening_myr=$${idx++}`); values.push(Number(opening_myr) || 0) }
+  if (opening_cny !== undefined) { fields.push(`opening_cny=$${idx++}`); values.push(Number(opening_cny) || 0) }
   if (!fields.length) return res.status(400).json({ error: 'no changes' })
   values.push(id)
   const rs = await query(`update customers set ${fields.join(', ')} where id=$${idx} returning *`, values)

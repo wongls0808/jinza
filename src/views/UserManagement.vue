@@ -28,19 +28,46 @@
               </div>
               <div class="username">@{{ u.username }}</div>
               <div class="meta" v-if="u.last_ip || u.last_seen">
-                <span v-if="u.last_ip">IP: {{ u.last_ip }}</span>
-                <span v-if="u.last_seen"> · {{ new Date(u.last_seen).toLocaleString() }}</span>
+                <span v-if="u.last_ip" class="kv"><span class="k">IP</span><span class="v">{{ u.last_ip }}</span></span>
+                <span v-if="u.last_seen" class="kv"><span class="k">TIME</span><span class="v">{{ new Date(u.last_seen).toLocaleString() }}</span></span>
               </div>
             </div>
             <div class="ops">
-              <el-switch v-model="u.is_active" @change="toggleActive(u)" :active-text="$t('users.active')" />
+              <div class="active-wrap">
+                <el-switch
+                  v-model="u.is_active"
+                  @change="toggleActive(u)"
+                  inline-prompt
+                  :active-icon="Check"
+                  :inactive-icon="Close"
+                />
+                <span class="muted">{{ t('users.active') }}</span>
+              </div>
               <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') || '分配权限' }}</el-button>
               <el-button type="warning" size="small" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
               <el-button type="danger" size="small" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
             </div>
           </div>
         </template>
-        <!-- 取消卡片内联权限，改为抽屉弹窗 -->
+        <!-- 日志预览（最近会话活动） -->
+        <div class="log-preview">
+          <div class="log-head">
+            <div class="log-title">{{ t('users.activityLog') || '用户日志' }}</div>
+            <div class="spacer"></div>
+            <el-button size="small" text @click="toggleLogs(u)">{{ isLogOpen(u) ? (t('common.collapse')||'收起') : (t('common.expand')||'展开') }}</el-button>
+            <el-button size="small" text :loading="logState.loading[u.id]" @click="refreshLogs(u)">{{ t('common.refresh') || '刷新' }}</el-button>
+          </div>
+          <el-collapse-transition>
+            <ul v-show="isLogOpen(u)" class="log-list">
+              <li v-if="(logs[u.id]||[]).length===0" class="log-empty">{{ t('common.noData') || '暂无数据' }}</li>
+              <li v-for="(it,idx) in (logs[u.id]||[])" :key="idx" class="log-item">
+                <span class="time">{{ new Date(it.last_seen || Date.now()).toLocaleString() }}</span>
+                <span class="ip">{{ it.last_ip }}</span>
+                <span class="ua" :title="it.user_agent">{{ it.user_agent?.slice(0, 60) || '' }}</span>
+              </li>
+            </ul>
+          </el-collapse-transition>
+        </div>
         
       </el-card>
     </div>
@@ -83,6 +110,10 @@
                 {{ group.name }} {{ isDrawerOpen(group.module) ? '▼' : '▶' }}
               </el-button>
               <div class="inline-perms" v-show="isDrawerOpen(group.module)">
+                <div class="group-batch">
+                  <el-button size="small" type="success" plain :disabled="permDrawer.user.is_admin" @click="selectGroup(group)">{{ t('users.selectAllInGroup') || '本组全选' }}</el-button>
+                  <el-button size="small" type="warning" plain :disabled="permDrawer.user.is_admin" @click="unselectGroup(group)">{{ t('users.unselectAllInGroup') || '本组全不选' }}</el-button>
+                </div>
                 <el-tag
                   v-for="p in group.items"
                   :key="p.code"
@@ -116,6 +147,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
+import { Check, Close } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 
@@ -131,6 +163,10 @@ const reset = ref({ visible: false, user: null, password: '', loading: false })
 const removeDlg = ref({ visible: false, user: null, loading: false })
 const reseed = ref({ loading: false })
 const permDrawer = ref({ visible: false, user: null, localPerms: [], saving: false, open: {} })
+// 日志数据与展开状态
+const logs = ref({}) // { [userId]: Array<{ last_ip, last_seen, user_agent }> }
+const logOpen = ref({}) // { [userId]: boolean }
+const logState = ref({ loading: {} })
 
 function userHas(u, code) {
   return (u._perms || []).includes(code)
@@ -297,6 +333,21 @@ async function savePerms() {
   }
 }
 
+// 本组一键全选/全不选
+function selectGroup(group) {
+  if (!group || !Array.isArray(group.items)) return
+  if (!permDrawer.value.user || permDrawer.value.user.is_admin) return
+  const set = new Set(permDrawer.value.localPerms)
+  for (const it of group.items) set.add(it.code)
+  permDrawer.value.localPerms = Array.from(set)
+}
+function unselectGroup(group) {
+  if (!group || !Array.isArray(group.items)) return
+  if (!permDrawer.value.user || permDrawer.value.user.is_admin) return
+  const del = new Set(group.items.map(it => it.code))
+  permDrawer.value.localPerms = permDrawer.value.localPerms.filter(c => !del.has(c))
+}
+
 async function doReseed() {
   reseed.value.loading = true
   try {
@@ -311,6 +362,21 @@ async function doReseed() {
 }
 
 onMounted(load)
+
+function isLogOpen(u) { return !!logOpen.value[u.id] }
+function toggleLogs(u) { logOpen.value[u.id] = !logOpen.value[u.id] }
+async function refreshLogs(u) {
+  if (!u?.id) return
+  logState.value.loading[u.id] = true
+  try {
+    const rows = await api.users.sessions(u.id)
+    logs.value[u.id] = rows || []
+  } catch (e) {
+    ElMessage.error(t('users.loadLogFailed') || '加载日志失败')
+  } finally {
+    logState.value.loading[u.id] = false
+  }
+}
 </script>
 
 <style scoped>
@@ -324,7 +390,10 @@ onMounted(load)
 .row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .name { font-weight: 600; font-size: 15px; }
 .username { color: var(--el-text-color-secondary); font-size: 12px; }
-.meta { color: var(--el-text-color-secondary); font-size: 12px; }
+.meta { color: var(--el-text-color-secondary); font-size: 12px; display:flex; gap:12px; flex-wrap:wrap; margin-top:2px; }
+.meta .kv { display:inline-flex; gap:6px; align-items:center; }
+.meta .kv .k { font-weight:600; opacity:0.75; }
+.meta .kv .v { font-variant-numeric: tabular-nums; }
 .status { margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 6px; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; }
 .status.online { color: var(--el-color-success); }
@@ -333,6 +402,8 @@ onMounted(load)
 .perm-tag { cursor: pointer; user-select: none; }
 .perm-tag.is-disabled { cursor: not-allowed; opacity: 0.7; }
 .ops { display: flex; gap: 8px; align-items: center; }
+.active-wrap { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.active-wrap .muted { font-size:12px; color: var(--el-text-color-secondary); }
 .perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
 .perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
 .perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -340,4 +411,14 @@ onMounted(load)
 .popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
 .inline-perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .admin-tip { color: var(--el-color-danger); font-size: 12px; margin: 4px 0 8px; }
+.group-batch { display:flex; gap:8px; margin: 0 0 8px; flex-wrap: wrap; }
+/* 日志样式 */
+.log-preview { margin-top: 8px; }
+.log-head { display:flex; align-items:center; gap:8px; }
+.log-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); }
+.log-list { list-style:none; padding:0; margin:6px 0 0; display:grid; gap:6px; }
+.log-item { display:grid; grid-template-columns: 160px 140px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
+.log-item .time { color: var(--el-text-color-secondary); }
+.log-item .ip { font-variant-numeric: tabular-nums; }
+.log-empty { font-size:12px; color: var(--el-text-color-secondary); padding:4px 0; }
 </style>

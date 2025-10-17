@@ -98,8 +98,7 @@
               <el-input-number
                 v-model="addDlg.form.opening_myr"
                 :precision="2"
-                :min="0"
-                :step="1"
+                :step="0.01"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -111,8 +110,7 @@
               <el-input-number
                 v-model="addDlg.form.opening_cny"
                 :precision="2"
-                :min="0"
-                :step="1"
+                :step="0.01"
                 controls-position="right"
                 :placeholder="'0.00'"
                 style="width:100%"
@@ -142,6 +140,32 @@
         <el-form-item :label="$t('customers.form.taxRate')" prop="tax_rate">
           <el-input-number v-model="editDlg.form.tax_rate" :precision="3" :min="0" :max="100" :step="0.001" controls-position="right" :placeholder="$t('customers.form.taxRatePlaceholder')" style="width:100%" />
         </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item :label="$t('customers.form.openingMYR')">
+              <el-input-number
+                v-model="editDlg.form.opening_myr"
+                :precision="2"
+                :step="0.01"
+                controls-position="right"
+                :placeholder="'0.00'"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('customers.form.openingCNY')">
+              <el-input-number
+                v-model="editDlg.form.opening_cny"
+                :precision="2"
+                :step="0.01"
+                controls-position="right"
+                :placeholder="'0.00'"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="editDlg.visible=false">{{ $t('common.cancel') }}</el-button>
@@ -243,7 +267,7 @@ const sort = ref('id')
 const order = ref('desc')
 const q = ref('')
 const addDlg = ref({ visible: false, loading: false, form: { abbr: '', name: '', tax_rate: null, opening_myr: 0, opening_cny: 0 } })
-const editDlg = ref({ visible: false, loading: false, id: null, form: { abbr: '', name: '', tax_rate: null } })
+const editDlg = ref({ visible: false, loading: false, id: null, form: { abbr: '', name: '', tax_rate: null, opening_myr: 0, opening_cny: 0 } })
 const addFormRef = ref()
 const editFormRef = ref()
 const { t } = useI18n()
@@ -550,11 +574,12 @@ function openEdit(row) {
   if (!row || !row.id) return
   editDlg.value.visible = true
   editDlg.value.id = row.id
-  // 仅编辑常规字段，期初金额不在此处编辑，避免误触
   editDlg.value.form = {
     abbr: row.abbr || '',
     name: row.name || '',
-    tax_rate: row.tax_rate == null ? null : Number(row.tax_rate)
+    tax_rate: row.tax_rate == null ? null : Number(row.tax_rate),
+    opening_myr: row.opening_myr == null ? 0 : Number(row.opening_myr),
+    opening_cny: row.opening_cny == null ? 0 : Number(row.opening_cny)
   }
 }
 
@@ -571,6 +596,9 @@ async function doEdit() {
     editDlg.value.loading = true
     const f = { ...editDlg.value.form }
     if (f.tax_rate != null) f.tax_rate = round3(f.tax_rate)
+  // 期初金额保留两位小数
+  if (f.opening_myr != null && f.opening_myr !== '') f.opening_myr = Math.round(Number(f.opening_myr) * 100) / 100
+  if (f.opening_cny != null && f.opening_cny !== '') f.opening_cny = Math.round(Number(f.opening_cny) * 100) / 100
     await api.customers.update(editDlg.value.id, f)
     editDlg.value.visible = false
     await reload()
