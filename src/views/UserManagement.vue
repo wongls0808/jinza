@@ -40,37 +40,28 @@
           </div>
         </template>
         <div class="perms" v-if="permTree && permTree.length">
+          <div v-if="u.is_admin" class="admin-tip">管理员拥有全部权限（不可更改）</div>
           <div class="perm-group" v-for="group in permTree" :key="group.module">
             <div class="perm-group-title">{{ group.name }}</div>
             <div class="perm-group-items">
-              <el-popover
-                placement="bottom-start"
-                trigger="click"
-                width="360px"
-                :hide-after="0"
-                v-model:visible="popVisible[u.id + '-' + group.module]"
-              >
-                <template #reference>
-                  <el-button size="small" plain @click.stop="popVisible[u.id + '-' + group.module] = !popVisible[u.id + '-' + group.module]">
-                    {{ t('users.permissions') }} · {{ group.name }}
-                  </el-button>
-                </template>
-                <div class="popover-perms">
-                  <el-tag
-                    v-for="p in group.items"
-                    :key="p.code"
-                    :type="userHas(u, p.code) ? 'success' : 'info'"
-                    class="perm-tag"
-                    effect="light"
-                    size="small"
-                    :disable-transitions="true"
-                    :class="{ 'is-disabled': u.is_admin }"
-                    @click="onPickPerm(u, p.code); popVisible[u.id + '-' + group.module] = false"
-                  >
-                    {{ p.name }}
-                  </el-tag>
-                </div>
-              </el-popover>
+              <el-button size="small" plain @click.stop="toggleGroup(u.id, group.module)">
+                {{ t('users.permissions') }} · {{ group.name }} {{ isOpen(u.id, group.module) ? '▼' : '▶' }}
+              </el-button>
+              <div class="inline-perms" v-show="isOpen(u.id, group.module)">
+                <el-tag
+                  v-for="p in group.items"
+                  :key="p.code"
+                  :type="userHas(u, p.code) ? 'success' : 'info'"
+                  class="perm-tag"
+                  effect="light"
+                  size="small"
+                  :disable-transitions="true"
+                  :class="{ 'is-disabled': u.is_admin }"
+                  @click="onPickPerm(u, p.code)"
+                >
+                  {{ p.name }}
+                </el-tag>
+              </div>
             </div>
           </div>
         </div>
@@ -112,7 +103,8 @@ const { t } = useI18n()
 const users = ref([])
 const perms = ref([]) // 后端完整清单（直接用于校验去重或显示 meta）
 const permTree = ref(null) // 新的权限树（分组展示）
-const popVisible = ref({}) // { `${userId}-${module}`: boolean }
+const popVisible = ref({}) // 兼容旧逻辑（不再使用）
+const openGroups = ref({}) // { `${userId}-${module}`: boolean }
 const extraPerms = ref([]) // 兼容逻辑已移除，保留变量但不使用
 const creating = ref(false)
 const newUser = ref({ username: '', password: '', display_name: '' })
@@ -140,6 +132,20 @@ async function load() {
   permTree.value = pt
   // 兼容逻辑移除：权限仅以权限树为准
   extraPerms.value = []
+
+  // 默认展开非管理员用户的所有权限分组，避免“无法展开/点击”导致看不到可点标签
+  try {
+    const tree = Array.isArray(permTree.value) ? permTree.value : []
+    for (const u of users.value) {
+      if (u && !u.is_admin) {
+        for (const g of tree) {
+          if (g && g.module) {
+            openGroups.value[keyFor(u.id, g.module)] = true
+          }
+        }
+      }
+    }
+  } catch {}
 }
 
 async function createUser() {
@@ -221,6 +227,10 @@ function onPickPerm(u, code) {
   setUserPerm(u, code, !has)
 }
 
+function keyFor(uid, mod) { return `${uid}-${mod}` }
+function isOpen(uid, mod) { return !!openGroups.value[keyFor(uid, mod)] }
+function toggleGroup(uid, mod) { const k = keyFor(uid, mod); openGroups.value[k] = !openGroups.value[k] }
+
 async function doReseed() {
   reseed.value.loading = true
   try {
@@ -262,4 +272,6 @@ onMounted(load)
 .perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }
 .popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
 .popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
+.inline-perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.admin-tip { color: var(--el-color-danger); font-size: 12px; margin: 4px 0 8px; }
 </style>
