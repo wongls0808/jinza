@@ -1438,6 +1438,10 @@ const handleFileChange = (file) => {
 
 function buildDedup(rows){
   // 临时移除去重逻辑，允许所有数据导入进行测试
+  // 定义必要的变量以避免运行时错误
+  const key = (r) => `${r.accountNumber}|${r.transactionDate}|${r.chequeRefNo || ''}`
+  const map = new Map()
+  const out = []
 
   for (const r of rows) {
     const k = key(r)
