@@ -15,7 +15,7 @@ const _bocCache = { data: null, time: 0, ttl: 60 * 1000 }
 // 简易内存缓存（Huaji API），按 pair 逐项缓存
 const _huajiCache = { map: new Map(), ttl: 60 * 1000 }
 
-async function ensureDDL() {
+export async function ensureDDL() {
   await query(`
     create table if not exists fx_settlements(
       id serial primary key,

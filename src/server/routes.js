@@ -9,7 +9,7 @@ import multer from 'multer'
 import { parseCSV, removeDuplicates } from './utils.js'
 import { transactionsRouter } from './transactions.js'
 import { createTransactionsController } from './transactionsFallback.js'
-import { fxRouter } from './fx.js'
+import { fxRouter, ensureDDL as ensureFxDDL } from './fx.js'
 import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, getModuleViewCode, buildPermissionIndex } from './permissions.js'
 import crypto from 'crypto'
 
@@ -71,6 +71,8 @@ router.post('/auth/logout', authMiddleware(true), async (req, res) => {
 // 工作台汇总统计（供图形展示）
 router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboard'), async (req, res) => {
   const { startDate, endDate } = req.query || {}
+  // 确保 FX 相关表存在（兼容首次部署或迁移后）
+  try { await ensureFxDDL() } catch {}
   // 通用 where 片段生成器
   const periodCond = (col) => {
     const wh = []
@@ -100,13 +102,16 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
     `, sPer.params)
 
     // 3) 购汇合计（平台互换 to_currency=MYR 的 amount_to 合计）
-    const bPer = periodCond('t.created_at')
-    const bSqlWhere = bPer.sql ? `${bPer.sql} and upper(t.to_currency) = 'MYR'` : `where upper(t.to_currency) = 'MYR'`
+    // 注意 created_at 为 timestamptz，原 <= endDate 可能遗漏当日稍晚数据；改为 [start, end+1) 半开区间
+    let bWhere = `where upper(t.to_currency) = 'MYR'`
+    const bParams = []
+    if (startDate) { bParams.push(startDate); bWhere += ` and t.created_at >= $${bParams.length}::date` }
+    if (endDate) { bParams.push(endDate); bWhere += ` and t.created_at < ($${bParams.length}::date + interval '1 day')` }
     const bSumRows = await runSafe(`
       select sum(t.amount_to) as total
         from fx_platform_fx_transfers t
-        ${bSqlWhere}
-    `, bPer.params)
+        ${bWhere}
+    `, bParams)
 
     // 4) 付款合计（payment_items.amount 合计）
     const pPer = periodCond('p.pay_date')
