@@ -117,19 +117,20 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
        order by month asc
     `, sPer.params)
 
-    // 3) 购汇合计（按 buy 表 amount_pay 合计 + 月度）
-    const bPer = periodCond('b.created_at')
+    // 3) 购汇合计（以平台内币种互换记录为准：to_currency = 'MYR' 的 amount_to 合计 + 月度）
+    const bPer = periodCond('t.created_at')
+    const bSqlWhere = bPer.sql ? `${bPer.sql} and upper(t.to_currency) = 'MYR'` : `where upper(t.to_currency) = 'MYR'`
     const bSumRows = await runSafe(`
-      select sum(b.amount_pay) as total
-        from fx_buy_orders b
-        ${bPer.sql}
+      select sum(t.amount_to) as total
+        from fx_platform_fx_transfers t
+        ${bSqlWhere}
     `, bPer.params)
     const bMonthlyRows = await runSafe(`
-      select to_char(b.created_at,'YYYY-MM') as month,
-             sum(b.amount_pay) as total
-        from fx_buy_orders b
-        ${bPer.sql}
-       group by to_char(b.created_at,'YYYY-MM')
+      select to_char(t.created_at,'YYYY-MM') as month,
+             sum(t.amount_to) as total
+        from fx_platform_fx_transfers t
+        ${bSqlWhere}
+       group by to_char(t.created_at,'YYYY-MM')
        order by month asc
     `, bPer.params)
 
@@ -151,16 +152,20 @@ router.get('/workbench/summary', authMiddleware(true), requirePerm('view_dashboa
        order by month asc
     `, pPer.params)
 
-    // 5) 费用合计（expenses.amount 合计 + 月度；借贷方向由 drcr 辅助，但这里总体合计 amount）
+    // 5) 费用合计（借贷后的净额：credit 为正、debit 为负）
     const ePer = periodCond('e.biz_date')
     const eSumRows = await runSafe(`
-      select sum(e.amount) as total
+      select sum(case when lower(coalesce(e.drcr,'')) = 'credit' then e.amount
+                      when lower(coalesce(e.drcr,'')) = 'debit' then -e.amount
+                      else 0 end) as total
         from expenses e
         ${ePer.sql}
     `, ePer.params)
     const eMonthlyRows = await runSafe(`
       select to_char(e.biz_date,'YYYY-MM') as month,
-             sum(e.amount) as total
+             sum(case when lower(coalesce(e.drcr,'')) = 'credit' then e.amount
+                      when lower(coalesce(e.drcr,'')) = 'debit' then -e.amount
+                      else 0 end) as total
         from expenses e
         ${ePer.sql}
        group by to_char(e.biz_date,'YYYY-MM')
