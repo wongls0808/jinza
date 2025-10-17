@@ -203,7 +203,7 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
 });
 
 // 批量删除交易
-transactionsRouter.delete('/batch', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
+transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
   try {
     const { ids } = req.body;
     
