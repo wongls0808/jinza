@@ -16,6 +16,8 @@ services:
         generateValue: true
       - key: DATA_DIR
         value: /data
+      - key: PERM_UI_ONLY
+        value: "1"
     disk:
       name: data
       mountPath: /data

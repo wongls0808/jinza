@@ -295,6 +295,8 @@ export function validatePasswordStrength(password) {
 
 export function requirePerm(code) {
   return (req, res, next) => {
+    // UI-only 权限模式：放行所有权限检查（仍需登录）
+    if (process.env.PERM_UI_ONLY === '1') return next()
     // 管理员直接放行
     if (req.user && req.user.is_admin) return next()
 
@@ -308,6 +310,8 @@ export function requirePerm(code) {
 // 判断是否拥有指定权限码
 export function hasPerm(req, code) {
   if (!req || !req.user) return false
+  // UI-only 权限模式：视为拥有所有权限（仍需登录）
+  if (process.env.PERM_UI_ONLY === '1') return true
   if (req.user.is_admin) return true
   const perms = Array.isArray(req.user.perms) ? req.user.perms : []
   return perms.includes(code)
@@ -317,10 +321,25 @@ export function hasPerm(req, code) {
 export function requireAnyPerm(...codes) {
   const flat = codes.flat().filter(Boolean)
   return (req, res, next) => {
+    // UI-only 权限模式：放行所有权限检查（仍需登录）
+    if (process.env.PERM_UI_ONLY === '1') return next()
     if (req.user && req.user.is_admin) return next()
     const perms = (req.user && req.user.perms) || []
     const ok = flat.some(c => perms.includes(c))
     if (!ok) return res.status(403).json({ error: 'Forbidden' })
     next()
+  }
+}
+
+// 放宽读取：
+// - 对 GET 请求不做权限拦截（仅需登录），用于基础数据/联动下拉等读取，避免前端因为缺少查看权限而无法使用
+// - 对非 GET 请求（写操作）仍按 requireAnyPerm 校验
+export function readOpenOr(...codes) {
+  const guard = requireAnyPerm(...codes)
+  return (req, res, next) => {
+    // UI-only 权限模式：放行所有权限检查（仍需登录）
+    if (process.env.PERM_UI_ONLY === '1') return next()
+    if (String(req.method || '').toUpperCase() === 'GET') return next()
+    return guard(req, res, next)
   }
 }

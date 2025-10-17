@@ -357,7 +357,7 @@ router.get('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
 })
 
 // Expenses（费用管理）
-router.get('/expenses', auth.authMiddleware(true), auth.requirePerm('expenses:list'), async (req, res) => {
+router.get('/expenses', auth.authMiddleware(true), auth.readOpenOr('expenses:list'), async (req, res) => {
   const { q = '', category = '', startDate = '', endDate = '', drcr = '', page = 1, pageSize = 50 } = req.query
   try {
     await query(`
@@ -438,7 +438,7 @@ router.delete('/expenses/:id', auth.authMiddleware(true), auth.requirePerm('expe
 })
 
 // 费用借贷报表：基于已匹配到费用项的银行流水
-router.get('/expenses/report', auth.authMiddleware(true), auth.requirePerm('expenses:list'), async (req, res) => {
+router.get('/expenses/report', auth.authMiddleware(true), auth.readOpenOr('expenses:list'), async (req, res) => {
   try {
     const { startDate = '', endDate = '', category = '', drcr = '' } = req.query || {}
     const wh = []
@@ -550,7 +550,7 @@ router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
 })
 
 // Customers
-router.get('/customers', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
+router.get('/customers', auth.authMiddleware(true), auth.readOpenOr('view_customers'), async (req, res) => {
   const { q = '', page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const term = `%${q}%`
@@ -873,7 +873,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
   }
 })
 
-router.get('/customers/export', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
+router.get('/customers/export', auth.authMiddleware(true), auth.readOpenOr('view_customers'), async (req, res) => {
   const rs = await query('select abbr,name,tax_rate,opening_myr,opening_cny,submitter from customers order by id desc')
   const lines = rs.rows.map(r => [r.abbr||'', r.name||'', Number(r.tax_rate||0).toFixed(3), r.opening_myr||0, r.opening_cny||0, r.submitter||''].join(','))
   const csv = lines.join('\n')
@@ -884,7 +884,7 @@ router.get('/customers/export', auth.authMiddleware(true), auth.requirePerm('vie
 })
 
 // Currencies CRUD (simple)
-router.get('/currencies', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
+router.get('/currencies', auth.authMiddleware(true), auth.readOpenOr('view_accounts'), async (req, res) => {
   const rs = await query('select code, name from currencies order by code')
   res.json(rs.rows)
 })
@@ -901,7 +901,7 @@ router.delete('/currencies/:code', auth.authMiddleware(true), auth.requirePerm('
 })
 
 // Receiving accounts
-router.get('/accounts', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
+router.get('/accounts', auth.authMiddleware(true), auth.readOpenOr('view_accounts'), async (req, res) => {
   const { page = 1, pageSize = 20, sort = 'id', order = 'desc' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const sortMap = {
@@ -967,7 +967,7 @@ router.delete('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('acco
 })
 
 // Customer specific receiving accounts
-router.get('/customers/:id/accounts', auth.authMiddleware(true), auth.requirePerm('view_customers'), async (req, res) => {
+router.get('/customers/:id/accounts', auth.authMiddleware(true), auth.readOpenOr('view_customers'), async (req, res) => {
   const cid = Number(req.params.id)
   const rs = await query(`
     select a.id, a.account_name, a.bank_account, a.currency_code,
@@ -1025,7 +1025,7 @@ router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requi
 })
 
 // Banks CRUD (server-managed)
-router.get('/banks', auth.authMiddleware(true), auth.requirePerm('view_banks'), async (req, res) => {
+router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')
   // 规范化 logo 路径：若数据库中的 logo_url 不存在或文件缺失，则按 svg/png/jpg 顺序寻找现有文件
   const publicDirCandidates = [
@@ -1190,7 +1190,7 @@ router.post('/banks/reset-defaults', auth.authMiddleware(true), auth.requireAnyP
   res.json({ ok: true, count: defaults.length })
 })
 
-router.get('/customers/template', auth.authMiddleware(true), auth.requireAnyPerm('customers:template','customers:import'), async (req, res) => {
+router.get('/customers/template', auth.authMiddleware(true), auth.readOpenOr('customers:template','customers:import'), async (req, res) => {
   const header = 'abbr,name,tax_rate,opening_myr,opening_cny,submitter' // 简称,客户名,税率,马币期初,人民币期初,提交人
   const sample = ['ABC,深圳市某某公司,6,1000,2000,王五', 'DEF,广州某某集团,0,0,3500,李四'].join('\n')
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')

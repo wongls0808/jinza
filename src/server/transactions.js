@@ -84,7 +84,7 @@ function sanitizeReferenceText(s) {
 }
 
 // 下载导入模板（返回JSON样例，前端将转CSV）
-transactionsRouter.get('/template', auth.authMiddleware(true), auth.requireAnyPerm('transactions:import','view_transactions'), async (req, res) => {
+transactionsRouter.get('/template', auth.authMiddleware(true), auth.readOpenOr('transactions:import','view_transactions'), async (req, res) => {
   return res.json([
     {
       accountNumber: '000123456789',
@@ -99,7 +99,7 @@ transactionsRouter.get('/template', auth.authMiddleware(true), auth.requireAnyPe
 })
 
 // 获取交易列表，支持分页、排序和筛选
-transactionsRouter.get('/', auth.authMiddleware(true), auth.requirePerm('view_transactions'), async (req, res) => {
+transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_transactions'), async (req, res) => {
   try {
     // 自愈：缺表时自动创建
     await ensureTransactionsDDL()
@@ -274,7 +274,7 @@ transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.require
 });
 
 // 获取交易统计信息
-transactionsRouter.get('/stats', auth.authMiddleware(true), auth.requirePerm('transactions:advanced_filter'), async (req, res) => {
+transactionsRouter.get('/stats', auth.authMiddleware(true), auth.readOpenOr('transactions:advanced_filter'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { startDate, endDate, account } = req.query;
@@ -382,7 +382,7 @@ transactionsRouter.get('/stats', auth.authMiddleware(true), auth.requirePerm('tr
 });
 
 // 导出交易（根据相同筛选条件返回不分页的结果，用于前端导出 CSV）
-transactionsRouter.get('/export', auth.authMiddleware(true), auth.requirePerm('transactions:export'), async (req, res) => {
+transactionsRouter.get('/export', auth.authMiddleware(true), auth.readOpenOr('transactions:export'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { 
@@ -811,7 +811,7 @@ transactionsRouter.put('/:id', auth.authMiddleware(true), auth.requireAnyPerm('t
 // 旧的重复导入端点已移除，避免行为冲突
 
 // 获取单个交易详情（供查看弹窗使用）
-transactionsRouter.get('/:id', auth.authMiddleware(true), auth.requirePerm('view_transactions'), async (req, res) => {
+transactionsRouter.get('/:id', auth.authMiddleware(true), auth.readOpenOr('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const id = Number(req.params.id);

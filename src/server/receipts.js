@@ -207,7 +207,7 @@ receiptsRouter.post('/import-text', auth.authMiddleware(true), auth.requirePerm(
 })
 
 // 列表（仅返回规范字段 + 富化）
-receiptsRouter.get('/', auth.authMiddleware(true), auth.requirePerm('view_accounts'), async (req, res) => {
+receiptsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_accounts'), async (req, res) => {
   const { page = 1, pageSize = 20, account_number = '' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
   const cond = []
