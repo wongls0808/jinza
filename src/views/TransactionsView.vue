@@ -1365,6 +1365,11 @@ const handleFileChange = (file) => {
     try {
       const fullText = String(e.target.result || '')
       originalCsvText.value = fullText
+      
+      // 从文件头提取默认账户号码
+      const accountMatch = /(^|\n)\s*Account\s+Number\s*:\s*,\s*([^\r\n,]+)/i.exec(fullText)
+      const defaultAccountNumber = accountMatch ? accountMatch[2].trim() : ''
+      
       // 仅解析从表头 Trn. Date 开始的数据区，以适配固定银行格式
       const lines = fullText.replace(/\r\n/g, '\n').split('\n')
       const headerIdx = lines.findIndex(l => /^\s*Trn\.\s*Date\s*,/i.test(l))
@@ -1392,29 +1397,32 @@ const handleFileChange = (file) => {
             }
             
             // 转为统一结构
-            const rows = results.data.map(row => ({
-              accountNumber: cleanExcelValue(row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || ''),
-              transactionDate: cleanExcelValue(row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || ''),
-              chequeRefNo: cleanExcelValue(row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || ''),
-              description: cleanExcelValue(row.description || row.描述 || row.Description || row['Transaction Description'] || ''),
-              debitAmount: Number(cleanExcelValue(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0).replace(/,/g, '')) || 0,
-              creditAmount: Number(cleanExcelValue(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0).replace(/,/g, '')) || 0,
-              reference1: cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
-              reference2: cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
-              reference3: cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
-              reference4: cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
-              reference5: cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
-              reference6: cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || ''),
-              // 合并所有参考字段为单一referenceText
-              referenceText: [
-                cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
-                cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
-                cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
-                cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
-                cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
-                cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || '')
-              ].filter(r => r && r !== '-').join(' ').trim()
-            }))
+            const rows = results.data.map(row => {
+              const rowAccountNumber = cleanExcelValue(row.accountNumber || row.账号 || row['账号'] || row['Account Number'] || '')
+              return {
+                accountNumber: rowAccountNumber || defaultAccountNumber,
+                transactionDate: cleanExcelValue(row.transactionDate || row.交易日期 || row['Transaction Date'] || row['Trn. Date'] || ''),
+                chequeRefNo: cleanExcelValue(row.chequeRefNo || row['参考号'] || row['Ref No'] || row['Cheque No/Ref No'] || ''),
+                description: cleanExcelValue(row.description || row.描述 || row.Description || row['Transaction Description'] || ''),
+                debitAmount: Number(cleanExcelValue(row.debitAmount || row.借方金额 || row['Debit Amount'] || 0).replace(/,/g, '')) || 0,
+                creditAmount: Number(cleanExcelValue(row.creditAmount || row.贷方金额 || row['Credit Amount'] || 0).replace(/,/g, '')) || 0,
+                reference1: cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+                reference2: cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+                reference3: cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+                reference4: cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+                reference5: cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+                reference6: cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || ''),
+                // 合并所有参考字段为单一referenceText
+                referenceText: [
+                  cleanExcelValue(row.reference1 || row.参考1 || row['Reference 1'] || ''),
+                  cleanExcelValue(row.reference2 || row.参考2 || row['Reference 2'] || ''),
+                  cleanExcelValue(row.reference3 || row.参考3 || row['Reference 3'] || ''),
+                  cleanExcelValue(row.reference4 || row.参考4 || row['Reference 4'] || ''),
+                  cleanExcelValue(row.reference5 || row.参考5 || row['Reference 5'] || ''),
+                  cleanExcelValue(row.reference6 || row.参考6 || row['Reference 6'] || '')
+                ].filter(r => r && r !== '-').join(' ').trim()
+              }
+            })
             buildDedup(rows)
           } else {
             importRows.value = []
@@ -1523,7 +1531,22 @@ const submitImport = async () => {
   try {
     // 新逻辑：仅导入勾选的行，统一走 JSON 导入接口
     const selected = importRows.value.filter(r => r.include)
-    const transformedData = selected.map(row => ({
+    
+    // 验证必要字段
+    const validRows = selected.filter(row => {
+      if (!row.accountNumber || !row.transactionDate) {
+        console.warn('跳过无效行（缺少账户号或交易日期）:', row)
+        return false
+      }
+      return true
+    })
+    
+    if (validRows.length === 0) {
+      ElMessage.warning('没有有效的数据可以导入')
+      return
+    }
+    
+    const transformedData = validRows.map(row => ({
       accountNumber: row.accountNumber,
       transactionDate: row.transactionDate,
       chequeRefNo: row.chequeRefNo,
@@ -1531,6 +1554,7 @@ const submitImport = async () => {
       debitAmount: row.debitAmount,
       creditAmount: row.creditAmount,
       category: '',
+      referenceText: row.referenceText,
       reference1: row.referenceText,
       reference2: '',
       reference3: ''
@@ -1574,7 +1598,12 @@ const submitImport = async () => {
     fetchTransactions()
   } catch (error) {
     console.error('导入交易数据失败:', error)
-    ElMessage.error(t('transactions.importFailed'))
+    // 显示更详细的错误信息
+    let errorMessage = t('transactions.importFailed')
+    if (error.message) {
+      errorMessage += `: ${error.message}`
+    }
+    ElMessage.error(errorMessage)
   } finally {
     importSubmitting.value = false
   }
