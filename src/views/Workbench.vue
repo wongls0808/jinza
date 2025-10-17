@@ -91,7 +91,7 @@
       <el-popover placement="bottom-start" width="auto" v-model:visible="datePopover">
         <el-date-picker v-model="range" type="daterange" unlink-panels :editable="false" @change="onRangeChange" />
         <template #reference>
-          <el-button size="small" circle :title="dateRangeLabel" @click="datePopover=true">
+          <el-button size="small" circle :type="dateBtnType" :title="dateRangeLabel" @click="datePopover=true">
             <el-icon><Calendar /></el-icon>
           </el-button>
         </template>
@@ -403,6 +403,12 @@ const dateRangeLabel = computed(() => {
   if (!Array.isArray(range.value) || !range.value[0] || !range.value[1]) return `${t('common.startDate')} ~ ${t('common.endDate')}`
   const s = fmtYmd(range.value[0]); const e = fmtYmd(range.value[1])
   return `${s} ~ ${e}`
+})
+const dateBtnType = computed(() => {
+  if (datePopover.value) return 'primary' // 打开时高亮
+  if (Array.isArray(range.value) && range.value[0] && range.value[1]) return 'success' // 已选择范围
+  if (quick.value) return 'warning' // 使用快捷筛选
+  return '' // 默认
 })
 function fmtYmd(d){ try { return d.toISOString().slice(0,10) } catch { return '' } }
 async function loadSummary(){
