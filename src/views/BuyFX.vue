@@ -46,36 +46,76 @@
       </el-col>
       <el-col :span="manage?14:24">
         <el-card shadow="never">
-          <template #header>
+          <template v-if="!compact" #header>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span>{{ t('buyfx.title') }}</span>
             </div>
           </template>
-          
-          <div class="convert-form">
-            <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" @change="onPlatformChange">
-              <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
-            </el-select>
-            <el-select v-model="convert.from" :placeholder="t('buyfx.sellCurrency')" @change="onFromChange">
-              <el-option label="USD" value="USD"/>
-              <el-option label="MYR" value="MYR"/>
-              <el-option label="CNY" value="CNY"/>
-            </el-select>
-            <el-select v-model="convert.to" :placeholder="t('buyfx.buyCurrency')">
-              <el-option label="USD" value="USD"/>
-              <el-option label="MYR" value="MYR"/>
-              <el-option label="CNY" value="CNY"/>
-            </el-select>
-            <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" :placeholder="t('buyfx.sellAmount')" @change="() => { amountEdited.value = true }"/>
-            <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" :placeholder="t('buyfx.rate')"/>
-            <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.sell') }}</el-button>
-          </div>
-          <div class="convert-hint" v-if="convertSummary">
-            <el-alert type="info" :title="convertSummary" show-icon :closable="false" />
-          </div>
-          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
-            <el-button type="primary" link @click="goBuyOrderHistory">{{ t('buyfx.viewOrders') }}</el-button>
-          </div>
+
+          <!-- 紧凑模式：标签+控件纵向表单 -->
+          <template v-if="compact">
+            <el-form label-width="80px" class="convert-form-compact">
+              <el-form-item :label="t('buyfx.platform')">
+                <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" style="width: 260px" @change="onPlatformChange">
+                  <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="t('buyfx.sellCurrency')">
+                <el-select v-model="convert.from" style="width: 160px" @change="onFromChange">
+                  <el-option label="USD" value="USD"/>
+                  <el-option label="MYR" value="MYR"/>
+                  <el-option label="CNY" value="CNY"/>
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="t('buyfx.buyCurrency')">
+                <el-select v-model="convert.to" style="width: 160px">
+                  <el-option label="USD" value="USD"/>
+                  <el-option label="MYR" value="MYR"/>
+                  <el-option label="CNY" value="CNY"/>
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="t('buyfx.sellAmount')">
+                <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" style="width: 260px" @change="() => { amountEdited.value = true }"/>
+              </el-form-item>
+              <el-form-item :label="t('buyfx.rate')">
+                <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" style="width: 260px"/>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.sell') }}</el-button>
+              </el-form-item>
+            </el-form>
+            <div class="convert-hint" v-if="convertSummary" style="margin-top:8px;">
+              <el-alert type="info" :title="convertSummary" show-icon :closable="false" />
+            </div>
+          </template>
+
+          <!-- 经典模式：原三列网格表单 -->
+          <template v-else>
+            <div class="convert-form">
+              <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" @change="onPlatformChange">
+                <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
+              </el-select>
+              <el-select v-model="convert.from" :placeholder="t('buyfx.sellCurrency')" @change="onFromChange">
+                <el-option label="USD" value="USD"/>
+                <el-option label="MYR" value="MYR"/>
+                <el-option label="CNY" value="CNY"/>
+              </el-select>
+              <el-select v-model="convert.to" :placeholder="t('buyfx.buyCurrency')">
+                <el-option label="USD" value="USD"/>
+                <el-option label="MYR" value="MYR"/>
+                <el-option label="CNY" value="CNY"/>
+              </el-select>
+              <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" :placeholder="t('buyfx.sellAmount')" @change="() => { amountEdited.value = true }"/>
+              <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" :placeholder="t('buyfx.rate')"/>
+              <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.sell') }}</el-button>
+            </div>
+            <div class="convert-hint" v-if="convertSummary">
+              <el-alert type="info" :title="convertSummary" show-icon :closable="false" />
+            </div>
+            <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+              <el-button type="primary" link @click="goBuyOrderHistory">{{ t('buyfx.viewOrders') }}</el-button>
+            </div>
+          </template>
         </el-card>
       </el-col>
     </el-row>
@@ -141,7 +181,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const router = useRouter()
-const props = defineProps({ manage: { type: Boolean, default: true } })
+const props = defineProps({ manage: { type: Boolean, default: true }, compact: { type: Boolean, default: false } })
 
 const platforms = ref([])
 
@@ -390,6 +430,8 @@ function exportExpensesCsv(){
 @media (max-width: 1200px){ .buy-form { grid-template-columns: 1fr; } }
 .convert-form { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; align-items:center; margin: 8px 0; }
 @media (max-width: 1200px){ .convert-form { grid-template-columns: 1fr; } }
+/* 紧凑表单 */
+.convert-form-compact :deep(.el-form-item) { margin-bottom: 8px; }
 /* 平台卡片列表 */
 .platform-list { display: flex; flex-direction: column; gap: 10px; max-height: 40vh; overflow:auto; padding-right: 2px; }
 .platform-card { border: 1px solid var(--el-border-color); border-radius: 10px; padding: 12px; background: var(--el-fill-color-blank); transition: box-shadow .2s ease, border-color .2s ease; }

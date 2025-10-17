@@ -288,8 +288,8 @@
       <FXManagement ref="payRef" mode="pay" :initial-pay-customer-id="payPrefillCustomerId" @paymentCreated="onPaymentCreated" />
     </el-drawer>
     <!-- 快捷操作：购汇抽屉 -->
-    <el-drawer v-model="buyDrawer.visible" title="购汇" size="70%">
-      <BuyFX :manage="false" />
+    <el-drawer v-model="buyDrawer.visible" title="购汇" size="520px">
+      <BuyFX :manage="false" :compact="true" />
     </el-drawer>
 
     <!-- 付款单明细抽屉 -->
