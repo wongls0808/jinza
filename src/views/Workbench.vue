@@ -1312,4 +1312,13 @@ function onPaymentCreated(){
 .chart-meta .big { font-size: 22px; font-weight: 800; line-height: 1.1; }
 .chart-meta .sub { color: var(--el-text-color-secondary); font-size: 12px; }
 .chart-meta .ops { margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* 抽屉内表格：移除外框与背景，保留行分隔线以保证可读性 */
+:deep(.el-drawer .el-table) { background: transparent; }
+:deep(.el-drawer .el-table__inner-wrapper)::before { display: none; }
+:deep(.el-drawer .el-table--border) { border: none; }
+:deep(.el-drawer .el-table--border::after),
+:deep(.el-drawer .el-table--border::before) { display: none; }
+:deep(.el-drawer .el-table th),
+:deep(.el-drawer .el-table td) { background: transparent; }
 </style>
