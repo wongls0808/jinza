@@ -280,11 +280,11 @@
     </el-drawer>
 
     <!-- 快捷操作：结汇抽屉 -->
-    <el-drawer v-model="settleDrawer.visible" title="结汇" size="70%">
+    <el-drawer v-model="settleDrawer.visible" title="结汇" size="40%">
       <FXManagement ref="settleRef" mode="settle" :initial-settle-customer-id="settlePrefillCustomerId" @settlementCreated="onSettlementCreated" />
     </el-drawer>
     <!-- 快捷操作：付款抽屉 -->
-    <el-drawer v-model="payDrawer.visible" title="付款" size="70%">
+    <el-drawer v-model="payDrawer.visible" title="付款" size="40%">
       <FXManagement ref="payRef" mode="pay" :initial-pay-customer-id="payPrefillCustomerId" @paymentCreated="onPaymentCreated" />
     </el-drawer>
     <!-- 快捷操作：购汇抽屉 -->
@@ -392,7 +392,7 @@
     </el-drawer>
 
     <!-- 统计明细抽屉（查看被计入的数据） -->
-  <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" size="980px">
+  <el-drawer v-model="detailDrawer.visible" :title="detailDrawer.title" :size="detailDrawerSize">
       <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading" @header-dragend="onColResizeDetail">
         <!-- 交易明细(借)：交易日期/账号/账户名称/借方金额 -->
         <template v-if="detailDrawer.type==='tx-debit'">
@@ -532,6 +532,13 @@ let _detailMem = useTableMemory(detailMemKey())
 function refreshDetailMem(){ _detailMem = useTableMemory(detailMemKey()) }
 const colWDetail = (col, def) => _detailMem.colW(col, def)
 const onColResizeDetail = (nw, ow, col, evt) => _detailMem.onColResize(nw, ow, col, evt)
+// 明细抽屉动态宽度：借/贷/结汇/购汇为40%，费用为50%，其他默认60%
+const detailDrawerSize = computed(() => {
+  const tp = detailDrawer.value.type
+  if (tp === 'tx-debit' || tp === 'tx-credit' || tp === 'settle' || tp === 'buy') return '40%'
+  if (tp === 'exp') return '50%'
+  return '60%'
+})
 
 // 服务器监控列宽记忆
 const { colW: colWMonitor, onColResize: onColResizeMonitor } = useTableMemory('wb-monitor')
