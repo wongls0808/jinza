@@ -511,25 +511,29 @@ router.put('/users/:id/permissions', auth.authMiddleware(true), auth.requirePerm
   }
 
   if (perms.length) {
-    // 查看权限为主：若某模块未勾选“查看”，则剔除该模块下的非查看权限
-    const { codeToModule } = buildPermissionIndex(PERMISSION_TREE)
+    // 规则调整：若某模块选了任意子权限且缺少“查看”主权限，自动补齐该模块的查看码
+    const { modToCodes, codeToModule } = buildPermissionIndex(PERMISSION_TREE)
     const selected = new Set(perms)
-    // 预先收集所有模块的查看码
     const moduleView = new Map()
+    for (const m of PERMISSION_TREE) moduleView.set(m.module, getModuleViewCode(m.module))
+
+    // 先补齐查看码
     for (const m of PERMISSION_TREE) {
-      moduleView.set(m.module, getModuleViewCode(m.module))
+      const viewCode = moduleView.get(m.module)
+      const codes = modToCodes.get(m.module) || []
+      const hasChild = codes.some(c => c !== viewCode && selected.has(c))
+      if (hasChild && !selected.has(viewCode)) selected.add(viewCode)
     }
+
+    // 再执行一次“查看为主”的过滤，保证一致性（理论上现在不会再剔除）
     const filtered = []
     for (const code of selected) {
       const mod = codeToModule.get(code)
       if (!mod) { filtered.push(code); continue }
       const viewCode = moduleView.get(mod)
-      if (code === viewCode) { filtered.push(code); continue }
-      // expenses 的查看码为 expenses:list；buyfx 复用 view_fx
-      if (selected.has(viewCode)) filtered.push(code)
+      if (code === viewCode || selected.has(viewCode)) filtered.push(code)
     }
-    // 用过滤后的 perms 覆盖
-    perms.splice(0, perms.length, ...filtered)
+    perms.splice(0, perms.length, ...Array.from(new Set(filtered)))
     await query(
       `insert into permissions(code, name)
        select x.code, x.code from unnest($1::text[]) as x(code)

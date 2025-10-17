@@ -2,7 +2,7 @@
 
 const state = reactive({
   token: "dev-mock-token",  // 开发模式下的模拟令牌
-  user: { id: 1, username: "admin", display_name: "开发者账户" },
+  user: { id: 1, username: "admin", display_name: "开发者账户", is_admin: true },
   // 默认给到常用权限，包含 view_fx 以便本地预览 FX 相关入口
   perms: [
     "view_dashboard",
@@ -34,7 +34,7 @@ function load() {
   if (!raw) {
     // 在开发或本机预览时，注入一个本地开发账号，便于无后端查看页面
     if (isDev) {
-      const devUser = { token: state.token, user: state.user, perms: state.perms }
+  const devUser = { token: state.token, user: state.user, perms: state.perms }
       sessionStorage.setItem("auth_user", JSON.stringify(devUser))
       return
     }
@@ -59,7 +59,7 @@ function load() {
     // 如果解析失败，兜底为本地开发账号（包含 view_fx）
     const devUser = {
       token: "dev-mock-token",
-      user: { id: 1, username: "admin", display_name: "开发者账户" },
+      user: { id: 1, username: "admin", display_name: "开发者账户", is_admin: true },
       perms: [
         "view_dashboard","manage_users","view_customers","view_banks","view_accounts",
         "view_transactions","view_fx","view_settings","view_account_management"
@@ -99,7 +99,7 @@ function logout() {
     // 开发模式：登出后重新设置为开发者账户（包含 view_fx）
     const devUser = {
       token: "dev-mock-token",
-      user: { id: 1, username: "admin", display_name: "开发者账户" },
+      user: { id: 1, username: "admin", display_name: "开发者账户", is_admin: true },
       perms: [
         "view_dashboard","manage_users","view_customers","view_banks","view_accounts",
         "view_transactions","view_fx","view_settings","view_account_management"
@@ -118,6 +118,8 @@ function logout() {
 }
 
 function has(perm) {
+  // 管理员直通（与后端保持一致）：管理员无需逐项勾选
+  if (state?.user?.is_admin) return true
   // 检查用户是否拥有特定权限
   return state.perms.includes(perm)
 }
