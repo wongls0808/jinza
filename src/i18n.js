@@ -1394,6 +1394,7 @@ const messages = {
   matchList: 'Matched List',
       accountNumber: 'A/C No.',
       transactionDate: 'Date',
+      chequeRefNo: 'Ref No',
       max: 'Max',
       amount: 'Amount',
       debitAmount: 'Debit',
