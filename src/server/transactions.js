@@ -78,8 +78,8 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     // 自愈：缺表时自动创建
     await ensureTransactionsDDL()
     const { 
-      page = 1, 
-      pageSize = 20, 
+      page = '1', 
+      pageSize = '20', 
       sort = 'transaction_date', 
       order = 'desc',
       startDate,
@@ -92,9 +92,11 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       searchAmountOnly = '0',
       status = 'all'
     } = req.query;
-    
-    const offset = (page - 1) * pageSize;
-    const limit = parseInt(pageSize);
+
+    // 分页参数（带上上下界，避免异常值）
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
+    const offset = (pageNum - 1) * limit;
     
     let whereClause = 'WHERE 1=1';
     const queryParams = [];
@@ -128,16 +130,22 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     }
     
     // 金额范围筛选
-    if (minAmount) {
-      whereClause += ` AND (debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`;
-      queryParams.push(parseFloat(minAmount));
-      paramIndex++;
+    if (minAmount !== undefined && minAmount !== null && String(minAmount).trim() !== '') {
+      const minVal = parseFloat(minAmount);
+      if (Number.isFinite(minVal)) {
+        whereClause += ` AND (debit_amount >= $${paramIndex} OR credit_amount >= $${paramIndex})`;
+        queryParams.push(minVal);
+        paramIndex++;
+      }
     }
     
-    if (maxAmount) {
-      whereClause += ` AND (debit_amount <= $${paramIndex} AND credit_amount <= $${paramIndex})`;
-      queryParams.push(parseFloat(maxAmount));
-      paramIndex++;
+    if (maxAmount !== undefined && maxAmount !== null && String(maxAmount).trim() !== '') {
+      const maxVal = parseFloat(maxAmount);
+      if (Number.isFinite(maxVal)) {
+        whereClause += ` AND (debit_amount <= $${paramIndex} AND credit_amount <= $${paramIndex})`;
+        queryParams.push(maxVal);
+        paramIndex++;
+      }
     }
     
     // 搜索条件
@@ -162,8 +170,13 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       whereClause += ` AND matched = true`;
     }
     
-    // 排序条件
-    const orderClause = `ORDER BY ${sort} ${order.toUpperCase()}`;
+    // 排序条件（白名单，避免注入/无效列导致错误）
+    const allowedSorts = new Set([
+      'id','transaction_date','debit_amount','credit_amount','balance','category','matched','created_at','trn_date'
+    ]);
+    const sortSafe = allowedSorts.has(String(sort)) ? String(sort) : 'transaction_date';
+    const orderSafe = (String(order).toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+    const orderClause = `ORDER BY ${sortSafe} ${orderSafe}`;
     
     // 查询数据，关联银行账户信息
     const dataQuery = `
@@ -196,7 +209,7 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
-    queryParams.push(limit, offset);
+  queryParams.push(limit, offset);
     
     // 统计查询，需要使用相同的关联表结构
     const countQuery = `
@@ -220,7 +233,7 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     res.json({
       data: dataResult.rows,
       pagination: {
-        page: parseInt(page),
+        page: pageNum,
         pageSize: limit,
         total,
         pages
