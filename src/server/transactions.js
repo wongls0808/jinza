@@ -684,14 +684,14 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
         await withTransaction(async (client) => {
           // 锁定行并读取数据（同一连接）
           const tr = await queryWithClient(client, `
-          select t.id, t.matched, t.match_type, t.match_target_id,
+       select t.id, t.matched, t.match_type, t.match_target_id,
                  t.debit_amount as debit, t.credit_amount as credit,
                  coalesce(t.platform_delta_applied,false) as platform_delta_applied,
                  a.currency_code as currency
             from transactions t
             left join receiving_accounts a on a.bank_account = t.account_number
            where t.id=$1
-           for update
+        for update of t
         `, [id])
         if (!tr.rowCount) { throw Object.assign(new Error('Transaction not found'), { status: 404 }) }
         const row = tr.rows[0]
