@@ -29,7 +29,9 @@
         </div>
   <el-table ref="settleTableRef" :data="matchedRows" size="small" border @selection-change="onSelMatchedChange" @header-dragend="onColResizeSettle">
     <el-table-column type="selection" width="48" :selectable="isSettleSelectable" />
-          <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)" />
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="colWSettle('trn_date',120)">
+            <template #default="{ row }">{{ fmtDate(row.trn_date || row.transaction_date) }}</template>
+          </el-table-column>
           <el-table-column prop="cheque_ref_no" column-key="cheque_ref_no" :label="t('transactions.chequeRefNo')" :width="colWSettle('cheque_ref_no',140)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
@@ -185,6 +187,16 @@ const selectedPayCustomer = computed(() => customers.value.find(c => c.id === pa
 const cnyBalance = computed(() => Number(selectedPayCustomer.value?.balance_cny || 0))
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
+
+function fmtDate(v){
+  if (!v) return ''
+  if (typeof v === 'string') return v.slice(0, 10)
+  try {
+    const d = new Date(v)
+    if (!isNaN(d)) return d.toISOString().slice(0, 10)
+  } catch {}
+  return String(v).slice(0, 10)
+}
 
 async function loadCustomers(){
   const res = await api.customers.list({ pageSize: 1000 })
