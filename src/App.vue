@@ -13,7 +13,7 @@
           :default-active="activeMenu"
           :background-color="navBgColor"
           text-color="#ffffff"
-          active-text-color="#ffffff"
+          active-text-color="var(--el-color-primary)"
           :ellipsis="false"
           router
           @select="handleSelect">
@@ -220,10 +220,18 @@ function handleSelect(key) {
   background-color: rgba(255, 255, 255, 0.1);
 }
 :deep(.el-menu--horizontal > .el-menu-item.is-active) {
-  color: white;
-  font-weight: bold;
-  background-color: rgba(255, 255, 255, 0.15);
-  border-bottom: 2px solid white;
+  color: var(--el-color-primary);
+  font-weight: 800;
+  background-color: #ffffff;
+  border-bottom: 2px solid var(--el-color-primary);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+/* 选中态悬停保持一致 */
+:deep(.el-menu--horizontal > .el-menu-item.is-active:hover) {
+  color: var(--el-color-primary);
+  background-color: #ffffff;
 }
 
 /* 语言切换样式 */
