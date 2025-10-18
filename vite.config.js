@@ -31,10 +31,6 @@ export default defineConfig({
           if (id.includes('node_modules/element-plus') && !id.includes('icons-vue')) {
             return 'element-plus'
           }
-          // Element Plus 图标 - 按需分割避免循环依赖
-          if (id.includes('@element-plus/icons-vue')) {
-            return 'element-icons'
-          }
           // ECharts
           if (id.includes('node_modules/echarts')) {
             return 'echarts'
