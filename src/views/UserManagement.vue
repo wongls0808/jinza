@@ -424,17 +424,17 @@ function fmtMinute(ts) {
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cards { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
 .user-card { padding: 0; }
-.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px; min-height: 64px; }
-.avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); }
+.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 12px; padding: 12px; padding-top: 48px; padding-bottom: 40px; min-height: 64px; }
+.avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); align-self: center; }
 .avatar.admin { background: var(--el-color-danger); }
-.info { min-width: 0; }
+.info { min-width: 0; align-self: center; }
 .name { font-weight: 600; font-size: 15px; }
 .username { color: var(--el-text-color-secondary); font-size: 12px; }
 .meta { color: var(--el-text-color-secondary); font-size: 12px; display:flex; gap:12px; flex-wrap:wrap; margin-top:2px; }
 .meta .kv { display:inline-flex; gap:6px; align-items:center; }
 .meta .kv .k { font-weight:600; opacity:0.75; }
 .meta .kv .v { font-variant-numeric: tabular-nums; }
-.controls { display:flex; align-items:center; gap: 8px; justify-self: end; }
+.controls { display:flex; align-items:center; gap: 8px; justify-self: end; align-self: center; }
 /* 右上角启用开关容器 */
 .switch-top-right { position: absolute; top: 8px; right: 12px; display:flex; align-items:center; gap:6px; }
 .switch-top-right .muted { font-size:12px; color: var(--el-text-color-secondary); }
