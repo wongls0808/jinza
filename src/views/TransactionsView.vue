@@ -1142,8 +1142,10 @@ const confirmMatch = async () => {
       if (ok === ids.length) {
         ElMessage.success(t('transactions.matchSuccess'))
       } else {
-        const tip = fails.length ? `，示例[${fails[0].id}]: ${fails[0].msg}` : ''
-        ElMessage.warning(`匹配完成 ${ok}/${ids.length}${tip}`)
+        const tip = fails.length 
+          ? t('transactions.errors.matchPartialWithExample', { id: fails[0].id, msg: fails[0].msg })
+          : ''
+        ElMessage.warning(t('transactions.errors.matchPartial', { done: ok, total: ids.length }) + tip)
       }
       fetchTransactions()
     } catch (e) {
@@ -1176,8 +1178,10 @@ const confirmMatch = async () => {
       if (ok === ids.length) {
         ElMessage.success(t('transactions.matchSuccess'))
       } else {
-        const tip = fails.length ? `，示例[${fails[0].id}]: ${fails[0].msg}` : ''
-        ElMessage.warning(`匹配完成 ${ok}/${ids.length}${tip}`)
+        const tip = fails.length 
+          ? t('transactions.errors.matchPartialWithExample', { id: fails[0].id, msg: fails[0].msg })
+          : ''
+        ElMessage.warning(t('transactions.errors.matchPartial', { done: ok, total: ids.length }) + tip)
       }
       fetchTransactions()
     } catch (e) {
@@ -1215,7 +1219,7 @@ const confirmMatch = async () => {
       // expense
       if (matchType.value === 'expense') {
           const dir = currentDirection()
-          if (dir === 'mixed') { ElMessage.warning(t('transactions.errors.unknownDirection')); return }
+          if (dir === 'mixed') { ElMessage.warning(t('transactions.errors.mixedDirection')); return }
           if (!dir) { ElMessage.warning(t('transactions.errors.unknownDirection')); return }
         if (!matchForm.expenseId) { ElMessage.warning(t('transactions.errors.selectExpense')); return }
         try {
@@ -1228,7 +1232,7 @@ const confirmMatch = async () => {
           }
           matchDrawerVisible.value = false
           batchMode.value = false
-          ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
+          ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : t('transactions.errors.matchPartial', { done: ok, total: ids.length }))
           fetchTransactions()
         } catch (e) {
           console.error('match expense failed', e)
@@ -1476,10 +1480,10 @@ const handleSimpleFileChange = (file) => {
         }
       }
       
-      console.log(t('transactions.errors.foundHeaderRow') + ':', headerIndex, headerIndex >= 0 ? lines[headerIndex] : t('transactions.errors.unknownError'))
+      console.log(t('transactions.errors.foundHeaderRow') + ':', headerIndex, headerIndex >= 0 ? lines[headerIndex] : 'not found')
       
       if (headerIndex === -1) {
-        ElMessage.warning('未找到标准的银行对账单表头，请检查文件格式')
+        ElMessage.warning(t('transactions.errors.headerNotFound'))
         return
       }
       

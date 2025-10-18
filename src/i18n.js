@@ -686,7 +686,11 @@ const messages = {
         unknownError: '未知错误',
         fetchPlatformsFailed: '获取平台商失败',
         fetchExpensesFailed: '获取费用项目失败',
-        foundHeaderRow: '找到表头行'
+        foundHeaderRow: '找到表头行',
+        matchPartial: '匹配完成 {done}/{total}',
+        matchPartialWithExample: '匹配完成 {done}/{total}，示例[{id}]: {msg}',
+        headerNotFound: '未找到标准的银行对账单表头，请检查文件格式',
+        mixedDirection: '批量匹配的借贷方向不一致，无法按费用匹配'
       },
       csvHeaders: {
         accountNumber: '账户号码',
@@ -1447,6 +1451,31 @@ const messages = {
       confirmBatchDelete: 'Delete selected items?',
       batchDeleteSuccess: 'Deleted',
       batchDeleteFailed: 'Delete failed',
+      errors: {
+        selectFirst: 'Please select transactions to match first',
+        selectTransactions: 'No transactions selected',
+        selectAccount: 'Please select receiving account',
+        unknownDirection: 'Cannot determine debit/credit direction',
+        selectExpense: 'Please select expense item',
+        noImportData: 'No data to import',
+        importFailed: 'Import failed',
+        unknownError: 'Unknown error',
+        fetchPlatformsFailed: 'Failed to load platforms',
+        fetchExpensesFailed: 'Failed to load expense items',
+        foundHeaderRow: 'Found header row',
+        matchPartial: 'Matched {done}/{total}',
+        matchPartialWithExample: 'Matched {done}/{total}, example[{id}]: {msg}',
+        headerNotFound: 'Standard bank statement header not found, please check file format',
+        mixedDirection: 'Mixed debit/credit direction in batch, cannot match as expense'
+      },
+      csvHeaders: {
+        accountNumber: 'Account Number',
+        transactionDate: 'Transaction Date',
+        chequeRefNo: 'Ref No',
+        description: 'Description',
+        debitAmount: 'Debit Amount',
+        creditAmount: 'Credit Amount'
+      }
     }
   }
 }
