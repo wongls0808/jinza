@@ -49,7 +49,17 @@ export async function request(path, opts = {}) {
     }
     let body = null
     let msg = ''
-    try { body = await res.json(); msg = body?.error || body?.message || '' } catch { msg = await res.text() }
+    try { 
+      const responseText = await res.text()
+      try {
+        body = JSON.parse(responseText)
+        msg = body?.error || body?.message || ''
+      } catch {
+        msg = responseText
+      }
+    } catch { 
+      msg = `HTTP ${res.status}` 
+    }
     const err = new Error(msg || `HTTP ${res.status}`)
     try { err.status = res.status } catch {}
     try { err.code = body?.code } catch {}

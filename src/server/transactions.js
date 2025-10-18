@@ -549,6 +549,29 @@ transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePer
   }
 });
 
+// 取消匹配
+transactionsRouter.post('/:id/unmatch', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
+  try {
+    await ensureTransactionsDDL()
+    const { id } = req.params
+    
+    const updateQuery = `
+      UPDATE transactions 
+      SET matched = false, match_type = NULL, match_target_id = NULL, match_target_name = NULL, 
+          matched_by = NULL, matched_at = NULL
+      WHERE id = $1
+    `;
+    
+    const rs = await query(updateQuery, [id]);
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'Transaction not found' });
+    
+    res.json({ success: true });
+  } catch (e) {
+    console.error('unmatch transaction failed', e)
+    res.status(500).json({ error: '取消匹配失败', detail: e?.message });
+  }
+});
+
 // 简单的CSV导入功能
 transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requirePerm('transactions:import'), async (req, res) => {
   try {
