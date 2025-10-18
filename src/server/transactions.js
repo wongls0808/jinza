@@ -696,10 +696,28 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
         `, [id])
         if (!tr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
         const row = tr.rows[0]
-        // 若账户未配置币种，默认 MYR（可根据业务调整为严格校验）
-        const cur = String(row.currency || 'MYR').toUpperCase()
+        // 规范化币种：允许 RM/MY -> MYR，RMB -> CNY；为空默认 MYR
+        const rawCur = (row.currency == null ? 'MYR' : String(row.currency)).toUpperCase().trim()
+        const cur = rawCur === 'RM' || rawCur === 'MY' ? 'MYR' : (rawCur === 'RMB' ? 'CNY' : rawCur || 'MYR')
         const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
-        if (!field) { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
+        if (!field) {
+          // 回退到 MYR，避免阻断业务（记录一次警告）
+          console.warn('buyfx match currency not recognized, fallback to MYR:', rawCur)
+          const field2 = 'balance_myr'
+          const delta = Number(row.debit || 0) - Number(row.credit || 0)
+          const upd1b = await query(`update fx_platforms set ${field2} = coalesce(${field2},0) + $1 where id=$2`, [delta, pid])
+          if (upd1b.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+          const matched_by_b = req.user?.id || null
+          const name_b = (targetName || '').toString().trim() || null
+          const rsb = await query(
+            `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now(), platform_delta_applied=true where id=$5`,
+            [t, pid, name_b, matched_by_b, id]
+          )
+          if (rsb.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
+          await query('commit'); txBegan = false
+          console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta, 'currency=fallback(MYR) from', rawCur)
+          return res.json({ success: true, updated: true, id: Number(id) })
+        }
         const delta = Number(row.debit || 0) - Number(row.credit || 0)
 
         // 若之前已匹配到平台商，则先从旧平台回滚
@@ -783,12 +801,20 @@ transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.re
         const applied = chk.rowCount ? !!chk.rows[0].applied : false
         if (applied) {
           const pid = Number(row.match_target_id)
-          const cur = String(row.currency || 'MYR').toUpperCase()
+          const rawCur = (row.currency == null ? 'MYR' : String(row.currency)).toUpperCase().trim()
+          const cur = rawCur === 'RM' || rawCur === 'MY' ? 'MYR' : (rawCur === 'RMB' ? 'CNY' : rawCur || 'MYR')
           const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
-          if (!field) { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
-          const delta = Number(row.debit || 0) - Number(row.credit || 0)
-          await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, pid])
-          await query(`update transactions set platform_delta_applied=false where id=$1`, [id])
+          if (!field) {
+            console.warn('buyfx unmatch currency not recognized, fallback to MYR:', rawCur)
+            const field2 = 'balance_myr'
+            const delta = Number(row.debit || 0) - Number(row.credit || 0)
+            await query(`update fx_platforms set ${field2} = coalesce(${field2},0) - $1 where id=$2`, [delta, pid])
+            await query(`update transactions set platform_delta_applied=false where id=$1`, [id])
+          } else {
+            const delta = Number(row.debit || 0) - Number(row.credit || 0)
+            await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, pid])
+            await query(`update transactions set platform_delta_applied=false where id=$1`, [id])
+          }
         }
       }
 
