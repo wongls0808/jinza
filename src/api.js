@@ -36,6 +36,10 @@ export async function request(path, opts = {}) {
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers })
+  
+  // 统一读取响应体文本
+  const responseText = await res.text()
+  
   if (!res.ok) {
     if (res.status === 401) {
       try {
@@ -49,16 +53,11 @@ export async function request(path, opts = {}) {
     }
     let body = null
     let msg = ''
-    try { 
-      const responseText = await res.text()
-      try {
-        body = JSON.parse(responseText)
-        msg = body?.error || body?.message || ''
-      } catch {
-        msg = responseText
-      }
-    } catch { 
-      msg = `HTTP ${res.status}` 
+    try {
+      body = JSON.parse(responseText)
+      msg = body?.error || body?.message || ''
+    } catch {
+      msg = responseText
     }
     const err = new Error(msg || `HTTP ${res.status}`)
     try { err.status = res.status } catch {}
@@ -66,9 +65,17 @@ export async function request(path, opts = {}) {
     try { err.raw = body || msg } catch {}
     throw err
   }
+  
+  // 处理成功响应
   const ct = res.headers.get('content-type') || ''
-  if (ct.includes('application/json')) return res.json()
-  return res.text()
+  if (ct.includes('application/json')) {
+    try {
+      return JSON.parse(responseText)
+    } catch {
+      return responseText
+    }
+  }
+  return responseText
 }
 
 export const api = {
