@@ -161,5 +161,11 @@ and not exists (
 回滚方案：
 - 如需回滚，可将上述两处改回原状，但会重新引入问题；建议仅用于问题复现，不用于生产。
 
+部署状态：
+- ✅ 2025-10-19 20:44 本地修复完成，git push 成功
+- ✅ 修复代码已提交到 main 分支 (commit: 280203a)
+- ✅ 新构建文件哈希: FXManagement-a6b79e83.js
+- ⚠️  生产环境如仍显示错误，可能需要清除浏览器缓存或等待 CDN 更新
+
 后续改进（可选）：
 - 在 `createSettlement()` 外层增加 try/catch，并在 catch 中使用 `ElMessage.error` 提示异常，避免未来无提示失败。
