@@ -78,6 +78,8 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
   try {
     // 自愈：缺表时自动创建
     await ensureTransactionsDDL()
+    // 需要在筛除已结汇交易时引用 fx_settlement_items，先确保 FX 相关表存在
+    try { await ensureFxDDL() } catch {}
     const { 
       page = '1', 
       pageSize = '20', 
@@ -95,7 +97,8 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       searchAmountOnly = '0',
       status = 'all',
       matchTargetId,
-      matchType
+      matchType,
+      excludeSettled
     } = req.query;
 
     // 分页参数（带上上下界，避免异常值）
@@ -200,6 +203,11 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
         queryParams.push(mtid)
         paramIndex++
       }
+    }
+
+    // 生成结汇单后隐藏已结汇（已出现在 fx_settlement_items）的交易
+    if (excludeSettled && String(excludeSettled).toLowerCase() !== 'false') {
+      whereClause += ` AND NOT EXISTS (SELECT 1 FROM fx_settlement_items si WHERE si.transaction_id = t.id)`
     }
     
     // 排序条件（白名单，避免注入/无效列导致错误）
