@@ -52,8 +52,8 @@
       <div v-if="!loading && rows.length===0" class="empty">{{ t('common.empty') }}</div>
     </el-card>
 
-    <el-dialog v-model="editDialog.visible" :title="t('common.edit')" width="520px">
-      <el-form label-width="100px">
+    <el-dialog v-model="editDialog.visible" :title="t('common.edit')" width="min(560px, 90vw)">
+      <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
         <el-form-item :label="t('buyfx.platform')">
           <el-input v-model="editDialog.platform_name" disabled />
         </el-form-item>

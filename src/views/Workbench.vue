@@ -205,9 +205,9 @@
     </div>
 
     <!-- 付款待审抽屉列表（含审核操作） -->
-  <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="960px">
+  <el-drawer v-model="paymentsDrawer" :title="t('workbench.todos.payments')" size="min(980px, 90vw)">
       <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
-  <el-select v-model="batch.platform_id" :placeholder="t('transactions.selectPlatform')" size="small" style="width:240px" filterable>
+  <el-select v-model="batch.platform_id" :placeholder="t('transactions.selectPlatform')" size="small" style="min-width:240px; max-width:300px;" filterable>
           <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name + (p.fee_percent!=null? ` (${t('workbench.preview.feePercent')} ${Number(p.fee_percent||0).toFixed(4)}%)` : '')" />
         </el-select>
   <el-button :disabled="!has('manage_fx') || !batch.platform_id || !multipleSelection.length || !canBatchApprove" type="success" size="small" @click="doBatchApprove">{{ t('common.approve') }}</el-button>
@@ -324,10 +324,10 @@
     
 
     <!-- 审核弹窗：选择平台并预览余额 -->
-    <el-dialog v-model="approveDialog.visible" :title="t('workbench.approveDialogTitle')" width="520px">
-      <el-form label-width="100px">
+    <el-dialog v-model="approveDialog.visible" :title="t('workbench.approveDialogTitle')" width="min(560px, 90vw)">
+      <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
         <el-form-item :label="t('buyfx.platform')">
-          <el-select v-model="approveDialog.platform_id" filterable :placeholder="t('transactions.selectPlatform')" style="width: 260px">
+          <el-select v-model="approveDialog.platform_id" filterable :placeholder="t('transactions.selectPlatform')" style="min-width: 260px; max-width: 100%;">
             <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
           </el-select>
         </el-form-item>

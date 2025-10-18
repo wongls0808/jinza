@@ -21,7 +21,18 @@
             style="width: 260px" />
         </el-form-item>
         <el-form-item>
-          <el-input v-model.trim="filters.account" clearable :placeholder="t('transactions.accountNumber')" style="width: 180px" />
+                      :placeholder="t('transactions.selectCustomer')"
+            filterable
+            clearable
+            style="min-width: 220px; max-width: 280px;" />
+          <el-input v-model.trim="filters.account" clearable :placeholder="t('transactions.accountNumber')" style="min-width: 160px; max-width: 200px;" />
+          <el-select v-model="filters.category" clearable :placeholder="t('transactions.category')" style="min-width: 140px; max-width: 180px;">
+            <el-option :label="t('transactions.categoryOptions.income')" value="收入" />
+            <el-option :label="t('transactions.categoryOptions.expense')" value="支出" />
+          </el-select>
+          <el-input v-model.trim="filters.accountName" clearable :placeholder="t('transactions.accountName')" style="min-width: 160px; max-width: 200px;" />
+          <el-input v-model.trim="filters.bankName" clearable :placeholder="t('transactions.bankName')" style="min-width: 160px; max-width: 200px;" />
+          <el-input v-model.trim="filters.relation" clearable :placeholder="t('transactions.relation')" style="min-width: 160px; max-width: 200px;" />
         </el-form-item>
         <el-form-item>
           <el-input v-model.trim="filters.accountName" clearable :placeholder="t('transactions.accountName')" style="width: 180px" />

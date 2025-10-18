@@ -224,13 +224,13 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? t('transactions.editTransaction') : t('transactions.addTransaction')"
-      width="600px"
+      width="min(650px, 90vw)"
       :close-on-click-modal="false">
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="120px"
+        :label-width="$i18n.locale === 'zh' ? '120px' : '140px'"
         label-position="left">
         
         <el-form-item :label="t('transactions.accountNumber')" prop="account_number">
@@ -324,11 +324,11 @@
     </el-dialog>
     
     <!-- 匹配抽屉（类型：结汇/购汇/调拨/费用；当前实现结汇，其它占位） -->
-    <el-drawer v-model="matchDrawerVisible" :title="t('transactions.matchTransactions')" size="520px">
+    <el-drawer v-model="matchDrawerVisible" :title="t('transactions.matchTransactions')" size="min(560px, 85vw)">
       <template #default>
         <el-tabs v-model="matchType" type="border-card">
           <el-tab-pane :label="t('transactions.matchTypeSettle')" name="settle">
-            <el-form label-width="100px">
+            <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
               <el-form-item :label="t('transactions.selectCustomer')">
                 <el-select
                   v-model="matchForm.customerId"
@@ -349,7 +349,7 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeBuyFx')" name="buyfx">
-            <el-form label-width="100px">
+            <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
               <el-form-item :label="t('transactions.selectPlatform')">
                 <el-select
                   v-model="matchForm.platformId"
@@ -370,7 +370,7 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
-            <el-form label-width="100px">
+            <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
               <el-form-item :label="t('transactions.receivingBankAccount')">
                 <el-select
                   v-model="matchForm.transferAccountId"
@@ -389,7 +389,7 @@
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
-            <el-form label-width="100px">
+            <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'">
               <el-form-item :label="t('transactions.selectExpenseItem')">
                 <el-select
                   v-model="matchForm.expenseId"

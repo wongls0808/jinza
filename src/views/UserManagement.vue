@@ -5,9 +5,9 @@
       <div class="spacer"></div>
       <!-- 移除了返回首页按钮 -->
       <div class="actions">
-        <el-input v-model.trim="newUser.username" :placeholder="$t('users.usernamePlaceholder')" style="width:180px" size="small" />
-        <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('users.passwordPlaceholder')" style="width:180px" size="small" />
-        <el-input v-model.trim="newUser.display_name" :placeholder="$t('users.displayNamePlaceholder')" style="width:180px" size="small" />
+        <el-input v-model.trim="newUser.username" :placeholder="$t('users.usernamePlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
+        <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('users.passwordPlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
+        <el-input v-model.trim="newUser.display_name" :placeholder="$t('users.displayNamePlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
   <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
         <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">{{ $t('users.reseedPermTree') }}</el-button>
       </div>

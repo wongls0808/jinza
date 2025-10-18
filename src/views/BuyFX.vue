@@ -54,31 +54,31 @@
 
           <!-- 紧凑模式：标签+控件纵向表单 -->
           <template v-if="compact">
-            <el-form label-width="80px" class="convert-form-compact">
+            <el-form :label-width="$i18n.locale === 'zh' ? '90px' : '110px'" class="convert-form-compact">
               <el-form-item :label="t('buyfx.platform')">
-                <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" style="width: 260px" @change="onPlatformChange">
+                <el-select v-model="convert.platform_id" filterable :placeholder="t('buyfx.placePlatform')" style="min-width: 240px; max-width: 100%;" @change="onPlatformChange">
                   <el-option v-for="p in platforms" :key="p.id" :value="p.id" :label="p.name" />
                 </el-select>
               </el-form-item>
               <el-form-item :label="t('buyfx.sellCurrency')">
-                <el-select v-model="convert.from" style="width: 160px" @change="onFromChange">
+                <el-select v-model="convert.from" style="min-width: 160px; max-width: 100%;" @change="onFromChange">
                   <el-option label="USD" value="USD"/>
                   <el-option label="MYR" value="MYR"/>
                   <el-option label="CNY" value="CNY"/>
                 </el-select>
               </el-form-item>
               <el-form-item :label="t('buyfx.buyCurrency')">
-                <el-select v-model="convert.to" style="width: 160px">
+                <el-select v-model="convert.to" style="min-width: 160px; max-width: 100%;">
                   <el-option label="USD" value="USD"/>
                   <el-option label="MYR" value="MYR"/>
                   <el-option label="CNY" value="CNY"/>
                 </el-select>
               </el-form-item>
               <el-form-item :label="t('buyfx.sellAmount')">
-                <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" style="width: 260px" @change="() => { amountEdited.value = true }"/>
+                <el-input-number v-model="convert.amount" :min="0" :precision="2" :step="100" style="min-width: 240px; max-width: 100%;" @change="() => { amountEdited.value = true }"/>
               </el-form-item>
               <el-form-item :label="t('buyfx.rate')">
-                <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" style="width: 260px"/>
+                <el-input-number v-model="convert.rate" :min="0" :precision="6" :step="0.0001" style="min-width: 240px; max-width: 100%;"/>
               </el-form-item>
               <el-form-item>
                 <el-button type="warning" :disabled="!canConvert" @click="doConvert">{{ t('buyfx.sell') }}</el-button>
@@ -120,8 +120,8 @@
       </el-col>
     </el-row>
 
-  <el-dialog v-if="manage" v-model="platformDialog.visible" :title="t('buyfx.dialogTitle')" width="560px">
-      <el-form label-width="100px" :model="platformDialog.model">
+  <el-dialog v-if="manage" v-model="platformDialog.visible" :title="t('buyfx.dialogTitle')" width="min(600px, 90vw)">
+      <el-form :label-width="$i18n.locale === 'zh' ? '100px' : '120px'" :model="platformDialog.model">
         <el-form-item :label="t('buyfx.code')"><el-input v-model="platformDialog.model.code" /></el-form-item>
         <el-form-item :label="t('buyfx.name')"><el-input v-model="platformDialog.model.name" /></el-form-item>
         <el-form-item :label="t('buyfx.loginUrl')"><el-input v-model="platformDialog.model.login_url" placeholder="https://..." /></el-form-item>

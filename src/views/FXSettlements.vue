@@ -2,7 +2,7 @@
   <div class="page">
     <h1>{{ t('fx.settlementHistory') }}</h1>
     <div class="filters">
-      <el-select v-model="qCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px">
+      <el-select v-model="qCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:220px; max-width:280px;">
         <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
       </el-select>
   <el-date-picker v-model="qRange" type="daterange" range-separator="-" :start-placeholder="t('transactions.startDate')" :end-placeholder="t('transactions.endDate')" value-format="YYYY-MM-DD" />
