@@ -728,7 +728,11 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
 
         // 应用到新平台：平台余额 += delta（借方为正，贷方为负）
         const upd1 = await queryWithClient(client, `update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
-        if (upd1.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+        if (upd1.rowCount === 0) {
+          const err = new Error('platform not found');
+          err.status = 404;
+          throw err;
+        }
 
         // 更新交易匹配信息并标记平台余额已应用
         const matched_by = req.user?.id || null
@@ -766,7 +770,7 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
     res.json({ success: true });
   } catch (e) {
     console.error('match transaction failed', e)
-    res.status(500).json({ error: '匹配交易失败', detail: e?.message });
+    res.status(500).json({ error: '匹配交易失败', detail: e?.message || String(e) });
   }
 });
 

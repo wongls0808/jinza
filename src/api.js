@@ -56,6 +56,10 @@ export async function request(path, opts = {}) {
     try {
       body = JSON.parse(responseText)
       msg = body?.error || body?.message || ''
+      if (body?.detail) {
+        const d = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+        msg = msg ? `${msg}: ${d}` : d
+      }
     } catch {
       msg = responseText
     }
