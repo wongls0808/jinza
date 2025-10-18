@@ -202,8 +202,8 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
   }
 });
 
-// 批量删除交易
-transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
+// 批量删除交易（兼容批量/单条删除权限）
+transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.requireAnyPerm('transactions:batch_delete','transactions:delete'), async (req, res) => {
   try {
     const { ids } = req.body;
     
