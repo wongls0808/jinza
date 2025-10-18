@@ -290,6 +290,7 @@ router.post('/users', auth.authMiddleware(true), auth.requirePerm('manage_users'
       'insert into users(username, password_hash, display_name, is_active, must_change_password) values($1,$2,$3,$4,$5) returning id, username, display_name, is_active',
       [username, hash, display_name || username, is_active, true]
     )
+    try { await auth.logActivity(req.user?.id, 'users.create', { target: rs.rows[0].id, username, display_name }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Username exists' })
@@ -314,6 +315,7 @@ router.delete('/users/:id', auth.authMiddleware(true), auth.requirePerm('manage_
   await query('delete from user_permissions where user_id=$1', [id])
   const rs = await query('delete from users where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'users.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -439,6 +441,7 @@ router.post('/expenses', auth.authMiddleware(true), auth.requirePerm('expenses:c
      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
     [safeDate, safeType, category||null, Number(amount)||0, currency||'MYR', subject_debit||null, subject_credit||null, desc||null, req.user?.id||null, drcr ? String(drcr).toLowerCase() : null]
   )
+  try { await auth.logActivity(req.user?.id, 'expenses.create', { target: rs.rows[0].id, category }, req) } catch {}
   res.json(rs.rows[0])
 })
 
@@ -461,6 +464,7 @@ router.put('/expenses/:id', auth.authMiddleware(true), auth.requirePerm('expense
   params.push(id)
   const rs = await query(`update expenses set ${fields.join(', ')}, updated_at=now() where id=$${params.length} returning *`, params)
   if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+  try { await auth.logActivity(req.user?.id, 'expenses.update', { target: id, fields: Object.keys(req.body) }, req) } catch {}
   res.json(rs.rows[0])
 })
 
@@ -468,6 +472,7 @@ router.delete('/expenses/:id', auth.authMiddleware(true), auth.requirePerm('expe
   const id = Number(req.params.id)
   const rs = await query('delete from expenses where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'not found' })
+  try { await auth.logActivity(req.user?.id, 'expenses.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -687,6 +692,7 @@ router.post('/customers', auth.authMiddleware(true), auth.requirePerm('customers
     if (me.rowCount) submitter = me.rows[0].display_name || me.rows[0].username
   } catch {}
   const nr = await query('insert into customers(abbr, name, tax_rate, opening_myr, opening_cny, submitter) values($1,$2,$3,$4,$5,$6) returning *', [abbr || null, name, Number(tax_rate)||0, Number(opening_myr)||0, Number(opening_cny)||0, submitter || null])
+  try { await auth.logActivity(req.user?.id, 'customers.create', { target: nr.rows[0].id, name }, req) } catch {}
   res.json(nr.rows[0])
 })
 
@@ -712,6 +718,7 @@ router.put('/customers/:id', auth.authMiddleware(true), auth.requirePerm('custom
   values.push(id)
   const rs = await query(`update customers set ${fields.join(', ')} where id=$${idx} returning *`, values)
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'customers.update', { target: id, fields: Object.keys(req.body) }, req) } catch {}
   res.json(rs.rows[0])
 })
 
@@ -719,6 +726,7 @@ router.delete('/customers', auth.authMiddleware(true), auth.requirePerm('custome
   const { ids } = req.body || {}
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
   await query('delete from customers where id = any($1::int[])', [ids])
+  try { await auth.logActivity(req.user?.id, 'customers.delete', { count: ids.length }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -727,6 +735,7 @@ router.post('/customers/batch-delete', auth.authMiddleware(true), auth.requirePe
   const { ids } = req.body || {}
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'empty ids' })
   await query('delete from customers where id = any($1::int[])', [ids])
+  try { await auth.logActivity(req.user?.id, 'customers.delete', { count: ids.length }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -903,6 +912,7 @@ router.post('/customers/import-csv', express.text({ type: '*/*', limit: '10mb' }
     const flat = values.flat()
     const sql = `insert into customers(abbr,name,tax_rate,opening_myr,opening_cny,submitter) values ${params}`
     await query(sql, flat)
+    try { await auth.logActivity(req.user?.id, 'customers.import', { count: values.length }, req) } catch {}
     return res.json({ inserted: values.length, errors })
   } catch (e) {
     console.error('import-csv failed', e)
@@ -917,6 +927,7 @@ router.get('/customers/export', auth.authMiddleware(true), auth.readOpenOr('view
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"')
   const BOM = '\ufeff'
+  try { await auth.logActivity(req.user?.id, 'customers.export', { count: rs.rowCount }, req) } catch {}
   res.send(BOM + csv)
 })
 
@@ -977,6 +988,7 @@ router.post('/accounts', auth.authMiddleware(true), auth.requirePerm('accounts:c
   const { account_name, bank_id, bank_account, currency_code, opening_balance = 0 } = req.body || {}
   if (!account_name || !bank_id || !bank_account || !currency_code) return res.status(400).json({ error: 'Missing fields' })
   const rs = await query('insert into receiving_accounts(account_name, bank_id, bank_account, currency_code, opening_balance) values($1,$2,$3,$4,$5) returning *', [account_name, Number(bank_id), bank_account, currency_code.toUpperCase(), Number(opening_balance)||0])
+  try { await auth.logActivity(req.user?.id, 'accounts.create', { target: rs.rows[0].id, account_name }, req) } catch {}
   res.json(rs.rows[0])
 })
 router.put('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('accounts:update'), async (req, res) => {
@@ -994,12 +1006,14 @@ router.put('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('account
   values.push(id)
   const rs = await query(`update receiving_accounts set ${fields.join(', ')} where id=$${idx} returning *`, values)
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'accounts.update', { target: id, fields: Object.keys(req.body) }, req) } catch {}
   res.json(rs.rows[0])
 })
 router.delete('/accounts/:id', auth.authMiddleware(true), auth.requirePerm('accounts:delete'), async (req, res) => {
   const id = Number(req.params.id)
   const rs = await query('delete from receiving_accounts where id=$1', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'accounts.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -1025,6 +1039,7 @@ router.post('/customers/:id/accounts', auth.authMiddleware(true), auth.requirePe
       'insert into customer_receiving_accounts(customer_id, account_name, bank_id, bank_account, currency_code) values($1,$2,$3,$4,$5) returning *',
       [cid, account_name, Number(bank_id), bank_account, String(currency_code).toUpperCase()]
     )
+    try { await auth.logActivity(req.user?.id, 'accounts.create', { target: rs.rows[0].id, customer_id: cid, account_name }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: '该客户下该银行账户已存在' })
@@ -1036,6 +1051,7 @@ router.delete('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.re
   const aid = Number(req.params.aid)
   const rs = await query('delete from customer_receiving_accounts where id=$1 and customer_id=$2', [aid, cid])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'accounts.delete', { target: aid, customer_id: cid }, req) } catch {}
   res.json({ ok: true })
 })
 router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requirePerm('accounts:update'), async (req, res) => {
@@ -1054,6 +1070,7 @@ router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requi
   try {
     const rs = await query(`update customer_receiving_accounts set ${fields.join(', ')} where id=$${idx++} and customer_id=$${idx} returning *`, values)
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+    try { await auth.logActivity(req.user?.id, 'accounts.update', { target: aid, customer_id: cid, fields: Object.keys(req.body) }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: '该客户下该银行账户已存在' })
@@ -1160,6 +1177,7 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
   }
   try {
     const rs = await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4) returning id, code, zh, en, logo_url', [code, zh, en, logo_url || null])
+    try { await auth.logActivity(req.user?.id, 'banks.create', { target: rs.rows[0].id, code, zh, en }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
@@ -1171,6 +1189,7 @@ router.delete('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:d
   const id = Number(req.params.id)
   const rs = await query('delete from banks where id=$1 returning id', [id])
   if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+  try { await auth.logActivity(req.user?.id, 'banks.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 
@@ -1228,6 +1247,7 @@ router.put('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:upda
   try {
     const rs = await query(`update banks set ${fields.join(', ')} where id=$${idx} returning id, code, zh, en, logo_url`, values)
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' })
+    try { await auth.logActivity(req.user?.id, 'banks.update', { target: id, fields: Object.keys(req.body) }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
@@ -1252,6 +1272,7 @@ router.post('/banks/reset-defaults', auth.authMiddleware(true), auth.requireAnyP
   await query('truncate table banks restart identity')
   const params = defaults.map((_, i) => `($${i*4+1},$${i*4+2},$${i*4+3},$${i*4+4})`).join(',')
   await query(`insert into banks(code, zh, en, logo_url) values ${params}`, defaults.flat())
+  try { await auth.logActivity(req.user?.id, 'banks.reset_defaults', { count: defaults.length }, req) } catch {}
   res.json({ ok: true, count: defaults.length })
 })
 

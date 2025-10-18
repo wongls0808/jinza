@@ -255,6 +255,7 @@ fxRouter.post('/buy', auth.authMiddleware(true), auth.requireAnyPerm('buyfx:oper
     insert into fx_buy_orders(order_no, platform_id, customer_id, customer_name, pay_currency, buy_currency, amount_pay, expected_rate, created_by)
     values($1,$2,$3,$4,upper($5),upper($6),$7,$8,$9) returning *
   `, [order_no, platform_id||null, customer_id||null, customer_name||null, pay_currency, buy_currency, Number(amount_pay), (expected_rate==null? null : Number(expected_rate)), created_by])
+  try { await auth.logActivity(req.user?.id, 'fx.buyfx.create', { target: rs.rows[0].id, order_no, amount_pay }, req) } catch {}
   res.json(rs.rows[0])
 })
 
@@ -791,6 +792,7 @@ fxRouter.post('/settlements', auth.authMiddleware(true), auth.requirePerm('fx:se
     }
     await query(`insert into fx_settlement_items(settlement_id, transaction_id, account_number, trn_date, amount_base, amount_settled) values ${values.join(',')}`, params)
   }
+  try { await auth.logActivity(req.user?.id, 'fx.settlement.create', { target: sid, customer_id, count: items.length }, req) } catch {}
   res.json({ id: sid })
 })
 
@@ -1585,6 +1587,7 @@ fxRouter.post('/payments', auth.authMiddleware(true), auth.requirePerm('fx:payme
       rest -= amt
     }
   }
+  try { await auth.logActivity(req.user?.id, 'fx.payment.create', { customer_id, count: createdIds.length }, req) } catch {}
   res.json({ ids: createdIds })
 })
 
@@ -2342,6 +2345,7 @@ fxRouter.delete('/settlements/:id', auth.authMiddleware(true), auth.requirePerm(
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
   await query('delete from fx_settlements where id=$1', [id])
+  try { await auth.logActivity(req.user?.id, 'fx.settlement.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
 fxRouter.delete('/payments/:id', auth.authMiddleware(true), auth.requirePerm('delete_fx'), async (req, res) => {
@@ -2349,5 +2353,6 @@ fxRouter.delete('/payments/:id', auth.authMiddleware(true), auth.requirePerm('de
   const id = Number(req.params.id)
   if (!id) return res.status(400).json({ error: 'invalid id' })
   await query('delete from fx_payments where id=$1', [id])
+  try { await auth.logActivity(req.user?.id, 'fx.payment.delete', { target: id }, req) } catch {}
   res.json({ ok: true })
 })
