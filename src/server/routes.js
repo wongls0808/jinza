@@ -248,6 +248,105 @@ router.get('/system/health', auth.authMiddleware(true), auth.requirePerm('view_d
   res.json(data)
 })
 
+// Dashboard: Balance health (customers/banks/platforms negatives and transfer imbalances)
+router.get('/workbench/balance', auth.authMiddleware(true), auth.requirePerm('view_dashboard'), async (req, res) => {
+  const days = Math.min(Math.max(parseInt(req.query.days || '60', 10) || 60, 1), 365)
+  try {
+    // 1) Customers negative balances (MYR/CNY)
+    const cus = await query(`
+      with tx_agg as (
+        select 
+          t.match_target_id as customer_id,
+          sum(case when upper(a.currency_code)='MYR' then coalesce(t.credit_amount,0) - coalesce(t.debit_amount,0) else 0 end) as net_myr
+        from transactions t
+        left join receiving_accounts a on a.bank_account = t.account_number
+        where coalesce(t.matched,false) = true and t.match_type = 'customer'
+        group by t.match_target_id
+      ),
+      settle_agg as (
+        select customer_id, coalesce(sum(total_base),0) as settled_myr
+          from fx_settlements
+         group by customer_id
+      ),
+      pay_agg as (
+        select p.customer_id, coalesce(sum(case when upper(pi.currency_code)='CNY' then pi.amount else 0 end),0) as paid_cny
+          from fx_payments p
+          left join fx_payment_items pi on pi.payment_id = p.id
+         group by p.customer_id
+      )
+      select c.id, c.name, c.abbr,
+             round(coalesce(c.opening_myr,0) + coalesce(tx.net_myr,0) - coalesce(s.settled_myr,0), 2) as balance_myr,
+             round(coalesce(c.opening_cny,0) - coalesce(pay.paid_cny,0), 2) as balance_cny
+        from customers c
+        left join tx_agg tx on tx.customer_id = c.id
+        left join settle_agg s on s.customer_id = c.id
+        left join pay_agg pay on pay.customer_id = c.id
+    `)
+    const cusNeg = cus.rows.filter(r => Number(r.balance_myr||0) < 0 || Number(r.balance_cny||0) < 0)
+
+    // 2) Receiving accounts negative balances
+    const acc = await query(`
+      with t as (
+        select a.id, a.account_name, a.bank_id, a.bank_account, a.currency_code,
+               coalesce(a.opening_balance,0) + coalesce(sum(coalesce(tr.credit_amount,0) - coalesce(tr.debit_amount,0)),0) as balance
+          from receiving_accounts a
+          left join transactions tr on tr.account_number = a.bank_account
+         group by a.id
+      )
+      select t.*, b.code as bank_code
+        from t left join banks b on b.id = t.bank_id
+    `)
+    const accNeg = acc.rows.filter(r => Number(r.balance||0) < 0)
+
+    // 3) FX platforms negative balances
+    const pf = await query(`select id, code, name, balance_usd, balance_myr, balance_cny from fx_platforms`)
+    const pfNeg = pf.rows.filter(r => Number(r.balance_usd||0) < 0 || Number(r.balance_myr||0) < 0 || Number(r.balance_cny||0) < 0)
+
+    // 4) Transfer mismatches (调拨核销失衡): same-day debit vs credit by amount
+    const im = await query(`
+      with trans as (
+        select t.id, t.account_number, t.transaction_date, t.debit_amount, t.credit_amount,
+               coalesce(a.currency_code,'MYR') as currency_code
+          from transactions t
+          left join receiving_accounts a on a.bank_account = t.account_number
+         where (coalesce(lower(t.category),'') like '%transfer%' or t.category like '%调拨%')
+           and t.transaction_date >= (current_date - $1::int)
+      ),
+      x as (
+        select transaction_date as d, currency_code as cur, round(coalesce(debit_amount,0)::numeric,2) as amt, 'debit' as side
+          from trans where coalesce(debit_amount,0) > 0
+        union all
+        select transaction_date as d, currency_code as cur, round(coalesce(credit_amount,0)::numeric,2) as amt, 'credit' as side
+          from trans where coalesce(credit_amount,0) > 0
+      ), g as (
+        select d, cur, amt,
+               sum(case when side='debit' then 1 else 0 end) as cnt_debit,
+               sum(case when side='credit' then 1 else 0 end) as cnt_credit
+          from x where amt > 0
+         group by d, cur, amt
+      )
+      select d, cur, amt, (cnt_debit - cnt_credit) as gap,
+             case when (cnt_debit - cnt_credit) > 0 then (cnt_debit - cnt_credit) * amt else 0 end as unmatched_debit_amount,
+             case when (cnt_debit - cnt_credit) < 0 then (cnt_credit - cnt_debit) * amt else 0 end as unmatched_credit_amount
+        from g
+       where cnt_debit <> cnt_credit
+       order by d desc, cur, amt desc
+    `, [days])
+    const imRows = im.rows || []
+    const imTotal = imRows.reduce((s, r) => s + Number(r.unmatched_debit_amount||0) + Number(r.unmatched_credit_amount||0), 0)
+
+    res.json({
+      customers: { negatives: cusNeg },
+      accounts: { negatives: accNeg },
+      platforms: { negatives: pfNeg },
+      transfers: { windowDays: days, totalImbalance: Math.round(imTotal*100)/100, items: imRows }
+    })
+  } catch (e) {
+    console.error('balance health failed', e)
+    res.status(500).json({ error: 'balance health failed', detail: e?.message })
+  }
+})
+
 // Change password (self)
 router.post('/auth/change-password', auth.authMiddleware(true), async (req, res) => {
   const { old_password, new_password } = req.body || {}

@@ -399,6 +399,32 @@ const messages = {
         },
         status: { ok: '正常', fail: '异常', yes: '已配置', no: '未配置' }
       },
+      balance: {
+        title: '余额健康',
+        tooltipPrefix: '异常项',
+        tooltipGap: '调拨差额',
+        noAnomalies: '没有检测到异常',
+        daysLabel: '天内调拨',
+        sections: {
+          customers: '客户负余额',
+          accounts: '收款账户负余额',
+          platforms: '平台负余额',
+          transfers: '调拨失衡（同日借贷不平）'
+        },
+        columns: {
+          balance: '余额',
+          balanceUSD: '余额(USD)',
+          balanceMYR: '余额(MYR)',
+          balanceCNY: '余额(CNY)',
+          gap: '差额'
+        },
+        summary: {
+          customers: '客户 {n} 个',
+          accounts: '账户 {n} 个',
+          platforms: '平台 {n} 个',
+          transferGap: '调拨差额合计：{amt}'
+        }
+      },
       errors: {
         rejectFailed: '驳回失败'
       }
@@ -921,6 +947,32 @@ const messages = {
           dbTopTables: 'Top Tables (5)'
         },
         status: { ok: 'OK', fail: 'Fail', yes: 'Yes', no: 'No' }
+      },
+      balance: {
+        title: 'Balance Health',
+        tooltipPrefix: 'Anomalies',
+        tooltipGap: 'Transfer Gap',
+        noAnomalies: 'No anomalies detected',
+        daysLabel: 'days window',
+        sections: {
+          customers: 'Customers (negative)',
+          accounts: 'Receiving Accounts (negative)',
+          platforms: 'Platforms (negative)',
+          transfers: 'Transfers Imbalance (same-day)'
+        },
+        columns: {
+          balance: 'Balance',
+          balanceUSD: 'Balance (USD)',
+          balanceMYR: 'Balance (MYR)',
+          balanceCNY: 'Balance (CNY)',
+          gap: 'Gap'
+        },
+        summary: {
+          customers: 'Customers {n}',
+          accounts: 'Accounts {n}',
+          platforms: 'Platforms {n}',
+          transferGap: 'Transfer gap total: {amt}'
+        }
       }
     },
     expenses: {

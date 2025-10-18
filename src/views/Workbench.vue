@@ -106,6 +106,14 @@
   <div class="kpi-title">{{ t('workbench.kpis.unmatched') }}</div>
         <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
       </div>
+      <!-- 新增：余额健康监控（负余额/调拨失衡） -->
+      <div class="kpi-card theme-info" role="button" tabindex="0" v-if="has('view_dashboard')" @click="openBalanceDrawer" @keydown.enter.prevent="openBalanceDrawer" @keydown.space.prevent="openBalanceDrawer">
+        <el-tooltip :content="balanceTooltip" placement="top">
+          <span class="kpi-count">{{ totalAnomalies }}</span>
+        </el-tooltip>
+        <div class="kpi-title">{{ t('workbench.balance.title') }}</div>
+        <div class="kpi-value">{{ money(balance.totalImbalance) }}</div>
+      </div>
     </div>
 
     <!-- 服务器监控入口从独立区域移动到任务栏（filters）右侧，保留抽屉详情 -->
@@ -278,6 +286,95 @@
           </template>
         </el-table-column>
       </el-table>
+    </el-drawer>
+
+    <!-- 余额健康抽屉：客户/账户/平台负余额 + 调拨失衡 -->
+    <el-drawer v-model="balanceDrawer.visible" :title="t('workbench.balance.title')" size="min(980px, 92vw)">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+        <el-tag type="danger" effect="light">{{ t('workbench.balance.summary.customers', { n: balance.counts.customers }) }}</el-tag>
+        <el-tag type="warning" effect="light">{{ t('workbench.balance.summary.accounts', { n: balance.counts.accounts }) }}</el-tag>
+        <el-tag type="info" effect="light">{{ t('workbench.balance.summary.platforms', { n: balance.counts.platforms }) }}</el-tag>
+        <el-tag type="primary" effect="light">{{ t('workbench.balance.summary.transferGap', { amt: money(balance.totalImbalance) }) }}</el-tag>
+        <span style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <el-input-number v-model="balance.days" :min="7" :max="365" size="small" :step="1" :precision="0" :controls="false" style="width:100px;" />
+          <span style="font-size:12px; color:var(--el-text-color-secondary);">{{ t('workbench.balance.daysLabel') }}</span>
+          <el-button size="small" type="primary" :loading="balance.loading" @click="loadBalance">{{ t('workbench.monitor.refresh') }}</el-button>
+        </span>
+      </div>
+
+      <el-empty v-if="!balance.loading && totalAnomalies===0 && Math.abs(balance.totalImbalance) < 0.005" :description="t('workbench.balance.noAnomalies')" />
+
+      <template v-if="balance.customers.length">
+        <div class="chart-title" style="margin-top:8px;">{{ t('workbench.balance.sections.customers') }}</div>
+        <el-table :data="balance.customers" size="small" border>
+          <el-table-column type="index" :label="t('common.no')" width="60" />
+          <el-table-column prop="name" :label="t('common.name')" min-width="200">
+            <template #default="{ row }">{{ row.name || row.abbr || row.customer_name || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="balance_myr" :label="t('workbench.balance.columns.balanceMYR')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance_myr||row.myr||0)) }}</template>
+          </el-table-column>
+          <el-table-column prop="balance_cny" :label="t('workbench.balance.columns.balanceCNY')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance_cny||row.cny||0)) }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="balance.accounts.length">
+        <div class="chart-title" style="margin-top:14px;">{{ t('workbench.balance.sections.accounts') }}</div>
+        <el-table :data="balance.accounts" size="small" border>
+          <el-table-column type="index" :label="t('common.no')" width="60" />
+          <el-table-column prop="account_name" :label="t('accounts.fields.accountName')" min-width="220" />
+          <el-table-column prop="bank_code" :label="t('transactions.bankName')" width="120" />
+          <el-table-column prop="bank_account" :label="t('accounts.fields.bankAccount')" width="200" />
+          <el-table-column prop="currency_code" :label="t('transactions.currency')" width="110" />
+          <el-table-column prop="balance" :label="t('workbench.balance.columns.balance')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance||0)) }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="balance.platforms.length">
+        <div class="chart-title" style="margin-top:14px;">{{ t('workbench.balance.sections.platforms') }}</div>
+        <el-table :data="balance.platforms" size="small" border>
+          <el-table-column type="index" :label="t('common.no')" width="60" />
+          <el-table-column prop="name" :label="t('buyfx.platform')" min-width="220">
+            <template #default="{ row }">{{ row.name || row.platform_name || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="balance_usd" :label="t('workbench.balance.columns.balanceUSD')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance_usd||0)) }}</template>
+          </el-table-column>
+          <el-table-column prop="balance_myr" :label="t('workbench.balance.columns.balanceMYR')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance_myr||0)) }}</template>
+          </el-table-column>
+          <el-table-column prop="balance_cny" :label="t('workbench.balance.columns.balanceCNY')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.balance_cny||0)) }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <template v-if="balance.transfers.length || Math.abs(balance.totalImbalance) >= 0.005">
+        <div class="chart-title" style="margin-top:14px;">{{ t('workbench.balance.sections.transfers') }}</div>
+        <el-table :data="balance.transfers" size="small" border>
+          <el-table-column type="index" :label="t('common.no')" width="60" />
+          <el-table-column prop="date" :label="t('common.date')" width="130">
+            <template #default="{ row }">{{ fmtDate(row.date || row.trn_date || row.transaction_date) }}</template>
+          </el-table-column>
+          <el-table-column prop="currency" :label="t('transactions.currency')" width="110">
+            <template #default="{ row }">{{ (row.currency || row.currency_code || '').toUpperCase() }}</template>
+          </el-table-column>
+          <el-table-column prop="debit" :label="t('common.debit')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.debit||row.debit_total||0)) }}</template>
+          </el-table-column>
+          <el-table-column prop="credit" :label="t('common.credit')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.credit||row.credit_total||0)) }}</template>
+          </el-table-column>
+          <el-table-column prop="gap" :label="t('workbench.balance.columns.gap')" width="160" align="right">
+            <template #default="{ row }">{{ money(Number(row.gap||row.imbalance||0)) }}</template>
+          </el-table-column>
+        </el-table>
+        <div class="kpi-sub">{{ t('workbench.balance.summary.transferGap', { amt: money(balance.totalImbalance) }) }}</div>
+      </template>
     </el-drawer>
 
     <!-- 快捷操作：结汇抽屉 -->
@@ -1092,7 +1189,7 @@ async function loadStats(){
   }
 }
 
-onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats(); loadSummary() })
+onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats(); loadSummary(); try { if (has('view_dashboard')) loadBalance() } catch { loadBalance() } })
 
 // —— 交易管理：未匹配统计（KPI） ——
 const unmatchedCount = ref(0)
@@ -1214,6 +1311,39 @@ function onPaymentCreated(){
   // 支付创建后刷新统计
   loadStats(); loadSummary(); loadPaymentsCount()
 }
+
+// —— Balance 健康卡片/抽屉 ——
+const balanceDrawer = ref({ visible: false })
+const balance = ref({ loading: false, days: 60, customers: [], accounts: [], platforms: [], transfers: [], totalImbalance: 0, counts: { customers: 0, accounts: 0, platforms: 0 } })
+const totalAnomalies = computed(() => Number(balance.value.counts.customers||0) + Number(balance.value.counts.accounts||0) + Number(balance.value.counts.platforms||0))
+const balanceTooltip = computed(() => `${t('workbench.balance.tooltipPrefix')} ${totalAnomalies.value} · ${t('workbench.balance.tooltipGap')} ${money(balance.value.totalImbalance)}`)
+async function loadBalance(){
+  balance.value.loading = true
+  try {
+    const r = await httpRequest(`/workbench/balance?days=${encodeURIComponent(balance.value.days||60)}`)
+    balance.value.customers = Array.isArray(r?.customers?.negatives) ? r.customers.negatives : []
+    balance.value.accounts = Array.isArray(r?.accounts?.negatives) ? r.accounts.negatives : []
+    balance.value.platforms = Array.isArray(r?.platforms?.negatives) ? r.platforms.negatives : []
+    balance.value.transfers = Array.isArray(r?.transfers?.items) ? r.transfers.items : []
+    balance.value.totalImbalance = Number(r?.transfers?.totalImbalance || 0)
+    balance.value.counts = {
+      customers: balance.value.customers.length,
+      accounts: balance.value.accounts.length,
+      platforms: balance.value.platforms.length
+    }
+  } catch (e) {
+    // 保持静默，避免阻断工作台
+    balance.value.customers = []
+    balance.value.accounts = []
+    balance.value.platforms = []
+    balance.value.transfers = []
+    balance.value.totalImbalance = 0
+    balance.value.counts = { customers: 0, accounts: 0, platforms: 0 }
+  } finally {
+    balance.value.loading = false
+  }
+}
+function openBalanceDrawer(){ balanceDrawer.value.visible = true; loadBalance() }
 </script>
 
 <style scoped>
