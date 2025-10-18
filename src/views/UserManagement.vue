@@ -183,30 +183,116 @@
     </el-drawer>
 
     <!-- 活动日志抽屉 -->
-    <el-drawer v-model="logDrawer.visible" :title="(logDrawer.user?.display_name || logDrawer.user?.username || '') + ' · ' + t('users.activityLog')" size="min(720px, 92vw)" :close-on-click-modal="true">
-      <div v-if="logDrawer.user">
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-          <el-button size="small" :loading="logState.loading[logDrawer.user.id]" @click="refreshLogs(logDrawer.user)">{{ t('common.refresh') }}</el-button>
+    <el-drawer 
+      v-model="logDrawer.visible" 
+      :title="(logDrawer.user?.display_name || logDrawer.user?.username || '') + ' · ' + t('users.activityLog')" 
+      size="min(800px, 92vw)" 
+      :close-on-click-modal="true"
+    >
+      <div v-if="logDrawer.user" class="activity-log-container">
+        <!-- 工具栏 -->
+        <div class="log-toolbar">
+          <el-button 
+            size="small" 
+            :loading="logState.loading[logDrawer.user.id]" 
+            @click="refreshLogs(logDrawer.user)"
+          >
+            {{ t('common.refresh') }}
+          </el-button>
+          <el-select 
+            v-model="logFilter" 
+            size="small" 
+            placeholder="筛选类型" 
+            clearable 
+            style="width: 160px;"
+          >
+            <el-option label="全部" value="" />
+            <el-option label="认证" value="auth" />
+            <el-option label="用户管理" value="user" />
+            <el-option label="客户管理" value="customer" />
+            <el-option label="交易管理" value="transaction" />
+            <el-option label="外汇管理" value="fx" />
+          </el-select>
         </div>
-        <ul class="log-list">
-          <li v-if="(logs[logDrawer.user.id]||[]).length===0" class="log-empty">{{ t('common.noData') }}</li>
-          <li v-for="(it,idx) in (logs[logDrawer.user.id]||[])" :key="idx" class="log-item">
-            <span class="time">{{ fmtMinute(it.ts) }}</span>
-            <span class="ip">{{ it.ip }}</span>
-            <span class="action">{{ it.action || '' }}</span>
-          </li>
-        </ul>
+
+        <!-- 时间线列表 -->
+        <div class="activity-timeline">
+          <div v-if="filteredLogs.length === 0" class="log-empty">
+            {{ t('common.noData') }}
+          </div>
+          
+          <div 
+            v-for="(activity, idx) in filteredLogs" 
+            :key="idx" 
+            class="activity-item"
+            :class="`activity-${getActivityCategory(activity)}`"
+          >
+            <!-- 时间线节点 -->
+            <div class="activity-timeline-node">
+              <div class="node-icon" :class="`icon-${getActivityCategory(activity)}`">
+                <component :is="getActivityIcon(activity)" />
+              </div>
+              <div class="node-line" v-if="idx < filteredLogs.length - 1"></div>
+            </div>
+
+            <!-- 活动内容 -->
+            <div class="activity-content">
+              <div class="activity-header">
+                <span class="activity-action">{{ getActivityText(activity) }}</span>
+                <span class="activity-time">{{ formatRelativeTime(activity.ts) }}</span>
+              </div>
+              
+              <div class="activity-meta" v-if="activity.meta || activity.ip">
+                <div class="meta-item" v-if="activity.ip">
+                  <el-icon><LocationInformation /></el-icon>
+                  <span>{{ activity.ip }}</span>
+                </div>
+                <div class="meta-item" v-if="activity.meta && activity.meta.target">
+                  <el-icon><Link /></el-icon>
+                  <span>{{ t('users.activityDetails.target') }}: {{ activity.meta.target }}</span>
+                </div>
+                <div class="meta-item" v-if="activity.meta && activity.meta.count">
+                  <el-icon><DataLine /></el-icon>
+                  <span>{{ t('users.activityDetails.count') }}: {{ activity.meta.count }}</span>
+                </div>
+              </div>
+
+              <div class="activity-timestamp">{{ fmtMinute(activity.ts) }}</div>
+            </div>
+          </div>
+        </div>
       </div>
     </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Check, Close } from '@element-plus/icons-vue'
+import { 
+  Check, 
+  Close, 
+  User, 
+  UserFilled,
+  Lock,
+  Key,
+  DocumentAdd,
+  Edit,
+  Delete,
+  Upload,
+  Download,
+  Setting,
+  LocationInformation,
+  Link,
+  DataLine,
+  Connection,
+  Wallet,
+  Money,
+  Coin,
+  TrendCharts
+} from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 
@@ -437,6 +523,75 @@ async function refreshLogs(u) {
 function openLogDrawer(u) {
   logDrawer.value = { visible: true, user: u }
   refreshLogs(u)
+}
+
+// 活动日志过滤
+const logFilter = ref('')
+const filteredLogs = computed(() => {
+  const userId = logDrawer.value.user?.id
+  if (!userId) return []
+  const allLogs = logs.value[userId] || []
+  if (!logFilter.value) return allLogs
+  return allLogs.filter(log => getActivityCategory(log) === logFilter.value)
+})
+
+// 获取活动类别
+function getActivityCategory(activity) {
+  const action = activity.action || activity.kind || ''
+  if (action === 'session' || action === 'login' || action === 'logout') return 'auth'
+  if (action.startsWith('users.') || action.startsWith('permissions.')) return 'user'
+  if (action.startsWith('customers.')) return 'customer'
+  if (action.startsWith('banks.') || action.startsWith('accounts.')) return 'bank'
+  if (action.startsWith('transactions.')) return 'transaction'
+  if (action.startsWith('fx.')) return 'fx'
+  if (action.startsWith('expenses.')) return 'expense'
+  return 'system'
+}
+
+// 获取活动图标
+function getActivityIcon(activity) {
+  const action = activity.action || ''
+  if (action === 'login') return Connection
+  if (action === 'logout') return Connection
+  if (action === 'session') return User
+  if (action.includes('create')) return DocumentAdd
+  if (action.includes('update')) return Edit
+  if (action.includes('delete')) return Delete
+  if (action.includes('import')) return Upload
+  if (action.includes('export')) return Download
+  if (action.includes('password')) return Lock
+  if (action.includes('permissions')) return Key
+  if (action.startsWith('fx.')) return Money
+  if (action.startsWith('transactions.')) return Wallet
+  return Setting
+}
+
+// 获取活动文本
+function getActivityText(activity) {
+  const action = activity.action || activity.kind || ''
+  if (action === 'session') return t('users.activityTypes.session')
+  // 尝试获取翻译,如果没有则返回原文
+  const translationKey = `users.activityTypes.${action}`
+  const translated = t(translationKey)
+  // 如果翻译和key相同,说明没有找到翻译,返回原action
+  return translated === translationKey ? action : translated
+}
+
+// 格式化相对时间
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return ''
+  const now = new Date()
+  const past = new Date(timestamp)
+  const diffMs = now - past
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 7) return `${diffDays}天前`
+  return fmtMinute(timestamp)
 }
 
 // 头像字母（显示名/用户名首字母缩写）
@@ -715,33 +870,150 @@ function fmtMinute(ts) {
   margin-top: 12px; 
 }
 
-/* 日志相关样式 */
-.log-list { 
-  list-style: none; 
-  padding: 0; 
-  margin: 6px 0 0; 
-  display: grid; 
-  gap: 6px; 
+/* 活动日志样式 */
+.activity-log-container {
+  padding: 0;
 }
-.log-item { 
-  display: grid; 
-  grid-template-columns: 180px 150px 1fr; 
-  gap: 8px; 
-  font-size: 12px; 
-  color: var(--el-text-color-regular); 
+
+.log-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
-.log-item .time { 
-  color: var(--el-text-color-secondary); 
+
+.activity-timeline {
+  position: relative;
+  padding-left: 0;
 }
-.log-item .ip { 
-  font-variant-numeric: tabular-nums; 
+
+.activity-item {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
 }
-.log-item .action { 
-  color: var(--el-text-color-secondary); 
+
+.activity-timeline-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
 }
+
+.node-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: white;
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.node-icon.icon-auth {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.node-icon.icon-user {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.node-icon.icon-customer {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+.node-icon.icon-transaction {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+.node-icon.icon-fx {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+.node-icon.icon-bank {
+  background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+}
+.node-icon.icon-expense {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+.node-icon.icon-system {
+  background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+}
+
+.node-line {
+  width: 2px;
+  flex: 1;
+  background: var(--el-border-color-light);
+  margin-top: 4px;
+  min-height: 24px;
+}
+
+.activity-content {
+  flex: 1;
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  transition: all 0.2s;
+}
+
+.activity-content:hover {
+  background: var(--el-fill-color-light);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.activity-action {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+
+.activity-time {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+
+.meta-item .el-icon {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+}
+
+.activity-timestamp {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+  margin-top: 8px;
+  font-family: monospace;
+}
+
 .log-empty { 
-  font-size: 12px; 
+  font-size: 14px; 
   color: var(--el-text-color-secondary); 
-  padding: 4px 0; 
+  padding: 40px 0;
+  text-align: center;
 }
 </style>
+
