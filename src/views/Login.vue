@@ -54,7 +54,7 @@ const submitting = ref(false)
 const passwordInput = ref(null)
 const { t, locale } = useI18n()
 // 记住我标签：中文界面仅中文，英文界面仅英文
-const rememberLabel = computed(()=> locale.value==='zh' ? '记住密码' : 'Remember Me')
+const rememberLabel = computed(()=> t('login.rememberMe'))
 const { save } = useAuth()
 
 function setLang(value){
@@ -68,7 +68,7 @@ const focusPassword = () => { passwordInput.value && passwordInput.value.focus()
 
 const onSubmit = async () => {
   if(!form.value.username || !form.value.password){
-    ElMessage({ message: t('login.username') + '/' + t('login.password') + ' 不能为空', type:'warning', duration:2000 })
+    ElMessage({ message: t('login.errors.missingCredentials'), type:'warning', duration:2000 })
     return
   }
   submitting.value = true
@@ -84,7 +84,7 @@ const onSubmit = async () => {
     if (res.must_change_password) {
       ElMessage({ message: t('login.firstLoginTip'), type:'warning', duration:1800 })
     } else {
-      ElMessage({ message:'登录成功，正在进入系统...', type:'success', duration:1500 })
+      ElMessage({ message: t('login.successEntering'), type:'success', duration:1500 })
     }
     setTimeout(()=>{ window.location.href = redirect === '/' ? '/' : String(redirect) }, 500)
   } catch(e){
@@ -98,8 +98,8 @@ const onSubmit = async () => {
       // 兼容旧服务：尝试解析 message 为 JSON 或使用原始 message
       try { const data = JSON.parse(e.message); text = data?.error || data?.message || '' } catch { text = e?.message || '' }
     }
-    if (!text) text = t('login.errors.defaultError')
-    ElMessage({ message: '登录失败：' + text, type:'error', duration:3200 })
+  if (!text) text = t('login.errors.defaultError')
+  ElMessage({ message: t('login.failedWithMsg', { msg: text }), type:'error', duration:3200 })
   } finally { submitting.value = false }
 }
 

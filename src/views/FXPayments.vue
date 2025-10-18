@@ -57,7 +57,7 @@
             :type="row.status==='completed' ? 'success' : 'default'"
             :disabled="row.status!=='completed'"
             @click="downloadPdf(row)"
-          >PDF</el-button>
+          >{{ t('common.pdf') }}</el-button>
           <el-button 
             v-if="has('manage_fx') && row.status==='completed'"
             size="small" type="warning"
@@ -101,7 +101,7 @@
           </div>
           <div class="row">
             <div class="cell actions" style="display:flex; gap:8px;">
-              <el-button @click="downloadCsv(detail)">CSV</el-button>
+              <el-button @click="downloadCsv(detail)">{{ t('common.csv') }}</el-button>
               <el-button type="primary" v-if="detail.status==='completed'" @click="previewPdf(detail)">{{ t('fx.previewPdf') }}</el-button>
             </div>
           </div>

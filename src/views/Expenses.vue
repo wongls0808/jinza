@@ -41,7 +41,7 @@
       </el-table>
     </el-card>
 
-    <!-- 借贷报表 -->
+  <!-- 借贷报表 / Debit-Credit Report -->
     <el-card shadow="never" class="card--plain" style="margin-top:12px;">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span style="font-weight:600;">{{ $t('expenses.reportTitle') }}</span>
@@ -110,7 +110,21 @@ const q = ref('')
 const cate = ref('')
 const drcr = ref('')
 const range = ref([]) // 业务弱化日期筛选，但保留内部变量兼容 loadList
-const categories = ['办公费','差旅费','通讯费','租赁费','运输费','服务费','广告费','咨询费','维修费','招待费','水电费','其他']
+// 使用 i18n 分类标签，值保持中文以兼容后端分类存储
+const categories = [
+  t('expensesCategories.office'),
+  t('expensesCategories.travel'),
+  t('expensesCategories.telecom'),
+  t('expensesCategories.rent'),
+  t('expensesCategories.transport'),
+  t('expensesCategories.service'),
+  t('expensesCategories.ad'),
+  t('expensesCategories.consult'),
+  t('expensesCategories.maintain'),
+  t('expensesCategories.hospitality'),
+  t('expensesCategories.utilities'),
+  t('expensesCategories.other'),
+]
 
 const drawer = ref(false)
 const isEdit = ref(false)

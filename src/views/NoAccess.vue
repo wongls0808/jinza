@@ -1,10 +1,10 @@
 <template>
   <div class="no-access">
-    <el-result icon="warning" title="暂无可访问的功能模块" sub-title="请联系管理员为你的账号分配权限">
+    <el-result icon="warning" :title="$t('noAccess.title')" :sub-title="$t('noAccess.subtitle')">
       <template #extra>
         <div class="actions">
-          <el-button type="primary" @click="toHome">返回首页</el-button>
-          <el-button @click="logout">退出登录</el-button>
+              <el-button type="primary" @click="toHome">{{ $t('common.backHome') }}</el-button>
+              <el-button @click="logout">{{ $t('app.logout') }}</el-button>
         </div>
       </template>
     </el-result>

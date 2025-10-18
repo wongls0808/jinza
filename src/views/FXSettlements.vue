@@ -36,7 +36,7 @@
       <el-table-column :label="t('common.actions')" width="220" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
-          <el-button size="small" type="primary" @click="downloadCsv(row)">CSV</el-button>
+          <el-button size="small" type="primary" @click="downloadCsv(row)">{{ t('common.csv') }}</el-button>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
@@ -81,7 +81,7 @@
           <div class="row">
             <div class="cell"><span class="k">{{ t('common.createdBy') }}</span><span class="v">{{ detail.created_by_name }}</span></div>
             <div class="cell"><span class="k">{{ t('common.createdAt') }}</span><span class="v">{{ fmtDate(detail.created_at) }}</span></div>
-            <div class="cell actions"><el-button type="primary" @click="downloadPdf(detail)">PDF</el-button></div>
+            <div class="cell actions"><el-button type="primary" @click="downloadPdf(detail)">{{ t('common.pdf') }}</el-button></div>
           </div>
         </div>
 

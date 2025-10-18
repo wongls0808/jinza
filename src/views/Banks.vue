@@ -32,13 +32,13 @@
     <el-drawer v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" :size="520" :close-on-click-modal="false">
       <el-form :model="dlg.form" label-width="140px" size="small" class="form">
         <el-form-item :label="$t('banks.labels.code')">
-          <el-input v-model.trim="dlg.form.code" placeholder="例如：ICBC" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" :disabled="dlg.mode==='edit' && !!dlg.form.id" />
+          <el-input v-model.trim="dlg.form.code" :placeholder="$t('banks.placeholders.codeExample')" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" :disabled="dlg.mode==='edit' && !!dlg.form.id" />
         </el-form-item>
         <el-form-item :label="$t('banks.labels.zh')">
-          <el-input v-model.trim="dlg.form.zh" placeholder="中国工商银行" @input="dlg.form.zh = (dlg.form.zh || '').toUpperCase()" />
+          <el-input v-model.trim="dlg.form.zh" :placeholder="$t('banks.placeholders.zhNameExample')" @input="dlg.form.zh = (dlg.form.zh || '').toUpperCase()" />
         </el-form-item>
         <el-form-item :label="$t('banks.labels.en')">
-          <el-input v-model.trim="dlg.form.en" placeholder="Industrial and Commercial Bank of China" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
+          <el-input v-model.trim="dlg.form.en" :placeholder="$t('banks.placeholders.enNameExample')" @input="dlg.form.en = (dlg.form.en || '').toUpperCase()" />
         </el-form-item>
         <!-- 取消 URL 输入，统一使用本地 /banks/<code>.(svg|png|jpg) -->
         <el-form-item :label="$t('banks.labels.uploadFile')">
@@ -74,7 +74,7 @@ async function remove(code) {
   try {
     const b = banks.value.find(x => x.code === code)
     if (!b) return
-    await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning') || '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning'), { type: 'warning' })
     await api.deleteBank(b.id)
     await load()
     ElMessage.success($t('customers.messages.deleted'))
@@ -154,7 +154,7 @@ async function removeInDialog() {
     const f = dlg.value.form
     const b = banks.value.find(x => x.id === f.id)
     if (!b) return
-  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning') || '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning'), { type: 'warning' })
     dlg.value.loading = true
     await api.deleteBank(b.id)
     dlg.value.visible = false

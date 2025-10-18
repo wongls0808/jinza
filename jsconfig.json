@@ -13,10 +13,16 @@
     "jsx": "preserve"
   },
   "include": [
-    "src/**/*",
+    "src/**/*.js",
+    "src/**/*.vue",
+    "src/**/*.json",
     "server.js",
     "vite.config.js",
     "env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
   ],
   "vueCompilerOptions": {
     "globalTypesPath": "./src/volar.d.ts"

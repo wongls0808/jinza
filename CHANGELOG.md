@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.8.1 (2025-10-18)
+
+UI/i18n improvements and editor configuration tweaks.
+
+### Frontend
+- i18n sweep continued: Banks placeholders for code/zh/en names; common keys added (csv/pdf/input).
+- FXPayments and FXSettlements: replaced hardcoded CSV/PDF labels with i18n.
+- Workbench: quick actions and drawers now fully localized; date filter Apply uses i18n.
+- UserManagement: admin-all-permissions notice localized via users.adminAllPermsNotice.
+- Removed legacy backup views `TransactionsView_backup_import.vue` and `TransactionsView_clean.vue`.
+
+### Tooling
+- jsconfig.json narrowed include/exclude to stabilize Vue language service and avoid false diagnostics.
+
+### Build
+- No functional backend changes. Vite build verified OK.
+
 ## v1.8.0 (2025-10-18)
 
 Stabilization and feature completeness release.

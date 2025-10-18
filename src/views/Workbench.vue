@@ -8,21 +8,21 @@
     <!-- 高频操作置顶工具栏：匹配 / 结汇 / 付款 / 购汇（左对齐，独立卡片） -->
     <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions" v-if="has('dashboard:quick_actions')">
       <div class="hf-row">
-        <div class="hf-item info" role="button" tabindex="0" aria-label="匹配" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
+        <div class="hf-item info" role="button" tabindex="0" :aria-label="t('home.qaTransactions')" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
           <div class="hf-icon"><Tickets /></div>
-          <div class="hf-label">匹配</div>
+          <div class="hf-label">{{ t('home.qaTransactions') }}</div>
         </div>
-        <div class="hf-item primary" role="button" tabindex="0" aria-label="结汇" v-if="has('dashboard:action:settle')" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
+        <div class="hf-item primary" role="button" tabindex="0" :aria-label="t('home.qaSettlements')" v-if="has('dashboard:action:settle')" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
           <div class="hf-icon"><Collection /></div>
-          <div class="hf-label">结汇</div>
+          <div class="hf-label">{{ t('home.qaSettlements') }}</div>
         </div>
-        <div class="hf-item success" role="button" tabindex="0" aria-label="付款" v-if="has('dashboard:action:pay')" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
+        <div class="hf-item success" role="button" tabindex="0" :aria-label="t('home.qaPayments')" v-if="has('dashboard:action:pay')" @click="openPayDrawer()" @keydown.enter.prevent="openPayDrawer()" @keydown.space.prevent="openPayDrawer()">
           <div class="hf-icon"><CreditCard /></div>
-          <div class="hf-label">付款</div>
+          <div class="hf-label">{{ t('home.qaPayments') }}</div>
         </div>
-        <div class="hf-item warning" role="button" tabindex="0" aria-label="购汇" v-if="has('dashboard:action:buyfx')" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
+        <div class="hf-item warning" role="button" tabindex="0" :aria-label="t('home.qaFx')" v-if="has('dashboard:action:buyfx')" @click="openBuyDrawer()" @keydown.enter.prevent="openBuyDrawer()" @keydown.space.prevent="openBuyDrawer()">
           <div class="hf-icon"><Coin /></div>
-          <div class="hf-label">购汇</div>
+          <div class="hf-label">{{ t('home.qaFx') }}</div>
         </div>
       </div>
     </div>
@@ -129,7 +129,7 @@
           />
           <div class="date-pop-ops">
             <el-button size="small" @click="onDateClear">{{ t('workbench.filters.clear') }}</el-button>
-            <el-button size="small" type="primary" @click="onDateApply">应用</el-button>
+            <el-button size="small" type="primary" @click="onDateApply">{{ t('workbench.filters.apply') }}</el-button>
           </div>
         </div>
         <template #reference>
@@ -281,15 +281,15 @@
     </el-drawer>
 
     <!-- 快捷操作：结汇抽屉 -->
-    <el-drawer v-model="settleDrawer.visible" title="结汇" size="50%">
+    <el-drawer v-model="settleDrawer.visible" :title="t('home.qaSettlements')" size="50%">
       <FXManagement ref="settleRef" mode="settle" :in-drawer="true" :initial-settle-customer-id="settlePrefillCustomerId" @settlementCreated="onSettlementCreated" />
     </el-drawer>
     <!-- 快捷操作：付款抽屉 -->
-    <el-drawer v-model="payDrawer.visible" title="付款" size="50%">
+    <el-drawer v-model="payDrawer.visible" :title="t('home.qaPayments')" size="50%">
       <FXManagement ref="payRef" mode="pay" :in-drawer="true" :initial-pay-customer-id="payPrefillCustomerId" @paymentCreated="onPaymentCreated" />
     </el-drawer>
     <!-- 快捷操作：购汇抽屉 -->
-    <el-drawer v-model="buyDrawer.visible" title="购汇" size="520px">
+    <el-drawer v-model="buyDrawer.visible" :title="t('home.qaFx')" size="520px">
       <BuyFX :manage="false" :compact="true" />
     </el-drawer>
 

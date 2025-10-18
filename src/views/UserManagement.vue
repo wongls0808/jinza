@@ -91,7 +91,7 @@
     <el-drawer v-model="permDrawer.visible" :title="(permDrawer.user?.display_name || permDrawer.user?.username || '') + ' · ' + (t('users.assignPerms') || '分配权限')" size="min(760px, 88vw)" :close-on-click-modal="false">
       <div v-if="permDrawer.user" class="drawer-body">
         <div class="drawer-toolbar">
-          <el-tag v-if="permDrawer.user.is_admin" type="danger" size="small">管理员拥有全部权限（不可更改）</el-tag>
+          <el-tag v-if="permDrawer.user.is_admin" type="danger" size="small">{{ t('users.adminAllPermsNotice') || '管理员拥有全部权限（不可更改）' }}</el-tag>
           <div class="spacer"></div>
           <el-button size="small" @click="expandAll(true)">{{ t('users.expandAll') || '展开全部' }}</el-button>
           <el-button size="small" @click="expandAll(false)">{{ t('users.collapseAll') || '收起全部' }}</el-button>

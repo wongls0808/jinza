@@ -31,7 +31,7 @@
             </el-button>
             <el-button @click="showSimpleImportDialog">
               <el-icon><Upload /></el-icon>
-              导入交易
+              {{ t('transactions.importTransactions') }}
             </el-button>
             <el-button @click="exportTransactions">
               <el-icon><Download /></el-icon>
@@ -473,7 +473,7 @@
     <!-- 简单导入对话框 -->
     <el-dialog
       v-model="simpleImportVisible"
-      title="导入交易"
+      :title="t('transactions.importTransactions')"
       width="600px">
       <el-upload
         class="simple-upload"
@@ -485,51 +485,51 @@
         :show-file-list="false">
         <el-icon class="el-icon--upload"><Upload /></el-icon>
         <div class="el-upload__text">
-          拖拽CSV文件到此处 <em>或点击选择文件</em>
+          {{ t('transactions.dropFiles') }} <em>{{ t('transactions.clickUpload') }}</em>
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持银行对账单CSV格式（如从Excel导出的对账单文件）
+            {{ t('transactions.supportedFormats') }}
           </div>
         </template>
       </el-upload>
       
       <div v-if="importPreview.length > 0" class="import-preview">
         <div class="preview-header">
-          <h4>银行对账单预览（前5条记录）</h4>
-          <span>共 {{ importPreview.length }} 条交易记录</span>
+          <h4>{{ t('transactions.previewFirstN', { n: 5 }) }}</h4>
+          <span>{{ t('transactions.totalRecords', { n: importPreview.length }) }}</span>
         </div>
         <el-table :data="importPreview.slice(0, 5)" border size="small" stripe>
-          <el-table-column label="行号" width="60" align="center">
+          <el-table-column :label="t('common.no')" width="60" align="center">
             <template #default="scope">
               {{ scope.row.rowIndex }}
             </template>
           </el-table-column>
-          <el-table-column label="账户号码" prop="accountNumber" width="120" />
-          <el-table-column label="交易日期" width="110">
+          <el-table-column :label="t('transactions.accountNumber')" prop="accountNumber" width="120" />
+          <el-table-column :label="t('transactions.transactionDate')" width="110">
             <template #default="scope">
               <span :class="{ 'invalid-date': !scope.row.transactionDate }">
                 {{ scope.row.transactionDate || scope.row.originalDate }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="支票号/参考号" prop="chequeRefNo" width="120" show-overflow-tooltip />
-          <el-table-column label="交易描述" prop="description" min-width="150" show-overflow-tooltip />
-          <el-table-column label="借方金额" prop="debitAmount" width="85" align="right">
+          <el-table-column :label="t('transactions.chequeRefNo')" prop="chequeRefNo" width="120" show-overflow-tooltip />
+          <el-table-column :label="t('transactions.transactionDescription')" prop="description" min-width="150" show-overflow-tooltip />
+          <el-table-column :label="t('transactions.debitAmount')" prop="debitAmount" width="85" align="right">
             <template #default="scope">
               <span v-if="scope.row.debitAmount > 0" class="debit-amount">
                 {{ scope.row.debitAmount.toFixed(2) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="贷方金额" prop="creditAmount" width="85" align="right">
+          <el-table-column :label="t('transactions.creditAmount')" prop="creditAmount" width="85" align="right">
             <template #default="scope">
               <span v-if="scope.row.creditAmount > 0" class="credit-amount">
                 {{ scope.row.creditAmount.toFixed(2) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="60" align="center">
+          <el-table-column :label="t('transactions.status')" width="60" align="center">
             <template #default="scope">
               <el-icon v-if="scope.row.transactionDate && (scope.row.debitAmount > 0 || scope.row.creditAmount > 0)" 
                        color="green" size="16">
@@ -545,13 +545,13 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="simpleImportVisible = false">取消</el-button>
+          <el-button @click="simpleImportVisible = false">{{ t('common.cancel') }}</el-button>
           <el-button 
             type="primary" 
             @click="submitSimpleImport" 
             :loading="importing"
             :disabled="importPreview.length === 0">
-            导入 ({{ importPreview.length }} 条)
+            {{ t('transactions.importCount', { n: importPreview.length }) }}
           </el-button>
         </span>
       </template>
@@ -701,15 +701,15 @@ const rules = {
   ]
 }
 
-// 类别选项
+// 类别选项（值保持中文以兼容后端/过滤，显示使用 i18n）
 const categoryOptions = ref([
-  '收入',
-  '支出',
-  '转账',
-  '贷款',
-  '投资',
-  '退款',
-  '其他'
+  { value: '收入', label: t('transactions.categories.income') },
+  { value: '支出', label: t('transactions.categories.expense') },
+  { value: '转账', label: t('transactions.categories.transfer') },
+  { value: '贷款', label: t('transactions.categories.loan') },
+  { value: '投资', label: t('transactions.categories.investment') },
+  { value: '退款', label: t('transactions.categories.refund') },
+  { value: '其他', label: t('transactions.categories.other') }
 ])
 
 // 监听日期范围变化

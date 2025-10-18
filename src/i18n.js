@@ -6,6 +6,10 @@ const messages = {
       title: 'BSB | BESTRADE SB',
       logout: '退出登录',
     },
+    noAccess: {
+      title: '暂无可访问的功能模块',
+      subtitle: '请联系管理员为你的账号分配权限'
+    },
     common: {
       backHome: '返回主页',
       back: '返回',
@@ -29,10 +33,14 @@ const messages = {
       export: '导出',
       template: '模板',
       reset: '重置',
-      confirmDelete: '确定删除？',
+    confirmDelete: '确定删除？',
   warning: '提示',
       cancel: '取消',
   ok: '确定',
+  input: '请输入',
+  csv: 'CSV',
+  pdf: 'PDF',
+  close: '关闭',
   startDate: '开始日期',
   endDate: '结束日期',
       total: '合计',
@@ -231,7 +239,12 @@ const messages = {
       addTitle: '新增银行',
   replaceTitle: '替换 Logo',
   labels: { code: '代码', zh: '中文名', en: '英文名', uploadFile: '上传文件（自动以代码命名）' },
-  hintFile: '文件上传后将以银行代码命名保存到 /banks 目录（优先 SVG，失败回退 PNG/JPG）'
+  hintFile: '文件上传后将以银行代码命名保存到 /banks 目录（优先 SVG，失败回退 PNG/JPG）',
+  placeholders: {
+    codeExample: '例如：ICBC',
+    zhNameExample: '中国工商银行',
+    enNameExample: 'Industrial and Commercial Bank of China'
+  }
   },
   login: {
       title: '登录',
@@ -239,6 +252,8 @@ const messages = {
       password: '密码',
   submit: '登录',
   firstLoginTip: '首次登录需修改密码，将跳转到改密页面',
+    successEntering: '登录成功，正在进入系统...',
+    failedWithMsg: '登录失败：{msg}',
       tagline: '企业财务与管理系统解决方案',
       welcome: '欢迎使用',
       rememberMe: '记住我',
@@ -296,6 +311,7 @@ const messages = {
         last6m: '近6个月',
         thisYear: '年度',
         clear: '清空',
+        apply: '应用',
       },
       charts: {
         transactionsDebit: '交易合计(借)',
@@ -428,11 +444,27 @@ const messages = {
         deleteFailed: '删除失败'
       }
   },
+  // 费用分类标签（用于前端显示），值为中文；英文环境显示英文
+  expensesCategories: {
+    office: '办公费',
+    travel: '差旅费',
+    telecom: '通讯费',
+    rent: '租赁费',
+    transport: '运输费',
+    service: '服务费',
+    ad: '广告费',
+    consult: '咨询费',
+    maintain: '维修费',
+    hospitality: '招待费',
+    utilities: '水电费',
+    other: '其他'
+  },
   users: {
       usernamePlaceholder: '用户名',
       passwordPlaceholder: '初始密码',
       displayNamePlaceholder: '显示名',
       reseedPermTree: '重建权限树',
+    adminAllPermsNotice: '管理员拥有全部权限（不可更改）',
     activityLog: '活动日志',
     assignPerms: '分配权限',
     savePerms: '保存权限',
@@ -508,6 +540,7 @@ const messages = {
       importCSV: '导入 CSV',
       exportCSV: '导出 CSV',
       addTransaction: '新增交易',
+    editTransaction: '编辑交易',
       importTransactions: '导入交易',
       relationObject: '关联对象',
       exportTransactions: '导出交易',
@@ -523,6 +556,10 @@ const messages = {
   balance: '余额',
   transactionDescription: '交易说明',
   reference: '参考',
+  accountNumberRequired: '请选择账号',
+  transactionDateRequired: '请选择交易日期',
+  debitAmountMin: '借方金额不能小于 0',
+  creditAmountMin: '贷方金额不能小于 0',
   relationPerson: '关联人',
   relation: '关联',
   bankName: '银行',
@@ -545,6 +582,15 @@ const messages = {
   clearFilters: '清空条件',
   applyFilters: '应用条件',
       uncategorized: '未分类',
+      categories: {
+        income: '收入',
+        expense: '支出',
+        transfer: '转账',
+        loan: '贷款',
+        investment: '投资',
+        refund: '退款',
+        other: '其他'
+      },
       dateRange: '日期范围',
       startDate: '开始日期',
       endDate: '结束日期',
@@ -585,6 +631,9 @@ const messages = {
       clickUpload: '点击上传',
       supportedFormats: '支持 .csv 格式文件',
       dataPreview: '数据预览',
+  previewFirstN: '预览（前 {n} 条）',
+  totalRecords: '共 {n} 条记录',
+  importCount: '导入 ({n} 条)',
   fetchAccountsFailed: '获取收款账户失败，请检查网络或权限',
       enterMatchPattern: '请输入匹配模式',
       patternRequired: '请输入有效的匹配模式',
@@ -678,12 +727,18 @@ const messages = {
       title: 'BSB | BESTRADE SB',
       logout: 'Logout',
     },
+    noAccess: {
+      title: 'No accessible modules for your account',
+      subtitle: 'Please contact the administrator to assign permissions to your account'
+    },
     login: {
       title: 'Login',
       username: 'Username',
       password: 'Password',
       submit: 'Login',
       firstLoginTip: 'First login requires password change',
+      successEntering: 'Login successful, entering system...',
+      failedWithMsg: 'Login failed: {msg}',
       errors: {
         missingCredentials: 'Please enter username and password',
         userNotFound: 'User not found',
@@ -699,6 +754,7 @@ const messages = {
         last6m: 'Last 6 months',
         thisYear: 'Year-to-date',
         clear: 'Clear',
+        apply: 'Apply',
       },
       charts: {
         transactionsDebit: 'Transactions (Debit)',
@@ -733,8 +789,16 @@ const messages = {
         unmatched: 'Unmatched Transactions'
       },
       preview: {
-        feePercent: 'Fee %'
+        feePercent: 'Fee %',
+        currency: 'Currency',
+        availableBalance: 'Available',
+        orderDeduction: 'Order Deduction (fee incl.)',
+        balanceAfter: 'Balance After'
       },
+      countTooltip: 'Total {n}',
+      approveDialogTitle: 'Approve Payment',
+      auditLog: 'Audit Log',
+      deductionDetails: 'Deduction Details',
       todos: {
         title: 'Todos',
         payments: 'Payments Pending'
@@ -824,6 +888,21 @@ const messages = {
         deleteFailed: 'Delete failed'
       }
     },
+    // Expense categories (labels only for UI)
+    expensesCategories: {
+      office: 'Office',
+      travel: 'Travel',
+      telecom: 'Telecom',
+      rent: 'Rent',
+      transport: 'Transport',
+      service: 'Service',
+      ad: 'Advertising',
+      consult: 'Consulting',
+      maintain: 'Maintenance',
+      hospitality: 'Hospitality',
+      utilities: 'Utilities',
+      other: 'Other'
+    },
     fx: {
       title: 'FX Management',
       settlementArea: 'Settlement',
@@ -881,6 +960,7 @@ const messages = {
       approve: 'Approve',
       revoke: 'Revoke',
       reject: 'Reject',
+    warning: 'Warning',
       name: 'Name',
       amount: 'Amount',
       actions: 'Actions',
@@ -912,6 +992,9 @@ const messages = {
       confirmDelete: 'Confirm delete?',
       cancel: 'Cancel',
       ok: 'OK',
+  input: 'Input',
+  csv: 'CSV',
+  pdf: 'PDF',
       total: 'Total',
       save: 'Save',
       loadFailed: 'Load failed',
@@ -1077,7 +1160,12 @@ const messages = {
       addTitle: 'Add Bank',
   replaceTitle: 'Replace Logo',
   labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', uploadFile: 'Upload file (named by code)' },
-  hintFile: 'Uploaded logo will be saved under /banks named by bank code (prefer SVG; fallback PNG/JPG)'
+  hintFile: 'Uploaded logo will be saved under /banks named by bank code (prefer SVG; fallback PNG/JPG)',
+  placeholders: {
+    codeExample: 'e.g. ICBC',
+    zhNameExample: '中国工商银行',
+    enNameExample: 'Industrial and Commercial Bank of China'
+  }
     },
     login: {
       title: 'Sign In',
@@ -1124,6 +1212,7 @@ const messages = {
       passwordPlaceholder: 'Initial Password',
       displayNamePlaceholder: 'Display Name',
       reseedPermTree: 'Reseed Permission Tree',
+      adminAllPermsNotice: 'Admins have all permissions (not editable)',
       activityLog: 'Activity Log',
       assignPerms: 'Assign Permissions',
       savePerms: 'Save Permissions',
@@ -1169,7 +1258,8 @@ const messages = {
       expand: 'Expand',
       collapse: 'Collapse',
       noData: 'No data',
-      updateFailed: 'Update failed'
+      updateFailed: 'Update failed',
+      close: 'Close'
     },
     settings: {
       title: 'Settings',
@@ -1205,7 +1295,8 @@ const messages = {
       title: 'Transactions',
       importCSV: 'Import CSV',
       exportCSV: 'Export CSV',
-      addTransaction: 'Add Trn',
+  addTransaction: 'Add Trn',
+  editTransaction: 'Edit Trn',
       importTransactions: 'Import',
       exportTransactions: 'Export',
       advancedFilter: 'Filter',
@@ -1213,7 +1304,7 @@ const messages = {
   matchList: 'Matched List',
       accountNumber: 'A/C No.',
       transactionDate: 'Date',
-      chequeRefNo: 'Ref No.',
+      max: 'Max',
       amount: 'Amount',
       debitAmount: 'Debit',
       creditAmount: 'Credit',
@@ -1222,6 +1313,9 @@ const messages = {
       reference: 'Reference',
   relationPerson: 'Related Person',
   relation: 'Relation',
+      previewFirstN: 'Preview (first {n})',
+      totalRecords: 'Total {n} records',
+      importCount: 'Import ({n})',
       bankName: 'Bank',
       accountName: 'A/C Name',
       match: 'Match',
@@ -1241,6 +1335,15 @@ const messages = {
   clearFilters: 'Clear Filters',
   applyFilters: 'Apply Filters',
       uncategorized: 'Uncat.',
+      categories: {
+        income: 'Income',
+        expense: 'Expense',
+        transfer: 'Transfer',
+        loan: 'Loan',
+        investment: 'Investment',
+        refund: 'Refund',
+        other: 'Other'
+      },
       dateRange: 'Period',
       startDate: 'Start',
       endDate: 'End',
@@ -1265,6 +1368,10 @@ const messages = {
       total: 'Total',
       pending: 'Pending',
       processed: 'Done',
+      accountNumberRequired: 'Please select an account',
+      transactionDateRequired: 'Please select a transaction date',
+      debitAmountMin: 'Debit amount must be >= 0',
+      creditAmountMin: 'Credit amount must be >= 0',
       all: 'All',
       income: 'In',
       expense: 'Out',
