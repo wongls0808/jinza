@@ -38,6 +38,35 @@ export async function query(text, params) {
   return res
 }
 
+// Acquire a dedicated client for transaction or batch operations
+export async function withTransaction(fn) {
+  if (!pool) throw new Error('DATABASE_URL not configured: 请设置环境变量 DATABASE_URL 或 DEV_LOCAL_DB')
+  const client = await pool.connect()
+  const start = Date.now()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    if (process.env.LOG_SQL) {
+      console.log('tx committed', { duration: Date.now() - start })
+    }
+    return result
+  } catch (e) {
+    try { await client.query('ROLLBACK') } catch {}
+    if (process.env.LOG_SQL) {
+      console.log('tx rolled back', { err: e?.message, duration: Date.now() - start })
+    }
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
+export async function queryWithClient(client, text, params) {
+  const res = await client.query(text, params)
+  return res
+}
+
 // Gracefully close pool (for CLI tools like migrations)
 export async function closePool() {
   if (pool) {

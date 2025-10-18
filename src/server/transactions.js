@@ -1,6 +1,6 @@
 // 交易管理相关API
 import express from 'express';
-import { query } from './db.js';
+import { query, withTransaction, queryWithClient } from './db.js';
 import { ensureDDL as ensureFxDDL } from './fx.js';
 import * as auth from './auth.js';
 import { getMockTransactions, getMockTransactionStats } from './mockTransactions.js';
@@ -680,11 +680,10 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
       if (!pf.rowCount) return res.status(400).json({ error: 'platform not found' })
       const pid = Number(targetId)
       if (!Number.isInteger(pid) || pid <= 0) return res.status(400).json({ error: 'invalid platform id' })
-      let txBegan = false
       try {
-        // 在同一事务中锁定行并读取数据
-        await query('begin'); txBegan = true
-        const tr = await query(`
+        await withTransaction(async (client) => {
+          // 锁定行并读取数据（同一连接）
+          const tr = await queryWithClient(client, `
           select t.id, t.matched, t.match_type, t.match_target_id,
                  t.debit_amount as debit, t.credit_amount as credit,
                  coalesce(t.platform_delta_applied,false) as platform_delta_applied,
@@ -694,7 +693,7 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
            where t.id=$1
            for update
         `, [id])
-        if (!tr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
+        if (!tr.rowCount) { throw Object.assign(new Error('Transaction not found'), { status: 404 }) }
         const row = tr.rows[0]
         // 规范化币种：允许 RM/MY -> MYR，RMB -> CNY；为空默认 MYR
         const rawCur = (row.currency == null ? 'MYR' : String(row.currency)).toUpperCase().trim()
@@ -705,18 +704,17 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
           console.warn('buyfx match currency not recognized, fallback to MYR:', rawCur)
           const field2 = 'balance_myr'
           const delta = Number(row.debit || 0) - Number(row.credit || 0)
-          const upd1b = await query(`update fx_platforms set ${field2} = coalesce(${field2},0) + $1 where id=$2`, [delta, pid])
-          if (upd1b.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
+          const upd1b = await queryWithClient(client, `update fx_platforms set ${field2} = coalesce(${field2},0) + $1 where id=$2`, [delta, pid])
+          if (upd1b.rowCount === 0) { const err = new Error('platform not found'); err.status=404; throw err }
           const matched_by_b = req.user?.id || null
           const name_b = (targetName || '').toString().trim() || null
-          const rsb = await query(
+          const rsb = await queryWithClient(client,
             `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now(), platform_delta_applied=true where id=$5`,
             [t, pid, name_b, matched_by_b, id]
           )
-          if (rsb.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
-          await query('commit'); txBegan = false
+          if (rsb.rowCount === 0) { const err = new Error('Transaction not found'); err.status=404; throw err }
           console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta, 'currency=fallback(MYR) from', rawCur)
-          return res.json({ success: true, updated: true, id: Number(id) })
+          return
         }
         const delta = Number(row.debit || 0) - Number(row.credit || 0)
 
@@ -724,31 +722,30 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
         if (row.matched && String(row.match_type||'').toLowerCase() === 'buyfx' && row.match_target_id) {
           const oldPid = Number(row.match_target_id)
           if (Number.isInteger(oldPid) && oldPid > 0 && row.platform_delta_applied) {
-            await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, oldPid])
+            await queryWithClient(client, `update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, oldPid])
           }
         }
 
         // 应用到新平台：平台余额 += delta（借方为正，贷方为负）
-        const upd1 = await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+        const upd1 = await queryWithClient(client, `update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
         if (upd1.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
 
         // 更新交易匹配信息并标记平台余额已应用
         const matched_by = req.user?.id || null
         const name = (targetName || '').toString().trim() || null
-        const rs = await query(
+        const rs = await queryWithClient(client,
           `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now(), platform_delta_applied=true where id=$5`,
           [t, pid, name, matched_by, id]
         )
         if (rs.rowCount === 0) {
-          await query('rollback')
-          return res.status(404).json({ error: 'Transaction not found' })
+          const err = new Error('Transaction not found'); err.status=404; throw err
         }
-  await query('commit'); txBegan = false
-  console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
-  return res.json({ success: true, updated: true, id: Number(id) })
+        console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
+        })
+        return res.json({ success: true, updated: true, id: Number(id) })
       } catch (err) {
-        if (txBegan) { try { await query('rollback') } catch {} }
-        throw err
+        const code = err?.status || 500
+        return res.status(code).json({ error: '匹配交易失败', detail: err?.message || String(err) })
       }
     }
 
@@ -791,13 +788,12 @@ transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.re
     if (!tr.rowCount) return res.status(404).json({ error: 'Transaction not found' })
     const row = tr.rows[0]
 
-    let txBegan = false
     try {
-      await query('begin'); txBegan = true
+      await withTransaction(async (client) => {
 
       // 若是 buyfx 平台商匹配，且之前确实对平台余额做过加账，则回滚
       if (row.matched && String(row.match_type || '').toLowerCase() === 'buyfx' && row.match_target_id) {
-        const chk = await query('select coalesce(platform_delta_applied,false) as applied from transactions where id=$1 for update', [id])
+        const chk = await queryWithClient(client, 'select coalesce(platform_delta_applied,false) as applied from transactions where id=$1 for update', [id])
         const applied = chk.rowCount ? !!chk.rows[0].applied : false
         if (applied) {
           const pid = Number(row.match_target_id)
@@ -808,28 +804,28 @@ transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.re
             console.warn('buyfx unmatch currency not recognized, fallback to MYR:', rawCur)
             const field2 = 'balance_myr'
             const delta = Number(row.debit || 0) - Number(row.credit || 0)
-            await query(`update fx_platforms set ${field2} = coalesce(${field2},0) - $1 where id=$2`, [delta, pid])
-            await query(`update transactions set platform_delta_applied=false where id=$1`, [id])
+            await queryWithClient(client, `update fx_platforms set ${field2} = coalesce(${field2},0) - $1 where id=$2`, [delta, pid])
+            await queryWithClient(client, `update transactions set platform_delta_applied=false where id=$1`, [id])
           } else {
             const delta = Number(row.debit || 0) - Number(row.credit || 0)
-            await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, pid])
-            await query(`update transactions set platform_delta_applied=false where id=$1`, [id])
+            await queryWithClient(client, `update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, pid])
+            await queryWithClient(client, `update transactions set platform_delta_applied=false where id=$1`, [id])
           }
         }
       }
 
       // 清空匹配信息
-      const rs = await query(
+      const rs = await queryWithClient(client,
         `update transactions set matched=false, match_type=null, match_target_id=null, match_target_name=null, matched_by=null, matched_at=null, updated_at=now() where id=$1`,
         [id]
       )
-      if (rs.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
-  await query('commit'); txBegan = false
+      if (rs.rowCount === 0) { const err = new Error('Transaction not found'); err.status=404; throw err }
+      })
   console.log('buyfx unmatched tx=', id)
   return res.json({ success: true, updated: true, id: Number(id) });
     } catch (err) {
-      if (txBegan) { try { await query('rollback') } catch {} }
-      throw err
+      const code = err?.status || 500
+      return res.status(code).json({ error: '取消匹配失败', detail: err?.message || String(err) })
     }
   } catch (e) {
     console.error('unmatch transaction failed', e)
