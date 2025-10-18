@@ -127,3 +127,39 @@ and not exists (
 1) 退出并重新登录（刷新令牌中的权限集合）；
 2) 再次尝试保存/编辑/删除交易；
 3) 可访问 `/api/auth/me` 检查返回的 `perms` 是否包含上述权限。
+
+---
+
+## 2025-10-19 修复：FX 管理“生成结汇单”按钮点击无反应
+
+现象：
+- 在“结汇管理 > 结汇区”点击“生成结汇单”没有任何反应，也无错误提示。
+
+影响范围：
+- 仅影响结汇创建动作；付款区不受影响；其他模块不受影响。
+
+根因：
+- `src/views/FXManagement.vue` 的 `createSettlement()` 中误用了不存在的变量 `customers.value`，应为 `allCustomers.value`，导致运行时异常被吞并，按钮点击无反馈。
+
+修复：
+- 将以下两处引用统一改为 `allCustomers.value`（已提交到 main）：
+    - 读取最新税率：`const latest = allCustomers.value.find(c => c.id === customerId.value)`
+    - 提交单据用客户名：`const found = allCustomers.value.find(c => c.id === customerId.value)`
+
+变更文件：
+- `src/views/FXManagement.vue`
+
+验证步骤：
+1) 进入“结汇管理”。
+2) 选择结汇日期、选择有 MYR 余额的客户、输入汇率。
+3) 在“已匹配交易”勾选至少一条记录；
+4) 点击“生成结汇单”：
+     - 成功提示“已生成结汇单”；
+     - 下方勾选清空并刷新，已结汇项目不再出现；
+     - 结汇日期重置为今天。
+
+回滚方案：
+- 如需回滚，可将上述两处改回原状，但会重新引入问题；建议仅用于问题复现，不用于生产。
+
+后续改进（可选）：
+- 在 `createSettlement()` 外层增加 try/catch，并在 catch 中使用 `ElMessage.error` 提示异常，避免未来无提示失败。
