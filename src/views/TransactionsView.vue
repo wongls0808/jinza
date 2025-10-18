@@ -1630,8 +1630,8 @@ const handleSimpleFileChange = (file) => {
           console.log(`❌ 第${index + 1}行列数不足: ${cells.length}列`)
         }
         
-        // 限制处理行数
-        if (processedCount > 100) break
+        // 限制处理行数（增加到2000行以处理大型CSV文件）
+        if (processedCount > 2000) break
       }
       
       console.log(`\n处理完成:`)
