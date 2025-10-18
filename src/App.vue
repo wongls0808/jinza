@@ -173,7 +173,8 @@ function handleSelect(key) {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  background: linear-gradient(90deg, var(--el-color-primary) 0%, color-mix(in oklab, var(--el-color-primary) 88%, #fff) 100%);
+  /* 更稳重的深色配色：深蓝灰到略浅渐变 */
+  background: linear-gradient(90deg, #111827 0%, #1f2937 100%);
   color: var(--el-color-white);
   box-shadow: 0 2px 10px rgba(0,0,0,.06);
   position: sticky;
@@ -214,10 +215,11 @@ function handleSelect(key) {
   border-bottom: none;
   padding: 0 12px; /* 收紧两侧内边距，提高可视项数量 */
   flex: 0 0 auto; /* 禁止被收缩，配合横向滚动 */
+  transition: background-color .12s ease, color .12s ease;
 }
 :deep(.el-menu--horizontal > .el-menu-item:hover) {
-  color: white;
-  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 :deep(.el-menu--horizontal > .el-menu-item.is-active) {
   color: var(--el-color-success);
@@ -234,6 +236,20 @@ function handleSelect(key) {
 :deep(.el-menu--horizontal > .el-menu-item.is-active:hover) {
   color: var(--el-color-success);
   background-color: #ffffff;
+}
+
+/* 移除点击后残留的阴影/覆盖层（焦点与按下态） */
+:deep(.el-menu--horizontal > .el-menu-item:focus),
+:deep(.el-menu--horizontal > .el-menu-item:active),
+:deep(.el-menu--horizontal > .el-menu-item.is-active:focus),
+:deep(.el-menu--horizontal > .el-menu-item.is-active:active) {
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+/* 非键盘操作的 focus 不显示特殊样式，避免“阴影覆盖感”，键盘依旧可见 */
+:deep(.el-menu--horizontal > .el-menu-item:focus) {
+  outline: none;
 }
 
 /* 非选中项的悬停，保留轻微对比，避免遮罩感过强 */
