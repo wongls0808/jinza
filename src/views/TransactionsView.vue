@@ -359,7 +359,7 @@
                     :value="c.id" />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
+              
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeBuyFx')" name="buyfx">
@@ -380,7 +380,7 @@
                   />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">{{ t('transactions.matchRemark') }}</div>
+              
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeTransfer')" name="transfer">
@@ -399,7 +399,7 @@
                   />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">{{ t('transactions.transferHint') }}</div>
+              
             </el-form>
           </el-tab-pane>
           <el-tab-pane :label="t('transactions.matchTypeExpense')" name="expense">
@@ -420,7 +420,7 @@
                     :value="e.id" />
                 </el-select>
               </el-form-item>
-              <div class="gray-text">{{ t('transactions.expenseHint') }}</div>
+              
             </el-form>
           </el-tab-pane>
         </el-tabs>

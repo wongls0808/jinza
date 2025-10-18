@@ -1625,6 +1625,7 @@ const messages = {
   matchRemark: 'After matching, the transaction will move to the matched list and be hidden from the pending list.',
   selectCustomer: 'Select Customer',
   searchCustomerPlaceholder: 'Type to search customers...',
+  searchCustomerAbbrPlaceholder: 'Type name/abbr to search customers...',
   selectCustomerFirst: 'Please select a customer first',
   selectPlatform: 'Select Platform',
   searchPlatformPlaceholder: 'Please pick a platform',
