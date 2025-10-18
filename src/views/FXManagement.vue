@@ -21,7 +21,7 @@
             <el-option v-for="c in settleCustomers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">MYR {{ money(myrBalance) }}</span>
-          <el-button type="primary" :disabled="!canCreateSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
+          <el-button type="primary" :disabled="!canCreateSettlement || creatingSettlement" :loading="creatingSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
         </div>
         <div class="totals">
           <span>{{ t('fx.selectedBase') }}: {{ money(selectedBaseTotal) }}</span>
@@ -161,6 +161,7 @@ const { colW: colWPay, onColResize: onColResizePay } = useTableMemory('fx-mgmt-p
 const payTableRef = ref(null)
 
 const canCreateSettlement = computed(() => !!(settleDate.value && customerId.value && rate.value && selMatched.value.length))
+const creatingSettlement = ref(false)
 const overBudget = computed(() => paymentTotal.value > Number(cnyBalance.value || 0))
 const canCreatePayment = computed(() => !!(payDate.value && payCustomerId.value && accounts.value.some(a => Number(a._amount) > 0) && !overBudget.value))
 
@@ -243,18 +244,20 @@ function onCustomerChangePay(){
 }
 
 async function createSettlement(){
+  if (creatingSettlement.value) return
+  creatingSettlement.value = true
   // 创建前刷新客户列表，确保拿到最新税率（修改后稍等推送）
   await loadCustomers()
-  const latest = customers.value.find(c => c.id === customerId.value)
+  const latest = allCustomers.value.find(c => c.id === customerId.value)
   customerTaxRate.value = normalizePercent(latest?.tax_rate)
-  if (!selMatched.value.length) return
+  if (!selMatched.value.length) { creatingSettlement.value = false; return }
   const baseSum = selectedBaseTotal.value
   // 校验余额：按所选明细全额
-  if (baseSum <= 0) { ElMessage.error(t('fx.errNothingToSettle')); return }
-  if (baseSum > myrBalance.value) { ElMessage.error(t('fx.errExceedBalance')); return }
+  if (baseSum <= 0) { ElMessage.error(t('fx.errNothingToSettle')); creatingSettlement.value = false; return }
+  if (baseSum > myrBalance.value) { ElMessage.error(t('fx.errExceedBalance')); creatingSettlement.value = false; return }
 
   const r = Number(rate.value || 0)
-  if (!r || r <= 0) { ElMessage.error(t('fx.errRateRequired')); return }
+  if (!r || r <= 0) { ElMessage.error(t('fx.errRateRequired')); creatingSettlement.value = false; return }
 
   // 全额：按所选明细全额，各自折算四舍五入到元
   const taxFactor = percentToFactor(customerTaxRate.value)
@@ -268,26 +271,33 @@ async function createSettlement(){
       amount_settled: Math.round(base * taxFactor * r)
     }
   })
-  const found = customers.value.find(c => c.id === customerId.value)
-  await api.fx.settlements.create({
-    customer_id: customerId.value,
-    customer_name: found?.name || null,
-    settle_date: settleDate.value,
-    rate: rate.value,
-    // 税率由后端根据 customer_id 查询，前端不再传递
-    items
-  })
-  ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))
-  try { emit('settlementCreated', { n: items.length, base: selectedBaseTotal.value, settled: selectedSettledTotal.value, customerId: customerId.value }) } catch {}
-  // 清空并刷新
-  selMatched.value = []
-  // 重新加载列表并排除已结汇交易
-  await loadMatched()
-  settleDate.value = formatToday()
-  rate.value = null
-  customerTaxRate.value = 0
-  // 重新加载客户匹配交易（若仍保留客户）
-  await loadCustomers()
+  const found = allCustomers.value.find(c => c.id === customerId.value)
+  try {
+    await api.fx.settlements.create({
+      customer_id: customerId.value,
+      customer_name: found?.name || null,
+      settle_date: settleDate.value,
+      rate: rate.value,
+      // 税率由后端根据 customer_id 查询，前端不再传递
+      items
+    })
+    ElMessage.success(t('fx.settlementCreated', { n: items.length, base: money(selectedBaseTotal.value), settled: money(selectedSettledTotal.value) }))
+    try { emit('settlementCreated', { n: items.length, base: selectedBaseTotal.value, settled: selectedSettledTotal.value, customerId: customerId.value }) } catch {}
+    // 清空并刷新
+    selMatched.value = []
+    // 重新加载列表并排除已结汇交易
+    await loadMatched()
+    settleDate.value = formatToday()
+    rate.value = null
+    customerTaxRate.value = 0
+    // 重新加载客户匹配交易（若仍保留客户）
+    await loadCustomers()
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : 'Create settlement failed'
+    ElMessage.error(msg)
+  } finally {
+    creatingSettlement.value = false
+  }
 }
 
 async function loadAccounts(){

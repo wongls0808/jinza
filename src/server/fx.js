@@ -733,8 +733,8 @@ fxRouter.get('/rates/boc', auth.authMiddleware(true), auth.readOpenOr('buyfx:vie
   }
 })
 
-// 创建结汇单
-fxRouter.post('/settlements', auth.authMiddleware(true), auth.requirePerm('fx:settlement:create'), async (req, res) => {
+// 创建结汇单（拥有 fx:settlement:create 或 manage_fx 任一权限即可）
+fxRouter.post('/settlements', auth.authMiddleware(true), auth.requireAnyPerm('fx:settlement:create','manage_fx'), async (req, res) => {
   await ensureDDL()
   const { customer_id, customer_name, settle_date, rate, items = [] } = req.body || {}
   if (!customer_id || !settle_date || !rate || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'invalid payload' })
