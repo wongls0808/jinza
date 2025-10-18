@@ -13,7 +13,18 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
+// CORS: 开发放开，生产按环境变量白名单控制（逗号分隔 ORIGINS）
+const allowOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true) // same-origin / curl
+    if (process.env.NODE_ENV !== 'production') return cb(null, true)
+    if (allowOrigins.length === 0) return cb(null, true)
+    if (allowOrigins.includes(origin)) return cb(null, true)
+    return cb(new Error('CORS not allowed'))
+  },
+  credentials: true,
+}))
 app.use(express.json({ limit: '10mb' }))
 
 // Serve runtime uploads (e.g., bank logos) — use persistent DATA_DIR when available
