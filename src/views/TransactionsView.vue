@@ -1568,13 +1568,20 @@ const handleSimpleFileChange = (file) => {
       let validCount = 0
       let invalidCount = 0
       
+      // 添加进度反馈
+      const totalLines = dataLines.length
+      console.log(`开始处理CSV文件：${totalLines}行数据`)
+      
       for (const [index, line] of dataLines.entries()) {
         if (!line.trim()) continue
         
         processedCount++
         const cells = line.split(',')
         
-        console.log(`\n处理第${index + 1}行 (${cells.length}列):`, cells.slice(0, 8))
+        // 减少console.log频率，只在每100行或调试时输出
+        if (processedCount % 100 === 1 || processedCount <= 10) {
+          console.log(`\n处理第${index + 1}行 (${cells.length}列):`, cells.slice(0, 6))
+        }
         
         if (cells.length >= 11) { // 确保有足够的列（包括Reference 1-6）
           const originalDate = cells[0]
@@ -1596,14 +1603,17 @@ const handleSimpleFileChange = (file) => {
           }
           const combinedReference = references.join(' ').trim()
           
-          console.log(`第${index + 1}行解析结果:`, {
-            transactionDate,
-            chequeRefNo,
-            description: description.substring(0, 30) + '...',
-            debitAmount,
-            creditAmount,
-            referenceCount: references.length
-          })
+          // 减少详细日志输出
+          if (processedCount % 100 === 1 || processedCount <= 10) {
+            console.log(`第${index + 1}行解析结果:`, {
+              transactionDate,
+              chequeRefNo,
+              description: description.substring(0, 30) + '...',
+              debitAmount,
+              creditAmount,
+              referenceCount: references.length
+            })
+          }
           
           // 验证：必须有有效日期和金额
           if (transactionDate && (debitAmount > 0 || creditAmount > 0)) {
@@ -1620,18 +1630,32 @@ const handleSimpleFileChange = (file) => {
               rowIndex: index + headerIndex + 2
             })
             
-            console.log(`✅ 第${index + 1}行有效`)
+            if (processedCount % 100 === 1 || processedCount <= 10) {
+              console.log(`✅ 第${index + 1}行有效`)
+            }
           } else {
             invalidCount++
-            console.log(`❌ 第${index + 1}行无效: date=${transactionDate}, debit=${debitAmount}, credit=${creditAmount}`)
+            if (processedCount % 100 === 1 || processedCount <= 10 || invalidCount <= 5) {
+              console.log(`❌ 第${index + 1}行无效: date=${transactionDate}, debit=${debitAmount}, credit=${creditAmount}`)
+            }
           }
         } else {
           invalidCount++
-          console.log(`❌ 第${index + 1}行列数不足: ${cells.length}列`)
+          if (processedCount % 100 === 1 || processedCount <= 10 || invalidCount <= 5) {
+            console.log(`❌ 第${index + 1}行列数不足: ${cells.length}列`)
+          }
         }
         
-        // 限制处理行数（增加到2000行以处理大型CSV文件）
-        if (processedCount > 2000) break
+        // 限制处理行数（增加到10000行以处理大型CSV文件）
+        if (processedCount > 10000) {
+          console.warn(`处理已达到${processedCount}行限制，停止处理剩余数据`)
+          break
+        }
+        
+        // 显示进度（每1000行）
+        if (processedCount % 1000 === 0) {
+          console.log(`进度：已处理 ${processedCount}/${totalLines} 行，有效 ${validCount} 行，无效 ${invalidCount} 行`)
+        }
       }
       
       console.log(`\n处理完成:`)
@@ -1645,7 +1669,10 @@ const handleSimpleFileChange = (file) => {
       if (rows.length === 0) {
         ElMessage.error(`未找到有效的交易数据。处理了${processedCount}行，有效${validCount}行，无效${invalidCount}行。请查看控制台详细日志。`)
       } else {
-        ElMessage.success(`成功解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`)
+        const successMsg = `成功解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`
+        const detailMsg = processedCount > rows.length ? 
+          `，跳过 ${processedCount - rows.length} 行无效数据` : ''
+        ElMessage.success(successMsg + detailMsg)
       }
       
     } catch (error) {
