@@ -82,7 +82,7 @@
 
     <!-- 新增客户：改为抽屉 -->
     <el-drawer v-model="addDlg.visible" :title="$t('customers.addTitle')" :close-on-click-modal="false" :show-close="true" :with-header="true" :size="'min(720px, 92vw)'">
-      <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" label-width="120px" label-position="left" class="form">
+      <el-form ref="addFormRef" :model="addDlg.form" :rules="addRules" :label-width="$i18n.locale === 'zh' ? '120px' : '140px'" label-position="left" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="addDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
@@ -133,7 +133,7 @@
 
     <!-- 编辑客户对话框 -->
     <el-dialog v-model="editDlg.visible" :title="$t('common.edit') + ' · ' + (editDlg.form.name || '')" width="min(720px, 92vw)" :close-on-click-modal="false">
-      <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" label-width="120px" label-position="left" class="form">
+      <el-form ref="editFormRef" :model="editDlg.form" :rules="addRules" :label-width="$i18n.locale === 'zh' ? '120px' : '140px'" label-position="left" class="form">
         <el-form-item :label="$t('customers.form.abbr')">
           <el-input v-model.trim="editDlg.form.abbr" :placeholder="$t('customers.form.abbrPlaceholder')" />
         </el-form-item>
@@ -227,7 +227,7 @@
     </el-drawer>
     <!-- 编辑客户账户 -->
   <el-dialog v-model="editAcc.visible" :title="$t('customers.accounts.editTitle')" width="min(720px, 92vw)" :close-on-click-modal="false">
-      <el-form :model="editAcc.form" label-width="120px" label-position="left" size="small" class="form">
+      <el-form :model="editAcc.form" :label-width="$i18n.locale === 'zh' ? '120px' : '140px'" label-position="left" size="small" class="form">
         <el-form-item :label="$t('customers.accounts.accountName')"><el-input v-model.trim="editAcc.form.account_name" :placeholder="$t('customers.accounts.accountName')" clearable /></el-form-item>
         <el-form-item :label="$t('customers.accounts.bank')">
           <el-select v-model="editAcc.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('customers.accounts.bank')">

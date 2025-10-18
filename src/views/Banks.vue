@@ -30,7 +30,7 @@
     </el-card>
 
     <el-drawer v-model="dlg.visible" :title="dlg.mode==='add' ? $t('banks.addTitle') : $t('banks.replaceTitle')" :size="520" :close-on-click-modal="false">
-      <el-form :model="dlg.form" label-width="140px" size="small" class="form">
+      <el-form :model="dlg.form" :label-width="$i18n.locale === 'zh' ? '140px' : '160px'" size="small" class="form">
         <el-form-item :label="$t('banks.labels.code')">
           <el-input v-model.trim="dlg.form.code" :placeholder="$t('banks.placeholders.codeExample')" @input="dlg.form.code = (dlg.form.code || '').toUpperCase()" :disabled="dlg.mode==='edit' && !!dlg.form.id" />
         </el-form-item>

@@ -98,7 +98,7 @@
     </el-drawer>
 
   <el-drawer v-model="dlg.visible" :title="$t('accounts.addTitle')" :size="'min(720px, 92vw)'" :close-on-click-modal="false">
-    <el-form :model="dlg.form" label-width="120px" label-position="left" size="small" class="form">
+    <el-form :model="dlg.form" :label-width="$i18n.locale === 'zh' ? '120px' : '140px'" label-position="left" size="small" class="form">
         <el-form-item :label="$t('accounts.form.accountName')">
           <el-input v-model.trim="dlg.form.account_name" :placeholder="$t('accounts.form.accountName')" clearable />
         </el-form-item>
