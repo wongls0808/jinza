@@ -424,7 +424,7 @@ function fmtMinute(ts) {
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .cards { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
 .user-card { padding: 0; }
-.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; padding-right: 140px; min-height: 64px; }
+.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; padding-left: 12px; padding-right: 12px; min-height: 64px; }
 .avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); }
 .avatar.admin { background: var(--el-color-danger); }
 .info { min-width: 0; }
