@@ -267,10 +267,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
+
+// 使用 shallowRef 避免深度响应式导致的循环依赖
 import { 
   Check, 
   Close, 

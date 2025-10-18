@@ -26,12 +26,27 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'element-plus': ['element-plus'],
-          'element-icons': ['@element-plus/icons-vue'],
-          'echarts': ['echarts'],
-          'vendor': ['vue', 'vue-router', 'vue-i18n'],
-          'utils': ['papaparse', 'qrcode']
+        manualChunks(id) {
+          // Element Plus 主包
+          if (id.includes('node_modules/element-plus') && !id.includes('icons-vue')) {
+            return 'element-plus'
+          }
+          // Element Plus 图标 - 按需分割避免循环依赖
+          if (id.includes('@element-plus/icons-vue')) {
+            return 'element-icons'
+          }
+          // ECharts
+          if (id.includes('node_modules/echarts')) {
+            return 'echarts'
+          }
+          // Vue 核心库
+          if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/vue-i18n')) {
+            return 'vendor'
+          }
+          // 工具库
+          if (id.includes('node_modules/papaparse') || id.includes('node_modules/qrcode')) {
+            return 'utils'
+          }
         },
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
