@@ -136,6 +136,7 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 import { useAuth } from '@/composables/useAuth'
 const { t } = useI18n()
 const { has } = useAuth()
@@ -286,22 +287,8 @@ function summaryMethod({ data }){
   return [t('common.total'), '', '', '', money(sum)]
 }
 
-// ---- 银行 logo 本地解析：统一从 /banks/<code>.(svg|png|jpg) 读取 ----
-const logoFail = ref({})
-function logoKey(row){ return (row.bank_code || '').toLowerCase() }
-function resolveLogo(row){
-  const key = logoKey(row)
-  if (!key) return ''
-  if (logoFail.value[key]) return ''
-  return `/banks/${key}.svg`
-}
-function onLogoError(evt, row){
-  const key = logoKey(row)
-  const cur = evt?.target?.getAttribute('src') || ''
-  if (/\.svg$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.svg$/i, '.png'))
-  else if (/\.png$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.png$/i, '.jpg'))
-  else logoFail.value[key] = true
-}
+// 银行 logo 渲染（统一逻辑）
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 </script>
 
 <style scoped>

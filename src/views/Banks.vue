@@ -17,7 +17,8 @@
       <div class="cards">
   <div class="bank-card" v-for="(b,i) in banks" :key="b.id" @dblclick="openEdit(b)" :title="$t('common.edit') + '/' + $t('banks.replaceLogo')">
           <div class="idx">{{ i + 1 }}</div>
-          <img class="logo" :src="imgSrc(b)" @error="onImgErr" />
+          <img class="logo" v-show="!logoFail[logoKey(b)]" :src="resolveLogo(b)" @error="onLogoError($event, b)" />
+          <span v-show="logoFail[logoKey(b)]" class="code">{{ (b.code||'').toUpperCase() }}</span>
           <div class="names">
             <span class="zh text-clip">{{ b.zh }}</span>
             <span class="en text-clip">{{ b.en }}</span>
@@ -65,6 +66,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
+import { useBankLogo } from '@/composables/useBankLogo'
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 
 const banks = ref([])
 const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } })
@@ -177,23 +180,7 @@ async function removeInDialog() {
 
 onMounted(load)
 
-function onImgErr(e) {
-  const el = e?.target
-  if (el && el.tagName === 'IMG') {
-    const current = el.getAttribute('src') || ''
-    // .svg -> .png -> .jpg -> 占位
-    if (current.endsWith('.svg')) el.src = current.replace(/\.svg$/i, '.png')
-    else if (current.endsWith('.png')) el.src = current.replace(/\.png$/i, '.jpg')
-    else el.src = '/banks/public.svg'
-  }
-}
-
-function imgSrc(bank) {
-  // 优先使用后端规范化后的 logo_url，避免前端猜测后缀导致的 404 闪烁
-  if (bank && bank.logo_url) return bank.logo_url
-  const c = String(bank?.code || 'public').toLowerCase()
-  return `/banks/${c}.svg`
-}
+// 统一银行 Logo 解析与回退通过 useBankLogo 实现
 </script>
 
 <style scoped>

@@ -187,7 +187,8 @@
           <el-select v-model="accDrawer.form.bank_id" filterable clearable :placeholder="$t('customers.accounts.bank')" style="width:220px">
             <el-option v-for="b in accDrawer.banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div style="display:inline-flex; align-items:center; gap:8px;">
-                <img :src="bankImg(b.code)" style="height:16px" @error="onBankImgErr($event)" />
+                <img v-show="!logoFail[logoKey(b)]" :src="resolveLogo(b)" style="height:16px" @error="onLogoError($event, b)" />
+                <span v-show="logoFail[logoKey(b)]" style="font-size:12px; color:var(--el-text-color-secondary);">{{ (b.code||'').toUpperCase() }}</span>
                 <span style="font-weight:600;">{{ b.zh }}</span>
                 <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ b.en }}</span>
               </div>
@@ -205,7 +206,8 @@
           <el-table-column column-key="bank" :label="$t('customers.accounts.bank')" :width="colWAcc('bank', 260)">
             <template #default="{ row }">
               <div style="display:inline-flex; align-items:center; gap:8px;">
-                <img :src="bankImg(row.bank_code)" style="height:16px" @error="onBankImgErr($event)" />
+                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" style="height:16px" @error="onLogoError($event, row)" />
+                <span v-show="logoFail[logoKey(row)]" style="font-size:12px; color:var(--el-text-color-secondary);">{{ (row.bank_code||'').toUpperCase() }}</span>
                 <span style="font-weight:600;">{{ row.bank_zh }}</span>
                 <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ row.bank_en }}</span>
               </div>
@@ -257,10 +259,13 @@ import Papa from 'papaparse'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const { colW, onColResize, reset: resetTableMem } = useTableMemory('customers')
 // 客户抽屉里的账户表格使用单独的列宽记忆 key，避免与主列表互相影响
 const { colW: colWAcc, onColResize: onColResizeAcc } = useTableMemory('customer-accounts')
+// 统一银行 logo 处理（无闪烁）
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 
 const tableRef = ref()
 const rows = ref([])

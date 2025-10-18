@@ -104,8 +104,8 @@
       <el-table-column :label="t('transactions.bankName')" prop="bank_name" column-key="bank_name" sortable :width="colW('bank_name',160)">
         <template #default="scope">
           <div class="bank-display">
-            <img v-if="getBankLogo(scope.row)" :src="getBankLogo(scope.row)" :alt="scope.row.bank_name" class="bank-logo" @error="e => e.target.style.display = 'none'" />
-            <span v-else>{{ scope.row.bank_name || '-' }}</span>
+            <img v-show="!logoFail[logoKey(scope.row)]" :src="resolveLogo(scope.row)" :alt="scope.row.bank_name" class="bank-logo" @error="onLogoError($event, scope.row)" />
+            <span v-show="logoFail[logoKey(scope.row)]">{{ scope.row.bank_name || (scope.row.bank_code || '-') }}</span>
           </div>
         </template>
       </el-table-column>
@@ -184,9 +184,11 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const router = useRouter()
 const { t } = useI18n()
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 
 const stats = ref({ summary: {}, monthly: [], categories: [] })
 const transactions = ref([])
@@ -314,11 +316,7 @@ function formatDate(date) {
 }
 
 // 获取银行logo：统一按银行代码从 /banks 读取（失败由 <img @error> 兜底）
-function getBankLogo(row) {
-  if (!row) return ''
-  if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
-  return '/banks/public.svg'
-}
+// 银行 Logo 使用 useBankLogo 的 resolveLogo/onLogoError 统一处理
 
 // 行双击：打开编辑/取消关联弹窗
 function onRowDblClick(row) {

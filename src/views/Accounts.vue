@@ -28,7 +28,8 @@
         <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
           <template #default="{ row }">
             <div class="bankcell">
-              <img class="logo" :src="bankImg(row)" alt="logo" @error="onBankImgErr($event)" />
+              <img v-show="!logoFail[logoKey(row)]" class="logo" :src="resolveLogo(row)" alt="logo" @error="onLogoError($event, row)" />
+              <span v-show="logoFail[logoKey(row)]" class="code">{{ (row.bank_code||'').toUpperCase() }}</span>
               <span class="zh">{{ row.bank_zh }}</span>
               <span class="en">{{ row.bank_en }}</span>
             </div>
@@ -106,7 +107,8 @@
           <el-select v-model="dlg.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('accounts.form.bank')">
             <el-option v-for="b in banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
               <div class="bankopt">
-                <img class="logo" :src="bankImg(b.code)" @error="onBankImgErr($event)" />
+                <img v-show="!logoFail[logoKey(b)]" class="logo" :src="resolveLogo(b)" @error="onLogoError($event, b)" />
+                <span v-show="logoFail[logoKey(b)]" class="code">{{ (b.code||'').toUpperCase() }}</span>
                 <span class="zh">{{ b.zh }}</span>
                 <span class="en">{{ b.en }}</span>
               </div>
@@ -150,8 +152,10 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const { colW, onColResize } = useTableMemory('accounts')
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 
 const rows = ref([])
 const total = ref(0)
@@ -284,20 +288,6 @@ function onRowDblClick(row) {
   } }
 }
 
-function bankImg(row) {
-  if (row && row.bank_logo) return row.bank_logo
-  const c = String(row?.bank_code||'public').toLowerCase()
-  return `/banks/${c}.svg`
-}
-function onBankImgErr(e) {
-  const el = e?.target
-  if (el && el.tagName === 'IMG') {
-    const current = el.getAttribute('src') || ''
-    if (/\.svg$/i.test(current)) el.src = current.replace(/\.svg$/i, '.png')
-    else if (/\.png$/i.test(current)) el.src = current.replace(/\.png$/i, '.jpg')
-    else el.src = '/banks/public.svg'
-  }
-}
 </script>
 
 <style scoped>

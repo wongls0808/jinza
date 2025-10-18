@@ -175,12 +175,12 @@
         <template #default="scope">
           <div class="bank-display">
             <img
-              v-if="getBankLogo(scope.row)"
-              :src="getBankLogo(scope.row)"
+              v-show="!logoFail[logoKey(scope.row)]"
+              :src="resolveLogo(scope.row)"
               :alt="scope.row.bank_name"
               class="bank-logo"
-              @error="onBankImgErr" />
-            <span v-else>{{ scope.row.bank_name || '-' }}</span>
+              @error="onLogoError($event, scope.row)" />
+            <span v-show="logoFail[logoKey(scope.row)]">{{ scope.row.bank_name || (scope.row.bank_code || '-') }}</span>
           </div>
         </template>
       </el-table-column>
@@ -271,8 +271,13 @@
         
         <el-form-item :label="t('transactions.bankName')" prop="bank_name">
           <div class="bank-display">
-            <img v-if="selectedBankLogo" :src="selectedBankLogo" alt="Bank Logo" class="bank-logo" @error="onBankImgErr" />
-            <span v-else>{{ form.bank_name }}</span>
+            <img
+              v-show="selectedBankInput && !logoFail[logoKey(selectedBankInput)]"
+              :src="selectedBankLogo || resolveLogo(selectedBankInput)"
+              alt="Bank Logo"
+              class="bank-logo"
+              @error="onLogoError($event, selectedBankInput)" />
+            <span v-show="!selectedBankInput || logoFail[logoKey(selectedBankInput)]">{{ form.bank_name }}</span>
           </div>
         </el-form-item>
         
@@ -630,6 +635,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close } from '@element-plus/icons-vue'
 import { api, request } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -647,7 +653,11 @@ const multipleSelection = ref([])
 const batchMatchToggle = ref(false)
 const batchMode = ref(false)
 const accounts = ref([])
-const selectedBankLogo = ref('')
+// 编辑表单中用于渲染的银行 logo 输入（可以是账户对象或交易行）
+const selectedBankInput = ref(null)
+const selectedBankLogo = ref('') // 保留字符串缓存，但优先通过 resolveLogo 计算
+// 通用银行 logo 解析/降级
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -903,6 +913,7 @@ const resetForm = () => {
     reference: ''
   })
   selectedBankLogo.value = ''
+  selectedBankInput.value = null
   
   if (formRef.value) {
     formRef.value.resetFields()
@@ -930,12 +941,9 @@ const handleEdit = (row) => {
     account_name: row.account_name || '',
     reference: row.reference || ''
   })
-  // 编辑态：回填银行 Logo（统一从 /banks 取）
-  if (row.bank_code) {
-    selectedBankLogo.value = `/banks/${String(row.bank_code).toLowerCase()}.svg`
-  } else {
-    selectedBankLogo.value = ''
-  }
+  // 编辑态：回填银行 Logo，优先后端提供的 logo_url，其次按 bank_code 静态回退
+  selectedBankInput.value = row
+  selectedBankLogo.value = resolveLogo(row)
   
   dialogVisible.value = true
 }
@@ -1292,17 +1300,14 @@ const handleAccountChange = (accountNumber) => {
   if (selectedAccount) {
     form.bank_name = selectedAccount.bank_zh || selectedAccount.bank_en
     form.account_name = selectedAccount.account_name
-    
-    // 设置银行logo（统一从 /banks 取）
-    if (selectedAccount.bank_code) {
-      selectedBankLogo.value = `/banks/${String(selectedAccount.bank_code).toLowerCase()}.svg`
-    } else {
-      selectedBankLogo.value = ''
-    }
+    // 设置银行 logo 输入对象并解析（支持 DB 与静态回退）
+    selectedBankInput.value = selectedAccount
+    selectedBankLogo.value = resolveLogo(selectedAccount)
   } else {
     form.bank_name = ''
     form.account_name = ''
     selectedBankLogo.value = ''
+    selectedBankInput.value = null
   }
 }
 
@@ -1841,23 +1846,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
 
-// 辅助：获取银行 Logo（统一按代码从 /banks 读取，失败由 <img @error> 处理为 png/jpg 或占位）
-function getBankLogo(row) {
-  if (!row) return ''
-  if (row.bank_code) return `/banks/${String(row.bank_code).toLowerCase()}.svg`
-  return '/banks/public.svg'
-}
-
-// 图片加载失败时的回退：svg -> png -> jpg -> 隐藏
-function onBankImgErr(e){
-  const el = e?.target
-  if (el && el.tagName === 'IMG') {
-    const cur = el.getAttribute('src') || ''
-    if (/\.svg$/i.test(cur)) el.src = cur.replace(/\.svg$/i, '.png')
-    else if (/\.png$/i.test(cur)) el.src = cur.replace(/\.png$/i, '.jpg')
-    else el.src = '/banks/public.svg'
-  }
-}
+// 统一银行 Logo 处理已迁移到 useBankLogo 组合式中
 </script>
 
 <style scoped>

@@ -614,6 +614,7 @@ import { ElMessage } from 'element-plus'
 import { useTableMemory } from '@/composables/useTableMemory'
 import FXManagement from './FXManagement.vue'
 import BuyFX from './BuyFX.vue'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const router = useRouter()
 const go = (path) => router.push(path)
@@ -957,19 +958,7 @@ const todoDetail = ref(null)
 function fmtDate(v){ try { if (!v) return ''; if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 // 参照其它列表的银行 Logo 回退策略：svg → png → jpg → public.svg
-function bankImg(code) {
-  const c = String(code || 'public').toLowerCase()
-  return `/banks/${c}.svg`
-}
-function onBankImgErr(e) {
-  const el = e?.target
-  if (el && el.tagName === 'IMG') {
-    const current = el.getAttribute('src') || ''
-    if (/\.svg$/i.test(current)) el.src = current.replace(/\.svg$/i, '.png')
-    else if (/\.png$/i.test(current)) el.src = current.replace(/\.png$/i, '.jpg')
-    else el.src = '/banks/public.svg'
-  }
-}
+const { resolveLogo: bankImg, onLogoError: onBankImgErr } = useBankLogo()
 async function openTodo(row){
   try {
     const d = await api.fx.payments.detail(row.id)
