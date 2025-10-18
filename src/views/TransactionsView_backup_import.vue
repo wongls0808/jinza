@@ -1040,12 +1040,23 @@ const confirmMatch = async () => {
       const c = customerOptions.value.find(x => x.id === matchForm.customerId)
       const name = c?.name || ''
       let ok = 0
+      const fails = []
       for (const id of ids) {
-        try { await api.transactions.match(id, { type: 'customer', targetId: matchForm.customerId, targetName: name }); ok++ } catch {}
+        try {
+          await api.transactions.match(id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
+          ok++
+        } catch (e) {
+          fails.push({ id, msg: e?.message || '未知错误' })
+        }
       }
       matchDrawerVisible.value = false
       batchMode.value = false
-      ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
+      if (ok === ids.length) {
+        ElMessage.success(t('transactions.matchSuccess'))
+      } else {
+        const tip = fails.length ? `，示例[${fails[0].id}]: ${fails[0].msg}` : ''
+        ElMessage.warning(`匹配完成 ${ok}/${ids.length}${tip}`)
+      }
       fetchTransactions()
     } catch (e) {
       console.error('match failed', e)
@@ -1063,12 +1074,23 @@ const confirmMatch = async () => {
       const p = platformOptions.value.find(x => x.id === matchForm.platformId)
       const name = p?.name || ''
       let ok = 0
+      const fails = []
       for (const id of ids) {
-        try { await api.transactions.match(id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name }); ok++ } catch {}
+        try {
+          await api.transactions.match(id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name })
+          ok++
+        } catch (e) {
+          fails.push({ id, msg: e?.message || '未知错误' })
+        }
       }
       matchDrawerVisible.value = false
       batchMode.value = false
-      ElMessage.success(ok === ids.length ? t('transactions.matchSuccess') : `匹配完成 ${ok}/${ids.length}`)
+      if (ok === ids.length) {
+        ElMessage.success(t('transactions.matchSuccess'))
+      } else {
+        const tip = fails.length ? `，示例[${fails[0].id}]: ${fails[0].msg}` : ''
+        ElMessage.warning(`匹配完成 ${ok}/${ids.length}${tip}`)
+      }
       fetchTransactions()
     } catch (e) {
       console.error('match buyfx failed', e)
