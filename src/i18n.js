@@ -1192,14 +1192,19 @@ const messages = {
       resetDefaults: 'Reset to Defaults',
       replaceLogo: 'Replace Logo',
       addTitle: 'Add Bank',
-  replaceTitle: 'Replace Logo',
-  labels: { code: 'Code', zh: 'Chinese Name', en: 'English Name', uploadFile: 'Upload file (named by code)' },
-  hintFile: 'Uploaded logo will be saved under /banks named by bank code (prefer SVG; fallback PNG/JPG)',
-  placeholders: {
-    codeExample: 'e.g. ICBC',
-    zhNameExample: '中国工商银行',
-    enNameExample: 'Industrial and Commercial Bank of China'
-  }
+      replaceTitle: 'Replace Logo',
+      labels: { 
+        code: 'Code', 
+        zh: 'Chinese Name', 
+        en: 'English Name', 
+        uploadFile: 'Upload Logo File' 
+      },
+      hintFile: 'Logo file will be saved as /banks/<code>.(svg|png|jpg). SVG preferred, fallback to PNG/JPG',
+      placeholders: {
+        codeExample: 'e.g. ICBC',
+        zhNameExample: 'e.g. 中国工商银行',
+        enNameExample: 'e.g. Industrial and Commercial Bank of China'
+      }
     },
     login: {
       title: 'Sign In',
