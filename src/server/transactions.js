@@ -85,6 +85,7 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       pageSize = '20', 
       sort = 'transaction_date', 
       order = 'desc',
+      sortMulti,
       startDate,
       endDate,
       account,
@@ -212,11 +213,26 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     
     // 排序条件（白名单，避免注入/无效列导致错误）
     const allowedSorts = new Set([
-      'id','transaction_date','debit_amount','credit_amount','balance','category','matched','created_at','trn_date'
+      'id','transaction_date','trn_date','debit_amount','credit_amount','balance','category','matched','created_at',
+      // 关联列/别名
+      'account_number','bank_name','account_name'
     ]);
-    const sortSafe = allowedSorts.has(String(sort)) ? String(sort) : 'transaction_date';
     const orderSafe = (String(order).toLowerCase() === 'asc') ? 'ASC' : 'DESC';
-    const orderClause = `ORDER BY ${sortSafe} ${orderSafe}`;
+    let orderClause = ''
+    // 支持多列排序：sortMulti=col1,col2,...（均采用同一方向），白名单保护
+    if (sortMulti && typeof sortMulti === 'string') {
+      const cols = String(sortMulti)
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && allowedSorts.has(s))
+      if (cols.length > 0) {
+        orderClause = 'ORDER BY ' + cols.map(c => `${c} ${orderSafe}`).join(', ')
+      }
+    }
+    if (!orderClause) {
+      const sortSafe = allowedSorts.has(String(sort)) ? String(sort) : 'transaction_date';
+      orderClause = `ORDER BY ${sortSafe} ${orderSafe}`;
+    }
     
     // 查询数据，关联银行账户信息
     const dataQuery = `

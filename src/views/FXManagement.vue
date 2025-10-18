@@ -18,7 +18,7 @@
           <!-- 税率只读：来自客户管理，按百分比(0-100)显示；计算时转换为系数 -->
           <el-input-number v-model="customerTaxRate" :precision="3" :step="0.001" :min="0" :max="100" :placeholder="t('fx.customerTaxRate')" :controls="false" disabled />
           <el-select v-model="customerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangeSettle">
-            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
+            <el-option v-for="c in settleCustomers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">MYR {{ money(myrBalance) }}</span>
           <el-button type="primary" :disabled="!canCreateSettlement" @click="createSettlement">{{ t('fx.createSettlement') }}</el-button>
@@ -59,7 +59,7 @@
         <div class="pay-filters">
           <el-date-picker v-model="payDate" type="date" :placeholder="t('fx.payDate')" value-format="YYYY-MM-DD" />
           <el-select v-model="payCustomerId" filterable clearable :placeholder="t('fx.selectCustomer')" style="min-width:240px" @change="onCustomerChangePay">
-            <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
+            <el-option v-for="c in payCustomers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">CNY {{ money(cnyBalance) }}</span>
           <el-button type="primary" :disabled="!canCreatePayment" @click="createPayment">{{ t('fx.createPayment') }}</el-button>
@@ -142,7 +142,7 @@ function setPayCustomerId(id){
 }
 defineExpose({ setSettleCustomerId, setPayCustomerId })
 
-const customers = ref([])
+const allCustomers = ref([])
 const settleDate = ref('')
 const customerId = ref(null)
 // 税率（百分比0-100），只读：从客户管理读取
@@ -181,10 +181,14 @@ const selectedSettledTotal = computed(() => {
 })
 const paymentTotal = computed(() => accounts.value.reduce((s, a) => s + (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0), 0))
 
-const selectedCustomer = computed(() => customers.value.find(c => c.id === customerId.value) || null)
+const selectedCustomer = computed(() => allCustomers.value.find(c => c.id === customerId.value) || null)
 const myrBalance = computed(() => Number(selectedCustomer.value?.balance_myr || 0))
-const selectedPayCustomer = computed(() => customers.value.find(c => c.id === payCustomerId.value) || null)
+const selectedPayCustomer = computed(() => allCustomers.value.find(c => c.id === payCustomerId.value) || null)
 const cnyBalance = computed(() => Number(selectedPayCustomer.value?.balance_cny || 0))
+
+// 下拉列表：按需求分别过滤
+const settleCustomers = computed(() => (allCustomers.value || []).filter(c => Number(c.balance_myr || 0) > 0))
+const payCustomers = computed(() => (allCustomers.value || []).filter(c => Number(c.balance_cny || 0) > 0))
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 
@@ -200,7 +204,7 @@ function fmtDate(v){
 
 async function loadCustomers(){
   const res = await api.customers.list({ pageSize: 1000 })
-  customers.value = res.items || []
+  allCustomers.value = res.items || []
 }
 
 function normalizePercent(v){
@@ -219,7 +223,7 @@ async function loadMatched(){
   matchedRows.value = Array.isArray(data?.data) ? data.data : []
   selMatched.value = []
   // 读取客户税率
-  const found = customers.value.find(c => c.id === customerId.value)
+  const found = allCustomers.value.find(c => c.id === customerId.value)
   customerTaxRate.value = normalizePercent(found?.tax_rate)
 }
 
@@ -295,7 +299,7 @@ async function loadAccounts(){
 }
 
 async function createPayment(){
-  const found = customers.value.find(c => c.id === payCustomerId.value)
+  const found = allCustomers.value.find(c => c.id === payCustomerId.value)
   if (paymentTotal.value > Number(cnyBalance.value || 0)) {
     ElMessage.error(t('fx.errExceedBalance'))
     return

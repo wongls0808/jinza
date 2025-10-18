@@ -48,6 +48,20 @@
           </el-button-group>
         </div>
         <div class="toolbar-right">
+          <div class="sort-controls">
+            <span class="lbl">{{ t('transactions.sortBy') }}:</span>
+            <el-checkbox v-model="sortCols.trn_date">{{ t('transactions.transactionDate') }}</el-checkbox>
+            <el-checkbox v-model="sortCols.account_number">{{ t('transactions.accountNumber') }}</el-checkbox>
+            <el-checkbox v-model="sortCols.bank_name">{{ t('transactions.bankName') }}</el-checkbox>
+            <el-checkbox v-model="sortCols.account_name">{{ t('transactions.accountName') }}</el-checkbox>
+            <el-checkbox v-model="sortCols.debit_amount">{{ t('transactions.debitAmount') }}</el-checkbox>
+            <el-checkbox v-model="sortCols.credit_amount">{{ t('transactions.creditAmount') }}</el-checkbox>
+            <el-select v-model="order" style="width:110px" @change="handleSearch">
+              <el-option :label="t('transactions.desc')" value="desc" />
+              <el-option :label="t('transactions.asc')" value="asc" />
+            </el-select>
+            <el-button size="small" @click="handleSearch">{{ t('transactions.apply') }}</el-button>
+          </div>
           <el-button type="success" class="match-list-btn" round @click="goToStats">
             <el-icon><List /></el-icon>
             {{ t('transactions.matchList') }}
@@ -149,15 +163,15 @@
       <el-table-column type="selection" width="55" />
 
       <!-- 列顺序：交易日期、账号、银行、账户名称、参考号、参考、借方金额、贷方金额 -->
-      <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" sortable :width="colW('trn_date', 140)">
+  <el-table-column :label="t('transactions.transactionDate')" prop="trn_date" :width="colW('trn_date', 140)">
         <template #default="scope">
           {{ formatDate(scope.row.trn_date) }}
         </template>
       </el-table-column>
 
-      <el-table-column :label="t('transactions.accountNumber')" prop="account_number" sortable :width="colW('account_number', 160)" />
+  <el-table-column :label="t('transactions.accountNumber')" prop="account_number" :width="colW('account_number', 160)" />
 
-      <el-table-column :label="t('transactions.bankName')" prop="bank_name" sortable :width="colW('bank_name', 160)">
+  <el-table-column :label="t('transactions.bankName')" prop="bank_name" :width="colW('bank_name', 160)">
         <template #default="scope">
           <div class="bank-display">
             <img
@@ -171,7 +185,7 @@
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.accountName')" prop="account_name" sortable :width="colW('account_name', 180)">
+  <el-table-column :label="t('transactions.accountName')" prop="account_name" :width="colW('account_name', 180)">
         <template #default="scope">
           {{ scope.row.account_name || '-' }}
         </template>
@@ -181,13 +195,13 @@
 
       <el-table-column :label="t('transactions.reference')" prop="reference" show-overflow-tooltip :width="colW('reference', 240)" />
 
-      <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" sortable :width="colW('debit_amount', 140)">
+  <el-table-column :label="t('transactions.debitAmount')" prop="debit_amount" align="right" :width="colW('debit_amount', 140)">
         <template #default="scope">
           <span class="negative">{{ formatCurrency(scope.row.debit_amount) }}</span>
         </template>
       </el-table-column>
       
-      <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" sortable :width="colW('credit_amount', 140)">
+  <el-table-column :label="t('transactions.creditAmount')" prop="credit_amount" align="right" :width="colW('credit_amount', 140)">
         <template #default="scope">
           <span class="positive">{{ formatCurrency(scope.row.credit_amount) }}</span>
         </template>
@@ -642,6 +656,15 @@ const pagination = reactive({
 })
 const sort = ref('transaction_date')
 const order = ref('desc')
+// 多列排序勾选（默认仅日期）
+const sortCols = reactive({
+  trn_date: true,
+  account_number: false,
+  bank_name: false,
+  account_name: false,
+  debit_amount: false,
+  credit_amount: false
+})
 const showStats = ref(false) // 保留变量但不在此页使用
 const stats = ref({ summary: {}, monthly: [], categories: [] })
 const filters = reactive({
@@ -740,6 +763,12 @@ const fetchTransactions = async () => {
       sort: sort.value,
       order: order.value
     }
+    // 组合多列排序（全局排序）：默认仅日期
+    try {
+      const colsOrdered = ['trn_date','account_number','bank_name','account_name','debit_amount','credit_amount']
+      const selectedCols = colsOrdered.filter(k => sortCols[k])
+      if (selectedCols.length > 0) params.sortMulti = selectedCols.join(',')
+    } catch {}
     
     if (searchQuery.value) {
       params.searchTerm = searchQuery.value
@@ -1875,6 +1904,14 @@ function onBankImgErr(e){
   display: flex;
   align-items: center;
 }
+
+.sort-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+}
+.sort-controls .lbl { color: #606266; font-size: 13px; margin-right: 4px; }
 
 /* 匹配列表按钮美化 */
 .match-list-btn {
