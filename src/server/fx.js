@@ -1290,6 +1290,24 @@ fxRouter.get('/settlements/:id/pdf', auth.authMiddleware(true), auth.readOpenOr(
       }
       return ''
     }
+    async function materializeDbLogo(bankId) {
+      try {
+        const id = Number(bankId)
+        if (!id) return ''
+        const row = await query('select mime, data, updated_at from bank_logos where bank_id=$1', [id])
+        if (row.rowCount === 0) return ''
+        const r = row.rows[0]
+        const mime = String(r.mime||'')
+        const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : (mime.includes('jpeg')||mime.includes('jpg') ? 'jpg' : 'bin'))
+        const dirs = uploadsDirs.length ? uploadsDirs : [path.join(process.cwd?.() || '', 'uploads')]
+        const dir = dirs.find(d => { try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); return true } catch { return false } }) || ''
+        if (!dir) return ''
+        const stamp = (r.updated_at && (new Date(r.updated_at)).getTime()) || Date.now()
+        const file = path.join(dir, `banklogo_${id}.${ext}`)
+        try { fs.writeFileSync(file, r.data) } catch {}
+        return file
+      } catch { return '' }
+    }
   // 从 DB 优先取 logo_url；无法解析时回退到 public/banks/<bank_code>.(svg|png|jpg)
   // 若仍不可用，则添加占位符（以银行代码绘制小方框），保证布局完整
   const logos = [] // { type:'image', path } | { type:'placeholder', code }
@@ -1319,6 +1337,11 @@ fxRouter.get('/settlements/:id/pdf', auth.authMiddleware(true), auth.readOpenOr(
       if (url) {
         if (url.startsWith('/banks/')) {
           p = resolveIn(publicBanksDirs, url.replace('/banks/',''))
+        } else if (url.startsWith('/api/banks/')) {
+          const m = /^\/api\/banks\/(\d+)\/logo/.exec(url)
+          if (m) {
+            p = await materializeDbLogo(Number(m[1]))
+          }
         } else if (url.startsWith('/uploads/')) {
           p = resolveIn(uploadsDirs, url.replace('/uploads/',''))
         } else if (/^https?:\/\//i.test(url)) {

@@ -397,7 +397,9 @@
       <el-table :data="detailDrawer.rows" size="small" border v-loading="detailDrawer.loading" @header-dragend="onColResizeDetail">
         <!-- 交易明细(借)：交易日期/账号/账户名称/借方金额 -->
         <template v-if="detailDrawer.type==='tx-debit'">
-          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)" />
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)">
+            <template #default="{ row }">{{ fmtDate(row.trn_date || row.transaction_date) }}</template>
+          </el-table-column>
           <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="colWDetail('account_number', 180)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colWDetail('account_name', 220)" />
           <el-table-column prop="debit" column-key="debit" :label="t('common.debit')" :width="colWDetail('debit', 140)" align="right">
@@ -406,7 +408,9 @@
         </template>
         <!-- 交易明细(贷)：交易日期/账号/账户名称/贷方金额 -->
         <template v-else-if="detailDrawer.type==='tx-credit'">
-          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)" />
+          <el-table-column prop="trn_date" column-key="trn_date" :label="t('common.date')" :width="colWDetail('trn_date', 120)">
+            <template #default="{ row }">{{ fmtDate(row.trn_date || row.transaction_date) }}</template>
+          </el-table-column>
           <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="colWDetail('account_number', 180)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colWDetail('account_name', 220)" />
           <el-table-column prop="credit" column-key="credit" :label="t('common.credit')" :width="colWDetail('credit', 140)" align="right">

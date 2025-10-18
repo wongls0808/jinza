@@ -435,9 +435,16 @@ function isSettleSelectable(row){
  .page-hd { display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px; }
  .fx-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
  .fx-page.single .fx-split { grid-template-columns: 1fr; }
+ /* 直接作用于根卡片元素（el-card.root 也带有 .section 类） */
+ .section { background: transparent; border: none; box-shadow: none; }
+ /* 去除结汇区与付款区卡片背景与边框，使之与页面背景融为一体 */
+ .section :deep(.el-card) { background: transparent; border: none; box-shadow: none; }
+ .section :deep(.el-card__header) { padding: 10px 12px; border-bottom: none; background: transparent; }
+ .section :deep(.el-card__body) { padding: 10px 12px; background: transparent; }
+ /* 在抽屉模式下保持紧凑的内边距 */
  .fx-page.drawer-compact .section :deep(.el-card__header) { padding: 10px 12px; }
  .fx-page.drawer-compact .section :deep(.el-card__body) { padding: 10px 12px; }
- .fx-page.drawer-compact :deep(.el-card) { border-color: var(--el-border-color-light); }
+ .fx-page.drawer-compact :deep(.el-card) { border: none; }
  .section-hd { font-weight: 700; }
  .settle-filters, .pay-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }
   .totals { display:flex; gap:16px; margin: 4px 0 8px; color: var(--el-text-color-secondary); font-size: 13px; }

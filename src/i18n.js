@@ -831,22 +831,7 @@ const messages = {
       title: 'No accessible modules for your account',
       subtitle: 'Please contact the administrator to assign permissions to your account'
     },
-    login: {
-      title: 'Login',
-      username: 'Username',
-      password: 'Password',
-      submit: 'Login',
-      firstLoginTip: 'First login requires password change',
-      successEntering: 'Login successful, entering system...',
-      failedWithMsg: 'Login failed: {msg}',
-      errors: {
-        missingCredentials: 'Please enter username and password',
-        userNotFound: 'User not found',
-        userDisabled: 'User is disabled',
-        invalidPassword: 'Incorrect password',
-        defaultError: 'Server connection error or unknown error'
-      }
-    },
+    
     workbench: {
       title: 'Workbench',
       filters: {
@@ -1282,8 +1267,18 @@ const messages = {
       title: 'Sign In',
       username: 'Username',
       password: 'Password',
-  submit: 'Login',
-  firstLoginTip: 'First login requires password change. Redirecting...',
+      submit: 'Login',
+      firstLoginTip: 'First login requires password change. Redirecting...',
+      rememberMe: 'Remember me',
+      successEntering: 'Login successful, entering system...',
+      failedWithMsg: 'Login failed: {msg}',
+      errors: {
+        missingCredentials: 'Please enter username and password',
+        userNotFound: 'User not found',
+        userDisabled: 'User is disabled',
+        invalidPassword: 'Incorrect password',
+        defaultError: 'Server connection error or unknown error'
+      }
     },
     home: {
       title: 'Dashboard',

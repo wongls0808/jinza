@@ -80,8 +80,16 @@ function save(data, rememberMe = false) {
   // 如果勾选了"记住我"，也存储到本地存储中
   if (rememberMe) {
     localStorage.setItem("auth_user", JSON.stringify(data))
+    // 标记开启 remember，以便 load() 在下次启动时优先使用本地存储并同步到会话
+    localStorage.setItem("remember_auth", "1")
+    // 同步清理旧的会话标志（如果存在）
+    try { sessionStorage.removeItem("auth_session") } catch {}
   } else {
     localStorage.removeItem("auth_user")
+    // 关闭记住我
+    try { localStorage.removeItem("remember_auth") } catch {}
+    // 标记仅会话登录
+    try { sessionStorage.setItem("auth_session", "1") } catch {}
   }
   
   load()

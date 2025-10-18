@@ -153,6 +153,17 @@ export async function ensureSchema() {
     create unique index if not exists ux_cus_acc_customer_bank_no
       on customer_receiving_accounts(customer_id, bank_id, bank_account);
   `)
+  // Bank logos table (fallback ensure)
+  try {
+    await query(`
+      create table if not exists bank_logos (
+        bank_id int primary key references banks(id) on delete cascade,
+        mime text not null,
+        data bytea not null,
+        updated_at timestamptz default now()
+      );
+    `)
+  } catch {}
   // 用户会话（单端登录 + 空闲超时）
   await query(`
     create table if not exists user_sessions (

@@ -75,11 +75,6 @@ const onSubmit = async () => {
   try {
     const res = await api.login(form.value.username, form.value.password)
     save({ token:res.token, user:res.user, perms:res.perms, must_change_password:!!res.must_change_password }, remember.value)
-    if(remember.value){
-      localStorage.setItem('remember_auth','1'); sessionStorage.removeItem('auth_session')
-    } else {
-      localStorage.removeItem('remember_auth'); sessionStorage.setItem('auth_session','1')
-    }
     const redirect = res.must_change_password ? '/change-password' : (route.query.redirect || '/')
     if (res.must_change_password) {
       ElMessage({ message: t('login.firstLoginTip'), type:'warning', duration:1800 })

@@ -1081,14 +1081,21 @@ router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requi
 // Banks CRUD (server-managed)
 router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), async (req, res) => {
   const rs = await query('select id, code, zh, en, logo_url from banks order by id')
-  // 规范化 logo 路径：若数据库中的 logo_url 不存在或文件缺失，则按 svg/png/jpg 顺序寻找现有文件
+  // 规范化 logo 路径：优先使用 DB 动态端点 /api/banks/:id/logo；
+  // 若该银行无存储的 logo，再回退到 public/banks 下的静态文件（svg/png/jpg 顺序）
   const publicDirCandidates = [
     path.join(process.cwd?.() || '', 'public'),
     path.join(__dirname, '../../', 'public')
   ]
   const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
   const banksDir = path.join(publicDir, 'banks')
-  function resolveLogoUrl(code, url) {
+  async function hasDbLogo(id) {
+    try {
+      const r = await query('select 1 from bank_logos where bank_id=$1 limit 1', [id])
+      return r.rowCount > 0
+    } catch { return false }
+  }
+  function resolveStaticLogoUrl(code, url) {
     try {
       const codeLower = String(code || 'public').toLowerCase()
       const normalized = codeLower.replace(/[^a-z0-9]/g, '') // 去掉空格和非字母数字
@@ -1133,7 +1140,14 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
       return '/banks/public.svg'
     } catch { return '/banks/public.svg' }
   }
-  const rows = rs.rows.map(r => ({ ...r, logo_url: resolveLogoUrl(r.code, r.logo_url) }))
+  // 并发检查每行是否有 DB logo，有则返回 API 路径
+  const rows = await Promise.all(rs.rows.map(async (r) => {
+    const hasDb = await hasDbLogo(r.id)
+    if (hasDb) {
+      return { ...r, logo_url: `/api/banks/${r.id}/logo` }
+    }
+    return { ...r, logo_url: resolveStaticLogoUrl(r.code, r.logo_url) }
+  }))
   res.json(rows)
 })
 
@@ -1152,25 +1166,25 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
       if (!m) return res.status(400).json({ error: 'invalid data url' })
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
-      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : (mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'bin'))
-      const publicDirCandidates = [
-        path.join(process.cwd?.() || '', 'public'),
-        path.join(__dirname, '../../', 'public')
-      ]
-      const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
-      const banksDir = path.join(publicDir, 'banks')
-      if (!fs.existsSync(banksDir)) fs.mkdirSync(banksDir, { recursive: true })
-      const codeLower = code.toLowerCase()
-      const file = path.join(banksDir, `${codeLower}.${ext}`)
-      fs.writeFileSync(file, buf)
-      // 清理其它后缀的旧文件，避免残留
-      for (const e of ['svg','png','jpg']) {
-        if (e !== ext) {
-          const p = path.join(banksDir, `${codeLower}.${e}`)
-          try { if (fs.existsSync(p)) fs.unlinkSync(p) } catch {}
-        }
+      // 存入数据库
+      try {
+        const tmp = await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4) returning id', [code, zh, en, null])
+        const bankId = tmp.rows[0].id
+        await query(
+          `insert into bank_logos(bank_id, mime, data, updated_at)
+           values($1,$2,$3, now())
+           on conflict(bank_id) do update set mime=excluded.mime, data=excluded.data, updated_at=now()`,
+          [bankId, mime, buf]
+        )
+        const apiUrl = `/api/banks/${bankId}/logo`
+        // 同步更新 banks.logo_url，便于其他联表（如 FX PDF）直接使用
+        await query('update banks set logo_url=$1 where id=$2', [apiUrl, bankId])
+        try { await auth.logActivity(req.user?.id, 'banks.create', { target: bankId, code, zh, en }, req) } catch {}
+        return res.json({ id: bankId, code, zh, en, logo_url: apiUrl })
+      } catch (e) {
+        if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+        throw e
       }
-      logo_url = `/banks/${codeLower}.${ext}`
     } catch (e) {
       return res.status(400).json({ error: 'upload failed' })
     }
@@ -1203,32 +1217,15 @@ router.put('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:upda
       if (!m) return res.status(400).json({ error: 'invalid data url' })
       const mime = m[1]
       const buf = Buffer.from(m[2], 'base64')
-      const ext = mime.includes('svg') ? 'svg' : (mime.includes('png') ? 'png' : (mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'bin'))
-      // 取银行代码用于命名；若未传 code，则从数据库读一次
-      let bankCode = code
-      if (!bankCode) {
-        const rs = await query('select code from banks where id=$1', [id])
-        bankCode = rs.rows?.[0]?.code
-      }
-      if (!bankCode) return res.status(400).json({ error: 'bank code required for upload' })
-      const publicDirCandidates = [
-        path.join(process.cwd?.() || '', 'public'),
-        path.join(__dirname, '../../', 'public')
-      ]
-      const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
-      const banksDir = path.join(publicDir, 'banks')
-      if (!fs.existsSync(banksDir)) fs.mkdirSync(banksDir, { recursive: true })
-      const codeLower = String(bankCode).toLowerCase()
-      const file = path.join(banksDir, `${codeLower}.${ext}`)
-      fs.writeFileSync(file, buf)
-      // 清理其它后缀的旧文件
-      for (const e of ['svg','png','jpg']) {
-        if (e !== ext) {
-          const p = path.join(banksDir, `${codeLower}.${e}`)
-          try { if (fs.existsSync(p)) fs.unlinkSync(p) } catch {}
-        }
-      }
-      logo_url = `/banks/${codeLower}.${ext}`
+      // 直接写入 DB 表
+      await query(
+        `insert into bank_logos(bank_id, mime, data, updated_at)
+         values($1,$2,$3, now())
+         on conflict(bank_id) do update set mime=excluded.mime, data=excluded.data, updated_at=now()`,
+        [id, mime, buf]
+      )
+      // 将返回路径指向 API 端点
+      logo_url = `/api/banks/${id}/logo`
     } catch (e) {
       return res.status(400).json({ error: 'upload failed' })
     }
@@ -1270,10 +1267,33 @@ router.post('/banks/reset-defaults', auth.authMiddleware(true), auth.requireAnyP
     ['HONGLEONG','丰隆银行','Hong Leong Bank','/banks/hlb.svg']
   ]
   await query('truncate table banks restart identity')
+  try { await query('truncate table bank_logos') } catch {}
   const params = defaults.map((_, i) => `($${i*4+1},$${i*4+2},$${i*4+3},$${i*4+4})`).join(',')
   await query(`insert into banks(code, zh, en, logo_url) values ${params}`, defaults.flat())
   try { await auth.logActivity(req.user?.id, 'banks.reset_defaults', { count: defaults.length }, req) } catch {}
   res.json({ ok: true, count: defaults.length })
+})
+
+// Stream bank logo from DB
+router.get('/banks/:id/logo', auth.authMiddleware(false), auth.readOpenOr('view_banks'), async (req, res) => {
+  const id = Number(req.params.id)
+  if (!id) return res.status(400).json({ error: 'invalid id' })
+  try {
+    const rs = await query('select mime, data, updated_at from bank_logos where bank_id=$1', [id])
+    if (rs.rowCount === 0) return res.status(404).json({ error: 'logo not found' })
+    const row = rs.rows[0]
+    res.setHeader('Content-Type', row.mime || 'application/octet-stream')
+    // Cache for 1 day; revalidate on change via simple ETag
+    const etag = 'W/"' + String(row.updated_at?.getTime?.() || Date.now()) + '"'
+    res.setHeader('ETag', etag)
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
+    res.end(row.data)
+  } catch (e) {
+    res.status(500).json({ error: 'read logo failed' })
+  }
 })
 
 router.get('/customers/template', auth.authMiddleware(true), auth.readOpenOr('customers:template','customers:import'), async (req, res) => {
