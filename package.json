@@ -8,8 +8,7 @@
   "scripts": {
     "dev": "node server.js",
     "frontend": "vite",
-  "build": "vite build && node scripts/write-version.mjs",
-    "prestart": "vite build",
+    "build": "vite build && node scripts/write-version.mjs",
     "preview": "vite preview",
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",

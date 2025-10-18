@@ -12,6 +12,12 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20
+      - key: NPM_CONFIG_FUND
+        value: "false"
+      - key: NPM_CONFIG_AUDIT
+        value: "false"
+      - key: NPM_CONFIG_PROGRESS
+        value: "false"
       - key: NPM_CONFIG_LOGLEVEL
         value: error
       - key: SESSION_SECRET
