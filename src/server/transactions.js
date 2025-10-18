@@ -6,7 +6,7 @@ import { getMockTransactions, getMockTransactionStats } from './mockTransactions
 
 export const transactionsRouter = express.Router();
 // 获取单条交易（用于排查匹配对象）
-transactionsRouter.get('/:id', auth.authMiddleware(true), auth.readOpenOr('view_transactions'), async (req, res) => {
+transactionsRouter.get('/:id(\\d+)', auth.authMiddleware(true), auth.readOpenOr('view_transactions'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { id } = req.params
@@ -519,7 +519,7 @@ transactionsRouter.post('/', auth.authMiddleware(true), auth.requirePerm('transa
 });
 
 // 更新交易
-transactionsRouter.put('/:id', auth.authMiddleware(true), auth.requirePerm('transactions:update'), async (req, res) => {
+transactionsRouter.put('/:id(\\d+)', auth.authMiddleware(true), auth.requirePerm('transactions:update'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { id } = req.params
@@ -563,7 +563,7 @@ transactionsRouter.put('/:id', auth.authMiddleware(true), auth.requirePerm('tran
 });
 
 // 删除交易
-transactionsRouter.delete('/:id', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
+transactionsRouter.delete('/:id(\\d+)', auth.authMiddleware(true), auth.requirePerm('transactions:delete'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { id } = req.params
@@ -577,7 +577,7 @@ transactionsRouter.delete('/:id', auth.authMiddleware(true), auth.requirePerm('t
 });
 
 // 交易匹配
-transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
+transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { id } = req.params
@@ -670,7 +670,7 @@ transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePer
 });
 
 // 取消匹配
-transactionsRouter.post('/:id/unmatch', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
+transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.requirePerm('transactions:match'), async (req, res) => {
   try {
     await ensureTransactionsDDL()
     const { id } = req.params
