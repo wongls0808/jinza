@@ -1,67 +1,115 @@
 <template>
   <div class="users container">
+    <!-- 页面头部 -->
     <div class="page-head">
-  <div class="title">{{ $t('home.users') }}</div>
+      <div class="title">{{ $t('home.users') }}</div>
       <div class="spacer"></div>
-      <!-- 移除了返回首页按钮 -->
-      <div class="actions">
-        <el-input v-model.trim="newUser.username" :placeholder="$t('users.usernamePlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
-        <el-input v-model.trim="newUser.password" type="password" :placeholder="$t('users.passwordPlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
-        <el-input v-model.trim="newUser.display_name" :placeholder="$t('users.displayNamePlaceholder')" style="min-width:180px; max-width:220px;" size="small" />
-  <el-button type="primary" :loading="creating" size="small" @click="createUser">{{ $t('common.add') }}</el-button>
-        <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">{{ $t('users.reseedPermTree') }}</el-button>
-      </div>
+      <el-button type="warning" plain size="small" :loading="reseed.loading" @click="doReseed">
+        {{ $t('users.reseedPermTree') }}
+      </el-button>
     </div>
 
+    <!-- 新增用户表单 -->
+    <el-card class="add-user-card" shadow="never">
+      <div class="add-user-form">
+        <div class="form-label">{{ $t('common.add') }}</div>
+        <el-input 
+          v-model.trim="newUser.username" 
+          :placeholder="$t('users.usernamePlaceholder')" 
+          style="width: 200px;" 
+          size="small" 
+        />
+        <el-input 
+          v-model.trim="newUser.password" 
+          type="password" 
+          :placeholder="$t('users.passwordPlaceholder')" 
+          style="width: 200px;" 
+          size="small" 
+        />
+        <el-input 
+          v-model.trim="newUser.display_name" 
+          :placeholder="$t('users.displayNamePlaceholder')" 
+          style="width: 200px;" 
+          size="small" 
+        />
+        <el-button type="primary" :loading="creating" size="small" @click="createUser">
+          {{ $t('common.add') }}
+        </el-button>
+      </div>
+    </el-card>
+
+    <!-- 用户卡片列表 -->
     <div class="grid cards">
       <el-card v-for="u in users" :key="u.id" class="user-card card">
         <template #header>
-          <div class="head">
-            <!-- 右上角：启用开关 -->
-            <div class="switch-top-right">
-              <el-switch
-                v-model="u.is_active"
-                @change="toggleActive(u)"
-                inline-prompt
-                :active-icon="Check"
-                :inactive-icon="Close"
-              />
-              <span class="muted">{{ t('users.active') }}</span>
+          <div class="card-header">
+            <!-- 左侧：头像和信息 -->
+            <div class="user-info-section">
+              <div class="avatar" :class="{ admin: u.is_admin }">{{ initials(u) }}</div>
+              <div class="info">
+                <div class="name-row">
+                  <span class="name">{{ u.display_name || u.username }}</span>
+                  <el-tag v-if="u.is_admin" type="danger" size="small" class="admin-badge">ADMIN</el-tag>
+                </div>
+                <div class="username">@{{ u.username }}</div>
+                <div class="meta">
+                  <span v-if="u.last_ip" class="kv">
+                    <span class="k">IP</span>
+                    <span class="v">{{ u.last_ip }}</span>
+                  </span>
+                  <span v-if="u.last_seen" class="kv">
+                    <span class="k">TIME</span>
+                    <span class="v">{{ fmtMinute(u.last_seen) }}</span>
+                  </span>
+                  <span v-if="Array.isArray(u._perms)" class="kv">
+                    <span class="k">PERMS</span>
+                    <span class="v">{{ u._perms.length }}</span>
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <!-- 主信息区 -->
-            <div class="avatar" :class="{ admin: u.is_admin }">{{ initials(u) }}</div>
-            <div class="info">
-              <div class="name">
-                {{ u.display_name || u.username }}
+            <!-- 右侧：状态和操作 -->
+            <div class="actions-section">
+              <div class="status-row">
+                <span class="status" :class="{ online: !!u.online }">
+                  <span class="dot"></span>
+                  <span class="status-text">{{ u.online ? 'Online' : 'Offline' }}</span>
+                </span>
+                <el-switch
+                  v-model="u.is_active"
+                  @change="toggleActive(u)"
+                  inline-prompt
+                  size="small"
+                  :active-icon="Check"
+                  :inactive-icon="Close"
+                />
               </div>
-              <div class="username">@{{ u.username }}</div>
-              <div class="meta">
-                <span v-if="u.last_ip" class="kv"><span class="k">IP</span><span class="v">{{ u.last_ip }}</span></span>
-                <span v-if="u.last_seen" class="kv"><span class="k">TIME</span><span class="v">{{ fmtMinute(u.last_seen) }}</span></span>
-                <span v-if="Array.isArray(u._perms)" class="kv"><span class="k">PERMS</span><span class="v">{{ u._perms.length }}</span></span>
-              </div>
-            </div>
-            <div class="controls">
-              <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') }}</el-button>
-            </div>
-
-            <!-- 右下角：管理员与在线标识 -->
-            <div class="badges-bottom-right">
-              <el-tag v-if="u.is_admin" type="danger" size="small">ADMIN</el-tag>
-              <span class="status" :class="{ online: !!u.online }">
-                <span class="dot"></span>
-                {{ u.online ? 'Online' : 'Offline' }}
-              </span>
+              <el-button 
+                type="primary" 
+                plain 
+                size="small" 
+                @click="openPermDrawer(u)"
+                style="width: 140px;"
+              >
+                {{ t('users.assignPerms') }}
+              </el-button>
             </div>
           </div>
         </template>
 
-        <div class="foot-actions">
-          <el-button size="small" text :loading="logState.loading[u.id]" @click="openLogDrawer(u)">{{ t('users.activityLog') }}</el-button>
+        <!-- 卡片底部操作 -->
+        <div class="card-footer">
+          <el-button size="small" text :loading="logState.loading[u.id]" @click="openLogDrawer(u)">
+            {{ t('users.activityLog') }}
+          </el-button>
           <div class="spacer"></div>
-          <el-button size="small" text type="warning" @click="openReset(u)">{{ $t('common.reset') }}</el-button>
-          <el-button size="small" text type="danger" @click="confirmRemove(u)">{{ $t('common.delete') }}</el-button>
+          <el-button size="small" text type="warning" @click="openReset(u)">
+            {{ $t('common.reset') }}
+          </el-button>
+          <el-button size="small" text type="danger" @click="confirmRemove(u)">
+            {{ $t('common.delete') }}
+          </el-button>
         </div>
       </el-card>
     </div>
@@ -418,52 +466,282 @@ function fmtMinute(ts) {
 
 <style scoped>
 .users { padding: 0; }
-.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.title { font-size: 18px; font-weight: 600; }
-.spacer { flex: 1; }
-.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.cards { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
-.user-card { padding: 0; }
-.head { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 12px; padding: 12px; padding-top: 48px; padding-bottom: 40px; min-height: 64px; }
-.avatar { width: 40px; height: 40px; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; background: var(--el-color-primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 10%, transparent); align-self: center; }
-.avatar.admin { background: var(--el-color-danger); }
-.info { min-width: 0; align-self: center; }
-.name { font-weight: 600; font-size: 15px; }
-.username { color: var(--el-text-color-secondary); font-size: 12px; }
-.meta { color: var(--el-text-color-secondary); font-size: 12px; display:flex; gap:12px; flex-wrap:wrap; margin-top:2px; }
-.meta .kv { display:inline-flex; gap:6px; align-items:center; }
-.meta .kv .k { font-weight:600; opacity:0.75; }
-.meta .kv .v { font-variant-numeric: tabular-nums; }
-.controls { display:flex; align-items:center; gap: 8px; justify-self: end; align-self: center; }
-/* 右上角启用开关容器 */
-.switch-top-right { position: absolute; top: 8px; right: 12px; display:flex; align-items:center; gap:6px; }
-.switch-top-right .muted { font-size:12px; color: var(--el-text-color-secondary); }
-.status { margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 6px; }
-.status .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; }
-.status.online { color: var(--el-color-success); }
-.status.online .dot { background: var(--el-color-success); box-shadow: 0 0 0 2px color-mix(in oklab, var(--el-color-success) 40%, transparent); }
-.perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.perm-tag { cursor: pointer; user-select: none; }
-.perm-tag.is-disabled { cursor: not-allowed; opacity: 0.7; }
-.ops { display: flex; gap: 8px; align-items: center; }
-.active-wrap { display:flex; align-items:center; gap:6px; white-space:nowrap; }
-.active-wrap .muted { font-size:12px; color: var(--el-text-color-secondary); }
-/* 右下角徽标容器（ADMIN/在线） */
-.badges-bottom-right { position: absolute; right: 12px; bottom: 8px; display:flex; align-items:center; gap:8px; }
-.perm-group { display: grid; gap: 6px; margin: 6px 0 10px; }
-.perm-group-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); }
-.perm-group-items { display: flex; flex-wrap: wrap; gap: 8px; }
-.popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
-.popover-perms { display: flex; flex-wrap: wrap; gap: 8px; max-width: 320px; }
-.inline-perms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.admin-tip { color: var(--el-color-danger); font-size: 12px; margin: 4px 0 8px; }
-.group-batch { display:flex; gap:8px; margin: 0 0 8px; flex-wrap: wrap; }
-/* 日志样式 */
-.foot-actions { margin-top: 2px; display:flex; align-items:center; gap:8px; }
-.log-list { list-style:none; padding:0; margin:6px 0 0; display:grid; gap:6px; }
-.log-item { display:grid; grid-template-columns: 180px 150px 1fr; gap:8px; font-size:12px; color: var(--el-text-color-regular); }
-.log-item .time { color: var(--el-text-color-secondary); }
-.log-item .ip { font-variant-numeric: tabular-nums; }
-.log-item .action { color: var(--el-text-color-secondary); }
-.log-empty { font-size:12px; color: var(--el-text-color-secondary); padding:4px 0; }
+
+/* 页面头部 */
+.page-head { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  margin-bottom: 16px; 
+}
+.title { 
+  font-size: 18px; 
+  font-weight: 600; 
+}
+.spacer { 
+  flex: 1; 
+}
+
+/* 新增用户表单卡片 */
+.add-user-card {
+  margin-bottom: 16px;
+  background: var(--el-fill-color-lighter);
+  border: 1px dashed var(--el-border-color);
+}
+.add-user-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  min-width: 60px;
+}
+
+/* 用户卡片网格 */
+.cards { 
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); 
+  gap: 16px;
+}
+.user-card { 
+  transition: all 0.2s;
+}
+.user-card:hover {
+  box-shadow: var(--el-box-shadow-light);
+}
+
+/* 卡片头部 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+/* 左侧用户信息区域 */
+.user-info-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar { 
+  width: 48px; 
+  height: 48px; 
+  border-radius: 10px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-weight: 700; 
+  font-size: 16px;
+  color: white; 
+  background: var(--el-color-primary); 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+.avatar.admin { 
+  background: var(--el-color-danger); 
+}
+
+.info { 
+  flex: 1;
+  min-width: 0; 
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name { 
+  font-weight: 600; 
+  font-size: 15px; 
+  color: var(--el-text-color-primary);
+}
+
+.admin-badge {
+  margin-left: 0;
+}
+
+.username { 
+  color: var(--el-text-color-secondary); 
+  font-size: 12px; 
+  font-family: monospace;
+}
+
+.meta { 
+  color: var(--el-text-color-secondary); 
+  font-size: 11px; 
+  display: flex; 
+  gap: 12px; 
+  flex-wrap: wrap; 
+  margin-top: 4px; 
+}
+.meta .kv { 
+  display: inline-flex; 
+  gap: 4px; 
+  align-items: center; 
+}
+.meta .kv .k { 
+  font-weight: 600; 
+  opacity: 0.7; 
+  text-transform: uppercase;
+}
+.meta .kv .v { 
+  font-variant-numeric: tabular-nums; 
+  font-family: monospace;
+}
+
+/* 右侧操作区域 */
+.actions-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status { 
+  font-size: 12px; 
+  color: var(--el-text-color-secondary); 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px; 
+  min-width: 70px;
+}
+.status .dot { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  background: #d1d5db; 
+  display: inline-block; 
+}
+.status.online { 
+  color: var(--el-color-success); 
+}
+.status.online .dot { 
+  background: var(--el-color-success); 
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--el-color-success) 30%, transparent); 
+}
+.status-text {
+  min-width: 50px;
+  text-align: left;
+}
+
+/* 卡片底部 */
+.card-footer { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  padding-top: 8px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+/* 权限抽屉和弹窗相关样式 */
+.perm-group { 
+  display: grid; 
+  gap: 6px; 
+  margin: 6px 0 10px; 
+}
+.perm-group-title { 
+  font-weight: 600; 
+  font-size: 13px; 
+  color: var(--el-text-color-primary); 
+}
+.perm-group-items { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 8px; 
+}
+.perm-tag { 
+  cursor: pointer; 
+  user-select: none; 
+}
+.perm-tag.is-disabled { 
+  cursor: not-allowed; 
+  opacity: 0.7; 
+}
+.popover-perms { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 8px; 
+  max-width: 320px; 
+}
+.inline-perms { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 8px; 
+  margin-top: 8px; 
+}
+.admin-tip { 
+  color: var(--el-color-danger); 
+  font-size: 12px; 
+  margin: 4px 0 8px; 
+}
+.group-batch { 
+  display: flex; 
+  gap: 8px; 
+  margin: 0 0 8px; 
+  flex-wrap: wrap; 
+}
+
+/* 抽屉样式 */
+.drawer-body { 
+  padding: 0; 
+}
+.drawer-toolbar { 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
+  margin-bottom: 16px; 
+}
+.drawer-perms { 
+  margin-top: 12px; 
+}
+
+/* 日志相关样式 */
+.log-list { 
+  list-style: none; 
+  padding: 0; 
+  margin: 6px 0 0; 
+  display: grid; 
+  gap: 6px; 
+}
+.log-item { 
+  display: grid; 
+  grid-template-columns: 180px 150px 1fr; 
+  gap: 8px; 
+  font-size: 12px; 
+  color: var(--el-text-color-regular); 
+}
+.log-item .time { 
+  color: var(--el-text-color-secondary); 
+}
+.log-item .ip { 
+  font-variant-numeric: tabular-nums; 
+}
+.log-item .action { 
+  color: var(--el-text-color-secondary); 
+}
+.log-empty { 
+  font-size: 12px; 
+  color: var(--el-text-color-secondary); 
+  padding: 4px 0; 
+}
 </style>
