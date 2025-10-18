@@ -85,12 +85,16 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       startDate,
       endDate,
       account,
+      accountName,
+      relation,
       category,
       minAmount,
       maxAmount,
       searchTerm,
       searchAmountOnly = '0',
-      status = 'all'
+      status = 'all',
+      matchTargetId,
+      matchType
     } = req.query;
 
     // 分页参数（带上上下界，避免异常值）
@@ -121,11 +125,23 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       queryParams.push(`%${account}%`);
       paramIndex++;
     }
+    // 账户名称筛选
+    if (accountName) {
+      whereClause += ` AND EXISTS (SELECT 1 FROM receiving_accounts ra WHERE ra.bank_account = t.account_number AND ra.account_name ILIKE $${paramIndex})`;
+      queryParams.push(`%${accountName}%`);
+      paramIndex++;
+    }
     
     // 类别筛选
     if (category) {
       whereClause += ` AND category = $${paramIndex}`;
       queryParams.push(category);
+      paramIndex++;
+    }
+    // 关联对象筛选（名称/参考）
+    if (relation) {
+      whereClause += ` AND (coalesce(match_target_name,'') ILIKE $${paramIndex} OR coalesce(reference_1,'') ILIKE $${paramIndex} OR coalesce(reference_2,'') ILIKE $${paramIndex} OR coalesce(reference_3,'') ILIKE $${paramIndex})`;
+      queryParams.push(`%${relation}%`);
       paramIndex++;
     }
     
@@ -168,6 +184,21 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       whereClause += ` AND (matched = false OR matched IS NULL)`;
     } else if (status === 'matched') {
       whereClause += ` AND matched = true`;
+    }
+    // 指定匹配类型
+    if (matchType) {
+      whereClause += ` AND match_type = $${paramIndex}`
+      queryParams.push(String(matchType))
+      paramIndex++
+    }
+    // 指定匹配对象ID（常用于拉取某客户的已匹配交易）
+    if (matchTargetId) {
+      const mtid = parseInt(matchTargetId, 10)
+      if (Number.isFinite(mtid)) {
+        whereClause += ` AND match_target_id = $${paramIndex}`
+        queryParams.push(mtid)
+        paramIndex++
+      }
     }
     
     // 排序条件（白名单，避免注入/无效列导致错误）
@@ -292,7 +323,10 @@ transactionsRouter.get('/stats', auth.authMiddleware(true), auth.readOpenOr('vie
       startDate,
       endDate,
       account,
-      category 
+      accountName,
+      relation,
+      category,
+      status = 'all'
     } = req.query;
     
     let whereClause = 'WHERE 1=1';
@@ -317,14 +351,29 @@ transactionsRouter.get('/stats', auth.authMiddleware(true), auth.readOpenOr('vie
       queryParams.push(`%${account}%`);
       paramIndex++;
     }
+    if (accountName) {
+      whereClause += ` AND EXISTS (SELECT 1 FROM receiving_accounts ra WHERE ra.bank_account = transactions.account_number AND ra.account_name ILIKE $${paramIndex})`;
+      queryParams.push(`%${accountName}%`);
+      paramIndex++;
+    }
     
     if (category) {
       whereClause += ` AND category = $${paramIndex}`;
       queryParams.push(category);
       paramIndex++;
     }
+    if (relation) {
+      whereClause += ` AND (coalesce(match_target_name,'') ILIKE $${paramIndex} OR coalesce(reference_1,'') ILIKE $${paramIndex} OR coalesce(reference_2,'') ILIKE $${paramIndex} OR coalesce(reference_3,'') ILIKE $${paramIndex})`;
+      queryParams.push(`%${relation}%`);
+      paramIndex++;
+    }
+    if (status === 'pending') {
+      whereClause += ` AND (matched = false OR matched IS NULL)`;
+    } else if (status === 'matched') {
+      whereClause += ` AND matched = true`;
+    }
     
-    // 总体统计
+    // 总体统计（原始口径）
     const summaryQuery = `
       SELECT 
         COUNT(*) as totalTransactions,
@@ -363,17 +412,50 @@ transactionsRouter.get('/stats', auth.authMiddleware(true), auth.readOpenOr('vie
       LIMIT 10
     `;
     
+    // 四类关联借贷映射统计
+    const byTypeQuery = `
+      with base as (
+        select match_type,
+               sum(coalesce(debit_amount,0)) as debit,
+               sum(coalesce(credit_amount,0)) as credit
+          from transactions
+         ${whereClause}
+         group by match_type
+      )
+      select 
+        coalesce(sum(case when match_type='customer' then debit else 0 end),0) as customer_debit,
+        coalesce(sum(case when match_type='customer' then credit else 0 end),0) as customer_credit,
+        -- 平台商：交易贷方计入平台借方；交易借方计入平台贷方
+        coalesce(sum(case when match_type='buyfx' then credit else 0 end),0) as buyfx_debit,
+        coalesce(sum(case when match_type='buyfx' then debit else 0 end),0) as buyfx_credit,
+        -- 调拨：不计入
+        0::numeric(18,2) as transfer_debit,
+        0::numeric(18,2) as transfer_credit,
+        -- 费用：按交易借贷原值统计（科目映射在费用模块）
+        coalesce(sum(case when match_type='expense' then debit else 0 end),0) as expense_debit,
+        coalesce(sum(case when match_type='expense' then credit else 0 end),0) as expense_credit
+      from base
+    `;
+
     // 执行所有查询
-    const [summaryResult, monthlyResult, categoryResult] = await Promise.all([
+    const [summaryResult, monthlyResult, categoryResult, byTypeResult] = await Promise.all([
       query(summaryQuery, queryParams),
       query(monthlyQuery, queryParams),
-      query(categoryQuery, queryParams)
+      query(categoryQuery, queryParams),
+      query(byTypeQuery, queryParams)
     ]);
     
+    const byTypeRow = byTypeResult.rows?.[0] || {};
     res.json({
       summary: summaryResult.rows[0],
       monthly: monthlyResult.rows,
-      categories: categoryResult.rows
+      categories: categoryResult.rows,
+      byType: {
+        customer: { debit: Number(byTypeRow.customer_debit||0), credit: Number(byTypeRow.customer_credit||0) },
+        buyfx: { debit: Number(byTypeRow.buyfx_debit||0), credit: Number(byTypeRow.buyfx_credit||0) },
+        transfer: { debit: 0, credit: 0 },
+        expense: { debit: Number(byTypeRow.expense_debit||0), credit: Number(byTypeRow.expense_credit||0) }
+      }
     });
   } catch (error) {
     console.error('获取交易统计失败:', error);
