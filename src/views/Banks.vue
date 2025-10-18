@@ -42,7 +42,11 @@
         </el-form-item>
         <!-- 取消 URL 输入，统一使用本地 /banks/<code>.(svg|png|jpg) -->
         <el-form-item :label="$t('banks.labels.uploadFile')">
-          <input ref="fileInputRef" type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" />
+          <input ref="fileInputRef" type="file" accept=".svg,.png,.jpg,.jpeg" @change="pickFile" style="display:none;" />
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <el-button size="small" @click="triggerPick">{{ $t('common.chooseFile') }}</el-button>
+            <span class="file-name">{{ fileName || $t('common.noFileChosen') }}</span>
+          </div>
           <div class="hint">{{ $t('banks.hintFile') }}</div>
         </el-form-item>
       </el-form>
@@ -65,6 +69,7 @@ import { api } from '@/api'
 const banks = ref([])
 const dlg = ref({ visible: false, mode: 'add', loading: false, form: { id: null, code: '', zh: '', en: '', logo_data_url: '' } })
 const fileInputRef = ref(null)
+const fileName = ref('')
 
 async function load() {
   banks.value = await api.requestBanks()
@@ -108,9 +113,14 @@ async function fileToDataUrl(file) {
 async function pickFile(e) {
   const f = e.target.files && e.target.files[0]
   if (!f) return
+  fileName.value = f.name || ''
   dlg.value.form.logo_data_url = await fileToDataUrl(f)
   // 选中一次后立刻清空 input，避免下次对话框再打开时保留历史选择
   try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
+}
+
+function triggerPick(){
+  try { fileInputRef.value && fileInputRef.value.click() } catch {}
 }
 
 async function submit() {
