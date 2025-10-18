@@ -20,6 +20,34 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets'
+    assetsDir: 'assets',
+    sourcemap: false,
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'element-plus': ['element-plus'],
+          'element-icons': ['@element-plus/icons-vue'],
+          'echarts': ['echarts'],
+          'vendor': ['vue', 'vue-router', 'vue-i18n'],
+          'utils': ['papaparse', 'qrcode']
+        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]'
+      }
+    },
+    cssCodeSplit: true
+  },
+  optimizeDeps: {
+    include: [
+      'vue',
+      'vue-router',
+      'vue-i18n',
+      'element-plus',
+      '@element-plus/icons-vue',
+      'echarts'
+    ]
   }
 })
