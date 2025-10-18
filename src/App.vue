@@ -13,7 +13,7 @@
           :default-active="activeMenu"
           :background-color="navBgColor"
           text-color="#ffffff"
-          active-text-color="var(--el-color-primary)"
+          active-text-color="var(--el-color-success)"
           :ellipsis="false"
           router
           @select="handleSelect">
@@ -220,18 +220,32 @@ function handleSelect(key) {
   background-color: rgba(255, 255, 255, 0.1);
 }
 :deep(.el-menu--horizontal > .el-menu-item.is-active) {
-  color: var(--el-color-primary);
+  color: var(--el-color-success);
   font-weight: 800;
   background-color: #ffffff;
-  border-bottom: 2px solid var(--el-color-primary);
+  border-bottom: 2px solid var(--el-color-success);
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
+  box-shadow: none !important; /* 去除任何默认阴影 */
+  background-image: none; /* 避免渐变或覆盖层 */
 }
 
 /* 选中态悬停保持一致 */
 :deep(.el-menu--horizontal > .el-menu-item.is-active:hover) {
-  color: var(--el-color-primary);
+  color: var(--el-color-success);
   background-color: #ffffff;
+}
+
+/* 非选中项的悬停，保留轻微对比，避免遮罩感过强 */
+:deep(.el-menu--horizontal > .el-menu-item:not(.is-active):hover) {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* 焦点可视化（无障碍），不产生阴影覆盖感 */
+:deep(.el-menu--horizontal > .el-menu-item:focus-visible) {
+  outline: 2px solid color-mix(in oklab, var(--el-color-success) 50%, #fff);
+  outline-offset: -2px;
+  box-shadow: none;
 }
 
 /* 语言切换样式 */
