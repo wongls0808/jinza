@@ -283,7 +283,7 @@ const detailTotal = computed(() => {
 function summaryMethod({ data }){
   const sum = data.reduce((s, r) => s + Number(r.amount||0), 0)
   // 列顺序：#，账户名，账号，币种，金额
-  return [t('common.total') || '合计', '', '', '', money(sum)]
+  return [t('common.total'), '', '', '', money(sum)]
 }
 
 // ---- 银行 logo 本地解析：统一从 /banks/<code>.(svg|png|jpg) 读取 ----

@@ -924,7 +924,7 @@ async function rejectPayment(row){
     ElMessage.success(t('common.ok'))
     await Promise.all([loadPaymentsList(), loadPaymentsCount()])
   } catch (e) {
-    ElMessage.error(e?.message || '驳回失败')
+    ElMessage.error(e?.message || t('workbench.errors.rejectFailed'))
   }
 }
 // 单笔审核余额预览计算

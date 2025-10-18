@@ -43,7 +43,7 @@
               </div>
             </div>
             <div class="controls">
-              <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') || '分配权限' }}</el-button>
+              <el-button type="primary" plain size="small" @click="openPermDrawer(u)">{{ t('users.assignPerms') }}</el-button>
             </div>
 
             <!-- 右下角：管理员与在线标识 -->
@@ -88,13 +88,13 @@
     </el-dialog>
 
     <!-- 权限分配抽屉 -->
-    <el-drawer v-model="permDrawer.visible" :title="(permDrawer.user?.display_name || permDrawer.user?.username || '') + ' · ' + (t('users.assignPerms') || '分配权限')" size="min(760px, 88vw)" :close-on-click-modal="false">
+    <el-drawer v-model="permDrawer.visible" :title="(permDrawer.user?.display_name || permDrawer.user?.username || '') + ' · ' + t('users.assignPerms')" size="min(760px, 88vw)" :close-on-click-modal="false">
       <div v-if="permDrawer.user" class="drawer-body">
         <div class="drawer-toolbar">
           <el-tag v-if="permDrawer.user.is_admin" type="danger" size="small">{{ t('users.adminAllPermsNotice') || '管理员拥有全部权限（不可更改）' }}</el-tag>
           <div class="spacer"></div>
-          <el-button size="small" @click="expandAll(true)">{{ t('users.expandAll') || '展开全部' }}</el-button>
-          <el-button size="small" @click="expandAll(false)">{{ t('users.collapseAll') || '收起全部' }}</el-button>
+          <el-button size="small" @click="expandAll(true)">{{ t('users.expandAll') }}</el-button>
+          <el-button size="small" @click="expandAll(false)">{{ t('users.collapseAll') }}</el-button>
         </div>
         <div class="drawer-perms" v-if="permTree && permTree.length">
           <div class="perm-group" v-for="group in permTree" :key="group.module">
@@ -105,8 +105,8 @@
               </el-button>
               <div class="inline-perms" v-show="isDrawerOpen(group.module)">
                 <div class="group-batch">
-                  <el-button size="small" type="success" plain :disabled="permDrawer.user.is_admin" @click="selectGroup(group)">{{ t('users.selectAllInGroup') || '本组全选' }}</el-button>
-                  <el-button size="small" type="warning" plain :disabled="permDrawer.user.is_admin" @click="unselectGroup(group)">{{ t('users.unselectAllInGroup') || '本组全不选' }}</el-button>
+                  <el-button size="small" type="success" plain :disabled="permDrawer.user.is_admin" @click="selectGroup(group)">{{ t('users.selectAllInGroup') }}</el-button>
+                  <el-button size="small" type="warning" plain :disabled="permDrawer.user.is_admin" @click="unselectGroup(group)">{{ t('users.unselectAllInGroup') }}</el-button>
                 </div>
                 <el-tag
                   v-for="p in group.items"
@@ -135,7 +135,7 @@
     </el-drawer>
 
     <!-- 活动日志抽屉 -->
-    <el-drawer v-model="logDrawer.visible" :title="(logDrawer.user?.display_name || logDrawer.user?.username || '') + ' · ' + (t('users.activityLog') || '活动日志')" size="min(720px, 92vw)" :close-on-click-modal="true">
+    <el-drawer v-model="logDrawer.visible" :title="(logDrawer.user?.display_name || logDrawer.user?.username || '') + ' · ' + t('users.activityLog')" size="min(720px, 92vw)" :close-on-click-modal="true">
       <div v-if="logDrawer.user">
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
           <el-button size="small" :loading="logState.loading[logDrawer.user.id]" @click="refreshLogs(logDrawer.user)">{{ t('common.refresh') }}</el-button>
@@ -381,7 +381,7 @@ async function refreshLogs(u) {
     const rows = await api.users.sessions(u.id)
     logs.value[u.id] = rows || []
   } catch (e) {
-    ElMessage.error(t('users.loadLogFailed') || '加载日志失败')
+    ElMessage.error(t('users.loadLogFailed'))
   } finally {
     logState.value.loading[u.id] = false
   }

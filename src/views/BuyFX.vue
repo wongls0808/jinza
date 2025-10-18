@@ -349,7 +349,7 @@ async function loadLedger(){
     const res = await api.buyfx.listPlatformLedger(loans.value.platform.id)
     loans.value.ledger = Array.isArray(res?.items) ? res.items : []
   }catch(e){
-    ElMessage.error(e?.message || '加载失败')
+    ElMessage.error(e?.message || t('buyfx.errors.loadFailed'))
   }finally{
     loans.value.loading = false
   }
@@ -393,7 +393,7 @@ async function loadExpenses(){
     const res = await api.buyfx.listPlatformExpenses(loans.value.platform.id)
     loans.value.expenses = Array.isArray(res?.items) ? res.items : []
   }catch(e){
-    ElMessage.error(e?.message || '加载失败')
+    ElMessage.error(e?.message || t('buyfx.errors.loadFailed'))
   }finally{
     loans.value.loadingExpenses = false
   }

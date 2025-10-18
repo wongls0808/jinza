@@ -948,7 +948,7 @@ const handleSelectionChange = (selection) => {
 const onBatchMatchToggle = (val) => {
   if (!val) return
   if (!multipleSelection.value.length) {
-    ElMessage.warning('请先勾选要匹配的交易')
+    ElMessage.warning(t('transactions.errors.selectFirst'))
     batchMatchToggle.value = false
     return
   }
@@ -1050,7 +1050,7 @@ const fetchPlatforms = async () => {
     const list = await api.buyfx.listPlatforms()
     platformOptions.value = Array.isArray(list) ? list : (list?.items || [])
   } catch (e) {
-    console.error('获取平台商失败', e)
+    console.error(t('transactions.errors.fetchPlatformsFailed'), e)
   } finally {
     platformsLoading.value = false
   }
@@ -1076,7 +1076,7 @@ const searchExpenses = async (q) => {
     const res = await api.expenses.list({ q: q || '', page: 1, pageSize: 20, drcr: direction || '' })
     expenseOptions.value = Array.isArray(res?.items) ? res.items : []
   } catch (e) {
-    console.error('获取费用项目失败', e)
+    console.error(t('transactions.errors.fetchExpensesFailed'), e)
   } finally {
     expensesLoading.value = false
   }
@@ -1114,7 +1114,7 @@ const confirmMatch = async () => {
   const isBatch = batchMode.value
   const ids = isBatch ? (matchForm.ids || []) : (matchForm.id ? [matchForm.id] : [])
   if (!ids.length) {
-    ElMessage.warning('未选择需要匹配的交易')
+    ElMessage.warning(t('transactions.errors.selectTransactions'))
     return
   }
 
@@ -1134,7 +1134,7 @@ const confirmMatch = async () => {
           await api.transactions.match(id, { type: 'customer', targetId: matchForm.customerId, targetName: name })
           ok++
         } catch (e) {
-          fails.push({ id, msg: e?.message || '未知错误' })
+          fails.push({ id, msg: e?.message || t('transactions.errors.unknownError') })
         }
       }
       matchDrawerVisible.value = false
@@ -1168,7 +1168,7 @@ const confirmMatch = async () => {
           await api.transactions.match(id, { type: 'buyfx', targetId: matchForm.platformId, targetName: name })
           ok++
         } catch (e) {
-          fails.push({ id, msg: e?.message || '未知错误' })
+          fails.push({ id, msg: e?.message || t('transactions.errors.unknownError') })
         }
       }
       matchDrawerVisible.value = false
@@ -1190,7 +1190,7 @@ const confirmMatch = async () => {
     // transfer
     if (matchType.value === 'transfer') {
       if (!matchForm.transferAccountId) {
-        ElMessage.warning('请选择收款账户')
+        ElMessage.warning(t('transactions.errors.selectAccount'))
         return
       }
       try {
@@ -1215,9 +1215,9 @@ const confirmMatch = async () => {
       // expense
       if (matchType.value === 'expense') {
           const dir = currentDirection()
-          if (dir === 'mixed') { ElMessage.warning('批量匹配的借贷方向不一致，无法按费用匹配'); return }
-          if (!dir) { ElMessage.warning('无法识别所选交易的借贷方向'); return }
-        if (!matchForm.expenseId) { ElMessage.warning('请选择费用项目'); return }
+          if (dir === 'mixed') { ElMessage.warning(t('transactions.errors.unknownDirection')); return }
+          if (!dir) { ElMessage.warning(t('transactions.errors.unknownDirection')); return }
+        if (!matchForm.expenseId) { ElMessage.warning(t('transactions.errors.selectExpense')); return }
         try {
           matching.value = true
           const e = (expenseOptions.value || []).find(x => x.id === matchForm.expenseId)
@@ -1390,7 +1390,14 @@ const exportTransactions = async () => {
     }
     
     // 简单的CSV导出，不依赖Papa Parse
-    const headers = ['账户号码', '交易日期', '参考号', '描述', '借方金额', '贷方金额']
+    const headers = [
+      t('transactions.csvHeaders.accountNumber'),
+      t('transactions.csvHeaders.transactionDate'),
+      t('transactions.csvHeaders.chequeRefNo'),
+      t('transactions.csvHeaders.description'),
+      t('transactions.csvHeaders.debitAmount'),
+      t('transactions.csvHeaders.creditAmount')
+    ]
     const csvContent = [
       headers.join(','),
       ...data.map(row => [
@@ -1469,7 +1476,7 @@ const handleSimpleFileChange = (file) => {
         }
       }
       
-      console.log('找到表头行:', headerIndex, headerIndex >= 0 ? lines[headerIndex] : '未找到')
+      console.log(t('transactions.errors.foundHeaderRow') + ':', headerIndex, headerIndex >= 0 ? lines[headerIndex] : t('transactions.errors.unknownError'))
       
       if (headerIndex === -1) {
         ElMessage.warning('未找到标准的银行对账单表头，请检查文件格式')
@@ -1649,7 +1656,7 @@ const handleSimpleFileChange = (file) => {
 // 提交简单导入
 const submitSimpleImport = async () => {
   if (importPreview.value.length === 0) {
-    ElMessage.warning('没有可导入的数据')
+    ElMessage.warning(t('transactions.errors.noImportData'))
     return
   }
   
@@ -1698,12 +1705,12 @@ const submitSimpleImport = async () => {
     }
     
     if (failed > 0 && errors.length > 0) {
-      console.warn('导入错误:', errors)
+      console.warn(t('transactions.errors.importFailed') + ':', errors)
     }
     
   } catch (error) {
-    console.error('导入失败:', error)
-    ElMessage.error(`导入失败: ${error.message || '未知错误'}`)
+    console.error(t('transactions.errors.importFailed') + ':', error)
+    ElMessage.error(`${t('transactions.errors.importFailed')}: ${error.message || t('transactions.errors.unknownError')}`)
   } finally {
     importing.value = false
   }

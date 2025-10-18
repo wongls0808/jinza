@@ -127,7 +127,10 @@ const messages = {
     action: '动作',
     debit: '借',
     credit: '贷',
-    balance: '余额'
+    balance: '余额',
+      errors: {
+        loadFailed: '加载失败'
+      }
   ,historyDate: '日期',
   platform: '平台',
   sellCurrency: '卖出币种',
@@ -392,6 +395,9 @@ const messages = {
           dbTopTables: '最大表(前5)'
         },
         status: { ok: '正常', fail: '异常', yes: '已配置', no: '未配置' }
+      },
+      errors: {
+        rejectFailed: '驳回失败'
       }
   },
   expenses: {
@@ -669,6 +675,27 @@ const messages = {
       confirmBatchDelete: '确认批量删除所选项目？',
       batchDeleteSuccess: '批量删除成功',
       batchDeleteFailed: '批量删除失败',
+      errors: {
+        selectFirst: '请先勾选要匹配的交易',
+        selectTransactions: '未选择需要匹配的交易',
+        selectAccount: '请选择收款账户',
+        unknownDirection: '无法识别所选交易的借贷方向',
+        selectExpense: '请选择费用项目',
+        noImportData: '没有可导入的数据',
+        importFailed: '导入失败',
+        unknownError: '未知错误',
+        fetchPlatformsFailed: '获取平台商失败',
+        fetchExpensesFailed: '获取费用项目失败',
+        foundHeaderRow: '找到表头行'
+      },
+      csvHeaders: {
+        accountNumber: '账户号码',
+        transactionDate: '交易日期',
+        chequeRefNo: '参考号',
+        description: '描述',
+        debitAmount: '借方金额',
+        creditAmount: '贷方金额'
+      }
   },
   fx: {
       title: '结汇管理',
@@ -1070,7 +1097,10 @@ const messages = {
   buyCurrency: 'Buy Currency',
   buyAmount: 'Buy Amount',
   fromBalance: 'Sell Currency Balance',
-  toBalance: 'Buy Currency Balance'
+  toBalance: 'Buy Currency Balance',
+      errors: {
+        loadFailed: 'Load failed'
+      }
     },
     customers: {
       title: 'Customers',
