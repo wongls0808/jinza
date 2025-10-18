@@ -26,24 +26,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // Element Plus 主包
-          if (id.includes('node_modules/element-plus') && !id.includes('icons-vue')) {
-            return 'element-plus'
-          }
-          // ECharts
-          if (id.includes('node_modules/echarts')) {
-            return 'echarts'
-          }
-          // Vue 核心库
-          if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/vue-i18n')) {
-            return 'vendor'
-          }
-          // 工具库
-          if (id.includes('node_modules/papaparse') || id.includes('node_modules/qrcode')) {
-            return 'utils'
-          }
-        },
+        // 交还给 Rollup/Vite 的默认分包，避免强制切分造成的初始化顺序（TDZ）问题
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]'

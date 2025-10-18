@@ -64,9 +64,28 @@ if (shouldServeStatic) {
     const verText = `version=${pkg.version || '0.0.0'}\nsha=${process.env.GIT_SHA || 'unknown'}\ntime=${new Date().toISOString()}\n`
     fs.writeFileSync(path.join(distPath, 'version.txt'), verText)
   } catch {}
-  app.use(express.static(distPath))
+  // Static assets caching strategy:
+  // - index.html: no-store,确保客户端总是获取最新入口，避免旧 index 引用新 chunk 导致运行时报错
+  // - 带哈希的静态资源(js/css/fonts/images)：immutable 长缓存
+  app.use(express.static(distPath, {
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-store')
+      } else if (/\.(?:js|css|png|jpg|jpeg|svg|webp|ico|woff2?|ttf|otf)$/.test(filePath)) {
+        // 若包含哈希文件名(rollup/vite 产物)，启用长期缓存
+        const hasHash = /\.[a-f0-9]{8,}\./i.test(path.basename(filePath))
+        if (hasHash) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=3600')
+        }
+      }
+    }
+  }))
   // SPA fallback for non-API routes
   app.get(/^(?!\/api).*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }
