@@ -1374,7 +1374,7 @@ const messages = {
       importCSV: 'Import CSV',
       accountNumber: 'Account Number',
       transactionDate: 'Transaction Date',
-      chequeRefNo: 'Cheque/Ref No',
+      chequeRefNo: 'Ref No',
       debitAmount: 'Debit Amount',
       creditAmount: 'Credit Amount',
       reference1: 'Reference 1',
