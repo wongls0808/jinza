@@ -732,6 +732,8 @@ const messages = {
       confirmBatchDelete: '确认批量删除所选项目？',
       batchDeleteSuccess: '批量删除成功',
       batchDeleteFailed: '批量删除失败',
+      csvParseSuccess: '成功解析 {count} 条交易记录（账户：{account}）',
+      csvParseSkipped: '，跳过 {skipped} 行无效数据',
       errors: {
         selectFirst: '请先勾选要匹配的交易',
         selectTransactions: '未选择需要匹配的交易',
@@ -747,7 +749,10 @@ const messages = {
         matchPartial: '匹配完成 {done}/{total}',
         matchPartialWithExample: '匹配完成 {done}/{total}，示例[{id}]: {msg}',
         headerNotFound: '未找到标准的银行对账单表头，请检查文件格式',
-        mixedDirection: '批量匹配的借贷方向不一致，无法按费用匹配'
+        mixedDirection: '批量匹配的借贷方向不一致，无法按费用匹配',
+        csvParseFailed: 'CSV文件解析失败',
+        csvParseNoValidData: '未找到有效的交易数据。处理了{processed}行，有效{valid}行，无效{invalid}行。请查看控制台详细日志。',
+        csvFormatError: 'CSV文件格式错误或数据为空'
       },
       csvHeaders: {
         accountNumber: '账户号码',
@@ -1622,6 +1627,8 @@ const messages = {
       confirmBatchDelete: 'Delete selected items?',
       batchDeleteSuccess: 'Deleted',
       batchDeleteFailed: 'Delete failed',
+      csvParseSuccess: 'Successfully parsed {count} records (Account: {account})',
+      csvParseSkipped: ', skipped {skipped} invalid rows',
       errors: {
         selectFirst: 'Please select transactions to match first',
         selectTransactions: 'No transactions selected',
@@ -1637,7 +1644,10 @@ const messages = {
         matchPartial: 'Matched {done}/{total}',
         matchPartialWithExample: 'Matched {done}/{total}, example[{id}]: {msg}',
         headerNotFound: 'Standard bank statement header not found, please check file format',
-        mixedDirection: 'Mixed debit/credit direction in batch, cannot match as expense'
+        mixedDirection: 'Mixed debit/credit direction in batch, cannot match as expense',
+        csvParseFailed: 'CSV file parsing failed',
+        csvParseNoValidData: 'No valid transaction data found. Processed {processed} rows, valid {valid}, invalid {invalid}. Check console for details.',
+        csvFormatError: 'CSV file format error or empty data'
       },
       csvHeaders: {
         accountNumber: 'Account Number',

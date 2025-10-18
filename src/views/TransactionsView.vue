@@ -1447,7 +1447,7 @@ const handleSimpleFileChange = (file) => {
       const lines = text.split('\n').filter(line => line.trim())
       
       if (lines.length < 2) {
-        ElMessage.warning('CSV文件格式错误或数据为空')
+        ElMessage.warning(t('transactions.errors.csvFormatError'))
         return
       }
       
@@ -1667,17 +1667,24 @@ const handleSimpleFileChange = (file) => {
       importPreview.value = rows
       
       if (rows.length === 0) {
-        ElMessage.error(`未找到有效的交易数据。处理了${processedCount}行，有效${validCount}行，无效${invalidCount}行。请查看控制台详细日志。`)
+        ElMessage.error(t('transactions.errors.csvParseNoValidData', { 
+          processed: processedCount, 
+          valid: validCount, 
+          invalid: invalidCount 
+        }))
       } else {
-        const successMsg = `成功解析 ${rows.length} 条交易记录（账户：${defaultAccountNumber}）`
+        const successMsg = t('transactions.csvParseSuccess', { 
+          count: rows.length, 
+          account: defaultAccountNumber 
+        })
         const detailMsg = processedCount > rows.length ? 
-          `，跳过 ${processedCount - rows.length} 行无效数据` : ''
+          t('transactions.csvParseSkipped', { skipped: processedCount - rows.length }) : ''
         ElMessage.success(successMsg + detailMsg)
       }
       
     } catch (error) {
-      console.error('解析CSV失败:', error)
-      ElMessage.error('CSV文件解析失败: ' + error.message)
+      console.error(t('transactions.errors.csvParseFailed'), error)
+      ElMessage.error(t('transactions.errors.csvParseFailed') + ': ' + error.message)
     }
   }
   
