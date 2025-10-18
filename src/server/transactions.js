@@ -677,29 +677,28 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
       if (!pf.rowCount) return res.status(400).json({ error: 'platform not found' })
       const pid = Number(targetId)
       if (!Number.isInteger(pid) || pid <= 0) return res.status(400).json({ error: 'invalid platform id' })
-
-      // 读取交易金额、币种以及当前匹配信息（上锁以避免并发）
-      const tr = await query(`
-        select t.id, t.matched, t.match_type, t.match_target_id,
-               t.debit_amount as debit, t.credit_amount as credit,
-               coalesce(t.platform_delta_applied,false) as platform_delta_applied,
-               a.currency_code as currency
-          from transactions t
-          left join receiving_accounts a on a.bank_account = t.account_number
-         where t.id=$1
-         for update
-      `, [id])
-      if (!tr.rowCount) return res.status(404).json({ error: 'Transaction not found' })
-      const row = tr.rows[0]
-  // 若账户未配置币种，默认 MYR（可根据业务调整为严格校验）
-  const cur = String(row.currency || 'MYR').toUpperCase()
-      const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
-      if (!field) return res.status(400).json({ error: `unsupported currency ${cur}` })
-      const delta = Number(row.debit || 0) - Number(row.credit || 0)
-
       let txBegan = false
       try {
+        // 在同一事务中锁定行并读取数据
         await query('begin'); txBegan = true
+        const tr = await query(`
+          select t.id, t.matched, t.match_type, t.match_target_id,
+                 t.debit_amount as debit, t.credit_amount as credit,
+                 coalesce(t.platform_delta_applied,false) as platform_delta_applied,
+                 a.currency_code as currency
+            from transactions t
+            left join receiving_accounts a on a.bank_account = t.account_number
+           where t.id=$1
+           for update
+        `, [id])
+        if (!tr.rowCount) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
+        const row = tr.rows[0]
+        // 若账户未配置币种，默认 MYR（可根据业务调整为严格校验）
+        const cur = String(row.currency || 'MYR').toUpperCase()
+        const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
+        if (!field) { await query('rollback'); return res.status(400).json({ error: `unsupported currency ${cur}` }) }
+        const delta = Number(row.debit || 0) - Number(row.credit || 0)
+
         // 若之前已匹配到平台商，则先从旧平台回滚
         if (row.matched && String(row.match_type||'').toLowerCase() === 'buyfx' && row.match_target_id) {
           const oldPid = Number(row.match_target_id)
@@ -709,7 +708,8 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
         }
 
         // 应用到新平台：平台余额 += delta（借方为正，贷方为负）
-        await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+        const upd1 = await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+        if (upd1.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'platform not found' }) }
 
         // 更新交易匹配信息并标记平台余额已应用
         const matched_by = req.user?.id || null
@@ -723,6 +723,7 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
           return res.status(404).json({ error: 'Transaction not found' })
         }
         await query('commit'); txBegan = false
+        console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
         return res.json({ success: true })
       } catch (err) {
         if (txBegan) { try { await query('rollback') } catch {} }
