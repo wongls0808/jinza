@@ -550,31 +550,54 @@ transactionsRouter.post('/:id/match', auth.authMiddleware(true), auth.requirePer
       const pid = Number(targetId)
       if (!Number.isInteger(pid) || pid <= 0) return res.status(400).json({ error: 'invalid platform id' })
 
-      // 读取交易金额与收款账户币种
+      // 读取交易金额、币种以及当前匹配信息（上锁以避免并发）
       const tr = await query(`
-        select t.debit_amount as debit, t.credit_amount as credit, a.currency_code as currency
-        from transactions t
-        left join receiving_accounts a on a.bank_account = t.account_number
-        where t.id=$1
+        select t.id, t.matched, t.match_type, t.match_target_id,
+               t.debit_amount as debit, t.credit_amount as credit,
+               a.currency_code as currency
+          from transactions t
+          left join receiving_accounts a on a.bank_account = t.account_number
+         where t.id=$1
+         for update
       `, [id])
       if (!tr.rowCount) return res.status(404).json({ error: 'Transaction not found' })
-      const { debit, credit, currency } = tr.rows[0]
-      const cur = String(currency || '').toUpperCase()
+      const row = tr.rows[0]
+      const cur = String(row.currency || '').toUpperCase()
       const field = cur === 'USD' ? 'balance_usd' : (cur === 'MYR' ? 'balance_myr' : (cur === 'CNY' ? 'balance_cny' : null))
       if (!field) return res.status(400).json({ error: `unsupported currency ${cur}` })
+      const delta = Number(row.debit || 0) - Number(row.credit || 0)
 
-      const delta = Number(debit || 0) - Number(credit || 0)
-      // 平台余额 += delta（借方为正，贷方为负）
-      await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+      let txBegan = false
+      try {
+        await query('begin'); txBegan = true
+        // 若之前已匹配到平台商，则先从旧平台回滚
+        if (row.matched && String(row.match_type||'').toLowerCase() === 'buyfx' && row.match_target_id) {
+          const oldPid = Number(row.match_target_id)
+          if (Number.isInteger(oldPid) && oldPid > 0) {
+            await query(`update fx_platforms set ${field} = coalesce(${field},0) - $1 where id=$2`, [delta, oldPid])
+          }
+        }
 
-      const matched_by = req.user?.id || null
-      const name = (targetName || '').toString().trim() || null
-      const rs = await query(
-        `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now() where id=$5`,
-        [t, pid, name, matched_by, id]
-      )
-      if (rs.rowCount === 0) return res.status(404).json({ error: 'Transaction not found' })
-      return res.json({ success: true })
+        // 应用到新平台：平台余额 += delta（借方为正，贷方为负）
+        await query(`update fx_platforms set ${field} = coalesce(${field},0) + $1 where id=$2`, [delta, pid])
+
+        // 更新交易匹配信息
+        const matched_by = req.user?.id || null
+        const name = (targetName || '').toString().trim() || null
+        const rs = await query(
+          `update transactions set matched=true, match_type=$1, match_target_id=$2, match_target_name=$3, matched_by=$4, matched_at=now() where id=$5`,
+          [t, pid, name, matched_by, id]
+        )
+        if (rs.rowCount === 0) {
+          await query('rollback')
+          return res.status(404).json({ error: 'Transaction not found' })
+        }
+        await query('commit'); txBegan = false
+        return res.json({ success: true })
+      } catch (err) {
+        if (txBegan) { try { await query('rollback') } catch {} }
+        throw err
+      }
     }
 
     // 其他类型：按原逻辑仅更新匹配字段
