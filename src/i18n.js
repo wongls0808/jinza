@@ -359,6 +359,7 @@ const messages = {
       approveDialogTitle: '审核付款单',
       auditLog: '审核日志',
         deductionDetails: '扣减明细',
+      notePaymentsDetail: '包含付款明细项（按所选时间范围）',
       todos: {
         title: '待办事项',
         payments: '付款待审'
@@ -896,6 +897,7 @@ const messages = {
       approveDialogTitle: 'Approve Payment',
       auditLog: 'Audit Log',
       deductionDetails: 'Deduction Details',
+      notePaymentsDetail: 'Including payment detail items (within selected period)',
       todos: {
         title: 'Todos',
         payments: 'Payments Pending'

@@ -1016,16 +1016,10 @@ const stats = ref({
 })
 const statDrawer = ref({ visible: false, title: '', key: '', rows: [] })
 function openStat(key){
-  const titles = {
-    cusMYR: '客户余额(MYR)',
-    cusCNY: '客户余额(CNY)',
-    bankMYR: '银行余额(MYR)',
-    payCNY: '可付余额(CNY)',
-    exchMYR: '可兑余额(MYR)',
-    pendingCNY: '待付余额(CNY)'
-  }
+  // 使用国际化标题，避免语言切换时标题未翻译
+  const title = t(`workbench.kpis.${key}`)
   const rows = Array.isArray(stats.value.lists[key]) ? stats.value.lists[key] : []
-  statDrawer.value = { visible: true, title: titles[key] || '', key, rows }
+  statDrawer.value = { visible: true, title, key, rows }
 }
 
 async function loadStats(){
