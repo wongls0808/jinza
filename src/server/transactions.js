@@ -1,6 +1,7 @@
 // 交易管理相关API
 import express from 'express';
 import { query } from './db.js';
+import { ensureDDL as ensureFxDDL } from './fx.js';
 import * as auth from './auth.js';
 import { getMockTransactions, getMockTransactionStats } from './mockTransactions.js';
 
@@ -672,6 +673,8 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
 
     // 特殊处理：匹配到平台商（buyfx）时，联动更新平台商余额
     if (t === 'buyfx') {
+      // 确保平台表结构存在（避免首次使用时表缺失）
+      try { await ensureFxDDL() } catch {}
       // 校验平台是否存在
       const pf = await query('select id from fx_platforms where id=$1', [targetId])
       if (!pf.rowCount) return res.status(400).json({ error: 'platform not found' })
@@ -722,9 +725,9 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
           await query('rollback')
           return res.status(404).json({ error: 'Transaction not found' })
         }
-        await query('commit'); txBegan = false
-        console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
-        return res.json({ success: true })
+  await query('commit'); txBegan = false
+  console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
+  return res.json({ success: true, updated: true, id: Number(id) })
       } catch (err) {
         if (txBegan) { try { await query('rollback') } catch {} }
         throw err
@@ -795,8 +798,9 @@ transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.re
         [id]
       )
       if (rs.rowCount === 0) { await query('rollback'); return res.status(404).json({ error: 'Transaction not found' }) }
-      await query('commit'); txBegan = false
-      return res.json({ success: true });
+  await query('commit'); txBegan = false
+  console.log('buyfx unmatched tx=', id)
+  return res.json({ success: true, updated: true, id: Number(id) });
     } catch (err) {
       if (txBegan) { try { await query('rollback') } catch {} }
       throw err
