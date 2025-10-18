@@ -21,10 +21,21 @@
             style="width: 260px" />
         </el-form-item>
         <el-form-item>
-                      :placeholder="t('transactions.selectCustomer')"
+          <el-select
+            v-model="filters.customerId"
+            :placeholder="t('transactions.selectCustomer')"
             filterable
+            remote
+            :remote-method="searchCustomers"
+            :loading="customersLoading"
             clearable
-            style="min-width: 220px; max-width: 280px;" />
+            style="min-width: 220px; max-width: 280px;">
+            <el-option
+              v-for="opt in customerOptions"
+              :key="opt.value || opt.id"
+              :label="opt.label || ((opt.abbr ? (opt.abbr + ' · ') : '') + opt.name)"
+              :value="opt.value || opt.id" />
+          </el-select>
           <el-input v-model.trim="filters.account" clearable :placeholder="t('transactions.accountNumber')" style="min-width: 160px; max-width: 200px;" />
           <el-select v-model="filters.category" clearable :placeholder="t('transactions.category')" style="min-width: 140px; max-width: 180px;">
             <el-option :label="t('transactions.categoryOptions.income')" value="收入" />
@@ -33,12 +44,6 @@
           <el-input v-model.trim="filters.accountName" clearable :placeholder="t('transactions.accountName')" style="min-width: 160px; max-width: 200px;" />
           <el-input v-model.trim="filters.bankName" clearable :placeholder="t('transactions.bankName')" style="min-width: 160px; max-width: 200px;" />
           <el-input v-model.trim="filters.relation" clearable :placeholder="t('transactions.relation')" style="min-width: 160px; max-width: 200px;" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model.trim="filters.accountName" clearable :placeholder="t('transactions.accountName')" style="width: 180px" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model.trim="filters.relation" clearable :placeholder="t('transactions.relation')" style="width: 180px" />
         </el-form-item>
         <el-form-item>
           <el-button @click="clearFilters">{{ t('transactions.clear') }}</el-button>
@@ -187,7 +192,7 @@ const stats = ref({ summary: {}, monthly: [], categories: [] })
 const transactions = ref([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0, pages: 0 })
-const filters = reactive({ startDate: '', endDate: '', account: '', accountName: '', relation: '' })
+const filters = reactive({ startDate: '', endDate: '', account: '', accountName: '', relation: '', customerId: null })
 const dateRange = ref([])
 // 列宽记忆
 const { colW, onColResize, reset: resetColMem } = useTableMemory('transactions-table-2')
@@ -217,7 +222,8 @@ const fetchStats = async () => {
     if (filters.endDate) params.endDate = filters.endDate
   if (filters.account) params.account = filters.account
   if (filters.accountName) params.accountName = filters.accountName
-  if (filters.relation) params.relation = filters.relation
+  if (filters.customerId) params.matchTargetId = filters.customerId
+  else if (filters.relation) params.relation = filters.relation
     const data = await api.transactions.stats(params)
     stats.value = data || { summary: {}, monthly: [], categories: [] }
     // 同步加载列表数据（表2自身独立取数）
@@ -236,7 +242,8 @@ const fetchTransactions = async () => {
     if (filters.endDate) params.endDate = filters.endDate
     if (filters.account) params.account = filters.account
     if (filters.accountName) params.accountName = filters.accountName
-    if (filters.relation) params.relation = filters.relation
+    if (filters.customerId) params.matchTargetId = filters.customerId
+    else if (filters.relation) params.relation = filters.relation
     const data = await api.transactions.list(params)
     transactions.value = Array.isArray(data?.data) ? data.data.map(normalizeRow) : []
     pagination.total = data.pagination.total
@@ -251,7 +258,7 @@ const handleSizeChange = (size) => { pagination.pageSize = size; fetchTransactio
 const handleCurrentChange = (page) => { pagination.page = page; fetchTransactions() }
 
 const goBack = () => router.push({ name: 'transactions' })
-const clearFilters = () => { dateRange.value = []; filters.startDate = ''; filters.endDate = ''; fetchStats() }
+const clearFilters = () => { dateRange.value = []; filters.startDate = ''; filters.endDate = ''; filters.customerId = null; filters.account = ''; filters.accountName=''; filters.bankName=''; filters.relation=''; filters.category=''; fetchStats() }
 
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return '0.00'
