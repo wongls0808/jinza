@@ -206,18 +206,30 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
 transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.requireAnyPerm('transactions:batch_delete','transactions:delete'), async (req, res) => {
   try {
     const { ids } = req.body;
-    
+
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: '无效的请求参数' });
     }
-    
+
+    // 统一将 ids 转为整数并去重、去除非法值
+    const idsInt = [...new Set(
+      ids
+        .map(v => {
+          const n = Number(v)
+          return Number.isFinite(n) ? Math.trunc(n) : NaN
+        })
+        .filter(n => Number.isInteger(n) && n > 0)
+    )]
+
+    if (idsInt.length === 0) {
+      return res.status(400).json({ error: '无效的ID列表' })
+    }
+
     await ensureTransactionsDDL()
     
-    // 使用 ANY() 操作符进行批量删除
-    const placeholders = ids.map((_, index) => `$${index + 1}`).join(',');
-    const deleteQuery = `DELETE FROM transactions WHERE id = ANY(ARRAY[${placeholders}])`;
-    
-    const result = await query(deleteQuery, ids);
+    // 使用 ANY($1::int[]) 操作符进行批量删除，避免 integer=text 类型不匹配
+    const deleteQuery = `DELETE FROM transactions WHERE id = ANY($1::int[])`;
+    const result = await query(deleteQuery, [idsInt]);
     
     res.json({
       success: true,
@@ -226,7 +238,7 @@ transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.require
     });
   } catch (error) {
     console.error('批量删除交易失败:', error);
-    res.status(500).json({ error: '批量删除交易失败', detail: error.message });
+    res.status(500).json({ error: '批量删除交易失败', detail: error?.message || String(error) });
   }
 });
 
