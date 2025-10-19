@@ -73,6 +73,18 @@ async function ensureTransactionsDDL() {
   `)
 }
 
+// 确保 bank_logos 表存在（用于 DB 持久化的银行 LOGO）
+async function ensureBankLogosDDL() {
+  await query(`
+    create table if not exists bank_logos (
+      bank_id int primary key references banks(id) on delete cascade,
+      mime text not null,
+      data bytea not null,
+      updated_at timestamptz default now()
+    );
+  `)
+}
+
 // 获取交易列表，支持分页、排序和筛选
 transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_transactions'), async (req, res) => {
   try {
@@ -80,6 +92,8 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
     await ensureTransactionsDDL()
     // 需要在筛除已结汇交易时引用 fx_settlement_items，先确保 FX 相关表存在
     try { await ensureFxDDL() } catch {}
+    // 需要联表 bank_logos 以优先返回 DB 中存储的 LOGO
+    try { await ensureBankLogosDDL() } catch {}
     const { 
       page = '1', 
       pageSize = '20', 
@@ -256,10 +270,17 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
         t.created_at,
         COALESCE(b.zh, b.en, '') as bank_name,
         COALESCE(a.account_name, '') as account_name,
-        COALESCE(b.code, '') as bank_code
+        COALESCE(b.code, '') as bank_code,
+        b.id as bank_id,
+        CASE 
+          WHEN bl.bank_id IS NOT NULL THEN ('/api/banks/' || b.id || '/logo')
+          WHEN b.logo_url IS NOT NULL AND b.logo_url <> '' THEN b.logo_url
+          ELSE NULL
+        END as bank_logo_url
       FROM transactions t
       LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
       LEFT JOIN banks b ON b.id = a.bank_id
+      LEFT JOIN bank_logos bl ON bl.bank_id = b.id
       ${whereClause} 
       ${orderClause} 
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -273,6 +294,7 @@ transactionsRouter.get('/', auth.authMiddleware(true), auth.readOpenOr('view_tra
       FROM transactions t
       LEFT JOIN receiving_accounts a ON a.bank_account = t.account_number
       LEFT JOIN banks b ON b.id = a.bank_id
+      LEFT JOIN bank_logos bl ON bl.bank_id = b.id
       ${whereClause}
     `;
     const countParams = queryParams.slice(0, -2);
