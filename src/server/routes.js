@@ -1385,7 +1385,9 @@ router.get('/banks/:id/logo', auth.authMiddleware(false), auth.readOpenOr('view_
     // Cache for 1 day; revalidate on change via simple ETag
     const etag = 'W/"' + String(row.updated_at?.getTime?.() || Date.now()) + '"'
     res.setHeader('ETag', etag)
-    res.setHeader('Cache-Control', 'public, max-age=86400')
+    // 关键修复：要求每次都进行条件请求以便及时获得更新后的 LOGO
+    // 使用 must-revalidate + max-age=0（等价于 no-cache 行为，但允许缓存并校验）
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
     if (req.headers['if-none-match'] === etag) {
       return res.status(304).end()
     }
