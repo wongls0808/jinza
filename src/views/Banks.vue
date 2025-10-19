@@ -96,6 +96,8 @@ async function reset() {
   await api.resetBanks()
   await load()
   ElMessage.success(t('banks.resetDefaults'))
+  // 重置后清空所有失败标记，避免旧失败导致不再尝试加载图片
+  try { logoFail.value = {} } catch {}
 }
 
 function openAdd() {
@@ -153,8 +155,21 @@ async function submit() {
   dlg.value.visible = false
   // 提交成功后清空临时数据，防止下次编辑残留
   dlg.value.form.logo_data_url = ''
+  fileName.value = ''
   try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
     await load()
+    // 提交成功后，清理该银行的失败标记，允许重新尝试加载图片
+    try {
+      const updated = banks.value.find(x => x.id === f.id) || { code: f.code }
+      const key = logoKey(updated)
+      if (key) delete logoFail.value[key]
+      // 保险起见：为该银行注入一次带时间戳的 bank_logo_url，绕过中间层可能的强缓存
+      if (updated) {
+        const base = updated.logo_url || ''
+        const sep = base.includes('?') ? '&' : '?'
+        updated.bank_logo_url = `${base}${sep}t=${Date.now()}`
+      }
+    } catch {}
     ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
     let msg = e?.message || ''

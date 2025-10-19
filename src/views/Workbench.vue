@@ -1188,8 +1188,18 @@ async function loadUnmatchedMetrics(){
   try {
     const p = await api.transactions.stats({ status: 'pending' })
     const m = await api.transactions.stats({ status: 'matched' })
-    unmatchedCount.value = Number(p?.summary?.totalTransactions || 0)
-    matchedCount.value = Number(m?.summary?.totalTransactions || 0)
+    const pickTotal = (res) => {
+      const s = res?.summary || {}
+      // 兼容后端字段别名（未加引号时会被PG转为小写）
+      return Number(
+        s.totalTransactions ??
+        s.totaltransactions ??
+        s.total ??
+        0
+      )
+    }
+    unmatchedCount.value = pickTotal(p)
+    matchedCount.value = pickTotal(m)
   } catch (e) {
     // 回退：使用列表接口读取 total
     try {
