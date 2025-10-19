@@ -50,7 +50,7 @@
           <el-tag :type="row.status==='completed' ? 'success' : 'warning'">{{ row.status==='completed' ? t('fx.status.completed') : t('fx.status.pending') }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 260)" align="center">
+      <el-table-column column-key="actions" :label="t('common.actions')" :width="colW('actions', 300)" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="openDetail(row)">{{ t('common.view') }}</el-button>
           <el-button 
@@ -59,11 +59,18 @@
             :disabled="row.status!=='completed'"
             @click="downloadPdf(row)"
           >{{ t('common.pdf') }}</el-button>
-          <el-button 
-            v-if="has('manage_fx') && row.status==='completed'"
-            size="small" type="warning"
-            @click="doUnapprove(row)"
-          >{{ t('common.revoke') }}</el-button>
+          <!-- Revoke：已完成可操作；待处理显示灰色禁用按钮以保持布局一致 -->
+          <template v-if="has('manage_fx')">
+            <el-button 
+              v-if="row.status==='completed'"
+              size="small" type="warning"
+              @click="doUnapprove(row)"
+            >{{ t('common.revoke') }}</el-button>
+            <el-button 
+              v-else-if="row.status==='pending'"
+              size="small" :disabled="true"
+            >{{ t('common.revoke') }}</el-button>
+          </template>
           <template v-if="has('delete_fx')">
             <el-popconfirm :title="t('common.confirmDelete')" @confirm="removeBill(row)">
               <template #reference>
