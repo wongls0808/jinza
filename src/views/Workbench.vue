@@ -263,8 +263,14 @@
   <el-table-column :label="t('transactions.bankName')" column-key="bank" :width="colWPay('bank', 220)">
           <template #default="{ row }">
             <div class="bank-cell">
-              <img v-if="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
-              <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
+              <img
+                v-if="logoKey(row) && resolveLogo(row) && !logoFail[logoKey(row)]"
+                :src="resolveLogo(row)"
+                alt="logo"
+                class="bank-logo"
+                @error="onLogoError($event, row)"
+              />
+              <span v-if="logoKey(row) && resolveLogo(row) && !logoFail[logoKey(row)]" class="sep">•</span>
               <span class="bank-name">{{ row.bank_name || row.bank_code || '-' }}</span>
               <span v-if="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
             </div>
@@ -1419,7 +1425,7 @@ function openBalanceDrawer(){ balanceDrawer.value.visible = true; loadBalance() 
 
 /* 银行 logo 单元格（与其它列表保持一致） */
 .bank-cell { display:flex; align-items:center; gap:6px; height: 24px; }
-.bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
+.bank-logo { width: 80px; height: 18px; object-fit: contain; display:inline-block; }
 .bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
 .bank-name { font-weight: 700; letter-spacing: .3px; }
 .sep { color: var(--el-text-color-secondary); margin: 0 6px; }
