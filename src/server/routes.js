@@ -1188,11 +1188,15 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   ]
   const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
   const banksDir = path.join(publicDir, 'banks')
-  async function hasDbLogo(id) {
+  async function getDbLogoVersion(id) {
     try {
-      const r = await query('select 1 from bank_logos where bank_id=$1 limit 1', [id])
-      return r.rowCount > 0
-    } catch { return false }
+      const r = await query('select updated_at from bank_logos where bank_id=$1 limit 1', [id])
+      if (r.rowCount > 0) {
+        const ts = r.rows[0].updated_at?.getTime?.() || Date.now()
+        return Number.isFinite(ts) ? ts : Date.now()
+      }
+      return 0
+    } catch { return 0 }
   }
   function resolveStaticLogoUrl(code, url) {
     try {
@@ -1241,9 +1245,9 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   }
   // 并发检查每行是否有 DB logo，有则返回 API 路径
   const rows = await Promise.all(rs.rows.map(async (r) => {
-    const hasDb = await hasDbLogo(r.id)
-    if (hasDb) {
-      return { ...r, logo_url: `/api/banks/${r.id}/logo` }
+    const v = await getDbLogoVersion(r.id)
+    if (v) {
+      return { ...r, logo_url: `/api/banks/${r.id}/logo?v=${v}` }
     }
     return { ...r, logo_url: resolveStaticLogoUrl(r.code, r.logo_url) }
   }))
