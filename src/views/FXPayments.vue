@@ -29,12 +29,13 @@
         <template #default="{ row }">{{ money(row.balance_cny) }}</template>
       </el-table-column>
       <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="colW('account_name', 200)" />
-      <el-table-column prop="bank_name" column-key="bank_name" :label="t('accounts.fields.bank')" :width="colW('bank_name', 200)">
+      <el-table-column prop="bank_name" column-key="bank_name" :label="t('accounts.fields.bank')" :width="colW('bank_name', 220)">
         <template #default="{ row }">
           <div class="bank-cell">
+            <span class="bank-name">{{ row.bank_name || row.bank_code || '-' }}</span>
+            <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
             <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
             <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
-            <span class="bank-name">{{ row.bank_name || row.bank_code }}</span>
           </div>
         </template>
       </el-table-column>
@@ -305,5 +306,6 @@ const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 .bank-cell { display:flex; align-items:center; gap:8px; height: 24px; }
 .bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
 .bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
-.bank-name { font-weight: 600; }
+.bank-name { font-weight: 700; letter-spacing: .3px; }
+.sep { color: var(--el-text-color-secondary); margin: 0 6px; }
 </style>

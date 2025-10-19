@@ -99,7 +99,15 @@
           <el-table-column prop="trn_date" column-key="trn_date" :label="t('transactions.transactionDate')" :width="memDetail.colW('trn_date', 130)">
             <template #default="{ row }">{{ fmtDate(row.trn_date) }}</template>
           </el-table-column>
-          <el-table-column prop="bank_name_en" column-key="bank_name_en" :label="t('banks.title')" :width="memDetail.colW('bank_name_en', 160)" />
+            <el-table-column prop="bank_name_en" column-key="bank_name_en" :label="t('banks.title')" :width="memDetail.colW('bank_name_en', 180)">
+              <template #default="{ row }">
+                <div class="bank-cell">
+                  <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
+                  <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
+                  <span class="bank-code">{{ (row.bank_code || row.bank_name_en || '-')?.toString().toUpperCase() }}</span>
+                </div>
+              </template>
+            </el-table-column>
           <el-table-column prop="account_name" column-key="account_name" :label="t('accounts.fields.accountName')" :width="memDetail.colW('account_name', 220)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('accounts.fields.bankAccount')" :width="memDetail.colW('account_number', 160)" />
           <el-table-column prop="amount_base" column-key="amount_base" :label="t('fx.baseAmount')" :width="memDetail.colW('amount_base', 120)" align="right">
@@ -121,6 +129,7 @@ import { useI18n } from 'vue-i18n'
 import { api, request as httpRequest } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
 import { useAuth } from '@/composables/useAuth'
+  import { useBankLogo } from '@/composables/useBankLogo'
 const { t, locale } = useI18n()
 const { has } = useAuth()
 const rows = ref([])
@@ -266,4 +275,8 @@ function summaryMethod({ data }){
 .bill-head .cell { display:flex; gap:6px; align-items:center; min-height:28px; }
 .bill-head .cell .k { color:#666; min-width:110px; }
 .bill-head .cell .v { font-weight: 600; }
+  .bank-cell { display:flex; align-items:center; gap:8px; height: 24px; }
+  .bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
+  .bank-code { font-weight: 700; letter-spacing: .5px; }
+  .sep { color: var(--el-text-color-secondary); margin: 0 6px; }
 </style>

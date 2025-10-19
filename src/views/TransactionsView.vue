@@ -171,16 +171,17 @@
 
   <el-table-column :label="t('transactions.accountNumber')" prop="account_number" :width="colW('account_number', 160)" />
 
-  <el-table-column :label="t('transactions.bankName')" prop="bank_name" :width="colW('bank_name', 180)">
+  <el-table-column :label="t('transactions.bankName')" prop="bank_name" :width="colW('bank_name', 200)">
         <template #default="scope">
           <div class="bank-display">
-            <span class="bank-code">{{ scope.row.bank_code || '-' }}</span>
             <img
               v-show="!logoFail[logoKey(scope.row)]"
               :src="resolveLogo(scope.row)"
               :alt="scope.row.bank_code || scope.row.bank_name || 'BANK'"
               class="bank-logo"
               @error="onLogoError($event, scope.row)" />
+            <span v-if="!logoFail[logoKey(scope.row)]" class="sep">•</span>
+            <span class="bank-code">{{ (scope.row.bank_code || '-')?.toString().toUpperCase() }}</span>
           </div>
         </template>
       </el-table-column>
@@ -1940,6 +1941,7 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.bank-display .sep { color: var(--el-text-color-secondary); margin: 0 6px; }
 .bank-code {
   font-weight: 600;
   margin-right: 8px;
