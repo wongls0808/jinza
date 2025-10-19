@@ -18,11 +18,11 @@ body {
 	--app-radius: 10px;
 	--app-gap: 12px;
 	--topbar-height: 56px;
-	/* 全局阴影：统一为“淡青绿色”主题阴影 */
-	--app-shadow-sm: 0 4px 12px color-mix(in oklab, rgb(16,185,129) 16%, rgba(0,0,0,.06));
-	--app-shadow-lg: 0 20px 50px color-mix(in oklab, rgb(20,184,166) 24%, rgba(0,0,0,.12));
+	/* 全局阴影：切换为“任务栏绿色”（success）主题，提高可见度 */
+	--app-shadow-sm: 0 4px 12px color-mix(in oklab, var(--el-color-success) 20%, rgba(0,0,0,.06));
+	--app-shadow-lg: 0 20px 50px color-mix(in oklab, var(--el-color-success) 28%, rgba(0,0,0,.12));
 	/* 鼠标移动特效阴影（tilt 指令使用） */
-	--app-mouse-shadow: 0 18px 45px color-mix(in oklab, rgb(34,211,238) 22%, rgba(0,0,0,.18));
+	--app-mouse-shadow: 0 18px 45px color-mix(in oklab, var(--el-color-success) 26%, rgba(0,0,0,.18));
 	--app-glass-bg: color-mix(in oklab, var(--el-color-primary) 6%, transparent);
 	--app-glass-border: color-mix(in oklab, var(--el-color-primary) 12%, var(--el-border-color));
 
@@ -79,7 +79,7 @@ body {
 	box-shadow: var(--app-shadow-lg);
 	transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
 }
-.jelly:hover { box-shadow: 0 30px 70px color-mix(in oklab, rgb(34,197,94) 18%, rgba(0,0,0,.18)); }
+.jelly:hover { box-shadow: 0 30px 70px color-mix(in oklab, var(--el-color-success) 24%, rgba(0,0,0,.18)); }
 .jelly-pop { animation: jellyPop .6s ease both; }
 @keyframes jellyPop { 0% { transform: scale(.98); } 60% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
@@ -101,7 +101,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--el-border-color); background: var(--el-bg-color); color: var(--el-text-color-primary); cursor: pointer; transition: background .15s, box-shadow .15s, transform .05s; }
-.btn:hover { box-shadow: 0 6px 14px color-mix(in oklab, rgb(20,184,166) 18%, rgba(0,0,0,.08)); }
+.btn:hover { box-shadow: 0 6px 14px color-mix(in oklab, var(--el-color-success) 22%, rgba(0,0,0,.08)); }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--el-color-primary); color: var(--el-color-white); border-color: var(--el-color-primary); }
 .btn.danger { background: var(--el-color-danger); color: var(--el-color-white); border-color: var(--el-color-danger); }
@@ -172,8 +172,8 @@ input:focus, select:focus, textarea:focus {
 /* 统一表格密度和标题文字大小 */
 .el-table { 
 	--el-table-header-text-color: var(--el-text-color-primary);
-	/* 提升列表 hover 可见度：统一淡青色 hover 背景 */
-	--el-table-row-hover-bg-color: color-mix(in oklab, rgb(20,184,166) 12%, #ffffff);
+	/* 提升列表 hover 可见度：统一“任务栏绿” hover 背景 */
+	--el-table-row-hover-bg-color: color-mix(in oklab, var(--el-color-success) 14%, #ffffff);
 }
 .el-table th.el-table__cell > .cell { font-weight: 600; font-size: 13px; }
 .el-table .cell { font-size: 13px; }
@@ -186,7 +186,7 @@ input:focus, select:focus, textarea:focus {
 	content: "";
 	position: absolute;
 	left: 0; top: 0; bottom: 0; width: 3px;
-	background: color-mix(in oklab, rgb(34,211,238) 82%, transparent);
+	background: color-mix(in oklab, var(--el-color-success) 85%, transparent);
 	border-radius: 2px;
 }
 
