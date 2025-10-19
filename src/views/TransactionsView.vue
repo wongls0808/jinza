@@ -171,16 +171,16 @@
 
   <el-table-column :label="t('transactions.accountNumber')" prop="account_number" :width="colW('account_number', 160)" />
 
-  <el-table-column :label="t('transactions.bankName')" prop="bank_name" :width="colW('bank_name', 160)">
+  <el-table-column :label="t('transactions.bankName')" prop="bank_name" :width="colW('bank_name', 180)">
         <template #default="scope">
           <div class="bank-display">
+            <span class="bank-code">{{ scope.row.bank_code || '-' }}</span>
             <img
               v-show="!logoFail[logoKey(scope.row)]"
               :src="resolveLogo(scope.row)"
-              :alt="scope.row.bank_name"
+              :alt="scope.row.bank_code || scope.row.bank_name || 'BANK'"
               class="bank-logo"
               @error="onLogoError($event, scope.row)" />
-            <span v-show="logoFail[logoKey(scope.row)]">{{ scope.row.bank_name || (scope.row.bank_code || '-') }}</span>
           </div>
         </template>
       </el-table-column>
@@ -658,6 +658,8 @@ const selectedBankInput = ref(null)
 const selectedBankLogo = ref('') // 保留字符串缓存，但优先通过 resolveLogo 计算
 // 通用银行 logo 解析/降级
 const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
+// 订阅银行更新，自动刷新当前列表中银行代码与logo
+let offBanksUpdated = null
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -1830,6 +1832,23 @@ onMounted(() => {
   try {
     fetchTransactions()
     fetchAccounts()
+    // 订阅银行更新事件：刷新当前页行的 bank_code 与 bank_logo_url，并清空失败缓存
+    offBanksUpdated = api.banks.onUpdated(async () => {
+      try {
+        const banks = await api.banks.all()
+        const map = {}
+        for (const b of (banks || [])) map[b.id] = b
+        for (const row of transactions.value || []) {
+          const b = map[row.bank_id]
+          if (b) {
+            row.bank_code = b.code
+            row.bank_logo_url = b.logo_url
+          }
+        }
+        // 重置失败缓存，允许新logo重试
+        if (logoFail && logoFail.value) logoFail.value = {}
+      } catch (e) { /* ignore */ }
+    })
   } catch (error) {
     console.error('初始化交易管理视图失败:', error)
     ElMessage({
@@ -1844,6 +1863,9 @@ onMounted(() => {
 // 在组件卸载时释放资源
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (typeof offBanksUpdated === 'function') {
+    try { offBanksUpdated() } catch {}
+  }
 })
 
 // 统一银行 Logo 处理已迁移到 useBankLogo 组合式中
@@ -1916,6 +1938,11 @@ onBeforeUnmount(() => {
 .bank-display {
   display: flex;
   align-items: center;
+}
+
+.bank-code {
+  font-weight: 600;
+  margin-right: 8px;
 }
 
 .bank-logo {

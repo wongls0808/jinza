@@ -12,6 +12,13 @@ function getCache(key) {
 }
 function delCache(key) { _cache.delete(key) }
 
+// ---- Banks 更新事件（让各页面可订阅并自动刷新）----
+const BANKS_UPDATED_EVENT = 'banks:updated'
+function emitBanksUpdated() {
+  try { window && window.dispatchEvent && window.dispatchEvent(new CustomEvent(BANKS_UPDATED_EVENT)) } catch {}
+  try { localStorage.setItem('banks.lastUpdated', String(Date.now())) } catch {}
+}
+
 function getToken() {
   // 优先从会话存储读取，保证“关闭浏览器需重登”的逻辑生效
   try {
@@ -127,21 +134,25 @@ export const api = {
   createBank: async (data) => {
     const res = await request('/banks', { method: 'POST', body: JSON.stringify(data) })
     delCache('banks.all')
+    emitBanksUpdated()
     return res
   },
   deleteBank: async (id) => {
     const res = await request(`/banks/${id}`, { method: 'DELETE' })
     delCache('banks.all')
+    emitBanksUpdated()
     return res
   },
   resetBanks: async () => {
     const res = await request('/banks/reset-defaults', { method: 'POST' })
     delCache('banks.all')
+    emitBanksUpdated()
     return res
   },
   updateBank: async (id, data) => {
     const res = await request(`/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) })
     delCache('banks.all')
+    emitBanksUpdated()
     return res
   },
   banks: {
@@ -152,6 +163,19 @@ export const api = {
       const data = await request('/banks')
       setCache(key, data, 3 * 60 * 1000) // 3 分钟
       return data
+    }
+    ,
+    onUpdated: (handler) => {
+      if (typeof handler !== 'function') return () => {}
+      const fn = () => { try { handler() } catch {} }
+      try { window.addEventListener(BANKS_UPDATED_EVENT, fn) } catch {}
+      // 跨标签页同步（同标签也无害）
+      const storageFn = (e) => { if (e && e.key === 'banks.lastUpdated') fn() }
+      try { window.addEventListener('storage', storageFn) } catch {}
+      return () => {
+        try { window.removeEventListener(BANKS_UPDATED_EVENT, fn) } catch {}
+        try { window.removeEventListener('storage', storageFn) } catch {}
+      }
     }
   },
 

@@ -148,7 +148,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
@@ -260,6 +260,28 @@ async function remove(row) {
 }
 
 onMounted(load)
+
+// 监听银行列表更新，自动刷新 banks 并将新 logo 应用到当前行
+let offBanksUpdated = null
+onMounted(() => {
+  try {
+    offBanksUpdated = api.banks.onUpdated(async () => {
+      try {
+        const updated = await api.banks.all()
+        banks.value = updated
+        // 将最新 bank 元数据应用到当前 rows（最小扰动：仅更新显示相关字段）
+        const map = Object.create(null)
+        for (const b of updated) { map[b.id] = b }
+        rows.value = (rows.value || []).map(r => {
+          const b = map[r.bank_id]
+          if (!b) return r
+          return { ...r, bank_code: b.code, bank_zh: b.zh, bank_en: b.en, bank_logo: b.logo_url }
+        })
+      } catch {}
+    })
+  } catch {}
+})
+onBeforeUnmount(() => { try { offBanksUpdated && offBanksUpdated() } catch {} })
 
 function onSort({ prop, order: ord }) {
   if (!prop) return
