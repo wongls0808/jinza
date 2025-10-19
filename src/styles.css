@@ -170,9 +170,25 @@ input:focus, select:focus, textarea:focus {
 .el-drawer__body { padding: 14px 16px !important; }
 
 /* 统一表格密度和标题文字大小 */
-.el-table { --el-table-header-text-color: var(--el-text-color-primary); }
+.el-table { 
+	--el-table-header-text-color: var(--el-text-color-primary);
+	/* 提升列表 hover 可见度：统一淡青色 hover 背景 */
+	--el-table-row-hover-bg-color: color-mix(in oklab, rgb(20,184,166) 12%, #ffffff);
+}
 .el-table th.el-table__cell > .cell { font-weight: 600; font-size: 13px; }
 .el-table .cell { font-size: 13px; }
+
+/* 行悬停动效与左侧强调条（增强视觉导引） */
+.el-table__body td { transition: background-color .14s ease, box-shadow .14s ease; }
+.el-table--enable-row-hover .el-table__body tr:hover > td { background-color: var(--el-table-row-hover-bg-color) !important; }
+.el-table--enable-row-hover .el-table__body tr:hover > td:first-child { position: relative; }
+.el-table--enable-row-hover .el-table__body tr:hover > td:first-child::before {
+	content: "";
+	position: absolute;
+	left: 0; top: 0; bottom: 0; width: 3px;
+	background: color-mix(in oklab, rgb(34,211,238) 82%, transparent);
+	border-radius: 2px;
+}
 
 /* 统一表单项间距与标签宽度（保持小尺寸紧凑） */
 .el-form-item { margin-bottom: 10px; }
