@@ -8,9 +8,9 @@
     <!-- 高频操作置顶工具栏：匹配 / 结汇 / 付款 / 购汇（左对齐，独立卡片） -->
     <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions" v-if="has('dashboard:quick_actions')">
       <div class="hf-row">
-        <div class="hf-item info" role="button" tabindex="0" :aria-label="t('home.qaTransactions')" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
+        <div class="hf-item info" role="button" tabindex="0" :aria-label="t('home.qaMatch')" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
           <div class="hf-icon"><Link /></div>
-          <div class="hf-label">{{ t('home.qaTransactions') }}</div>
+          <div class="hf-label">{{ t('home.qaMatch') }}</div>
         </div>
         <div class="hf-item primary" role="button" tabindex="0" :aria-label="t('home.qaSettlements')" v-if="has('dashboard:action:settle')" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
           <div class="hf-icon"><Collection /></div>
@@ -891,7 +891,7 @@ const dbColor = computed(() => colorByPct(monitorDbPct.value))
 // 工作台页面：入口按类别排序（管理 -> 历史），每个入口独立授权
 const quickActions = computed(() => [
   // 管理类
-  { key: 'tx', label: t('home.qaTransactions'), desc: t('workbench.cards.tx'), route: 'transactions', color: 'blue', icon: 'Link' },
+  { key: 'tx', label: t('home.qaTransactions'), desc: t('workbench.cards.tx'), route: 'transactions', color: 'blue', icon: 'Tickets' },
   { key: 'settleManage', label: t('home.qaSettlements'), desc: t('workbench.cards.settleManage'), route: 'fx-settlements', color: 'green', icon: 'Collection' },
   // 历史类
   { key: 'settleHistory', label: t('home.qaSettlementsHistory'), desc: t('workbench.cards.settleHistory'), route: 'fx-settlements', color: 'teal', icon: 'FolderOpened' },
