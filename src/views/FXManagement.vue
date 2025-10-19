@@ -63,7 +63,6 @@
             <el-option v-for="c in payCustomers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">CNY {{ money(cnyBalance) }}</span>
-          <span class="balance-sub" v-if="Number(cnyBalance)>0">（{{ t('fx.remainingPayable') }}：{{ money(remainingPayable) }}）</span>
           <el-button type="primary" :disabled="!canCreatePayment" @click="createPayment">{{ t('fx.createPayment') }}</el-button>
         </div>
         <div class="totals">
