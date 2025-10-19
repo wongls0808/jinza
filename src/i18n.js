@@ -814,7 +814,7 @@ const messages = {
   selectedBase: '已选合计(马币)',
       selectedSettled: '已选折算合计',
       paymentTotal: '付款金额合计',
-  remainingPayable: '剩余可输入金额',
+  remainingPayable: '还可付金额',
   autoClampedToRemaining: '已按剩余可输入金额自动截断',
   settlementCreated: '已生成结汇单：{n} 笔，马币 {base}，折算 {settled}',
       paymentCreated: '已生成付款单：{n} 笔，总额 {total}',

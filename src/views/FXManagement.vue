@@ -63,10 +63,12 @@
             <el-option v-for="c in payCustomers" :key="c.id" :value="c.id" :label="(c.abbr ? (c.abbr + ' · ') : '') + c.name" />
           </el-select>
           <span class="balance">CNY {{ money(cnyBalance) }}</span>
+          <span class="balance-sub" v-if="Number(cnyBalance)>0">（{{ t('fx.remainingPayable') }}：{{ money(remainingPayable) }}）</span>
           <el-button type="primary" :disabled="!canCreatePayment" @click="createPayment">{{ t('fx.createPayment') }}</el-button>
         </div>
         <div class="totals">
           <span>{{ t('fx.paymentTotal') }}: {{ money(paymentTotal) }}</span>
+          <span>· {{ t('fx.remainingPayable') }}: CNY {{ money(remainingPayable) }}</span>
           <span v-if="overBudget" style="color: var(--el-color-danger);">{{ t('fx.errExceedBalance') }}</span>
         </div>
   <el-table ref="payTableRef" :data="accounts" size="small" border @selection-change="onSelAccountsChange" @header-dragend="onColResizePay">
@@ -95,9 +97,21 @@
           <!-- 币种 -->
           <el-table-column prop="currency_code" column-key="currency_code" :label="t('customers.accounts.currency')" :width="colWPay('currency_code',120)" />
           <!-- 金额（默认空，不显示0.00） -->
-          <el-table-column column-key="amount" :label="t('fx.amount')" :width="colWPay('amount',160)">
+          <el-table-column column-key="amount" :label="t('fx.amount')" :width="colWPay('amount',200)">
             <template #default="{ row }">
-              <el-input-number v-model="row._amount" :precision="2" :min="0" :step="100" :placeholder="t('common.input')" style="width:140px" @change="() => onAmountChange(row)" />
+              <div style="display:flex; align-items:center; gap:8px;">
+                <el-input-number
+                  v-model="row._amount"
+                  :precision="2"
+                  :min="0"
+                  :max="maxAllowedFor(row)"
+                  :step="100"
+                  :placeholder="t('common.input')"
+                  style="width:160px"
+                  @change="() => onAmountChange(row)"
+                />
+                <span v-if="maxAllowedFor(row) > 0" class="hint-remaining">{{ t('fx.remainingPayable') }}: {{ money(maxAllowedFor(row)) }}</span>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -184,6 +198,11 @@ const selectedSettledTotal = computed(() => {
   return Math.round(base * taxFactor * r)
 })
 const paymentTotal = computed(() => accounts.value.reduce((s, a) => s + (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0), 0))
+const remainingPayable = computed(() => {
+  const bal = Number(cnyBalance.value || 0)
+  const rem = bal - Number(paymentTotal.value || 0)
+  return rem > 0 ? Math.round(rem * 100) / 100 : 0
+})
 
 const selectedCustomer = computed(() => allCustomers.value.find(c => c.id === customerId.value) || null)
 const myrBalance = computed(() => Number(selectedCustomer.value?.balance_myr || 0))
@@ -392,10 +411,24 @@ function onSelAccountsChange(val){
       row._amount = Math.max(0, Math.round(bal * 100) / 100)
     }
   }
+  // 多选：为新加入的行提供“最大可填”提示（不强制自动填充，避免覆盖用户意图）
+  // 若需要自动填充，可取消注释以下逻辑（按剩余上限填入未填写的新增行）
+  // added.forEach(row => {
+  //   if (!row._amount || Number(row._amount) === 0) {
+  //     const max = maxAllowedFor(row)
+  //     if (max > 0) row._amount = max
+  //   }
+  // })
 }
 function onAmountChange(row){
   const n = Number(row._amount || 0)
   if (n > 0) {
+    // 超过可用余额：自动截断到可填上限
+    const max = maxAllowedFor(row)
+    if (n > max) {
+      row._amount = max
+      ElMessage.warning(t('fx.autoClampedToRemaining'))
+    }
     if (!isRowSelected(row)) toggleRowSelection(row, true)
   } else {
     // 金额为 0 或空：清空并取消勾选
@@ -413,6 +446,14 @@ function isSettleSelectable(row){
   const MAX = 8
   const selected = selMatched.value || []
   return selected.length < MAX || selected.some(r => r.id === row.id)
+}
+
+// 付款区：每行可填上限 = 客户CNY余额 - 其他行已填金额（>=0）
+function maxAllowedFor(row){
+  const bal = Number(cnyBalance.value || 0)
+  const others = accounts.value.reduce((s, a) => s + (a.id !== row.id ? (Number(a._amount || 0) > 0 ? Number(a._amount || 0) : 0) : 0), 0)
+  const rem = bal - others
+  return rem > 0 ? Math.round(rem * 100) / 100 : 0
 }
 </script>
 
@@ -442,5 +483,7 @@ function isSettleSelectable(row){
   .bank-code { font-weight: 700; letter-spacing: .5px; }
   .bank-name { font-weight: 700; }
   .sep { color: var(--el-text-color-secondary); margin: 0 6px; }
+  .hint-remaining { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; }
+  .balance-sub { color: var(--el-text-color-secondary); font-size: 12px; }
  @media (max-width: 1100px) { .fx-split { grid-template-columns: 1fr; } }
 </style>
