@@ -366,7 +366,7 @@ router.post('/auth/change-password', auth.authMiddleware(true), async (req, res)
 
 // Users CRUD
 router.get('/users', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {
-  // 联合会话返回在线状态与最近 IP/时间
+  // 联合会话返回最近 IP/时间，并基于会话新鲜度计算在线状态
   const rs = await query(`
     select u.id, u.username, u.display_name, u.is_active, u.is_admin, u.created_at,
            (case when s.id is not null then true else false end) as online,
@@ -377,7 +377,15 @@ router.get('/users', auth.authMiddleware(true), auth.requirePerm('manage_users')
       ) s on true
      order by u.id
   `)
-  res.json(rs.rows)
+  // 使用与鉴权一致的空闲阈值（默认 30 分钟）来判断是否在线
+  const maxIdle = Number(process.env.SESSION_IDLE_MS || 30 * 60 * 1000)
+  const now = Date.now()
+  const rows = rs.rows.map(r => {
+    const lastSeenTs = r.last_seen ? new Date(r.last_seen).getTime() : 0
+    const fresh = lastSeenTs && (now - lastSeenTs) <= maxIdle
+    return { ...r, online: !!fresh }
+  })
+  res.json(rows)
 })
 
 router.post('/users', auth.authMiddleware(true), auth.requirePerm('manage_users'), async (req, res) => {

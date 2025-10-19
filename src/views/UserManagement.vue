@@ -210,8 +210,11 @@
             <el-option label="认证" value="auth" />
             <el-option label="用户管理" value="user" />
             <el-option label="客户管理" value="customer" />
+            <el-option label="银行管理" value="bank" />
             <el-option label="交易管理" value="transaction" />
             <el-option label="外汇管理" value="fx" />
+            <el-option label="费用管理" value="expense" />
+            <el-option label="系统" value="system" />
           </el-select>
         </div>
 
@@ -254,6 +257,10 @@
                 <div class="meta-item" v-if="activity.meta && activity.meta.count">
                   <el-icon><DataLine /></el-icon>
                   <span>{{ t('users.activityDetails.count') }}: {{ activity.meta.count }}</span>
+                </div>
+                <div class="meta-item" v-if="activity.user_agent">
+                  <el-icon><Connection /></el-icon>
+                  <span>{{ t('users.activityDetails.device') }}: {{ activity.user_agent }}</span>
                 </div>
               </div>
 
