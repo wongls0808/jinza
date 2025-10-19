@@ -109,7 +109,6 @@
                   style="width:160px"
                   @change="() => onAmountChange(row)"
                 />
-                <span v-if="maxAllowedFor(row) > 0" class="hint-remaining">{{ t('fx.remainingPayable') }}: {{ money(maxAllowedFor(row)) }}</span>
               </div>
             </template>
           </el-table-column>
