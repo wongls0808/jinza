@@ -35,14 +35,12 @@
           <el-table-column prop="cheque_ref_no" column-key="cheque_ref_no" :label="t('transactions.chequeRefNo')" :width="colWSettle('cheque_ref_no',140)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
-          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',160)" align="center">
+          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',200)" align="left">
             <template #default="{ row }">
               <div class="bank-cell">
-                <template v-if="!logoFail[logoKey(row)]">
-                  <img :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
-                  <span class="sep">•</span>
-                </template>
-                <span class="bank-code">{{ (row.bank_code || '-')?.toString().toUpperCase() }}</span>
+                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
+                <span class="bank-code">{{ (row.bank_code || row.bank_name_en || row.bank_name || '-')?.toString().toUpperCase() }}</span>
               </div>
             </template>
           </el-table-column>
@@ -82,15 +80,13 @@
           <!-- 账户名称 -->
           <el-table-column prop="account_name" column-key="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
           <!-- 银行名称（中文） • Logo 同列显示 -->
-          <el-table-column column-key="bank" :label="t('customers.accounts.bank')" :width="colWPay('bank',240)">
+          <el-table-column column-key="bank" :label="t('customers.accounts.bank')" :width="colWPay('bank',260)">
             <template #default="{ row }">
               <div class="bank-cell" style="justify-content:flex-start; gap:8px;">
                 <span class="bank-name">{{ row.bank_zh || row.bank_name || '-' }}</span>
-                <template v-if="!logoFail[logoKey(row)]">
-                  <span class="sep">•</span>
-                  <img :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
-                </template>
-                <span v-else class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
+                <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
+                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
               </div>
             </template>
           </el-table-column>
@@ -116,6 +112,7 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { useTableMemory } from '@/composables/useTableMemory'
+import { useBankLogo } from '@/composables/useBankLogo'
 
 const { t } = useI18n()
 const props = defineProps({
@@ -407,24 +404,8 @@ function onAmountChange(row){
   }
 }
 
-// ---- 银行 logo 本地解析：统一从 /banks/<code>.(svg|png|jpg) 读取 ----
-const logoFail = ref({})
-function logoKey(row){ return (row.bank_code || row.bank_name_en || row.bank_name || 'unknown').toLowerCase() }
-function resolveLogo(row){
-  const key = logoKey(row)
-  if (logoFail.value[key]) return ''
-  const code = (row.bank_code || '').toLowerCase()
-  if (!code) return ''
-  return `/banks/${code}.svg`
-}
-function onLogoError(evt, row){
-  const key = logoKey(row)
-  const cur = evt?.target?.getAttribute('src') || ''
-  // 依次尝试 svg -> png -> jpg
-  if (/\.svg$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.svg$/i, '.png'))
-  else if (/\.png$/i.test(cur)) evt.target.setAttribute('src', cur.replace(/\.png$/i, '.jpg'))
-  else logoFail.value[key] = true
-}
+// 统一银行 Logo 渲染（支持后端 bank_logo_url + 静态回退）
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 
 // 结汇区选择上限：未达上限时可选，达到上限后仅允许取消已选项
 const settleTableRef = ref(null)
