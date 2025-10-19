@@ -260,11 +260,13 @@
         </el-table-column>
   <el-table-column prop="bill_no" :label="t('common.billNo')" :width="colWPay('bill_no', 200)" />
   <el-table-column prop="customer_name" :label="t('common.customer')" :width="colWPay('customer_name', 180)" />
-  <el-table-column :label="t('transactions.bankName')" column-key="bank" :width="colWPay('bank', 160)">
+  <el-table-column :label="t('transactions.bankName')" column-key="bank" :width="colWPay('bank', 220)">
           <template #default="{ row }">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img v-if="row.bank_code" :src="bankImg(row.bank_code)" :alt="row.bank_code" style="height:16px; width:auto; object-fit:contain;" @error="onBankImgErr($event)" />
-              <span>{{ row.bank_name || row.bank_code || '-' }}</span>
+            <div class="bank-cell">
+              <img v-if="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="logo" class="bank-logo" @error="onLogoError($event, row)" />
+              <span v-if="!logoFail[logoKey(row)]" class="sep">•</span>
+              <span class="bank-name">{{ row.bank_name || row.bank_code || '-' }}</span>
+              <span v-if="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
             </div>
           </template>
         </el-table-column>
@@ -958,7 +960,7 @@ const todoDetail = ref(null)
 function fmtDate(v){ try { if (!v) return ''; if (typeof v === 'string') return v.slice(0,10); if (v.toISOString) return v.toISOString().slice(0,10); return String(v).slice(0,10) } catch { return String(v).slice(0,10) } }
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }
 // 参照其它列表的银行 Logo 回退策略：svg → png → jpg → public.svg
-const { resolveLogo: bankImg, onLogoError: onBankImgErr } = useBankLogo()
+const { logoFail, logoKey, resolveLogo, onLogoError } = useBankLogo()
 async function openTodo(row){
   try {
     const d = await api.fx.payments.detail(row.id)
@@ -1414,6 +1416,13 @@ function openBalanceDrawer(){ balanceDrawer.value.visible = true; loadBalance() 
 .preview-card .cell.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .preview-card .cell.warn { color: var(--el-text-color-primary); }
 .preview-card .cell.danger { color: var(--el-color-danger); font-weight: 600; }
+
+/* 银行 logo 单元格（与其它列表保持一致） */
+.bank-cell { display:flex; align-items:center; gap:6px; height: 24px; }
+.bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
+.bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
+.bank-name { font-weight: 700; letter-spacing: .3px; }
+.sep { color: var(--el-text-color-secondary); margin: 0 6px; }
 
 /* 图表区域 */
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 8px; }
