@@ -28,6 +28,18 @@ transactionsRouter.get('/:id(\\d+)', auth.authMiddleware(true), auth.readOpenOr(
       where t.id = $1
     `, [id])
     if (!rs.rowCount) return res.status(404).json({ error: 'Not found' })
+        try {
+          await auth.logActivity(req.user?.id, 'transactions.view', {
+            id: Number(id),
+            account_number: rs.rows[0]?.account_number,
+            transaction_date: rs.rows[0]?.transaction_date,
+            debit: Number(rs.rows[0]?.debit_amount || 0),
+            credit: Number(rs.rows[0]?.credit_amount || 0),
+            matched: !!rs.rows[0]?.matched,
+            match_type: rs.rows[0]?.match_type || null,
+            match_target_id: rs.rows[0]?.match_target_id || null
+          }, req)
+        } catch {}
     res.json(rs.rows[0])
   } catch (e) {
     console.error('get transaction failed', e)
@@ -351,8 +363,8 @@ transactionsRouter.post('/batch-delete', auth.authMiddleware(true), auth.require
     // 使用 ANY($1::int[]) 操作符进行批量删除，避免 integer=text 类型不匹配
     const deleteQuery = `DELETE FROM transactions WHERE id = ANY($1::int[])`;
     const result = await query(deleteQuery, [idsInt]);
-    
-    res.json({
+        try { await auth.logActivity(req.user?.id, 'transactions.delete', { count: result.rowCount, ids: idsInt }, req) } catch {}
+        res.json({
       success: true,
       deletedCount: result.rowCount,
       message: `成功删除 ${result.rowCount} 条交易记录`
@@ -579,6 +591,7 @@ transactionsRouter.get('/export', auth.authMiddleware(true), auth.readOpenOr('vi
     `;
     
     const result = await query(exportQuery, queryParams);
+    try { await auth.logActivity(req.user?.id, 'transactions.export', { count: result.rowCount }, req) } catch {}
     res.json(result.rows);
   } catch (e) {
     console.error('export failed', e)
@@ -639,7 +652,17 @@ transactionsRouter.post('/', auth.authMiddleware(true), auth.requirePerm('transa
       LEFT JOIN banks b ON b.id = a.bank_id
       WHERE t.id = $1
     `, [rs.rows[0].id]);
-
+        try {
+          const row = createdTransaction.rows?.[0]
+          await auth.logActivity(req.user?.id, 'transactions.create', {
+            id: rs.rows[0].id,
+            account_number,
+            trn_date: row?.trn_date,
+            debit: Number(row?.debit_amount || debit_amount || 0),
+            credit: Number(row?.credit_amount || credit_amount || 0),
+            category: row?.category || category || null
+          }, req)
+        } catch {}
     res.json(createdTransaction.rows[0]);
   } catch (e) {
     console.error('create transaction failed', e)
@@ -684,6 +707,12 @@ transactionsRouter.put('/:id(\\d+)', auth.authMiddleware(true), auth.requirePerm
     const updateQuery = `UPDATE transactions SET ${fields.join(', ')} WHERE id = $${idx}`;
     const rs = await query(updateQuery, values);
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+        try {
+          await auth.logActivity(req.user?.id, 'transactions.update', {
+            target: Number(id),
+            fields: Object.keys(req.body || {})
+          }, req)
+        } catch {}
     res.json({ id });
   } catch (e) {
     console.error('update transaction failed', e)
@@ -698,6 +727,7 @@ transactionsRouter.delete('/:id(\\d+)', auth.authMiddleware(true), auth.requireP
     const { id } = req.params
     const rs = await query('DELETE FROM transactions WHERE id = $1', [id]);
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+        try { await auth.logActivity(req.user?.id, 'transactions.delete', { target: Number(id) }, req) } catch {}
     res.json({ success: true });
   } catch (e) {
     console.error('delete transaction failed', e)
@@ -792,6 +822,14 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
         }
         console.log('buyfx matched tx=', id, 'platform=', pid, 'delta=', delta)
         })
+        try {
+          await auth.logActivity(req.user?.id, 'transactions.match', {
+            id: Number(id),
+            type: t,
+            target_id: Number(targetId),
+            target_name: (targetName || null)
+          }, req)
+        } catch {}
         return res.json({ success: true, updated: true, id: Number(id) })
       } catch (err) {
         const code = err?.status || 500
@@ -813,6 +851,14 @@ transactionsRouter.post('/:id(\\d+)/match', auth.authMiddleware(true), auth.requ
     `;
     const rs = await query(updateQuery, [t, targetId, targetName, req.user?.id || null, id]);
     if (rs.rowCount === 0) return res.status(404).json({ error: 'Transaction not found' });
+    try {
+      await auth.logActivity(req.user?.id, 'transactions.match', {
+        id: Number(id),
+        type: t,
+        target_id: Number(targetId),
+        target_name: (targetName || null)
+      }, req)
+    } catch {}
     res.json({ success: true });
   } catch (e) {
     console.error('match transaction failed', e)
@@ -872,6 +918,13 @@ transactionsRouter.post('/:id(\\d+)/unmatch', auth.authMiddleware(true), auth.re
       if (rs.rowCount === 0) { const err = new Error('Transaction not found'); err.status=404; throw err }
       })
   console.log('buyfx unmatched tx=', id)
+  try {
+    await auth.logActivity(req.user?.id, 'transactions.unmatch', {
+      id: Number(id),
+      prev_type: row?.match_type || null,
+      prev_target_id: row?.match_target_id || null
+    }, req)
+  } catch {}
   return res.json({ success: true, updated: true, id: Number(id) });
     } catch (err) {
       const code = err?.status || 500
@@ -1112,6 +1165,9 @@ transactionsRouter.post('/simple-import', auth.authMiddleware(true), auth.requir
       }
     }
     
+    try {
+      await auth.logActivity(req.user?.id, 'transactions.import', { inserted, skipped, failed }, req)
+    } catch {}
     res.json({
       success: true,
       inserted,

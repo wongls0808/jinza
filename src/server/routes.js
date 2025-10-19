@@ -347,6 +347,52 @@ router.get('/workbench/balance', auth.authMiddleware(true), auth.requirePerm('vi
   }
 })
 
+// Workbench: Transfers list and net amount (资金调拨)
+// Returns entries related to transfers within optional date range and their net total (credit - debit)
+router.get('/workbench/transfers', auth.authMiddleware(true), auth.requirePerm('view_dashboard'), async (req, res) => {
+  try {
+    const { startDate = '', endDate = '' } = req.query || {}
+    // Build where conditions
+    const wh = []
+    const ps = []
+    // transfer semantic: either explicitly matched as 'transfer' or categorized as transfer/调拨
+    wh.push(`(lower(coalesce(t.match_type,'')) = 'transfer' OR lower(coalesce(t.category,'')) like '%transfer%' OR coalesce(t.category,'') like '%调拨%')`)
+    if (startDate) { ps.push(startDate); wh.push(`t.transaction_date >= $${ps.length}`) }
+    if (endDate) { ps.push(endDate); wh.push(`t.transaction_date <= $${ps.length}`) }
+    const whereSql = wh.length ? `where ${wh.join(' and ')}` : ''
+
+    const sql = `
+      select 
+        t.transaction_date as trn_date,
+        t.account_number,
+        t.cheque_ref_no,
+        t.debit_amount as debit,
+        t.credit_amount as credit,
+        coalesce(a.account_name,'') as account_name,
+        coalesce(b.zh, b.en, '') as bank_name,
+        coalesce(b.code, '') as bank_code
+      from transactions t
+      left join receiving_accounts a on a.bank_account = t.account_number
+      left join banks b on b.id = a.bank_id
+      ${whereSql}
+      order by t.transaction_date asc, t.id asc
+      limit 2000
+    `
+    const rows = await query(sql, ps)
+    const items = rows?.rows || []
+    const agg = items.reduce((s, r) => {
+      const d = Number(r.debit || 0)
+      const c = Number(r.credit || 0)
+      return { debit: s.debit + d, credit: s.credit + c }
+    }, { debit: 0, credit: 0 })
+    const net = Math.round(((agg.credit - agg.debit) || 0) * 100) / 100
+    res.json({ net, count: items.length, items })
+  } catch (e) {
+    console.error('workbench transfers failed', e)
+    res.status(500).json({ error: 'transfers failed', detail: e?.message })
+  }
+})
+
 // Change password (self)
 router.post('/auth/change-password', auth.authMiddleware(true), async (req, res) => {
   const { old_password, new_password } = req.body || {}

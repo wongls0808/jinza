@@ -426,6 +426,18 @@ const messages = {
           transferGap: '调拨差额合计：{amt}'
         }
       },
+      transfer: {
+        title: '资金调拨',
+        columns: {
+          date: '日期',
+          accountNo: '账号',
+          bank: '银行',
+          accountName: '账户名称',
+          refNo: '参考号',
+          debit: '借',
+          credit: '贷'
+        }
+      },
       errors: {
         rejectFailed: '驳回失败'
       }
@@ -550,6 +562,9 @@ const messages = {
         'transactions.delete': '删除交易',
         'transactions.import': '导入交易',
         'transactions.export': '导出交易',
+  'transactions.match': '关联交易',
+  'transactions.unmatch': '取消关联',
+  'transactions.view': '查看交易',
         'fx.settlement.create': '创建结汇',
         'fx.settlement.update': '更新结汇',
         'fx.settlement.delete': '删除结汇',
@@ -975,6 +990,19 @@ const messages = {
           accounts: 'Accounts {n}',
           platforms: 'Platforms {n}',
           transferGap: 'Transfer gap total: {amt}'
+        }
+      }
+      ,
+      transfer: {
+        title: 'Transfers',
+        columns: {
+          date: 'Date',
+          accountNo: 'A/C No.',
+          bank: 'Bank',
+          accountName: 'A/C Name',
+          refNo: 'Ref No',
+          debit: 'Debit',
+          credit: 'Credit'
         }
       }
     },
@@ -1426,6 +1454,9 @@ const messages = {
         'transactions.delete': 'Deleted transaction',
         'transactions.import': 'Imported transactions',
         'transactions.export': 'Exported transactions',
+  'transactions.match': 'Matched transaction',
+  'transactions.unmatch': 'Unmatched transaction',
+  'transactions.view': 'Viewed transaction',
         'fx.settlement.create': 'Created settlement',
         'fx.settlement.update': 'Updated settlement',
         'fx.settlement.delete': 'Deleted settlement',

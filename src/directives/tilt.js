@@ -15,7 +15,8 @@ export default {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         el.style.transform = `perspective(800px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${scale})`
-        if (shadow) el.style.boxShadow = `0 18px 45px rgba(0,0,0,.18)`
+        // 使用全局变量定义的“淡青绿色”阴影，统一鼠标移动阴影色调
+        if (shadow) el.style.boxShadow = `var(--app-mouse-shadow, 0 18px 45px rgba(45,212,191,.22))`
       })
     }
     function reset() {

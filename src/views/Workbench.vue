@@ -106,13 +106,13 @@
   <div class="kpi-title">{{ t('workbench.kpis.unmatched') }}</div>
         <div class="kpi-value">{{ unmatchedCount.toLocaleString() }}</div>
       </div>
-      <!-- 新增：余额健康监控（负余额/调拨失衡） -->
-      <div class="kpi-card theme-info" role="button" tabindex="0" v-if="has('view_dashboard')" @click="openBalanceDrawer" @keydown.enter.prevent="openBalanceDrawer" @keydown.space.prevent="openBalanceDrawer">
-        <el-tooltip :content="balanceTooltip" placement="top">
-          <span class="kpi-count">{{ totalAnomalies }}</span>
+      <!-- 新增：资金调拨（展示净额：贷-借） -->
+      <div class="kpi-card theme-info" role="button" tabindex="0" v-if="has('view_dashboard')" @click="openTransferDrawer" @keydown.enter.prevent="openTransferDrawer" @keydown.space.prevent="openTransferDrawer">
+        <el-tooltip :content="t('workbench.transfer.title')" placement="top">
+          <span class="kpi-count">{{ transfers.count }}</span>
         </el-tooltip>
-        <div class="kpi-title">{{ t('workbench.balance.title') }}</div>
-        <div class="kpi-value">{{ money(balance.totalImbalance) }}</div>
+        <div class="kpi-title">{{ t('workbench.transfer.title') }}</div>
+        <div class="kpi-value">{{ money(transfers.net) }}</div>
       </div>
     </div>
 
@@ -385,6 +385,31 @@
       </template>
     </el-drawer>
 
+    <!-- 资金调拨抽屉：字段 Date、A/C No.、Bank、A/C Name、Ref No、Debit、Credit -->
+    <el-drawer v-model="transferDrawer.visible" :title="t('workbench.transfer.title')" size="min(980px, 92vw)">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+        <el-button size="small" type="primary" :loading="transfers.loading" @click="loadTransfers">{{ t('workbench.monitor.refresh') }}</el-button>
+      </div>
+      <el-empty v-if="!transfers.loading && (!Array.isArray(transfers.items) || !transfers.items.length)" :description="t('common.noData')" />
+      <el-table v-else :data="transfers.items" size="small" border v-loading="transfers.loading" @header-dragend="onColResizeTransfer">
+        <el-table-column type="index" :label="t('common.no')" :width="colWTransfer('__idx', 60)" />
+        <el-table-column prop="trn_date" :label="t('workbench.transfer.columns.date')" :width="colWTransfer('trn_date', 130)">
+          <template #default="{ row }">{{ fmtDate(row.trn_date || row.transaction_date) }}</template>
+        </el-table-column>
+        <el-table-column prop="account_number" :label="t('workbench.transfer.columns.accountNo')" :width="colWTransfer('account_number', 180)" />
+        <el-table-column prop="bank_name" :label="t('workbench.transfer.columns.bank')" :width="colWTransfer('bank_name', 200)" />
+        <el-table-column prop="account_name" :label="t('workbench.transfer.columns.accountName')" :width="colWTransfer('account_name', 220)" />
+        <el-table-column prop="cheque_ref_no" :label="t('workbench.transfer.columns.refNo')" :width="colWTransfer('cheque_ref_no', 180)" />
+        <el-table-column prop="debit" :label="t('workbench.transfer.columns.debit')" :width="colWTransfer('debit', 140)" align="right">
+          <template #default="{ row }">{{ money(row.debit) }}</template>
+        </el-table-column>
+        <el-table-column prop="credit" :label="t('workbench.transfer.columns.credit')" :width="colWTransfer('credit', 140)" align="right">
+          <template #default="{ row }">{{ money(row.credit) }}</template>
+        </el-table-column>
+      </el-table>
+      <div class="kpi-sub" style="margin-top:8px;">{{ t('common.total') }}: {{ transfers.count }} · NET = {{ money(transfers.net) }}</div>
+    </el-drawer>
+
     <!-- 快捷操作：结汇抽屉 -->
     <el-drawer v-model="settleDrawer.visible" :title="t('home.qaSettlements')" size="50%">
       <FXManagement ref="settleRef" mode="settle" :in-drawer="true" :initial-settle-customer-id="settlePrefillCustomerId" @settlementCreated="onSettlementCreated" />
@@ -653,6 +678,8 @@ const detailDrawerSize = computed(() => {
 
 // 服务器监控列宽记忆
 const { colW: colWMonitor, onColResize: onColResizeMonitor } = useTableMemory('wb-monitor')
+// 资金调拨列宽记忆
+const { colW: colWTransfer, onColResize: onColResizeTransfer } = useTableMemory('wb-transfers')
 
 // —— 计算图形：聚合汇总 ——
 const summary = ref({
@@ -700,6 +727,7 @@ function onQuick(){
   else { range.value = null; return loadSummary() }
   range.value = [s, e]
   loadSummary()
+  loadTransfers()
 }
 function clearFilters(){ quick.value=''; range.value=null; loadSummary() }
 function onDateApply(){
@@ -709,6 +737,8 @@ function onDateApply(){
     loadSummary()
     // 同步刷新统计区
     loadStats()
+    // 刷新资金调拨
+    loadTransfers()
   }
 }
 function onDateClear(){
@@ -717,6 +747,7 @@ function onDateClear(){
   datePopover.value = false
   loadSummary()
   loadStats()
+  loadTransfers()
 }
 // 图形区域仅显示合计，不提供明细抽屉（声明已提前放置于顶部以供列宽记忆使用）
 async function openDetail(type){
@@ -1187,6 +1218,7 @@ async function loadStats(){
 }
 
 onMounted(() => { loadPaymentsCount(); loadPlatforms(); loadStats(); loadSummary(); try { if (has('view_dashboard')) loadBalance() } catch { loadBalance() } })
+onMounted(() => { loadTransfers() })
 
 // —— 交易管理：未匹配统计（KPI） ——
 const unmatchedCount = ref(0)
@@ -1351,6 +1383,25 @@ async function loadBalance(){
   }
 }
 function openBalanceDrawer(){ balanceDrawer.value.visible = true; loadBalance() }
+// —— Transfers（资金调拨）卡片/抽屉 ——
+const transferDrawer = ref({ visible: false })
+const transfers = ref({ loading: false, net: 0, count: 0, items: [] })
+async function loadTransfers(){
+  transfers.value.loading = true
+  try {
+    const params = new URLSearchParams()
+    if (Array.isArray(range.value) && range.value[0] && range.value[1]) { params.set('startDate', fmtYmd(range.value[0])); params.set('endDate', fmtYmd(range.value[1])) }
+    const r = await httpRequest(`/workbench/transfers?${params.toString()}`)
+    transfers.value.net = Number(r?.net || 0)
+    transfers.value.count = Number(r?.count || (Array.isArray(r?.items)? r.items.length : 0) || 0)
+    transfers.value.items = Array.isArray(r?.items) ? r.items : []
+  } catch {
+    transfers.value.net = 0
+    transfers.value.count = 0
+    transfers.value.items = []
+  } finally { transfers.value.loading = false }
+}
+function openTransferDrawer(){ transferDrawer.value.visible = true; loadTransfers() }
 </script>
 
 <style scoped>

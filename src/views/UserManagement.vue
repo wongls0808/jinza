@@ -258,6 +258,51 @@
                   <el-icon><DataLine /></el-icon>
                   <span>{{ t('users.activityDetails.count') }}: {{ activity.meta.count }}</span>
                 </div>
+                <!-- Transactions details enrichment -->
+                <template v-if="activity.action && activity.action.startsWith('transactions.') && activity.meta">
+                  <div class="meta-item" v-if="activity.meta.id">
+                    <el-icon><Link /></el-icon>
+                    <span>ID: {{ activity.meta.id }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.meta.account_number">
+                    <el-icon><Link /></el-icon>
+                    <span>A/C: {{ activity.meta.account_number }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.meta.transaction_date || activity.meta.trn_date">
+                    <el-icon><Link /></el-icon>
+                    <span>{{ activity.meta.transaction_date || activity.meta.trn_date }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.meta.debit != null">
+                    <el-icon><DataLine /></el-icon>
+                    <span>借: {{ Number(activity.meta.debit).toFixed(2) }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.meta.credit != null">
+                    <el-icon><DataLine /></el-icon>
+                    <span>贷: {{ Number(activity.meta.credit).toFixed(2) }}</span>
+                  </div>
+                  <!-- Match/Unmatch details -->
+                  <div class="meta-item" v-if="activity.action === 'transactions.match' && (activity.meta.type || activity.meta.target_id)">
+                    <el-icon><Link /></el-icon>
+                    <span>匹配: {{ activity.meta.type }} → {{ activity.meta.target_name || activity.meta.target_id }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.action === 'transactions.unmatch' && (activity.meta.prev_type || activity.meta.prev_target_id)">
+                    <el-icon><Link /></el-icon>
+                    <span>原关联: {{ activity.meta.prev_type }} → {{ activity.meta.prev_target_id }}</span>
+                  </div>
+                  <!-- Import/Export summary -->
+                  <div class="meta-item" v-if="activity.action === 'transactions.import'">
+                    <el-icon><Upload /></el-icon>
+                    <span>导入: {{ activity.meta.inserted || 0 }} / 跳过: {{ activity.meta.skipped || 0 }} / 失败: {{ activity.meta.failed || 0 }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.action === 'transactions.export' && activity.meta.count != null">
+                    <el-icon><Download /></el-icon>
+                    <span>导出: {{ activity.meta.count }}</span>
+                  </div>
+                  <div class="meta-item" v-if="activity.action === 'transactions.delete' && Array.isArray(activity.meta.ids)">
+                    <el-icon><Delete /></el-icon>
+                    <span>批量删除: {{ activity.meta.ids.slice(0,5).join(', ') }}<span v-if="activity.meta.ids.length>5"> 等{{ activity.meta.ids.length }}条</span></span>
+                  </div>
+                </template>
               </div>
 
               <div class="activity-timestamp">{{ fmtMinute(activity.ts) }}</div>
