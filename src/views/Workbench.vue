@@ -9,7 +9,7 @@
     <div class="hf-toolbar" role="toolbar" aria-label="High frequency actions" v-if="has('dashboard:quick_actions')">
       <div class="hf-row">
         <div class="hf-item info" role="button" tabindex="0" :aria-label="t('home.qaMatch')" v-if="has('dashboard:action:match')" @click="go({ name: 'transactions' })" @keydown.enter.prevent="go({ name: 'transactions' })" @keydown.space.prevent="go({ name: 'transactions' })">
-          <div class="hf-icon"><Link /></div>
+          <div class="hf-icon"><List /></div>
           <div class="hf-label">{{ t('home.qaMatch') }}</div>
         </div>
         <div class="hf-item primary" role="button" tabindex="0" :aria-label="t('home.qaSettlements')" v-if="has('dashboard:action:settle')" @click="openSettleDrawer()" @keydown.enter.prevent="openSettleDrawer()" @keydown.space.prevent="openSettleDrawer()">
@@ -1365,6 +1365,7 @@ function openBalanceDrawer(){ balanceDrawer.value.visible = true; loadBalance() 
 .hf-item.primary .hf-icon { background: color-mix(in oklab, var(--el-color-primary) 16%, transparent); color: var(--el-color-primary); }
 .hf-item.success .hf-icon { background: color-mix(in oklab, var(--el-color-success) 16%, transparent); color: var(--el-color-success); }
 .hf-item.warning .hf-icon { background: color-mix(in oklab, var(--el-color-warning) 16%, transparent); color: var(--el-color-warning); }
+.hf-item.info .hf-icon { background: color-mix(in oklab, var(--el-color-info) 16%, transparent); color: var(--el-color-info); }
 @media (max-width: 768px){ .hf-row { gap: 8px; } }
 
 /* 卡片网格 */
