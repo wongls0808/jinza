@@ -35,11 +35,14 @@
           <el-table-column prop="cheque_ref_no" column-key="cheque_ref_no" :label="t('transactions.chequeRefNo')" :width="colWSettle('cheque_ref_no',140)" />
           <el-table-column prop="account_number" column-key="account_number" :label="t('transactions.accountNumber')" :width="colWSettle('account_number',160)" />
           <el-table-column prop="account_name" column-key="account_name" :label="t('transactions.accountName')" :width="colWSettle('account_name',180)" />
-          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',100)" align="center">
+          <el-table-column column-key="bank_logo" :label="t('transactions.bankName')" :width="colWSettle('bank_logo',160)" align="center">
             <template #default="{ row }">
               <div class="bank-cell">
-                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
-                <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || row.bank_name_en || row.bank_name || '').toUpperCase().slice(0,6) }}</span>
+                <template v-if="!logoFail[logoKey(row)]">
+                  <img :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                  <span class="sep">•</span>
+                </template>
+                <span class="bank-code">{{ (row.bank_code || '-')?.toString().toUpperCase() }}</span>
               </div>
             </template>
           </el-table-column>
@@ -78,13 +81,16 @@
           </el-table-column>
           <!-- 账户名称 -->
           <el-table-column prop="account_name" column-key="account_name" :label="t('customers.accounts.accountName')" :width="colWPay('account_name',200)" />
-          <!-- 银行名称（中文）+ Logo 同列显示 -->
-          <el-table-column column-key="bank" :label="t('customers.accounts.bank')" :width="colWPay('bank',220)">
+          <!-- 银行名称（中文） • Logo 同列显示 -->
+          <el-table-column column-key="bank" :label="t('customers.accounts.bank')" :width="colWPay('bank',240)">
             <template #default="{ row }">
               <div class="bank-cell" style="justify-content:flex-start; gap:8px;">
-                <img v-show="!logoFail[logoKey(row)]" :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
-                <span v-show="logoFail[logoKey(row)]" class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
-                <span style="font-weight:600;">{{ row.bank_zh || row.bank_name || '' }}</span>
+                <span class="bank-name">{{ row.bank_zh || row.bank_name || '-' }}</span>
+                <template v-if="!logoFail[logoKey(row)]">
+                  <span class="sep">•</span>
+                  <img :src="resolveLogo(row)" alt="bank" class="bank-logo" @error="onLogoError($event, row)" />
+                </template>
+                <span v-else class="bank-text">{{ (row.bank_code || '').toUpperCase().slice(0,6) }}</span>
               </div>
             </template>
           </el-table-column>
@@ -452,5 +458,8 @@ function isSettleSelectable(row){
   .bank-cell { display:flex; align-items:center; justify-content:center; height: 24px; }
   .bank-logo { max-width: 80px; max-height: 18px; object-fit: contain; display:inline-block; }
   .bank-text { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 600; letter-spacing: .5px; }
+  .bank-code { font-weight: 700; letter-spacing: .5px; }
+  .bank-name { font-weight: 700; }
+  .sep { color: var(--el-text-color-secondary); margin: 0 6px; }
  @media (max-width: 1100px) { .fx-split { grid-template-columns: 1fr; } }
 </style>
