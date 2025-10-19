@@ -258,10 +258,6 @@
                   <el-icon><DataLine /></el-icon>
                   <span>{{ t('users.activityDetails.count') }}: {{ activity.meta.count }}</span>
                 </div>
-                <div class="meta-item" v-if="activity.user_agent">
-                  <el-icon><Connection /></el-icon>
-                  <span>{{ t('users.activityDetails.device') }}: {{ activity.user_agent }}</span>
-                </div>
               </div>
 
               <div class="activity-timestamp">{{ fmtMinute(activity.ts) }}</div>
@@ -522,7 +518,9 @@ async function refreshLogs(u) {
   logState.value.loading[u.id] = true
   try {
     const rows = await api.users.sessions(u.id)
-    logs.value[u.id] = rows || []
+    // 将后端 last_seen 规范化为 ts，避免渲染缺省为“当前时间”
+    const mapped = Array.isArray(rows) ? rows.map(r => ({ ...r, ts: r?.last_seen ?? r?.ts ?? null })) : []
+    logs.value[u.id] = mapped
   } catch (e) {
     ElMessage.error(t('users.loadLogFailed'))
   } finally {
@@ -615,7 +613,8 @@ function initials(u) {
 // 将时间格式化为 "YYYY-MM-DD HH:mm"（到分钟）
 function fmtMinute(ts) {
   try {
-    const d = ts ? new Date(ts) : new Date()
+    if (!ts) return ''
+    const d = new Date(ts)
     if (isNaN(d.getTime())) return ''
     const pad = (n) => (n < 10 ? '0' + n : '' + n)
     const y = d.getFullYear()
@@ -623,7 +622,9 @@ function fmtMinute(ts) {
     const day = pad(d.getDate())
     const hh = pad(d.getHours())
     const mm = pad(d.getMinutes())
-    return `${y}-${m}-${day} ${hh}:${mm}`
+    const ss = pad(d.getSeconds())
+    // 提升显示精度到秒
+    return `${y}-${m}-${day} ${hh}:${mm}:${ss}`
   } catch { return '' }
 }
 </script>
