@@ -25,13 +25,15 @@
       >
         <el-table-column type="index" column-key="__idx" :label="$t('accounts.fields.index')" :width="colW('__idx', 60)" />
         <el-table-column prop="account_name" :label="$t('accounts.fields.accountName')" sortable="custom" :width="colW('account_name', 160)" />
-        <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 260)">
+        <el-table-column column-key="bank" :label="$t('accounts.fields.bank')" :width="colW('bank', 320)">
           <template #default="{ row }">
             <div class="bankcell">
               <img v-show="!logoFail[logoKey(row)]" class="logo" :src="resolveLogo(row)" alt="logo" @error="onLogoError($event, row)" />
-              <span v-show="logoFail[logoKey(row)]" class="code">{{ (row.bank_code||'').toUpperCase() }}</span>
-              <span class="zh">{{ row.bank_zh }}</span>
-              <span class="en">{{ row.bank_en }}</span>
+              <span class="code">{{ (row.bank_code||'').toUpperCase() }}</span>
+              <span class="sep">•</span>
+              <span class="zh">{{ row.bank_zh || '-' }}</span>
+              <span class="sep">•</span>
+              <span class="en">{{ row.bank_en || '-' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -105,12 +107,14 @@
         </el-form-item>
         <el-form-item :label="$t('accounts.form.bank')">
           <el-select v-model="dlg.form.bank_id" filterable clearable style="width:100%" :placeholder="$t('accounts.form.bank')">
-            <el-option v-for="b in banks" :key="b.id" :value="b.id" :label="b.zh + ' · ' + b.en">
+            <el-option v-for="b in banks" :key="b.id" :value="b.id" :label="(b.code||'') + ' · ' + (b.zh||'') + ' · ' + (b.en||'')">
               <div class="bankopt">
                 <img v-show="!logoFail[logoKey(b)]" class="logo" :src="resolveLogo(b)" @error="onLogoError($event, b)" />
-                <span v-show="logoFail[logoKey(b)]" class="code">{{ (b.code||'').toUpperCase() }}</span>
-                <span class="zh">{{ b.zh }}</span>
-                <span class="en">{{ b.en }}</span>
+                <span class="code">{{ (b.code||'').toUpperCase() }}</span>
+                <span class="sep">•</span>
+                <span class="zh">{{ b.zh || '-' }}</span>
+                <span class="sep">•</span>
+                <span class="en">{{ b.en || '-' }}</span>
               </div>
             </el-option>
           </el-select>
@@ -277,6 +281,8 @@ onMounted(() => {
           if (!b) return r
           return { ...r, bank_code: b.code, bank_zh: b.zh, bank_en: b.en, bank_logo: b.logo_url }
         })
+        // 重置失败缓存，允许新logo重试
+        if (logoFail && logoFail.value) logoFail.value = {}
       } catch {}
     })
   } catch {}
@@ -322,6 +328,8 @@ function onRowDblClick(row) {
 .add-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .bankcell, .bankopt { display: inline-flex; align-items: center; gap: 10px; }
 .bankcell .logo, .bankopt .logo { height: 16px; width: auto; object-fit: contain; }
+.bankcell .code, .bankopt .code { font-weight: 700; letter-spacing: .5px; }
+.bankcell .sep, .bankopt .sep { color: var(--el-text-color-secondary); margin: 0 -4px; }
 .bankcell .zh, .bankopt .zh { font-weight: 600; }
 .bankcell .en, .bankopt .en { color: var(--el-text-color-secondary); font-size: 12px; }
 .plain-card { background: transparent; border: none; box-shadow: none; }
