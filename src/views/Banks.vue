@@ -64,6 +64,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api'
 import { useBankLogo } from '@/composables/useBankLogo'
@@ -78,21 +79,23 @@ async function load() {
   banks.value = await api.requestBanks()
 }
 
+const { t } = useI18n()
+
 async function remove(code) {
   try {
     const b = banks.value.find(x => x.code === code)
     if (!b) return
-  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning'), { type: 'warning' })
+    await ElMessageBox.confirm(`${t('common.confirmDelete')}`, t('common.warning'), { type: 'warning' })
     await api.deleteBank(b.id)
     await load()
-    ElMessage.success($t('customers.messages.deleted'))
+    ElMessage.success(t('customers.messages.deleted'))
   } catch {}
 }
 
 async function reset() {
   await api.resetBanks()
   await load()
-  ElMessage.success($t('banks.resetDefaults'))
+  ElMessage.success(t('banks.resetDefaults'))
 }
 
 function openAdd() {
@@ -131,7 +134,7 @@ async function submit() {
   try {
     const f = dlg.value.form
     if (dlg.value.mode === 'add') {
-      if (!f.code || !f.zh || !f.en) { ElMessage.warning($t('customers.messages.fillAllFields')); return }
+      if (!f.code || !f.zh || !f.en) { ElMessage.warning(t('customers.messages.fillAllFields')); return }
       await api.createBank({
         code: (f.code || '').trim().toUpperCase(),
         zh: (f.zh || '').trim().toUpperCase(),
@@ -152,11 +155,11 @@ async function submit() {
   dlg.value.form.logo_data_url = ''
   try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
     await load()
-    ElMessage.success($t('customers.messages.saved'))
+    ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
     let msg = e?.message || ''
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
-    ElMessage.error(($t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg))
+    ElMessage.error((t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg))
   } finally {
     dlg.value.loading = false
   }
@@ -167,12 +170,12 @@ async function removeInDialog() {
     const f = dlg.value.form
     const b = banks.value.find(x => x.id === f.id)
     if (!b) return
-  await ElMessageBox.confirm(`${$t('common.confirmDelete')}`, $t('common.warning'), { type: 'warning' })
+    await ElMessageBox.confirm(`${t('common.confirmDelete')}`, t('common.warning'), { type: 'warning' })
     dlg.value.loading = true
     await api.deleteBank(b.id)
     dlg.value.visible = false
     await load()
-  ElMessage.success($t('customers.messages.deleted'))
+    ElMessage.success(t('customers.messages.deleted'))
   } catch {} finally {
     dlg.value.loading = false
   }
