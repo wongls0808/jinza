@@ -95,8 +95,8 @@ if (shouldServeStatic) {
       }
     }
   }))
-  // SPA fallback for non-API routes
-  app.get(/^(?!\/api).*/, (req, res) => {
+  // SPA fallback for non-API, non-asset routes（不匹配带扩展名的静态资源路径）
+  app.get(/^(?!\/api)(?!.*\.).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-store')
     res.sendFile(path.join(distPath, 'index.html'))
   })
