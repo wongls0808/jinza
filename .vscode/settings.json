@@ -1,0 +1,13 @@
+{
+  // 避免联网下载 JSON Schema（离线/内网环境稳定）
+  "json.schemaDownload.enable": false,
+  // 将 package.json 绑定到 VS Code 内置架构，保证 IntelliSense 正常
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "package.json"
+      ],
+      "url": "vscode://schemas/package"
+    }
+  ]
+}
