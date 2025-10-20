@@ -12,7 +12,7 @@ export function signToken(payload) {
 export function authMiddleware(required = true) {
   return async (req, res, next) => {
     // 显式允许通过环境变量绕过鉴权（仅用于临时联调），默认不启用
-    if (process.env.AUTH_BYPASS === '1') {
+    if (process.env.NODE_ENV !== 'production' && process.env.AUTH_BYPASS === '1') {
       req.user = {
         id: 1,
         username: 'admin',
@@ -343,7 +343,7 @@ export function validatePasswordStrength(password) {
 export function requirePerm(code) {
   return (req, res, next) => {
     // UI-only 权限模式：放行所有权限检查（仍需登录）
-    if (process.env.PERM_UI_ONLY === '1') return next()
+    if (process.env.NODE_ENV !== 'production' && process.env.PERM_UI_ONLY === '1') return next()
     // 管理员直接放行
     if (req.user && req.user.is_admin) return next()
 
@@ -358,7 +358,7 @@ export function requirePerm(code) {
 export function hasPerm(req, code) {
   if (!req || !req.user) return false
   // UI-only 权限模式：视为拥有所有权限（仍需登录）
-  if (process.env.PERM_UI_ONLY === '1') return true
+  if (process.env.NODE_ENV !== 'production' && process.env.PERM_UI_ONLY === '1') return true
   if (req.user.is_admin) return true
   const perms = Array.isArray(req.user.perms) ? req.user.perms : []
   return perms.includes(code)
@@ -369,7 +369,7 @@ export function requireAnyPerm(...codes) {
   const flat = codes.flat().filter(Boolean)
   return (req, res, next) => {
     // UI-only 权限模式：放行所有权限检查（仍需登录）
-    if (process.env.PERM_UI_ONLY === '1') return next()
+    if (process.env.NODE_ENV !== 'production' && process.env.PERM_UI_ONLY === '1') return next()
     if (req.user && req.user.is_admin) return next()
     const perms = (req.user && req.user.perms) || []
     const ok = flat.some(c => perms.includes(c))
@@ -385,7 +385,7 @@ export function readOpenOr(...codes) {
   const guard = requireAnyPerm(...codes)
   return (req, res, next) => {
     // UI-only 权限模式：放行所有权限检查（仍需登录）
-    if (process.env.PERM_UI_ONLY === '1') return next()
+    if (process.env.NODE_ENV !== 'production' && process.env.PERM_UI_ONLY === '1') return next()
     if (String(req.method || '').toUpperCase() === 'GET') return next()
     return guard(req, res, next)
   }

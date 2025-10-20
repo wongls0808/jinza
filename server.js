@@ -13,19 +13,31 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// CORS: 开发放开，生产按环境变量白名单控制（逗号分隔 ORIGINS）
+// CORS: 开发放开，生产按环境变量白名单控制（逗号分隔 ORIGINS）；默认不宽松放行
 const allowOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true) // same-origin / curl
     if (process.env.NODE_ENV !== 'production') return cb(null, true)
-    if (allowOrigins.length === 0) return cb(null, true)
-    if (allowOrigins.includes(origin)) return cb(null, true)
+    if (allowOrigins.length > 0 && allowOrigins.includes(origin)) return cb(null, true)
     return cb(new Error('CORS not allowed'))
   },
   credentials: true,
 }))
 app.use(express.json({ limit: '10mb' }))
+
+// 信任反向代理（获取真实 IP 用于审计/限流）
+try { app.set('trust proxy', 1) } catch {}
+
+// 基础安全响应头（不引入依赖，避免破坏构建）
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
+  next()
+})
 
 // Serve runtime uploads (e.g., bank logos) — use persistent DATA_DIR when available
 const dataDir = process.env.DATA_DIR || path.join(__dirname)
