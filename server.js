@@ -13,16 +13,71 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// CORS: 开发放开，生产按环境变量白名单控制（逗号分隔 ORIGINS）；默认不宽松放行
-const allowOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true) // same-origin / curl
-    if (process.env.NODE_ENV !== 'production') return cb(null, true)
-    if (allowOrigins.length > 0 && allowOrigins.includes(origin)) return cb(null, true)
+// CORS: 开发环境放开；生产按环境变量白名单控制
+// - CORS_ORIGINS: 逗号分隔的列表，支持：
+//   * 完整 Origin（含协议/端口），例如：https://app.example.com、https://app.example.com:8443
+//   * 主机名（可用通配符前缀）：example.com 或 *.example.com（忽略协议与端口）
+//   * "*" 表示允许所有（仅在明确设置时生效）
+// - CORS_ALLOW_ALL=1 将放开所有来源（反射 Origin），仅应紧急/临时使用
+const allowOriginEntries = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+const allowAll = process.env.CORS_ALLOW_ALL === '1' || allowOriginEntries.includes('*')
+
+function hostMatches(host, pattern) {
+  if (!host || !pattern) return false
+  // 只比较主机名部分（忽略端口）
+  const normalizeHost = h => String(h).toLowerCase()
+  const h = normalizeHost(host)
+  const p = normalizeHost(pattern)
+  if (p.startsWith('*.')) {
+    const base = p.slice(2)
+    return h === base || h.endsWith('.' + base)
+  }
+  return h === p
+}
+
+function isAllowedOrigin(requestOrigin, reqHost) {
+  if (!requestOrigin) return true // same-origin 或非浏览器请求
+  if (process.env.NODE_ENV !== 'production') return true
+  if (allowAll) return true
+  if (allowOriginEntries.length === 0) return false
+
+  // 尝试解析 Origin
+  try {
+    const u = new URL(requestOrigin)
+    const originHost = u.hostname
+    // 逐条匹配：完整 Origin 或主机通配
+    for (const entry of allowOriginEntries) {
+      if (!entry) continue
+      if (/^https?:\/\//i.test(entry)) {
+        // 完整 Origin 比较（大小写不敏感）
+        if (entry.toLowerCase() === requestOrigin.toLowerCase()) return true
+      } else {
+        if (hostMatches(originHost, entry)) return true
+      }
+    }
+    // 同主机兜底（当白名单包含当前 Host 的裸域时，带子域也可能通过）
+    if (reqHost) {
+      const reqHostname = String(reqHost).split(':')[0]
+      for (const entry of allowOriginEntries) {
+        if (!/^https?:\/\//i.test(entry) && hostMatches(reqHostname, entry)) return true
+      }
+    }
+  } catch {}
+  return false
+}
+
+app.use(cors((req, cb) => {
+  const origin = req.headers.origin
+  const allowed = isAllowedOrigin(origin, req.headers.host)
+  if (!allowed) {
+    // 显式拒绝：返回错误以触发 403/500，由全局错误处理拦截
     return cb(new Error('CORS not allowed'))
-  },
-  credentials: true,
+  }
+  // 反射 Origin（而非 *），以便携带凭据
+  cb(null, { origin: true, credentials: true })
 }))
 app.use(express.json({ limit: '10mb' }))
 
