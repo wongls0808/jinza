@@ -75,3 +75,49 @@
 - 前端展示：各处始终按 `/banks/<code>.svg` 加载，图片加载失败时前端会依次尝试 `.png`、`.jpg`，最终使用占位
 
 注意：旧有的外链 URL 将不再使用；若仍保留数据库中的 `logo_url` 字段，其值仅用于兼容读取 `/banks/<code>.<ext>` 路径，不建议填写外站地址。
+
+## 生产部署指南
+
+本项目由 `server.js` 同时托管后端 API 与打包后的前端（Vite 产物在 `dist/`）。生产部署建议流程：
+
+1) 构建前端
+   - 运行 `npm run build` 生成 `dist/` 目录
+2) 启动服务
+   - 运行 `npm start`（Express 会托管 `dist/` 静态资源，并提供 SPA fallback）
+
+关键环境变量（生产）：
+- NODE_ENV=production
+- PORT=3000（或平台注入的端口变量）
+- DATABASE_URL=postgresql://user:pass@host:5432/dbname
+- JWT_SECRET=强随机密钥
+- CORS 配置（二选一）
+  - CORS_ORIGINS=以逗号分隔的 Origin 列表，支持通配符域名（如 `*.example.com`）或完整 Origin（含协议与端口）
+  - CORS_ALLOW_ALL=1（紧急放开所有来源；上线排障可临时使用，尽快改回白名单）
+- 可选：DATA_DIR=持久化数据目录（例如挂载卷的路径，用于 `/uploads` 等）
+
+静态资源与 SPA：
+- `index.html` 设置为 `Cache-Control: no-store`，避免旧入口引用新 chunk 造成白屏
+- 带哈希文件（js/css/font/img）启用 `immutable` 长缓存
+- SPA fallback 仅对“非 /api 且不包含点”的路径生效，确保 `*.js/*.css` 等静态请求不被错误回退
+
+### Railway 部署步骤（示例）
+1) 在 Railway 连接本仓库（main 分支）
+2) 在 Variables 设置：
+   - NODE_ENV=production
+   - DATABASE_URL=你的 PostgreSQL 连接串
+   - JWT_SECRET=强随机密钥
+   - 任选其一：CORS_ALLOW_ALL=1（全部放开）或 CORS_ORIGINS=你的域名列表（如 `https://app.example.com,https://admin.example.com` / `*.example.com`）
+   - 如需持久化 `/uploads`，为服务添加 Volume 并设置 DATA_DIR=/data（示例路径）
+3) 部署命令：Railway 会自动安装依赖；建议明确设置：
+   - Build Command: `npm run build`
+   - Start Command: `npm start`
+4) 部署完成后，验证：
+   - GET `/api/health` → { status: 'ok' }
+   - GET `/api/version` 查看版本与时间
+   - 浏览器访问站点首页并检查 Network：入口引用当前 `index-*.js`，无跨域报错
+
+常见部署问题排查：
+- 浏览器白屏且请求旧 chunk 名：清理 CDN/浏览器缓存；确认入口 `index.html` 响应头为 `no-store`
+- 资产 404 被回退到 HTML：检查反代/网关重写规则，确保仅对“非点路径”回退
+- CORS 报错：在生产设置 `CORS_ORIGINS` 或临时 `CORS_ALLOW_ALL=1`，并重启服务
+
