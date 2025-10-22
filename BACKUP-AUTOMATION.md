@@ -31,6 +31,9 @@
 - SMTP_FROM=ops@example.com 可选
 - BACKUP_EMAIL_ATTACH=1 可选，邮件附带 zip（文件较大时不建议）
 - SMTP_TIMEOUT_MS=10000 可选，邮件发送超时（毫秒，默认 10000），避免网络受限时挂起请求
+- SMTP_DEBUG=1 可选，开启 nodemailer 调试日志（仅用于排障，避免在生产长期开启）
+
+连接失败回退：若使用 465/SSL 超时或被拒，系统会自动回退到 587/STARTTLS 再尝试一次。
 
 服务启动后日志中会看到：
 

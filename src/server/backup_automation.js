@@ -107,14 +107,17 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
   const from = process.env.SMTP_FROM || user
   if (!host || !user || !pass) return { sent: false }
   const timeout = Math.max(3000, Number(process.env.SMTP_TIMEOUT_MS || 10000))
-  const transport = nodemailer.createTransport({
+  const enableDebug = process.env.SMTP_DEBUG === '1'
+  const mkTransport = (p, s) => nodemailer.createTransport({
     host,
-    port,
-    secure,
+    port: p,
+    secure: s,
     auth: { user, pass },
     connectionTimeout: timeout,
     greetingTimeout: timeout,
     socketTimeout: timeout,
+    logger: enableDebug,
+    debug: enableDebug,
   })
   const subject = ok ? `数据备份成功: ${fileName}` : `数据备份失败: ${fileName}`
   const lines = []
@@ -133,15 +136,38 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
     text: lines.join('\n'),
     attachments: attach ? [{ filename: fileName, path: filePath, contentType: 'application/zip' }] : []
   }
-  const withTimeout = new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('SMTP timeout')), timeout + 1000)
-    transport.sendMail(mailOptions).then(r => { clearTimeout(t); resolve(r) }).catch(err => { clearTimeout(t); reject(err) })
-  })
+  const trySend = async (p, s) => {
+    const transport = mkTransport(p, s)
+    const withTimeout = new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('SMTP timeout')), timeout + 1000)
+      transport.sendMail(mailOptions).then(r => { clearTimeout(t); resolve(r) }).catch(err => { clearTimeout(t); reject(err) })
+    })
+    try {
+      await withTimeout
+      return true
+    } finally {
+      try { transport.close() } catch {}
+    }
+  }
+  // 首选使用用户显式配置
   try {
-    await withTimeout
+    await trySend(port, secure)
     return { sent: true }
-  } finally {
-    try { transport.close() } catch {}
+  } catch (e) {
+    // 超时或网络错误时回退到 587/STARTTLS
+    const msg = String(e?.message||'')
+    const code = String(e?.code||'')
+    const isNetErr = /timeout|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ESOCKET/i.test(msg+code)
+    if (isNetErr && !(port===587 && secure===false)) {
+      try {
+        await trySend(587, false)
+        return { sent: true, fallback: true }
+      } catch (e2) {
+        console.warn('[backup][smtp] fallback 587 failed:', e2?.message||e2)
+        throw e2
+      }
+    }
+    throw e
   }
 }
 
