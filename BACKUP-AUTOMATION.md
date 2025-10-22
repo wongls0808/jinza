@@ -30,6 +30,7 @@
 - SMTP_PASS=…
 - SMTP_FROM=ops@example.com 可选
 - BACKUP_EMAIL_ATTACH=1 可选，邮件附带 zip（文件较大时不建议）
+- SMTP_TIMEOUT_MS=10000 可选，邮件发送超时（毫秒，默认 10000），避免网络受限时挂起请求
 
 服务启动后日志中会看到：
 

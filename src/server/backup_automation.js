@@ -106,7 +106,16 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
   const pass = process.env.SMTP_PASS
   const from = process.env.SMTP_FROM || user
   if (!host || !user || !pass) return { sent: false }
-  const transport = nodemailer.createTransport({ host, port, secure, auth: { user, pass } })
+  const timeout = Math.max(3000, Number(process.env.SMTP_TIMEOUT_MS || 10000))
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    connectionTimeout: timeout,
+    greetingTimeout: timeout,
+    socketTimeout: timeout,
+  })
   const subject = ok ? `数据备份成功: ${fileName}` : `数据备份失败: ${fileName}`
   const lines = []
   lines.push(`时间: ${new Date().toISOString()}`)
@@ -117,14 +126,23 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
     lines.push(`本地文件: ${filePath}`)
   }
   const attach = process.env.BACKUP_EMAIL_ATTACH === '1'
-  await transport.sendMail({
+  const mailOptions = {
     from,
     to,
     subject,
     text: lines.join('\n'),
     attachments: attach ? [{ filename: fileName, path: filePath, contentType: 'application/zip' }] : []
+  }
+  const withTimeout = new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('SMTP timeout')), timeout + 1000)
+    transport.sendMail(mailOptions).then(r => { clearTimeout(t); resolve(r) }).catch(err => { clearTimeout(t); reject(err) })
   })
-  return { sent: true }
+  try {
+    await withTimeout
+    return { sent: true }
+  } finally {
+    try { transport.close() } catch {}
+  }
 }
 
 function cleanupRetention(dir) {
