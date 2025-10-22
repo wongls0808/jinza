@@ -33,7 +33,15 @@
 - SMTP_TIMEOUT_MS=10000 可选，邮件发送超时（毫秒，默认 10000），避免网络受限时挂起请求
 - SMTP_DEBUG=1 可选，开启 nodemailer 调试日志（仅用于排障，避免在生产长期开启）
 
-连接失败回退：若使用 465/SSL 超时或被拒，系统会自动回退到 587/STARTTLS 再尝试一次。
+可选（邮件通知 via AWS SES，HTTPS 通道，适合出站 SMTP 端口受限的环境）：
+
+- SES_REGION=ap-southeast-1（或使用 AWS_REGION）
+- SES_FROM=ops@example.com 可选，未设置时回退到 SMTP_FROM 或 SMTP_USER
+- AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 使用与 S3 相同凭据
+
+说明：启用 SES 时，系统在 SMTP 失败（含 465 和回退的 587）后，会自动改用 SES 发送通知邮件。SES 回退为纯文本邮件，出于简化未附带备份 zip 附件（即使 BACKUP_EMAIL_ATTACH=1）。
+
+连接失败回退顺序：SMTP 465/SSL → SMTP 587/STARTTLS → SES（如已配置）。
 
 服务启动后日志中会看到：
 

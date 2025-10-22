@@ -8,11 +8,17 @@ import * as auth from './auth.js'
 
 // Optional deps (loaded only when configured)
 let S3Client, PutObjectCommand
+let SESClient, SendEmailCommand
 let nodemailer
 try {
   const s3mod = await import('@aws-sdk/client-s3')
   S3Client = s3mod.S3Client
   PutObjectCommand = s3mod.PutObjectCommand
+} catch {}
+try {
+  const sesmod = await import('@aws-sdk/client-ses')
+  SESClient = sesmod.SESClient
+  SendEmailCommand = sesmod.SendEmailCommand
 } catch {}
 try { nodemailer = (await import('nodemailer')).default } catch {}
 
@@ -98,14 +104,14 @@ async function uploadS3IfConfigured(filePath, key) {
 
 async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
   const to = (process.env.BACKUP_NOTIFY_EMAILS || '').split(',').map(s=>s.trim()).filter(Boolean)
-  if (!to.length || !nodemailer) return { sent: false }
+  if (!to.length) return { sent: false }
+  // 先尝试 SMTP（如果 nodemailer 可用且已配置）→ 失败则考虑 SES 回退（HTTPS，不附带附件）
   const host = process.env.SMTP_HOST
   const port = Number(process.env.SMTP_PORT || 587)
   const secure = process.env.SMTP_SECURE === '1' || port === 465
   const user = process.env.SMTP_USER
   const pass = process.env.SMTP_PASS
   const from = process.env.SMTP_FROM || user
-  if (!host || !user || !pass) return { sent: false }
   const timeout = Math.max(3000, Number(process.env.SMTP_TIMEOUT_MS || 10000))
   const enableDebug = process.env.SMTP_DEBUG === '1'
   const mkTransport = (p, s) => nodemailer.createTransport({
@@ -149,26 +155,51 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
       try { transport.close() } catch {}
     }
   }
-  // 首选使用用户显式配置
-  try {
-    await trySend(port, secure)
-    return { sent: true }
-  } catch (e) {
-    // 超时或网络错误时回退到 587/STARTTLS
-    const msg = String(e?.message||'')
-    const code = String(e?.code||'')
-    const isNetErr = /timeout|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ESOCKET/i.test(msg+code)
-    if (isNetErr && !(port===587 && secure===false)) {
-      try {
-        await trySend(587, false)
-        return { sent: true, fallback: true }
-      } catch (e2) {
-        console.warn('[backup][smtp] fallback 587 failed:', e2?.message||e2)
-        throw e2
+  // 若提供了完整 SMTP 配置且 nodemailer 可用，则先走 SMTP
+  if (nodemailer && host && user && pass) {
+    try {
+      await trySend(port, secure)
+      return { sent: true, via: 'smtp' }
+    } catch (e) {
+      // 超时或网络错误时回退到 587/STARTTLS
+      const msg = String(e?.message||'')
+      const code = String(e?.code||'')
+      const isNetErr = /timeout|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ESOCKET/i.test(msg+code)
+      if (isNetErr && !(port===587 && secure===false)) {
+        try {
+          await trySend(587, false)
+          return { sent: true, via: 'smtp-fallback-587' }
+        } catch (e2) {
+          console.warn('[backup][smtp] fallback 587 failed:', e2?.message||e2)
+        }
       }
+      // SMTP 明确失败则继续尝试 SES（若可用）
     }
-    throw e
   }
+
+  // 尝试使用 AWS SES（HTTPS 通道）；不附带附件
+  const sesRegion = process.env.SES_REGION || process.env.AWS_REGION || process.env.BACKUP_S3_REGION
+  const sesFrom = process.env.SES_FROM || from || process.env.SMTP_FROM || user
+  if (SESClient && SendEmailCommand && sesRegion && sesFrom) {
+    try {
+      const client = new SESClient({ region: sesRegion })
+      const text = attach ? lines.concat(['', '提示: 由于使用 SES 回退，附件已省略']).join('\n') : lines.join('\n')
+      await client.send(new SendEmailCommand({
+        Source: sesFrom,
+        Destination: { ToAddresses: to },
+        Message: {
+          Subject: { Data: subject, Charset: 'UTF-8' },
+          Body: { Text: { Data: text, Charset: 'UTF-8' } }
+        }
+      }))
+      return { sent: true, via: 'ses' }
+    } catch (e) {
+      console.warn('[backup][ses] send failed:', e?.message || e)
+      throw e
+    }
+  }
+
+  return { sent: false }
 }
 
 function cleanupRetention(dir) {

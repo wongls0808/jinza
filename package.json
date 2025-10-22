@@ -19,7 +19,8 @@
     "backup:now": "node scripts/run-backup.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.637.0",
+  "@aws-sdk/client-ses": "3.637.0",
+  "@aws-sdk/client-s3": "3.637.0",
     "@element-plus/icons-vue": "^2.3.1",
     "@vitejs/plugin-vue": "^4.3.0",
     "archiver": "^5.3.2",
