@@ -15,7 +15,7 @@ import crypto from 'crypto'
 import os from 'os'
 import archiver from 'archiver'
 import unzipper from 'unzipper'
-import { resolveBackupDir } from './backup_automation.js'
+import { resolveBackupDir, runBackupOnce } from './backup_automation.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -406,6 +406,21 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
     res.status(500).json({ error: 'restore failed', detail: e?.message })
   } finally {
     try { if (req.file?.path) fs.unlink(req.file.path, ()=>{}) } catch {}
+  }
+})
+
+// System: trigger backup now (admin-only)
+router.post('/system/backup-now', auth.authMiddleware(true), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    if (!process.env.DATABASE_URL && !process.env.DEV_LOCAL_DB) return res.status(400).json({ error: 'no database configured' })
+    const tables = Array.isArray(req.body?.tables) && req.body.tables.length ? req.body.tables : undefined
+    const result = await runBackupOnce({ tables })
+    try { await auth.logActivity(req.user?.id, 'system.backup.now', { file: result?.fileName || null, s3: !!result?.s3?.uploaded }, req) } catch {}
+    res.json({ ok: true, ...result })
+  } catch (e) {
+    console.error('backup-now failed', e)
+    res.status(500).json({ error: 'backup-now failed', detail: e?.message })
   }
 })
 

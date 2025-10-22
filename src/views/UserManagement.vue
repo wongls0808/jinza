@@ -40,6 +40,7 @@
         <div class="drawer-toolbar" style="justify-content: space-between;">
           <div style="display:flex; gap:8px; align-items:center;">
             <el-button size="small" :loading="dc.loadingBackups" @click="loadBackups">刷新备份</el-button>
+            <el-button size="small" type="success" :loading="dc.triggering" @click="triggerBackupNow">立即备份</el-button>
           </div>
           <div style="font-size:12px; color:var(--el-text-color-secondary);">目录：本机备份（保留{{ dc.retentionDays }}天）</div>
         </div>
@@ -411,7 +412,7 @@ const logState = ref({ loading: {} })
 const logDrawer = ref({ visible: false, user: null })
 
 // 数据中心状态
-const dc = ref({ visible: false, available: false, drawer: false, items: [], loading: false, backing: false, restoring: false, selection: [], mode: 'insert-only', backups: [], loadingBackups: false, retentionDays: (Number(import.meta.env?.VITE_BACKUP_RETENTION_DAYS)||Number((window.BACKUP_RETENTION_DAYS))||7) })
+const dc = ref({ visible: false, available: false, drawer: false, items: [], loading: false, backing: false, restoring: false, selection: [], mode: 'insert-only', backups: [], loadingBackups: false, triggering: false, retentionDays: (Number(import.meta.env?.VITE_BACKUP_RETENTION_DAYS)||Number((window.BACKUP_RETENTION_DAYS))||7) })
 
 async function loadTables() {
   dc.value.loading = true
@@ -458,6 +459,20 @@ async function downloadBackup(row) {
     setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() }, 0)
   } catch (e) {
     ElMessage.error('下载失败：' + (e?.message||''))
+  }
+}
+
+async function triggerBackupNow() {
+  dc.value.triggering = true
+  try {
+    const r = await api.system.backups.triggerNow()
+    // 备份完成后刷新列表
+    await loadBackups()
+    ElMessage.success('已触发备份：' + (r?.fileName || '完成'))
+  } catch (e) {
+    ElMessage.error('触发失败：' + (e?.message||''))
+  } finally {
+    dc.value.triggering = false
   }
 }
 

@@ -147,6 +147,7 @@ export const api = {
     },
     backups: {
       list: (limit=20) => request(`/system/backups?limit=${limit}`),
+      triggerNow: (tables) => request('/system/backup-now', { method: 'POST', body: JSON.stringify({ tables }) }),
       download: async (file) => {
         if (!file) throw new Error('file required')
         const token = (function(){
