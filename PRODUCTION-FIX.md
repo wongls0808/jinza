@@ -1,5 +1,7 @@
 # 生产环境问题修复指南
 
+> 2025-10-23 更新：系统已移除历史表 `bank_statements`、`bank_transactions`、`account_management`（见 migrations/20251023_drop_legacy_bank_tables.sql）。若早期有临时依赖，请改用当前正式交易/账户/客户等模块；如需保留历史数据，请在执行迁移前完成导出或重命名备份。
+
 ## 问题描述
 
 1. 浏览器警告：`<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated`
