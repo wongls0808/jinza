@@ -5,6 +5,7 @@ import fs from 'fs'
 import cors from 'cors'
 import { fileURLToPath } from 'url'
 import { router as apiRouter } from './src/server/routes.js'
+import { scheduleBackups } from './src/server/backup_automation.js'
 import { ensureSchema, seedInitialAdmin } from './src/server/auth.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -208,6 +209,8 @@ app.get('/api/system/db-status', (req, res) => {
     await ensureSchema()
     await seedInitialAdmin()
     console.log('Database schema ensured and admin seeded')
+    // Start auto backups if enabled
+    try { scheduleBackups() } catch (e) { console.warn('Failed to init auto backup scheduler:', e?.message || e) }
   } catch (e) {
     console.error('Background DB initialization failed', e)
     if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND') {

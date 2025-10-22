@@ -103,7 +103,76 @@ export const api = {
     sessions: (id) => request(`/users/${id}/sessions`),
   },
   system: {
-    health: () => request('/system/health')
+    health: () => request('/system/health'),
+    tables: (exact=true) => request(`/system/tables?exact=${exact?1:0}`),
+    backup: async (tables=[]) => {
+      // 返回 blob 由调用方触发下载
+      const token = (function(){
+        try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        return null
+      })()
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_BASE}/system/backup`, { method: 'POST', headers, body: JSON.stringify({ tables }) })
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      // 尝试获取服务端文件名
+      const cd = res.headers.get('Content-Disposition') || ''
+      let filename = 'DataBackup.zip'
+      try {
+        const mUtf8 = cd.match(/filename\*=UTF-8''([^;]+)/i)
+        if (mUtf8) filename = decodeURIComponent(mUtf8[1])
+        else {
+          const m = cd.match(/filename="?([^";]+)"?/i)
+          if (m) filename = m[1]
+        }
+      } catch {}
+      return { blob, filename }
+    },
+    restore: async (file, mode='insert-only') => {
+      const token = (function(){
+        try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+        return null
+      })()
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('mode', mode)
+      const headers = { }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_BASE}/system/restore`, { method: 'POST', headers, body: fd })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    backups: {
+      list: (limit=20) => request(`/system/backups?limit=${limit}`),
+      download: async (file) => {
+        if (!file) throw new Error('file required')
+        const token = (function(){
+          try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
+          return null
+        })()
+        const headers = { }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+        const res = await fetch(`${API_BASE}/system/backups/download?${new URLSearchParams({ file }).toString()}` , { headers })
+        if (!res.ok) throw new Error(await res.text())
+        const blob = await res.blob()
+        // name from query file or response header
+        const cd = res.headers.get('Content-Disposition') || ''
+        let filename = file
+        try {
+          const mUtf8 = cd.match(/filename\*=UTF-8''([^;]+)/i)
+          if (mUtf8) filename = decodeURIComponent(mUtf8[1])
+          else {
+            const m = cd.match(/filename="?([^";]+)"?/i)
+            if (m) filename = m[1]
+          }
+        } catch {}
+        return { blob, filename }
+      }
+    }
   },
   perms: {
     list: () => request('/permissions'),

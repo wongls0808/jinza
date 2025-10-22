@@ -13,6 +13,9 @@ import { fxRouter, ensureDDL as ensureFxDDL } from './fx.js'
 import { PERMISSION_TREE, reseedPermissions, flattenPermissionCodes, getModuleViewCode, buildPermissionIndex } from './permissions.js'
 import crypto from 'crypto'
 import os from 'os'
+import archiver from 'archiver'
+import unzipper from 'unzipper'
+import { resolveBackupDir } from './backup_automation.js'
 
 export const router = express.Router()
 const upload = multer({ dest: 'uploads/' })
@@ -246,6 +249,218 @@ router.get('/system/health', auth.authMiddleware(true), auth.requirePerm('view_d
     }
   }
   res.json(data)
+})
+
+// System: list tables with counts and sizes
+router.get('/system/tables', auth.authMiddleware(true), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    if (!process.env.DATABASE_URL) return res.json({ items: [] })
+    const exact = String(req.query.exact||'1') === '1'
+    const base = await query(`
+      select c.relname as name,
+             pg_total_relation_size(c.oid) as size_bytes,
+             coalesce(s.n_live_tup,0) as est_rows
+        from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        left join pg_stat_user_tables s on s.relid = c.oid
+       where n.nspname = 'public' and c.relkind = 'r'
+       order by c.relname
+    `)
+    const items = []
+    for (const r of base.rows) {
+      let rows = Number(r.est_rows||0)
+      if (exact) {
+        try {
+          const cnt = await query(`select count(*) from ${r.name}`)
+          rows = Number(cnt.rows?.[0]?.count||0)
+        } catch {}
+      }
+      items.push({ name: r.name, rows, sizeMB: Math.round((Number(r.size_bytes||0)/(1024*1024))*10)/10 })
+    }
+    res.json({ items })
+  } catch (e) {
+    console.error('system tables failed', e)
+    res.status(500).json({ error: 'tables failed', detail: e?.message })
+  }
+})
+
+// System: backup selected/all tables as a zip of JSON
+router.post('/system/backup', auth.authMiddleware(true), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'no database configured' })
+    const body = req.body || {}
+    const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname`)
+    const all = list.rows.map(r=>r.name)
+    const pick = Array.isArray(body.tables) && body.tables.length ? body.tables.filter(t=>all.includes(t)) : all
+
+    const fileBase = 'DataBackup-' + new Date().toISOString().replaceAll(':','').replaceAll('-','').replace('.', '')
+    const asciiName = `${fileBase}.zip`.replace(/[^\x20-\x7E]/g,'_')
+    const utf8Name = encodeURIComponent(`${fileBase}.zip`)
+    res.setHeader('Content-Type', 'application/zip')
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    archive.on('error', (err)=>{ try { res.destroy(err) } catch{} })
+    archive.pipe(res)
+    // meta
+    const meta = { time: new Date().toISOString(), user: req.user?.username||null, tables: pick }
+    archive.append(JSON.stringify(meta,null,2), { name: 'meta.json' })
+    // dump each table
+    for (const t of pick) {
+      try {
+        const rs = await query(`select * from ${t}`)
+        const text = JSON.stringify({ name: t, count: rs.rowCount, rows: rs.rows })
+        archive.append(text, { name: `tables/${t}.json` })
+      } catch (e) {
+        archive.append(JSON.stringify({ error: e?.message||String(e) }), { name: `tables/${t}.error.txt` })
+      }
+    }
+    try { await auth.logActivity(req.user?.id, 'system.backup', { count: pick.length }, req) } catch {}
+    archive.finalize()
+  } catch (e) {
+    console.error('system backup failed', e)
+    res.status(500).json({ error: 'backup failed', detail: e?.message })
+  }
+})
+
+// System: restore from a backup zip
+router.post('/system/restore', auth.authMiddleware(true), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'no database configured' })
+    const mode = String(req.body?.mode||'insert-only')
+    if (!req.file?.path) return res.status(400).json({ error: 'file required' })
+
+    // discover allowed tables
+    const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'`)
+    const allowed = new Set(list.rows.map(r=>r.name))
+
+    // open zip
+    const zip = await unzipper.Open.file(req.file.path)
+    const metaEntry = zip.files.find(f => f.path.toLowerCase() === 'meta.json')
+    let meta = {}
+    if (metaEntry) try { meta = JSON.parse((await metaEntry.buffer()).toString('utf-8')) } catch {}
+    const tableEntries = zip.files.filter(f => f.path.startsWith('tables/') && f.path.endsWith('.json'))
+    const wanted = []
+    for (const ent of tableEntries) {
+      const name = ent.path.slice('tables/'.length).replace(/\.json$/,'')
+      if (allowed.has(name)) wanted.push({ name, ent })
+    }
+
+    // build dependency order among wanted tables
+    const names = wanted.map(w=>w.name)
+    const edges = await query(`
+      select conrelid::regclass::text as child, confrelid::regclass::text as parent
+        from pg_constraint c
+        join pg_namespace n1 on n1.oid = c.connamespace
+       where c.contype='f' and n1.nspname='public'
+         and conrelid::regclass::text = any($1::text[]) and confrelid::regclass::text = any($1::text[])
+    `, [names])
+    const parents = new Map()
+    for (const r of edges.rows) {
+      if (!parents.has(r.child)) parents.set(r.child, new Set())
+      parents.get(r.child).add(r.parent)
+      if (!parents.has(r.parent)) parents.set(r.parent, new Set())
+    }
+    for (const n of names) if (!parents.has(n)) parents.set(n, new Set())
+    const order = []
+    const remaining = new Set(names)
+    while (remaining.size) {
+      const ready = Array.from(remaining).filter(n => Array.from(parents.get(n)||[]).every(p => !remaining.has(p)))
+      if (!ready.length) { order.push(...Array.from(remaining)); break }
+      for (const r of ready) { order.push(r); remaining.delete(r) }
+    }
+
+    // optional truncate with cascade
+    if (mode === 'truncate-insert') {
+      const toTruncate = order.map(n=>`"${n}"`).join(',')
+      await query(`truncate table ${toTruncate} restart identity cascade`)
+    }
+
+    // insert data in parent-first order
+    let inserted = 0, failed = 0
+    for (const tbl of order) {
+      const it = wanted.find(w=>w.name===tbl)
+      if (!it) continue
+      let payload = null
+      try { payload = JSON.parse((await it.ent.buffer()).toString('utf-8')) } catch { payload = null }
+      const rows = Array.isArray(payload?.rows) ? payload.rows : []
+      if (!rows.length) continue
+      // read columns from information_schema, intersect with row keys
+      const colsRs = await query(`select column_name from information_schema.columns where table_schema='public' and table_name=$1`, [tbl])
+      const colsSet = new Set(colsRs.rows.map(r=>r.column_name))
+      const keys = Array.from(new Set(rows.flatMap(r=>Object.keys(r)))).filter(k=>colsSet.has(k))
+      if (!keys.length) continue
+      for (const r of rows) {
+        const vals = keys.map(k => r[k] === undefined ? null : r[k])
+        const placeholders = keys.map((_,i)=>`$${i+1}`).join(',')
+        const sql = `insert into ${tbl}(${keys.map(k=>`"${k}"`).join(',')}) values(${placeholders})` + (mode==='insert-only' ? '' : '')
+        try { await query(sql, vals); inserted++ } catch (e) { failed++ }
+      }
+    }
+    try { await auth.logActivity(req.user?.id, 'system.restore', { mode, inserted, failed }, req) } catch {}
+    res.json({ ok: true, inserted, failed })
+  } catch (e) {
+    console.error('system restore failed', e)
+    res.status(500).json({ error: 'restore failed', detail: e?.message })
+  } finally {
+    try { if (req.file?.path) fs.unlink(req.file.path, ()=>{}) } catch {}
+  }
+})
+
+// System: list recent backup files (local directory)
+router.get('/system/backups', auth.authMiddleware(true), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100)
+    const dir = resolveBackupDir()
+    let items = []
+    try {
+      for (const f of fs.readdirSync(dir)) {
+        if (!/\.zip$/i.test(f)) continue
+        if (!/^DataBackup-/.test(f)) continue
+        const p = path.join(dir, f)
+        try {
+          const st = fs.statSync(p)
+          items.push({ file: f, sizeBytes: st.size, sizeMB: Math.round((st.size/(1024*1024))*10)/10, mtime: st.mtime })
+        } catch {}
+      }
+    } catch {}
+    items.sort((a,b) => new Date(b.mtime) - new Date(a.mtime))
+    items = items.slice(0, limit)
+    // Attach expected S3 key when configured (not presigned)
+    const bucket = process.env.BACKUP_S3_BUCKET || null
+    const prefix = process.env.BACKUP_S3_PREFIX || ''
+    const normPrefix = prefix ? String(prefix).replace(/\/$/, '') + '/' : ''
+    const withS3 = items.map(it => ({ ...it, s3: bucket ? { bucket, key: `${normPrefix}${it.file}` } : null }))
+    res.json({ items: withS3 })
+  } catch (e) {
+    console.error('list backups failed', e)
+    res.status(500).json({ error: 'list backups failed', detail: e?.message })
+  }
+})
+
+// System: download a specific backup file (admin-only)
+router.get('/system/backups/download', auth.authMiddleware(true), async (req, res) => {
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
+    const name = String(req.query.file || '')
+    if (!name || name.includes('..') || name.includes('/') || name.includes('\\') || !/\.zip$/i.test(name)) {
+      return res.status(400).json({ error: 'invalid file' })
+    }
+    const dir = resolveBackupDir()
+    const p = path.join(dir, name)
+    if (!fs.existsSync(p)) return res.status(404).json({ error: 'not found' })
+    res.setHeader('Content-Type', 'application/zip')
+    const asciiName = name.replace(/[^\x20-\x7E]/g,'_')
+    const utf8Name = encodeURIComponent(name)
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`)
+    fs.createReadStream(p).pipe(res)
+  } catch (e) {
+    console.error('download backup failed', e)
+    res.status(500).json({ error: 'download failed', detail: e?.message })
+  }
 })
 
 // Dashboard: Balance health (customers/banks/platforms negatives and transfer imbalances)
