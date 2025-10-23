@@ -78,3 +78,68 @@ npm run backup:now
 ---
 
 如需“合并式恢复（不清表）”或自定义清理规则，可告诉我你的具体要求与判定条件，我可以补充一条安全开关的恢复/清理脚本。
+
+# Railway 部署指南（推荐做法）
+
+以下步骤假设你已在 Railway 创建项目并关联本仓库。
+
+1) Build/Start 配置
+- Build 命令：Railway/Nixpacks 会自动执行 `npm ci` 与（检测到）`npm run build`；无需额外配置。
+- Start 命令：`npm start`（即 `node server.js`）。服务会在有 `dist/` 时自动托管前端静态资源。
+
+2) 数据库与环境变量
+- 数据库：在 Railway 中添加 PostgreSQL 插件，并把其 `DATABASE_URL` 注入到服务环境变量。
+- 必填：
+  - `DATABASE_URL`（来自 Railway Postgres）
+  - `JWT_SECRET`（32+ 随机字符）
+- 强烈建议：
+  - `DATA_DIR=/data`（需挂载卷；用于备份与上传持久化）
+  - `BACKUP_ENABLED=1`（开启每日自动备份）
+  - `BACKUP_SCHEDULE=02:30`（每日时间，24h 格式）
+  - `BACKUP_RETENTION_DAYS=7`（本地备份保留天数）
+- 可选（S3 远端备份与通知）：
+  - `BACKUP_S3_BUCKET`、`BACKUP_S3_REGION`、`BACKUP_S3_PREFIX`
+  - SMTP：`SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS`、`SMTP_FROM`、`BACKUP_EMAIL_ATTACH=1`
+  - 或 SES：`SES_REGION`、`SES_FROM`（可配合 `AWS_REGION`）
+- CORS 建议：
+  - 生产建议设置 `CORS_ORIGINS` 为你的域名或 Railway 分配域（逗号分隔）。例如：`app.example.com, *.example.com`
+  - 不建议在生产使用 `*` 或 `CORS_ALLOW_ALL=1`。
+- 其它：
+  - 缺省将对 Postgres 开启 SSL(no-verify)。如确需禁用可设 `PGSSLMODE=disable`。
+
+3) 卷（Volumes）与持久化
+- 在 Railway 服务中添加 Volume（例如大小 1–10GB），挂载路径建议 `/data`。
+- 在环境变量中设置 `DATA_DIR=/data`。
+- 说明：若不挂卷，容器文件系统为短暂存储，备份文件将随实例回收而丢失。若不便挂卷，强烈建议配置 S3 远端备份。
+
+4) 一次性执行“生产准备”
+- Dashboard → 服务 → Run（或 One-off）执行：
+  - 干跑（校验环境并迁移，不做破坏性清理）：`npm run prod:prepare`
+  - 实跑（建议选择性带上开关）：`npm run prod:prepare -- --apply --purge-sessions --remove-demo-data`
+- 或使用 Railway CLI（本地登录后）：
+
+```powershell
+# 干跑
+railway run npm run prod:prepare
+# 实跑（示例：应用清理与清会话）
+railway run npm run prod:prepare -- --apply --purge-sessions --remove-demo-data
+```
+
+5) 健康检查与冒烟测试
+- 打开服务日志，确认启动日志中包含：`[static] DATA_DIR= ...`、`Server listening ...`。
+- 访问接口：
+  - `GET /api/health` → { status: 'ok' }
+  - `GET /api/version` → { version, git, time }
+  - `GET /api/system/health` → 含 DB 延迟、连接与容量信息
+- UI 关键检查：
+  - “付款历史”页面银行列：应看到银行名/代码/LOGO（已实现多路径回退）
+  - 从“完整备份”恢复后，银行 LOGO 地址应为 `/api/banks/:id/logo`（已在恢复后标准化）
+
+6) 自动备份运行确认
+- 设置 `BACKUP_ENABLED=1` 与合适的 `BACKUP_SCHEDULE` 后，查看日志应每日触发一次：`[backup] 开始执行定时备份...`。
+- 本地目录：`${DATA_DIR}/backups` 下生成 `DataBackup-*.zip`；
+- 若配置了 S3，将打印目标 `s3://bucket/key`；如配置 SMTP/SES，成功后会发送通知邮件。
+
+7) 回滚与恢复建议
+- 回滚：在 Railway 选择上一个成功部署版本重新部署；如涉及数据错误，使用后台“系统 → 恢复”或 `POST /api/system/restore` 从“完整备份包”恢复。
+- 注意：恢复策略为“清表+回填”，系统已在恢复前校验备份完整性，防止不完整包导致数据级联丢失。
