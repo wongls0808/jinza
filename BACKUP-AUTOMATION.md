@@ -39,7 +39,9 @@
 - SES_FROM=ops@example.com 可选，未设置时回退到 SMTP_FROM 或 SMTP_USER
 - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 使用与 S3 相同凭据
 
-说明：启用 SES 时，系统在 SMTP 失败（含 465 和回退的 587）后，会自动改用 SES 发送通知邮件。SES 回退为纯文本邮件，出于简化未附带备份 zip 附件（即使 BACKUP_EMAIL_ATTACH=1）。
+说明：启用 SES 时，系统在 SMTP 失败（含 465 和回退的 587）后，会自动改用 SES 发送通知邮件：
+- 当 BACKUP_EMAIL_ATTACH=1 且可用时，使用 RawEmail 方式发送并附带 zip 附件（HTTPS，不依赖 SMTP 端口）。
+- 当未开启附件时，发送纯文本邮件。
 
 连接失败回退顺序：SMTP 465/SSL → SMTP 587/STARTTLS → SES（如已配置）。
 

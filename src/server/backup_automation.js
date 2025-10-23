@@ -8,7 +8,7 @@ import * as auth from './auth.js'
 
 // Optional deps (loaded only when configured)
 let S3Client, PutObjectCommand
-let SESClient, SendEmailCommand
+let SESClient, SendEmailCommand, SendRawEmailCommand
 let nodemailer
 try {
   const s3mod = await import('@aws-sdk/client-s3')
@@ -19,6 +19,7 @@ try {
   const sesmod = await import('@aws-sdk/client-ses')
   SESClient = sesmod.SESClient
   SendEmailCommand = sesmod.SendEmailCommand
+  SendRawEmailCommand = sesmod.SendRawEmailCommand
 } catch {}
 try { nodemailer = (await import('nodemailer')).default } catch {}
 
@@ -177,22 +178,56 @@ async function sendEmailIfConfigured({ ok, filePath, fileName, s3 }) {
     }
   }
 
-  // 尝试使用 AWS SES（HTTPS 通道）；不附带附件
+  // 尝试使用 AWS SES（HTTPS 通道）；支持纯文本与附件（RawEmail）
   const sesRegion = process.env.SES_REGION || process.env.AWS_REGION || process.env.BACKUP_S3_REGION
   const sesFrom = process.env.SES_FROM || from || process.env.SMTP_FROM || user
-  if (SESClient && SendEmailCommand && sesRegion && sesFrom) {
+  if (SESClient && (SendEmailCommand || SendRawEmailCommand) && sesRegion && sesFrom) {
     try {
       const client = new SESClient({ region: sesRegion })
-      const text = attach ? lines.concat(['', '提示: 由于使用 SES 回退，附件已省略']).join('\n') : lines.join('\n')
-      await client.send(new SendEmailCommand({
-        Source: sesFrom,
-        Destination: { ToAddresses: to },
-        Message: {
-          Subject: { Data: subject, Charset: 'UTF-8' },
-          Body: { Text: { Data: text, Charset: 'UTF-8' } }
-        }
-      }))
-      return { sent: true, via: 'ses' }
+      if (attach && SendRawEmailCommand && filePath && fileName) {
+        // 通过 RawEmail 发送带附件的 MIME 邮件
+        const boundary = '----=_Part_' + Date.now()
+        const bodyText = lines.join('\n')
+        const fileBuf = fs.readFileSync(filePath)
+        const fileB64 = fileBuf.toString('base64')
+        const mime = [
+          `From: ${sesFrom}`,
+          `To: ${to.join(', ')}`,
+          `Subject: ${subject}`,
+          'MIME-Version: 1.0',
+          `Content-Type: multipart/mixed; boundary="${boundary}"`,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/plain; charset="utf-8"',
+          'Content-Transfer-Encoding: 7bit',
+          '',
+          bodyText,
+          '',
+          `--${boundary}`,
+          'Content-Type: application/zip; name="' + fileName + '"',
+          'Content-Transfer-Encoding: base64',
+          'Content-Disposition: attachment; filename="' + fileName + '"',
+          '',
+          fileB64,
+          '',
+          `--${boundary}--`,
+          ''
+        ].join('\r\n')
+        await client.send(new SendRawEmailCommand({ RawMessage: { Data: Buffer.from(mime) } }))
+        return { sent: true, via: 'ses-raw' }
+      } else {
+        // 纯文本（无附件）
+        const text = lines.join('\n')
+        await client.send(new SendEmailCommand({
+          Source: sesFrom,
+          Destination: { ToAddresses: to },
+          Message: {
+            Subject: { Data: subject, Charset: 'UTF-8' },
+            Body: { Text: { Data: text, Charset: 'UTF-8' } }
+          }
+        }))
+        return { sent: true, via: 'ses' }
+      }
     } catch (e) {
       console.warn('[backup][ses] send failed:', e?.message || e)
       throw e
