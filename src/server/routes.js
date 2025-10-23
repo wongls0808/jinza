@@ -349,6 +349,21 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
       if (allowed.has(name)) wanted.push({ name, ent })
     }
 
+    // Safety gate: require a "full" backup for truncate-insert restore.
+    // If critical tables are missing from the backup, abort to avoid TRUNCATE CASCADE wiping data (e.g., customers -> customer_receiving_accounts).
+    {
+      const wantedNames = new Set(wanted.map(w=>w.name))
+      const optional = new Set(['user_sessions','user_activity']) // can be regenerated
+      const missing = Array.from(allowed).filter(n => !wantedNames.has(n) && !optional.has(n))
+      if (missing.length) {
+        return res.status(400).json({
+          error: 'incomplete backup',
+          detail: 'This backup does not contain all required tables for truncate-insert restore. Aborting to protect existing data.',
+          missing
+        })
+      }
+    }
+
     // build dependency order among wanted tables
     const names = wanted.map(w=>w.name)
     const edges = await query(`
@@ -402,6 +417,14 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
         try { await query(sql, vals); inserted++ } catch (e) { failed++ }
       }
     }
+    // Post-restore normalization: ensure banks.logo_url points to DB logo endpoint when available
+    try {
+      await query(`
+        update banks b
+           set logo_url = '/api/banks/' || b.id || '/logo'
+         where exists (select 1 from bank_logos l where l.bank_id = b.id)
+      `)
+    } catch {}
     try { await auth.logActivity(req.user?.id, 'system.restore', { mode, inserted, failed }, req) } catch {}
     res.json({ ok: true, inserted, failed })
   } catch (e) {
