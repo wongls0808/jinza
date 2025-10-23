@@ -1489,7 +1489,14 @@ router.put('/customers/:id/accounts/:aid', auth.authMiddleware(true), auth.requi
 
 // Banks CRUD (server-managed)
 router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), async (req, res) => {
-  const rs = await query('select id, code, zh, en, logo_url from banks order by id')
+  // 一次性查出 bank 及其 logo 更新时间，避免 N+1 查询导致连接池耗尽/性能劣化
+  const rs = await query(`
+    select b.id, b.code, b.zh, b.en, b.logo_url,
+           l.updated_at as logo_updated_at
+      from banks b
+      left join bank_logos l on l.bank_id = b.id
+     order by b.id
+  `)
   // 规范化 logo 路径：优先使用 DB 动态端点 /api/banks/:id/logo；
   // 若该银行无存储的 logo，再回退到 public/banks 下的静态文件（svg/png/jpg 顺序）
   const publicDirCandidates = [
@@ -1498,16 +1505,6 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   ]
   const publicDir = publicDirCandidates.find(d => fs.existsSync(d)) || publicDirCandidates[0]
   const banksDir = path.join(publicDir, 'banks')
-  async function getDbLogoVersion(id) {
-    try {
-      const r = await query('select updated_at from bank_logos where bank_id=$1 limit 1', [id])
-      if (r.rowCount > 0) {
-        const ts = r.rows[0].updated_at?.getTime?.() || Date.now()
-        return Number.isFinite(ts) ? ts : Date.now()
-      }
-      return 0
-    } catch { return 0 }
-  }
   function resolveStaticLogoUrl(code, url) {
     try {
       const codeLower = String(code || 'public').toLowerCase()
@@ -1553,14 +1550,12 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
       return '/banks/public.svg'
     } catch { return '/banks/public.svg' }
   }
-  // 并发检查每行是否有 DB logo，有则返回 API 路径
-  const rows = await Promise.all(rs.rows.map(async (r) => {
-    const v = await getDbLogoVersion(r.id)
-    if (v) {
-      return { ...r, logo_url: `/api/banks/${r.id}/logo?v=${v}` }
-    }
-    return { ...r, logo_url: resolveStaticLogoUrl(r.code, r.logo_url) }
-  }))
+  // 直接使用联结结果判断是否存在 DB logo（有则带时间戳参数，触发缓存校验）
+  const rows = rs.rows.map((r) => {
+    const v = r.logo_updated_at ? (new Date(r.logo_updated_at).getTime() || Date.now()) : 0
+    if (v) return { id: r.id, code: r.code, zh: r.zh, en: r.en, logo_url: `/api/banks/${r.id}/logo?v=${v}` }
+    return { id: r.id, code: r.code, zh: r.zh, en: r.en, logo_url: resolveStaticLogoUrl(r.code, r.logo_url) }
+  })
   res.json(rows)
 })
 
