@@ -1590,7 +1590,7 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
         try { await auth.logActivity(req.user?.id, 'banks.create', { target: bankId, code, zh, en }, req) } catch {}
         return res.json({ id: bankId, code, zh, en, logo_url: apiUrl })
       } catch (e) {
-        if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+        if (e.code === '23505') return res.status(409).json({ error: '银行编号已存在' })
         throw e
       }
     } catch (e) {
@@ -1602,7 +1602,7 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
     try { await auth.logActivity(req.user?.id, 'banks.create', { target: rs.rows[0].id, code, zh, en }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+    if (e.code === '23505') return res.status(409).json({ error: '银行编号已存在' })
     throw e
   }
 })
@@ -1655,7 +1655,7 @@ router.put('/banks/:id', auth.authMiddleware(true), auth.requirePerm('banks:upda
     try { await auth.logActivity(req.user?.id, 'banks.update', { target: id, fields: Object.keys(req.body) }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ error: 'code exists' })
+    if (e.code === '23505') return res.status(409).json({ error: '银行编号已存在' })
     throw e
   }
 })

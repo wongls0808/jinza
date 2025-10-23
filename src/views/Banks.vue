@@ -173,8 +173,16 @@ async function submit() {
     ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
     let msg = e?.message || ''
+    // 如果 message 为空，尝试从 status/raw 补充
+    if (!msg && e && e.status) msg = `HTTP ${e.status}`
+    if (!msg && e && e.raw) {
+      try {
+        const j = typeof e.raw === 'string' ? JSON.parse(e.raw) : e.raw
+        msg = j?.error || j?.message || ''
+      } catch {}
+    }
     try { const j = JSON.parse(msg); msg = j.error || msg } catch {}
-    ElMessage.error((t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg))
+    ElMessage.error((t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg || '未知错误'))
   } finally {
     dlg.value.loading = false
   }
