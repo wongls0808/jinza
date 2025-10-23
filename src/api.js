@@ -105,7 +105,7 @@ export const api = {
   system: {
     health: () => request('/system/health'),
     tables: (exact=true) => request(`/system/tables?exact=${exact?1:0}`),
-    backup: async (tables=[]) => {
+    backup: async () => {
       // 返回 blob 由调用方触发下载
       const token = (function(){
         try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
@@ -114,7 +114,8 @@ export const api = {
       })()
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch(`${API_BASE}/system/backup`, { method: 'POST', headers, body: JSON.stringify({ tables }) })
+      // 强制全量备份：无需传入表清单
+      const res = await fetch(`${API_BASE}/system/backup`, { method: 'POST', headers, body: JSON.stringify({}) })
       if (!res.ok) throw new Error(await res.text())
       const blob = await res.blob()
       // 尝试获取服务端文件名
@@ -130,7 +131,7 @@ export const api = {
       } catch {}
       return { blob, filename }
     },
-    restore: async (file, mode='insert-only') => {
+    restore: async (file) => {
       const token = (function(){
         try { const s = sessionStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
         try { const s = localStorage.getItem('auth_user'); if (s) { const d = JSON.parse(s); if (d?.token) return d.token } } catch{}
@@ -138,7 +139,7 @@ export const api = {
       })()
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('mode', mode)
+      // 强制清表恢复：不再传递 mode
       const headers = { }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`${API_BASE}/system/restore`, { method: 'POST', headers, body: fd })
@@ -147,7 +148,7 @@ export const api = {
     },
     backups: {
       list: (limit=20) => request(`/system/backups?limit=${limit}`),
-      triggerNow: (tables) => request('/system/backup-now', { method: 'POST', body: JSON.stringify({ tables }) }),
+      triggerNow: () => request('/system/backup-now', { method: 'POST', body: JSON.stringify({}) }),
       download: async (file) => {
         if (!file) throw new Error('file required')
         const token = (function(){

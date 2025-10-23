@@ -18,19 +18,13 @@
         <div class="drawer-toolbar" style="justify-content: space-between;">
           <div style="display:flex; gap:8px; align-items:center;">
             <el-button size="small" :loading="dc.loading" @click="loadTables">刷新</el-button>
-            <el-button size="small" type="primary" :disabled="!dc.items.length" :loading="dc.backing" @click="backupSelected(false)">备份所选</el-button>
-            <el-button size="small" type="primary" plain :disabled="!dc.items.length" :loading="dc.backing" @click="backupSelected(true)">备份全部</el-button>
+            <el-button size="small" type="primary" plain :disabled="!dc.items.length" :loading="dc.backing" @click="backupAll">备份全部</el-button>
             <el-upload :show-file-list="false" :before-upload="onRestoreBefore" :http-request="onRestoreUpload">
-              <el-button size="small" type="warning" :loading="dc.restoring">恢复</el-button>
+              <el-button size="small" type="warning" :loading="dc.restoring">恢复（清表导入）</el-button>
             </el-upload>
           </div>
-          <el-select v-model="dc.mode" size="small" style="width:180px">
-            <el-option label="插入(不清表)" value="insert-only" />
-            <el-option label="清表后导入(级联)" value="truncate-insert" />
-          </el-select>
         </div>
-        <el-table :data="dc.items" height="60vh" border @selection-change="sel=>dc.selection=sel" :default-sort="{prop:'name',order:'ascending'}">
-          <el-table-column type="selection" width="42" />
+        <el-table :data="dc.items" height="60vh" border :default-sort="{prop:'name',order:'ascending'}">
           <el-table-column prop="name" label="表名" min-width="260" sortable />
           <el-table-column prop="rows" label="行数" width="140" sortable :formatter="(_, __, v)=>Number(v||0).toLocaleString()" />
           <el-table-column prop="sizeMB" label="大小(MB)" width="140" sortable :formatter="(_, __, v)=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})" />
@@ -412,7 +406,7 @@ const logState = ref({ loading: {} })
 const logDrawer = ref({ visible: false, user: null })
 
 // 数据中心状态
-const dc = ref({ visible: false, available: false, drawer: false, items: [], loading: false, backing: false, restoring: false, selection: [], mode: 'insert-only', backups: [], loadingBackups: false, triggering: false, retentionDays: (Number(import.meta.env?.VITE_BACKUP_RETENTION_DAYS)||Number((window.BACKUP_RETENTION_DAYS))||7) })
+const dc = ref({ visible: false, available: false, drawer: false, items: [], loading: false, backing: false, restoring: false, backups: [], loadingBackups: false, triggering: false, retentionDays: (Number(import.meta.env?.VITE_BACKUP_RETENTION_DAYS)||Number((window.BACKUP_RETENTION_DAYS))||7) })
 
 async function loadTables() {
   dc.value.loading = true
@@ -476,12 +470,11 @@ async function triggerBackupNow() {
   }
 }
 
-async function backupSelected(all=false) {
-  const tables = all ? (dc.value.items||[]).map(i=>i.name) : (dc.value.selection||[]).map(i=>i.name)
-  if (!tables.length) return ElMessage.warning('请选择需要备份的表')
+async function backupAll() {
+  if (!dc.value.items.length) return ElMessage.warning('暂无可备份的表')
   dc.value.backing = true
   try {
-    const { blob, filename } = await api.system.backup(tables)
+    const { blob, filename } = await api.system.backup()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = filename || 'DataBackup.zip'
@@ -506,7 +499,7 @@ async function onRestoreUpload(opt) {
   if (!file) return opt?.onError?.(new Error('no file'))
   dc.value.restoring = true
   try {
-    const r = await api.system.restore(file, dc.value.mode)
+    const r = await api.system.restore(file)
     ElMessage.success(`恢复完成，成功 ${r.inserted||0} 条，失败 ${r.failed||0} 条`)
     await loadTables()
     opt?.onSuccess?.(r)

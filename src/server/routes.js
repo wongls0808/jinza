@@ -290,12 +290,10 @@ router.post('/system/backup', auth.authMiddleware(true), async (req, res) => {
   try {
     if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
     if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'no database configured' })
-  const body = req.body || {}
-  const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname`)
-  const all = list.rows.map(r=>r.name)
-  const reqList = Array.isArray(body.tables) ? body.tables : []
-  let pick = reqList.length ? reqList.filter(t=>all.includes(t)) : all
-  if (!pick.length) pick = all
+    // 强制全量备份：忽略任何传入的表清单
+    const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname`)
+    const all = list.rows.map(r=>r.name)
+    const pick = all
 
     const fileBase = 'DataBackup-' + new Date().toISOString().replaceAll(':','').replaceAll('-','').replace('.', '')
     const asciiName = `${fileBase}.zip`.replace(/[^\x20-\x7E]/g,'_')
@@ -306,7 +304,7 @@ router.post('/system/backup', auth.authMiddleware(true), async (req, res) => {
     archive.on('error', (err)=>{ try { res.destroy(err) } catch{} })
     archive.pipe(res)
     // meta
-    const meta = { time: new Date().toISOString(), user: req.user?.username||null, tables: pick }
+  const meta = { time: new Date().toISOString(), user: req.user?.username||null, tables: pick }
     archive.append(JSON.stringify(meta,null,2), { name: 'meta.json' })
     // dump each table
     for (const t of pick) {
@@ -331,7 +329,8 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
   try {
     if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
     if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'no database configured' })
-    const mode = String(req.body?.mode||'insert-only')
+    // 强制清表恢复（truncate-insert），忽略前端传入的 mode
+    const mode = 'truncate-insert'
     if (!req.file?.path) return res.status(400).json({ error: 'file required' })
 
     // discover allowed tables
@@ -374,10 +373,12 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
       for (const r of ready) { order.push(r); remaining.delete(r) }
     }
 
-    // optional truncate with cascade
-    if (mode === 'truncate-insert') {
+    // 强制 truncate with cascade
+    {
       const toTruncate = order.map(n=>`"${n}"`).join(',')
-      await query(`truncate table ${toTruncate} restart identity cascade`)
+      if (toTruncate) {
+        await query(`truncate table ${toTruncate} restart identity cascade`)
+      }
     }
 
     // insert data in parent-first order
@@ -397,7 +398,7 @@ router.post('/system/restore', auth.authMiddleware(true), upload.single('file'),
       for (const r of rows) {
         const vals = keys.map(k => r[k] === undefined ? null : r[k])
         const placeholders = keys.map((_,i)=>`$${i+1}`).join(',')
-        const sql = `insert into ${tbl}(${keys.map(k=>`"${k}"`).join(',')}) values(${placeholders})` + (mode==='insert-only' ? '' : '')
+        const sql = `insert into ${tbl}(${keys.map(k=>`"${k}"`).join(',')}) values(${placeholders})`
         try { await query(sql, vals); inserted++ } catch (e) { failed++ }
       }
     }
@@ -416,8 +417,8 @@ router.post('/system/backup-now', auth.authMiddleware(true), async (req, res) =>
   try {
     if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
     if (!process.env.DATABASE_URL && !process.env.DEV_LOCAL_DB) return res.status(400).json({ error: 'no database configured' })
-    const tables = Array.isArray(req.body?.tables) && req.body.tables.length ? req.body.tables : undefined
-    const result = await runBackupOnce({ tables })
+    // 强制全量备份：忽略传入的表清单
+    const result = await runBackupOnce()
     try { await auth.logActivity(req.user?.id, 'system.backup.now', { file: result?.fileName || null, s3: !!result?.s3?.uploaded }, req) } catch {}
     res.json({ ok: true, ...result })
   } catch (e) {
