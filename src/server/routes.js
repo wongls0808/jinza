@@ -290,10 +290,12 @@ router.post('/system/backup', auth.authMiddleware(true), async (req, res) => {
   try {
     if (!req.user?.is_admin) return res.status(403).json({ error: 'Forbidden' })
     if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'no database configured' })
-    const body = req.body || {}
-    const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname`)
-    const all = list.rows.map(r=>r.name)
-    const pick = Array.isArray(body.tables) && body.tables.length ? body.tables.filter(t=>all.includes(t)) : all
+  const body = req.body || {}
+  const list = await query(`select c.relname as name from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' order by c.relname`)
+  const all = list.rows.map(r=>r.name)
+  const reqList = Array.isArray(body.tables) ? body.tables : []
+  let pick = reqList.length ? reqList.filter(t=>all.includes(t)) : all
+  if (!pick.length) pick = all
 
     const fileBase = 'DataBackup-' + new Date().toISOString().replaceAll(':','').replaceAll('-','').replace('.', '')
     const asciiName = `${fileBase}.zip`.replace(/[^\x20-\x7E]/g,'_')

@@ -258,9 +258,14 @@ export async function runBackupOnce({ tables, backupDir } = {}) {
   const dir = backupDir || resolveBackupDir()
   ensureDir(dir)
   const allTables = await listAllTables()
-  const pick = Array.isArray(tables) && tables.length
-    ? tables.filter(t => allTables.includes(t))
-    : (process.env.BACKUP_TABLES ? process.env.BACKUP_TABLES.split(',').map(s=>s.trim()).filter(t=>allTables.includes(t)) : allTables)
+  // 期望：未指定表或指定结果为空时，默认回退为“全部 public 表”
+  const envTables = (process.env.BACKUP_TABLES || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+  const requested = Array.isArray(tables) && tables.length ? tables : envTables
+  let pick = requested.length ? requested.filter(t => allTables.includes(t)) : allTables
+  if (!pick.length) pick = allTables
   const fileName = buildBackupFilename('DataBackup')
   const filePath = path.join(dir, fileName)
   await dumpTablesToZipFile({ tables: pick, outputPath: filePath })
