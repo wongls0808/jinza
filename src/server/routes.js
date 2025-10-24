@@ -1609,13 +1609,43 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
       return res.status(400).json({ error: 'upload failed' })
     }
   }
+  const doInsert = async () => {
+    return await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4) returning id, code, zh, en, logo_url', [code, zh, en, logo_url || null])
+  }
   try {
-    const rs = await query('insert into banks(code, zh, en, logo_url) values($1,$2,$3,$4) returning id, code, zh, en, logo_url', [code, zh, en, logo_url || null])
+    let rs
+    try {
+      rs = await doInsert()
+    } catch (e1) {
+      if (e1 && e1.code === '23505') {
+        const constraint = String(e1.constraint || '')
+        const msg = String(e1.message || '') + ' ' + String(e1.detail || '')
+        // 1) 主键冲突：很可能是序列未对齐（恢复/导入后未重置），尝试修复序列后重试一次
+        if (constraint.includes('banks_pkey') || /banks_pkey/i.test(msg)) {
+          try {
+            await query(`select setval(pg_get_serial_sequence('banks','id'), (select coalesce(max(id),0) from banks), true)`)
+            rs = await doInsert()
+          } catch (e2) {
+            if (e2 && e2.code === '23505') {
+              return res.status(409).json({ error: '主键冲突：已尝试修复序列仍失败，请联系管理员' })
+            }
+            throw e2
+          }
+        } else if (constraint.includes('banks_code') || /code/i.test(msg)) {
+          // 2) 编号唯一冲突
+          return res.status(409).json({ error: '银行编号已存在' })
+        } else {
+          // 其它唯一冲突
+          return res.status(409).json({ error: '唯一约束冲突' })
+        }
+      } else {
+        throw e1
+      }
+    }
     try { await auth.logActivity(req.user?.id, 'banks.create', { target: rs.rows[0].id, code, zh, en }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ error: '银行编号已存在' })
-    throw e
+    res.status(500).json({ error: 'create failed', detail: e?.message })
   }
 })
 
