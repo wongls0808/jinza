@@ -61,19 +61,31 @@ export async function request(path, opts = {}) {
     let body = null
     let msg = ''
     try {
-      body = JSON.parse(responseText)
-      msg = body?.error || body?.message || ''
-      if (body?.detail) {
-        const d = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
-        msg = msg ? `${msg}: ${d}` : d
+      // 尝试解析 JSON 响应体
+      if (responseText.trim()) {
+        body = JSON.parse(responseText)
+        msg = body?.error || body?.message || ''
+        if (body?.detail) {
+          const d = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+          msg = msg ? `${msg}: ${d}` : d
+        }
       }
     } catch {
-      msg = responseText
+      // JSON 解析失败，使用原始文本
+      msg = responseText.trim()
     }
-    const err = new Error(msg || `HTTP ${res.status}`)
+    // 如果仍然没有错误信息，至少提供状态码
+    if (!msg) {
+      msg = `HTTP ${res.status}`
+      if (res.status === 409) msg = `HTTP ${res.status} (冲突)`
+      if (res.status === 413) msg = `HTTP ${res.status} (请求过大)`
+      if (res.status === 422) msg = `HTTP ${res.status} (数据验证失败)`
+      if (res.status >= 500) msg = `HTTP ${res.status} (服务器错误)`
+    }
+    const err = new Error(msg)
     try { err.status = res.status } catch {}
     try { err.code = body?.code } catch {}
-    try { err.raw = body || msg } catch {}
+    try { err.raw = body || responseText } catch {}
     throw err
   }
   
