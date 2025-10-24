@@ -132,11 +132,21 @@ function triggerPick(){
 }
 
 async function submit() {
+  // 防重复提交（如双击、回车触发两次）
+  if (dlg.value.loading) return
   dlg.value.loading = true
   try {
     const f = dlg.value.form
     if (dlg.value.mode === 'add') {
       if (!f.code || !f.zh || !f.en) { ElMessage.warning(t('customers.messages.fillAllFields')); return }
+      // 前置唯一性校验：本地列表中是否已存在同名 code（忽略大小写与空白）
+      const norm = (s) => String(s||'').trim().toUpperCase()
+      const newCode = norm(f.code)
+      const exists = banks.value.some(x => norm(x.code) === newCode)
+      if (exists) {
+        ElMessage.error('银行编号已存在')
+        return
+      }
       await api.createBank({
         code: (f.code || '').trim().toUpperCase(),
         zh: (f.zh || '').trim().toUpperCase(),
