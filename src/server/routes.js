@@ -1645,7 +1645,8 @@ router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'
     try { await auth.logActivity(req.user?.id, 'banks.create', { target: rs.rows[0].id, code, zh, en }, req) } catch {}
     res.json(rs.rows[0])
   } catch (e) {
-    res.status(500).json({ error: 'create failed', detail: e?.message })
+    console.error('Banks create final error:', e) // 调试日志
+    res.status(500).json({ error: '创建银行失败', detail: e?.message })
   }
 })
 

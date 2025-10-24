@@ -46,6 +46,7 @@ export async function request(path, opts = {}) {
   
   // 统一读取响应体文本
   const responseText = await res.text()
+  console.log(`API ${path} status:${res.status} response:`, responseText) // 调试日志
   
   if (!res.ok) {
     if (res.status === 401) {

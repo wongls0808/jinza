@@ -146,6 +146,7 @@ async function submit() {
   dlg.value.loading = true
   try {
     const f = dlg.value.form
+    console.log('Submitting bank:', f) // 调试日志
     if (dlg.value.mode === 'add') {
       if (!f.code || !f.zh || !f.en) { ElMessage.warning(t('customers.messages.fillAllFields')); return }
       // 前置唯一性校验：本地列表中是否已存在同名 code（忽略大小写与空白）
@@ -199,6 +200,7 @@ async function submit() {
     } catch {}
     ElMessage.success(t('customers.messages.saved'))
   } catch (e) {
+    console.error('Banks submit error:', e) // 调试日志
     let msg = e?.message || ''
     
     // 优先使用 error.message（已由 api.js 处理过）
@@ -217,6 +219,7 @@ async function submit() {
       if (e.status >= 500) msg += ' (服务器错误)'
     }
     
+    console.log('Final error message:', msg) // 调试日志
     ElMessage.error((t('customers.messages.saveFailedWithMsg') || '保存失败：{msg}').replace('{msg}', msg || '未知错误'))
   } finally {
     dlg.value.loading = false
