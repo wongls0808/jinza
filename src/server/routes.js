@@ -1559,6 +1559,18 @@ router.get('/banks', auth.authMiddleware(true), auth.readOpenOr('view_banks'), a
   res.json(rows)
 })
 
+// Validate bank code availability (server-side pre-check)
+router.get('/banks/validate-code', auth.authMiddleware(true), auth.readOpenOr('view_banks'), async (req, res) => {
+  let code = String(req.query.code || '').trim().toUpperCase()
+  if (!code) return res.status(400).json({ error: 'code required' })
+  try {
+    const rs = await query('select 1 from banks where code=$1 limit 1', [code])
+    res.json({ available: rs.rowCount === 0 })
+  } catch (e) {
+    res.status(500).json({ error: 'validate failed' })
+  }
+})
+
 // Accept either {code, zh, en, logo_url} or {logo_data_url} (data:image/svg+xml;base64,...)
 router.post('/banks', auth.authMiddleware(true), auth.requirePerm('banks:create'), express.json({ limit: '10mb' }), async (req, res) => {
   let { code, zh, en, logo_url, logo_data_url } = req.body || {}

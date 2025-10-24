@@ -121,6 +121,15 @@ async function fileToDataUrl(file) {
 async function pickFile(e) {
   const f = e.target.files && e.target.files[0]
   if (!f) return
+  // 基础大小限制，防止 data URL 过大导致后端 413（10MB JSON 限制，base64 膨胀约 1/3）
+  const maxBytes = 4 * 1024 * 1024 // 4MB
+  if (f.size > maxBytes) {
+    ElMessage.error(t('banks.hintFileTooLarge') || '文件过大，请选择小于 4MB 的图片（推荐 SVG）')
+    try { if (fileInputRef.value) fileInputRef.value.value = '' } catch {}
+    fileName.value = ''
+    dlg.value.form.logo_data_url = ''
+    return
+  }
   fileName.value = f.name || ''
   dlg.value.form.logo_data_url = await fileToDataUrl(f)
   // 选中一次后立刻清空 input，避免下次对话框再打开时保留历史选择
@@ -147,6 +156,14 @@ async function submit() {
         ElMessage.error('银行编号已存在')
         return
       }
+      // 服务端唯一性校验：避免并发/跨端情况下的列表滞后
+      try {
+        const r = await api.banks.checkCode(newCode)
+        if (!r?.available) {
+          ElMessage.error('银行编号已存在')
+          return
+        }
+      } catch {}
       await api.createBank({
         code: (f.code || '').trim().toUpperCase(),
         zh: (f.zh || '').trim().toUpperCase(),

@@ -227,6 +227,10 @@ export const api = {
     return res
   },
   banks: {
+    checkCode: async (code) => {
+      const q = new URLSearchParams({ code: String(code||'').trim().toUpperCase() }).toString()
+      return request(`/banks/validate-code?${q}`)
+    },
     all: async () => {
       const key = 'banks.all'
       const cached = getCache(key)
