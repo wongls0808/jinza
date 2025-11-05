@@ -1,0 +1,15 @@
+# Ignore video files (too large for GitHub)
+videos/*.mp4
+videos/*.webm
+videos/*.avi
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

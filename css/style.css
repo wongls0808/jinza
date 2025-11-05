@@ -1,0 +1,2039 @@
+/* =========================================
+   全局样式
+   ========================================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --accent-color: #f093fb;
+    --text-dark: #2d3748;
+    --text-light: #718096;
+    --bg-light: #f7fafc;
+    --white: #ffffff;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+html {
+    scroll-behavior: smooth;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 
+                 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-dark);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+body.single-page {
+    overflow: hidden;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.container-full {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    transition: var(--transition);
+}
+
+/* =========================================
+   导航栏
+   ========================================= */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: var(--white);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    transition: var(--transition);
+}
+
+.navbar.scrolled {
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.nav-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo a {
+    display: flex;
+    align-items: center;
+}
+
+.logo-img {
+    height: 50px;
+    width: auto;
+    transition: var(--transition);
+}
+
+.logo a:hover .logo-img {
+    transform: scale(1.05);
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: var(--text-dark);
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    transition: var(--transition);
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: var(--primary-color);
+    background: rgba(102, 126, 234, 0.1);
+}
+
+/* =========================================
+   Hero Section - Logo Showcase
+   ========================================= */
+.hero-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 100px 20px 50px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)"/></svg>');
+    opacity: 0.5;
+}
+
+.hero-content {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.hero-subtitle {
+    color: var(--white);
+    font-size: 2rem;
+    font-weight: 300;
+    margin-bottom: 3rem;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    opacity: 0.9;
+}
+
+/* Logo Showcase - Central JINZA with Surrounding Brands */
+.logo-showcase {
+    position: relative;
+    width: 600px;
+    height: 600px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Central JINZA Logo */
+.central-logo {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    background: var(--white);
+    padding: 3rem;
+    border-radius: 50%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 280px;
+    height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: float 3s ease-in-out infinite;
+}
+
+.jinza-main-logo {
+    width: 150px;
+    height: auto;
+    margin-bottom: 1rem;
+}
+
+.central-logo h2 {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.central-logo p {
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Brand Orbit - Surrounding Logos */
+.brand-orbit {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+.brand-item {
+    position: absolute;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.brand-card {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 150px;
+    transition: var(--transition);
+}
+
+.brand-card:hover {
+    transform: translateY(-10px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+}
+
+.brand-card img {
+    width: 100%;
+    height: 80px;
+    object-fit: contain;
+    margin-bottom: 0.5rem;
+}
+
+.brand-name {
+    display: block;
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+}
+
+/* Position each brand logo */
+.brand-1 {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.brand-2 {
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.brand-3 {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.brand-4 {
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Scroll Indicator */
+.scroll-indicator {
+    margin-top: 4rem;
+    color: var(--white);
+    animation: bounce 2s infinite;
+}
+
+.scroll-indicator i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.scroll-indicator p {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(10px);
+    }
+}
+
+/* =========================================
+   通用区块样式
+   ========================================= */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+section {
+    padding: 5rem 0;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-dark);
+}
+
+.section-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-light);
+}
+
+/* =========================================
+   About Section
+   ========================================= */
+.about-section {
+    background: var(--bg-light);
+}
+
+.about-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+}
+
+.about-text h3 {
+    font-size: 1.8rem;
+    color: var(--primary-color);
+    margin: 2rem 0 1rem 0;
+}
+
+.about-text h3:first-child {
+    margin-top: 0;
+}
+
+.about-text p {
+    color: var(--text-light);
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+}
+
+.feature-list {
+    list-style: none;
+    margin-top: 1.5rem;
+}
+
+.feature-list li {
+    padding: 0.8rem 0;
+    font-size: 1.05rem;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.feature-list i {
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.about-image img {
+    width: 100%;
+    border-radius: 15px;
+    box-shadow: var(--shadow);
+}
+
+/* =========================================
+   Brands Section
+   ========================================= */
+.brands-section {
+    background: var(--white);
+}
+
+.brands-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.brand-grid-item {
+    text-decoration: none;
+    display: block;
+}
+
+.brand-grid-card {
+    background: var(--white);
+    border: 2px solid var(--bg-light);
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+    transition: var(--transition);
+    height: 100%;
+}
+
+.brand-grid-card:hover {
+    transform: translateY(-10px);
+    box-shadow: var(--shadow);
+    border-color: var(--primary-color);
+}
+
+.brand-grid-card img {
+    width: 100%;
+    height: 100px;
+    object-fit: contain;
+    margin-bottom: 1.5rem;
+}
+
+.brand-grid-card h3 {
+    font-size: 1.3rem;
+    color: var(--text-dark);
+    margin-bottom: 0.8rem;
+}
+
+.brand-grid-card p {
+    color: var(--text-light);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.learn-more {
+    color: var(--primary-color);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: var(--transition);
+}
+
+.brand-grid-card:hover .learn-more {
+    gap: 1rem;
+}
+
+/* =========================================
+   Contact Section
+   ========================================= */
+.contact-section {
+    background: var(--bg-light);
+}
+
+.contact-content {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.contact-info {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 2rem;
+    align-items: stretch;
+}
+
+.contact-item {
+    background: var(--white);
+    padding: 2.5rem;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+}
+
+.contact-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.contact-item-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--bg-light);
+}
+
+.contact-item-header i {
+    font-size: 2rem;
+    color: var(--primary-color);
+}
+
+.contact-item-header h3 {
+    font-size: 1.4rem;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+/* Company Information */
+.contact-item-large {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+    border: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.contact-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.detail-group {
+    text-align: left;
+    padding: 1.25rem;
+    background: var(--white);
+    border-radius: 10px;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.detail-group:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.detail-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.detail-label i {
+    font-size: 1rem;
+}
+
+.detail-value {
+    color: var(--text-dark);
+    font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+    line-height: 1.7;
+    font-weight: 500;
+}
+
+.detail-subtext {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+/* Email Section */
+.contact-item-email {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--white);
+    position: relative;
+    overflow: hidden;
+}
+
+.contact-item-email::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.contact-item-email .contact-item-header {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    position: relative;
+    z-index: 1;
+}
+
+.contact-item-email .contact-item-header i,
+.contact-item-email .contact-item-header h3 {
+    color: var(--white);
+}
+
+.email-action {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+}
+
+.email-label {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.email-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+}
+
+.email-link:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.02);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.email-address {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--white);
+    word-break: break-all;
+    letter-spacing: 0.5px;
+}
+
+.email-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.95);
+    opacity: 0.85;
+    transition: all 0.3s ease;
+}
+
+.email-link:hover .email-hint {
+    opacity: 1;
+    gap: 0.75rem;
+}
+
+.email-hint i {
+    font-size: 1rem;
+}
+
+.email-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.email-note i {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+/* =========================================
+   Footer
+   ========================================= */
+.footer {
+    background: var(--text-dark);
+    color: var(--white);
+    padding: 3rem 0 1rem;
+}
+
+.footer-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.footer-logo {
+    height: 50px;
+    width: auto;
+    margin-bottom: 1rem;
+}
+
+.footer-section p {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1rem;
+}
+
+.footer-section h4 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.footer-section ul {
+    list-style: none;
+}
+
+.footer-section ul li {
+    margin-bottom: 0.5rem;
+}
+
+.footer-section ul li a {
+    color: rgba(255, 255, 255, 0.7);
+    transition: var(--transition);
+}
+
+.footer-section ul li a:hover {
+    color: var(--white);
+    padding-left: 5px;
+}
+
+.footer-bottom {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* =========================================
+   Back to Top Button
+   ========================================= */
+.back-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--white);
+    border: none;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+    z-index: 999;
+    box-shadow: var(--shadow);
+}
+
+.back-to-top.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.back-to-top:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* =========================================
+   Responsive Design
+   ========================================= */
+@media (max-width: 968px) {
+    .nav-menu {
+        display: none;
+    }
+    
+    .logo-showcase {
+        width: 500px;
+        height: 500px;
+    }
+    
+    .central-logo {
+        width: 220px;
+        height: 220px;
+        padding: 2rem;
+    }
+    
+    .jinza-main-logo {
+        width: 120px;
+    }
+    
+    .brand-card {
+        width: 120px;
+        padding: 1rem;
+    }
+    
+    .about-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .contact-info {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .contact-item {
+        padding: 2rem;
+    }
+    
+    .detail-group {
+        padding: 1rem;
+    }
+    
+    .section-title {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .logo-showcase {
+        width: 350px;
+        height: 350px;
+    }
+    
+    .central-logo {
+        width: 160px;
+        height: 160px;
+        padding: 1.5rem;
+    }
+    
+    .jinza-main-logo {
+        width: 80px;
+    }
+    
+    .central-logo h2 {
+        font-size: 1.3rem;
+    }
+    
+    .central-logo p {
+        font-size: 0.75rem;
+    }
+    
+    .brand-card {
+        width: 90px;
+        padding: 0.8rem;
+    }
+    
+    .brand-card img {
+        height: 50px;
+    }
+    
+    .brand-name {
+        font-size: 0.75rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.2rem;
+    }
+    
+    section {
+        padding: 3rem 0;
+    }
+    
+    .section-title {
+        font-size: 1.8rem;
+    }
+    
+    .contact-item {
+        padding: 1.5rem;
+    }
+    
+    .contact-item-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .contact-item-header h3 {
+        font-size: 1.1rem;
+    }
+    
+    .detail-group {
+        padding: 1rem;
+    }
+    
+    .detail-value {
+        font-size: 0.95rem;
+    }
+    
+    .email-address {
+        font-size: 1rem;
+    }
+    
+    .email-link {
+        padding: 1.25rem;
+    }
+}
+
+/* =========================================
+   产品区
+   ========================================= */
+.products-section {
+    background: var(--bg-light);
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+.product-card {
+    background: var(--white);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.product-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+}
+
+.product-image {
+    position: relative;
+    overflow: hidden;
+    height: 250px;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition);
+}
+
+.product-card:hover .product-image img {
+    transform: scale(1.1);
+}
+
+.product-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(102, 126, 234, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.product-card:hover .product-overlay {
+    opacity: 1;
+}
+
+.view-details {
+    padding: 0.8rem 2rem;
+    background: var(--white);
+    color: var(--primary-color);
+    border-radius: 25px;
+    font-weight: 600;
+}
+
+.product-info {
+    padding: 1.5rem;
+}
+
+.product-info h3 {
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    color: var(--text-dark);
+}
+
+.product-info p {
+    color: var(--text-light);
+    line-height: 1.6;
+}
+
+/* =========================================
+   服务特色
+   ========================================= */
+.services-section {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--white);
+}
+
+.services-section .section-title {
+    color: var(--white);
+}
+
+.services-section .section-title::after {
+    background: var(--white);
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.service-item {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    transition: var(--transition);
+}
+
+.service-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px);
+}
+
+.service-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.service-item h3 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+}
+
+/* =========================================
+   关于我们
+   ========================================= */
+.about-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+}
+
+.about-text h3 {
+    font-size: 1.5rem;
+    margin: 1rem 0;
+    color: var(--primary-color);
+}
+
+.about-text p {
+    margin: 1rem 0;
+    color: var(--text-light);
+    line-height: 1.8;
+}
+
+.about-images {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.about-image-item {
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.about-image-item img {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+}
+
+.image-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    color: var(--white);
+    padding: 2rem 1.5rem 1rem;
+    font-weight: 600;
+}
+
+/* =========================================
+   企业文化
+   ========================================= */
+.culture-section {
+    background: var(--bg-light);
+}
+
+.culture-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+}
+
+.culture-image {
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.culture-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.culture-text h3 {
+    font-size: 1.8rem;
+    margin: 1rem 0;
+    color: var(--primary-color);
+}
+
+.culture-text p {
+    margin: 1rem 0;
+    color: var(--text-light);
+    line-height: 1.8;
+}
+
+/* =========================================
+   企业社会责任
+   ========================================= */
+.csr-section {
+    text-align: center;
+}
+
+.csr-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.csr-content > p {
+    color: var(--text-light);
+    line-height: 1.8;
+    margin-bottom: 3rem;
+}
+
+.csr-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.stat-item {
+    padding: 2rem;
+    background: var(--bg-light);
+    border-radius: 15px;
+    transition: var(--transition);
+}
+
+.stat-item:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+}
+
+.stat-number {
+    font-size: 3rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-label {
+    font-size: 1rem;
+    color: var(--text-light);
+    margin-top: 0.5rem;
+}
+
+/* =========================================
+   新闻动态
+   ========================================= */
+.news-section {
+    background: var(--bg-light);
+}
+
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+}
+
+.news-card {
+    background: var(--white);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.news-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+}
+
+.news-image {
+    position: relative;
+    height: 220px;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+}
+
+.news-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition);
+}
+
+.news-card:hover .news-image img {
+    transform: scale(1.1);
+}
+
+.news-date {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: var(--white);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+}
+
+.news-content {
+    padding: 1.5rem;
+}
+
+.news-content h3 {
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    color: var(--text-dark);
+}
+
+.news-content p {
+    color: var(--text-light);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.read-more {
+    color: var(--primary-color);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.read-more:hover {
+    gap: 1rem;
+}
+
+.view-more-wrapper {
+    text-align: center;
+    margin-top: 3rem;
+}
+
+/* =========================================
+   联系我们
+   ========================================= */
+.contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+}
+
+.contact-item {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border-radius: 15px;
+    margin-bottom: 1.5rem;
+    transition: var(--transition);
+}
+
+.contact-item:hover {
+    transform: translateX(10px);
+    box-shadow: var(--shadow);
+}
+
+.contact-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.contact-details h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-dark);
+}
+
+.contact-details p {
+    color: var(--text-light);
+}
+
+.contact-form {
+    background: var(--bg-light);
+    padding: 2rem;
+    border-radius: 15px;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: var(--white);
+    transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.contact-form .btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--white);
+}
+
+/* =========================================
+   极简联系区
+   ========================================= */
+.minimal-contact {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    padding: 4rem 0;
+}
+
+.minimal-contact .contact-content {
+    text-align: center;
+}
+
+.minimal-contact h2 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 3rem;
+    color: var(--text-dark);
+}
+
+.contact-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 3rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.contact-item-minimal {
+    text-align: center;
+    padding: 2rem;
+    background: var(--white);
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    transition: var(--transition);
+}
+
+.contact-item-minimal:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.contact-item-minimal i {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.contact-item-minimal h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-dark);
+}
+
+.contact-item-minimal p {
+    font-size: 1rem;
+    color: var(--text-light);
+}
+
+/* =========================================
+   动画
+   ========================================= */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.fade-in {
+    animation: fadeInUp 0.8s ease;
+}
+
+.email-link:hover .email-hint i {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* =========================================
+   响应式设计
+   ========================================= */
+@media (max-width: 968px) {
+    .logo-img {
+        height: 50px;
+    }
+
+    .hero-section {
+        height: 100vh;
+        min-height: 500px;
+    }
+
+    .slide-title {
+        font-size: 2rem;
+    }
+
+    .minimal-contact h2 {
+        font-size: 2rem;
+    }
+
+    .contact-info-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    .brand-logos {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+
+    .brand-showcase h3 {
+        font-size: 1.2rem;
+    }
+
+    .slide-subtitle {
+        font-size: 1rem;
+    }
+
+    .section-title {
+        font-size: 2rem;
+    }
+
+    .about-content,
+    .culture-content,
+    .contact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .culture-content .culture-image {
+        order: -1;
+    }
+
+    .products-grid,
+    .news-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .services-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .csr-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-section {
+        height: 100vh;
+        min-height: 450px;
+    }
+
+    .slide-title {
+        font-size: 1.5rem;
+    }
+
+    .slider-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .logo-img {
+        height: 45px;
+    }
+
+    .brand-logos {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .brand-showcase {
+        padding: 1.5rem 0 2rem;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 0.8rem 1.5rem;
+        font-size: 0.9rem;
+    }
+
+    .csr-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+    }
+}
+
+/* =========================================
+   单页布局样式
+   ========================================= */
+
+/* 移除导航栏样式 */
+.single-page .navbar {
+    display: none;
+}
+
+/* 主内容区域 */
+.main-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.split-layout {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+/* 左右面板 */
+.left-panel,
+.right-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+.left-panel {
+    background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+    border-right: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.right-panel {
+    background: var(--white);
+}
+
+.panel-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Panel Header with Logo */
+.panel-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.panel-logo {
+    width: 80px;
+    height: auto;
+    flex-shrink: 0;
+}
+
+.panel-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0;
+    margin-top: 0.5rem;
+    text-align: left;
+    position: relative;
+    padding-bottom: 1rem;
+}
+
+.panel-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 2px;
+}
+
+/* About Us 样式 */
+.about-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.company-intro {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-dark);
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.info-section {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: var(--transition);
+}
+
+.info-section:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.15);
+}
+
+.info-section h3 {
+    font-size: 1.4rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.info-section h3 i {
+    font-size: 1.2rem;
+}
+
+.info-section p {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: var(--text-dark);
+}
+
+.feature-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.05rem;
+    color: var(--text-dark);
+}
+
+.feature-list li i {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+/* Right Panel - 4宫格布局 */
+.panel-content-wide {
+    max-width: 100%;
+    width: 100%;
+    padding: 0 1rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-title-center {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    position: relative;
+    padding-bottom: 0.75rem;
+    flex-shrink: 0;
+}
+
+.panel-title-center::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 2px;
+}
+
+/* 4宫格品牌网格 */
+.brands-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    max-width: 650px;
+    margin: 0 auto;
+    flex: 1;
+    align-content: center;
+}
+
+.brand-grid-card {
+    background: var(--white);
+    border-radius: 12px;
+    border: 2px solid rgba(102, 126, 234, 0.15);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    position: relative;
+}
+
+.brand-grid-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-color);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
+}
+
+.brand-card-inner {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 1.25rem 1.25rem;
+    height: 100%;
+    position: relative;
+}
+
+.brand-logo-box {
+    width: 100%;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
+    transition: all 0.3s ease;
+}
+
+.brand-grid-card:hover .brand-logo-box {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.brand-logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.brand-details {
+    flex: 1;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.brand-card-inner h3 {
+    font-size: 1.2rem;
+    color: var(--text-dark);
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+
+.brand-card-inner p {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.3;
+    margin-bottom: 0;
+}
+
+.view-more {
+    position: absolute;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--primary-color);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.brand-grid-card:hover .view-more {
+    opacity: 1;
+    gap: 0.4rem;
+}
+
+.view-more i {
+    font-size: 0.7rem;
+}
+
+/* 页脚最小化 */
+.footer-minimal {
+    background: var(--text-dark);
+    color: var(--white);
+    padding: 1.25rem 0;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.footer-content-minimal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.social-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.social-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--white);
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: 2px solid transparent;
+}
+
+.social-icon:hover {
+    background: var(--primary-color);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.footer-text {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* 滚动条样式 */
+.left-panel::-webkit-scrollbar,
+.right-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.left-panel::-webkit-scrollbar-track,
+.right-panel::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.left-panel::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 4px;
+}
+
+/* 响应式设计 */
+@media (max-width: 968px) {
+    .split-layout {
+        flex-direction: column;
+    }
+    
+    .left-panel,
+    .right-panel {
+        flex: auto;
+        border-right: none;
+        border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+        padding: 2rem 1.5rem;
+    }
+    
+    .panel-title,
+    .panel-title-center {
+        font-size: 1.8rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .panel-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .panel-title::after {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    .brands-grid-4 {
+        gap: 1.25rem;
+    }
+    
+    .brand-logo-box {
+        height: 70px;
+    }
+    
+    .main-content {
+        overflow-y: auto;
+    }
+    
+    body.single-page {
+        overflow-y: auto;
+        height: auto;
+    }
+}
+
+@media (max-width: 600px) {
+    .left-panel,
+    .right-panel {
+        padding: 1.5rem 1rem;
+    }
+    
+    .panel-logo {
+        width: 60px;
+    }
+    
+    .panel-title,
+    .panel-title-center {
+        font-size: 1.5rem;
+        margin-bottom: 1.25rem;
+    }
+    
+    .company-intro {
+        font-size: 1rem;
+        padding: 1rem;
+    }
+    
+    .brands-grid-4 {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+    
+    .brand-logo-box {
+        height: 80px;
+    }
+    
+    .brand-card-inner {
+        padding: 1.25rem 1rem 1rem;
+    }
+    
+    .brand-card-inner h3 {
+        font-size: 1.1rem;
+    }
+    
+    .brand-card-inner p {
+        font-size: 0.8rem;
+    }
+    
+    .social-links {
+        gap: 0.75rem;
+    }
+    
+    .social-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+    
+    .footer-text {
+        font-size: 0.75rem;
+    }
+}
