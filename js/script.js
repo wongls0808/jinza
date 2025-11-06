@@ -250,3 +250,44 @@ if ('IntersectionObserver' in window) {
 console.log('%cWelcome to 3TREES Official Website!', 'color: #667eea; font-size: 20px; font-weight: bold;');
 console.log('%cBuilt with Modern Technology', 'color: #764ba2; font-size: 14px;');
 console.log('%cAuthorized Distributor for Malaysia', 'color: #667eea; font-size: 12px;');
+
+// =========================================
+// WeChat QR Code Modal
+// =========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const wechatBtn = document.getElementById('wechatBtn');
+    const wechatModal = document.getElementById('wechatModal');
+    const wechatClose = document.querySelector('.wechat-close');
+
+    if (wechatBtn) {
+        wechatBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('WeChat button clicked'); // Debug
+            wechatModal.classList.add('show');
+        });
+    } else {
+        console.error('WeChat button not found');
+    }
+
+    if (wechatClose) {
+        wechatClose.addEventListener('click', () => {
+            wechatModal.classList.remove('show');
+        });
+    }
+
+    // 点击模态框外部关闭
+    if (wechatModal) {
+        wechatModal.addEventListener('click', (e) => {
+            if (e.target === wechatModal) {
+                wechatModal.classList.remove('show');
+            }
+        });
+    }
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && wechatModal && wechatModal.classList.contains('show')) {
+            wechatModal.classList.remove('show');
+        }
+    });
+});

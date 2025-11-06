@@ -109,21 +109,21 @@
         <div class="container">
             <div class="footer-content-minimal">
                 <div class="social-links">
-                    <a href="https://www.facebook.com/Jinza Sb" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Facebook">
+                    <a href="https://www.facebook.com/share/1PABviHwqa/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Facebook">
                         <i class="fab fa-facebook-f"></i>
                     </a>
                     <a href="https://www.instagram.com/jinza.sb" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Instagram">
                         <i class="fab fa-instagram"></i>
                     </a>
-                    <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="TikTok">
+                    <a href="https://www.tiktok.com/@jinza.trading" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="TikTok">
                         <i class="fab fa-tiktok"></i>
                     </a>
                     <a href="https://wa.me/60165777137" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="WhatsApp">
                         <i class="fab fa-whatsapp"></i>
                     </a>
-                    <a href="https://weixin.qq.com" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="WeChat">
+                    <button class="social-icon" id="wechatBtn" aria-label="WeChat">
                         <i class="fab fa-weixin"></i>
-                    </a>
+                    </button>
                     <a href="mailto:jinza.sb@gmail.com" class="social-icon" aria-label="Email">
                         <i class="fas fa-envelope"></i>
                     </a>
@@ -133,6 +133,60 @@
         </div>
     </footer>
 
+    <!-- WeChat QR Code Modal -->
+    <div id="wechatModal" class="wechat-modal">
+        <div class="wechat-modal-content">
+            <span class="wechat-close">&times;</span>
+            <h3>Scan QR Code to Add WeChat</h3>
+            <img src="images/wechat-qr.jpg" alt="WeChat QR Code" class="wechat-qr-image">
+            <p>Jinza Trading - Malaysia</p>
+        </div>
+    </div>
+
     <script src="js/script.js"></script>
+    <script>
+        // WeChat Modal - Inline Script
+        (function() {
+            const wechatBtn = document.getElementById('wechatBtn');
+            const wechatModal = document.getElementById('wechatModal');
+            const wechatClose = document.querySelector('.wechat-close');
+
+            console.log('Inline script loaded');
+            console.log('Button:', wechatBtn);
+            console.log('Modal:', wechatModal);
+
+            if (wechatBtn) {
+                wechatBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('WeChat button clicked!');
+                    wechatModal.classList.add('show');
+                });
+                console.log('Event listener attached');
+            } else {
+                console.error('ERROR: WeChat button not found!');
+            }
+
+            if (wechatClose) {
+                wechatClose.addEventListener('click', function() {
+                    wechatModal.classList.remove('show');
+                });
+            }
+
+            if (wechatModal) {
+                wechatModal.addEventListener('click', function(e) {
+                    if (e.target === wechatModal) {
+                        wechatModal.classList.remove('show');
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && wechatModal && wechatModal.classList.contains('show')) {
+                    wechatModal.classList.remove('show');
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -1897,6 +1897,11 @@ section {
     transition: all 0.3s ease;
     text-decoration: none;
     border: 2px solid transparent;
+    cursor: pointer;
+}
+
+#wechatBtn {
+    padding: 0;
 }
 
 .social-icon:hover {
@@ -1909,6 +1914,100 @@ section {
 .footer-text {
     margin: 0;
     color: rgba(255, 255, 255, 0.8);
+}
+
+/* WeChat Modal */
+.wechat-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation: fadeIn 0.3s ease;
+}
+
+.wechat-modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wechat-modal-content {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 15px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.wechat-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: var(--transition);
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wechat-close:hover {
+    color: var(--text-dark);
+    transform: rotate(90deg);
+}
+
+.wechat-modal-content h3 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+
+.wechat-qr-image {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    margin: 0 auto 1rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.wechat-modal-content p {
+    color: var(--text-light);
+    font-size: 1rem;
+    margin: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 /* 滚动条样式 */
