@@ -306,17 +306,14 @@ const server = http.createServer(async (req, res) => {
 });
 
 /* ────── 启动 ────── */
-async function start() {
-  try {
-    await db.initTables();
-    console.log("Database connected and tables ready.");
-  } catch (err) {
-    console.error("Database init failed:", err.message);
-    console.log("Server will start without database persistence.");
-  }
-  server.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
-}
-
-start();
+/* 先监听端口（让健康检查尽快通过），再异步连接数据库 */
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+  /* 异步初始化数据库，不阻塞端口监听 */
+  db.initTables()
+    .then(() => console.log("Database connected and tables ready."))
+    .catch((err) => {
+      console.error("Database init failed:", err.message);
+      console.log("Server running without database persistence.");
+    });
+});
