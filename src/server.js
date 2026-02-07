@@ -42,7 +42,9 @@ try {
 }
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
-console.log(`PORT=${PORT}, DATABASE_URL=${process.env.DATABASE_URL ? "set (" + process.env.DATABASE_URL.substring(0, 30) + "...)" : "NOT SET"}`);
+const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+console.log(`PORT=${PORT}, DB=${dbUrl ? "set (" + dbUrl.replace(/\/\/[^@]*@/, "//***@") + ")" : "NOT SET (need DATABASE_URL or DATABASE_PUBLIC_URL)"}`);
+
 
 /* ────── MIME ────── */
 const MIME = {
@@ -349,7 +351,10 @@ server.listen(PORT, () => {
   db.initTables()
     .then(() => console.log("Database connected and tables ready."))
     .catch((err) => {
-      console.error("Database init failed:", err.message);
+      console.error("Database init failed:", err.message, err.code || "");
+      if (err.message && err.message.includes("password authentication")) {
+        console.error("提示: 密码认证失败，请检查 DATABASE_URL 或 DATABASE_PUBLIC_URL 中的密码是否正确。");
+      }
       console.log("Server running without database persistence.");
     });
 });

@@ -5,16 +5,23 @@ let dbAvailable = false;
 
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
+    /* 优先 DATABASE_URL（Railway 内网），回退 DATABASE_PUBLIC_URL（外网） */
+    const connectionString =
+      process.env.DATABASE_URL ||
+      process.env.DATABASE_PUBLIC_URL;
     if (!connectionString) {
       return null;
     }
+    console.log(
+      `DB connecting: ${connectionString.replace(/\/\/[^@]*@/, "//***@")}`
+    );
     /* Railway 内网(*.railway.internal)不需要 SSL；
-       外网连接默认开启 SSL（rejectUnauthorized: false） */
+       外网(.proxy.rlwy.net 等)需要 SSL */
     const isInternal = connectionString.includes(".railway.internal");
-    const sslOpt = process.env.DB_SSL === "false" || isInternal
-      ? false
-      : { rejectUnauthorized: false };
+    const sslOpt =
+      process.env.DB_SSL === "false" || isInternal
+        ? false
+        : { rejectUnauthorized: false };
     pool = new Pool({
       connectionString,
       ssl: sslOpt,
