@@ -9,11 +9,15 @@ function getPool() {
     if (!connectionString) {
       return null;
     }
+    /* Railway 内网(*.railway.internal)不需要 SSL；
+       外网连接默认开启 SSL（rejectUnauthorized: false） */
+    const isInternal = connectionString.includes(".railway.internal");
+    const sslOpt = process.env.DB_SSL === "false" || isInternal
+      ? false
+      : { rejectUnauthorized: false };
     pool = new Pool({
       connectionString,
-      ssl: process.env.DB_SSL === "false"
-        ? false
-        : { rejectUnauthorized: false },
+      ssl: sslOpt,
       max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000
