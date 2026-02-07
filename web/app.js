@@ -1400,8 +1400,10 @@ async function callAutoCount({ method, path, query, body }) {
 }
 
 async function callProxy(payload) {
-  /* 代理地址: 优先用配置值，否则自动使用当前页面 origin（Railway 部署时同源） */
-  const proxyBase = state.config.proxyBaseUrl || window.location.origin;
+  /* 远程环境始终使用当前 origin 作为代理地址（同源）；本地才允许自定义 */
+  const proxyBase = isRemote
+    ? window.location.origin
+    : (state.config.proxyBaseUrl || window.location.origin);
   const url = `${proxyBase.replace(/\/$/, "")}/api/proxy`;
   const response = await fetch(url, {
     method: "POST",
