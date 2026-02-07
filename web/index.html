@@ -14,8 +14,6 @@
           <div class="brand-subtitle">同步控制台</div>
         </div>
         <nav class="nav">
-          <button class="menu-btn" data-overlay-target="config">连接配置</button>
-          <button class="menu-btn" data-overlay-target="modules">同步模块</button>
           <div class="menu-group">
             <div class="menu-title">基础资料</div>
             <button class="menu-btn" data-overlay-target="supplier">供应商</button>
@@ -51,114 +49,7 @@
       <main class="content">
 
       <div id="sectionsBucket" class="sections-bucket">
-      <section id="section-config" class="card overlay-section" data-overlay-title="连接配置">
-        <h2>连接配置</h2>
-        <div class="grid">
-          <label class="field">
-            <span>API 基础地址</span>
-            <input
-              id="baseUrl"
-              type="text"
-              placeholder="https://accounting-api.autocountcloud.com"
-            />
-          </label>
-          <label class="field">
-            <span>连接模式</span>
-            <select id="connectMode">
-              <option value="direct">直连 AutoCount</option>
-              <option value="proxy">本地代理</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>代理服务地址</span>
-            <input
-              id="proxyBaseUrl"
-              type="text"
-              placeholder="http://localhost:8787"
-            />
-          </label>
-          <label class="field">
-            <span>账套 ID</span>
-            <input id="accountBookId" type="text" placeholder="ACCOUNT_BOOK_ID" />
-          </label>
-          <label class="field">
-            <span>Key ID</span>
-            <input id="keyId" type="password" placeholder="AUTOCOUNT_KEY_ID" />
-          </label>
-          <label class="field">
-            <span>API Key</span>
-            <input id="apiKey" type="password" placeholder="AUTOCOUNT_API_KEY" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="saveConfig" class="btn primary">保存配置</button>
-          <button id="testConnection" class="btn">测试连接</button>
-        </div>
-      </section>
 
-      <section id="section-modules" class="card overlay-section" data-overlay-title="同步模块">
-        <div class="card-header">
-          <h2>同步模块</h2>
-          <div class="row">
-            <button id="syncAll" class="btn primary">全部同步</button>
-            <button id="clearLog" class="btn">清空日志</button>
-          </div>
-        </div>
-        <div class="modules">
-          <div class="module">
-            <div class="module-info">
-              <h3>供应商</h3>
-              <p>Creditor 列表同步</p>
-            </div>
-            <button data-entity="supplier" class="btn ghost">同步</button>
-          </div>
-          <div class="module">
-            <div class="module-info">
-              <h3>客户</h3>
-              <p>Debtor 列表同步</p>
-            </div>
-            <button data-entity="customer" class="btn ghost">同步</button>
-          </div>
-          <div class="module">
-            <div class="module-info">
-              <h3>产品库</h3>
-              <p>Product 列表同步</p>
-            </div>
-            <button data-entity="product" class="btn ghost">同步</button>
-          </div>
-          <div class="module">
-            <div class="module-info">
-              <h3>销售管理</h3>
-              <p>Invoice / Quotation / Credit Note</p>
-            </div>
-            <div class="row">
-              <button data-entity="invoice" class="btn ghost">发票</button>
-              <button data-entity="quotation" class="btn ghost">报价</button>
-              <button data-entity="creditNote" class="btn ghost">贷项</button>
-            </div>
-          </div>
-          <div class="module">
-            <div class="module-info">
-              <h3>采购管理</h3>
-              <p>Purchase Order / Invoice / Return</p>
-            </div>
-            <div class="row">
-              <button data-entity="purchaseOrder" class="btn ghost">订单</button>
-              <button data-entity="purchaseInvoice" class="btn ghost">发票</button>
-              <button data-entity="purchaseReturn" class="btn ghost">退货</button>
-            </div>
-          </div>
-          <div class="module">
-            <div class="module-info">
-              <h3>采购 PI 管理</h3>
-              <p>本地 PI 列表（不回传 AutoCount）</p>
-            </div>
-            <div class="row">
-              <button data-entity="purchasePI" class="btn ghost">PI 列表</button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section id="section-log" class="card overlay-section" data-overlay-title="同步日志">
         <div class="card-header">

@@ -16,12 +16,6 @@ const state = {
 };
 
 const logEl = document.getElementById("log");
-const baseUrlEl = document.getElementById("baseUrl");
-const connectModeEl = document.getElementById("connectMode");
-const proxyBaseUrlEl = document.getElementById("proxyBaseUrl");
-const accountBookIdEl = document.getElementById("accountBookId");
-const keyIdEl = document.getElementById("keyId");
-const apiKeyEl = document.getElementById("apiKey");
 const drawerEl = document.getElementById("drawer");
 const drawerTitleEl = document.getElementById("drawerTitle");
 const drawerContentEl = document.getElementById("drawerContent");
@@ -436,8 +430,6 @@ const fieldMap = {
 
 const entityLabelMap = new Map(entities.map((entity) => [entity.name, entity.label]));
 const sectionMap = new Map([
-  ["config", document.getElementById("section-config")],
-  ["modules", document.getElementById("section-modules")],
   ["log", document.getElementById("section-log")],
   ["data", document.getElementById("section-data")]
 ]);
@@ -1331,33 +1323,17 @@ async function persistSyncState() {
   } catch (e) { /* 静默失败 */ }
 }
 
-function applyConfigToForm() {
-  baseUrlEl.value = state.config.baseUrl || "";
-  connectModeEl.value = state.config.connectMode || "direct";
-  proxyBaseUrlEl.value = state.config.proxyBaseUrl || "";
-  accountBookIdEl.value = state.config.accountBookId || "";
-  keyIdEl.value = state.config.keyId || "";
-  apiKeyEl.value = state.config.apiKey || "";
-}
+/* 配置已改为后端环境变量驱动，前端不再需要表单 */
+function applyConfigToForm() { /* noop */ }
 
 async function persistConfig() {
   localStorage.setItem("autocount-config", JSON.stringify(state.config));
-  /* 同时写入后端数据库 */
   try {
     await apiPost("/api/config", state.config);
   } catch (e) { /* 静默失败 */ }
 }
 
-function updateConfigFromForm() {
-  state.config = {
-    baseUrl: baseUrlEl.value.trim(),
-    proxyBaseUrl: proxyBaseUrlEl.value.trim(),
-    connectMode: connectModeEl.value,
-    accountBookId: accountBookIdEl.value.trim(),
-    keyId: keyIdEl.value.trim(),
-    apiKey: apiKeyEl.value.trim()
-  };
-}
+function updateConfigFromForm() { /* noop — 配置从数据库/环境变量读取 */ }
 
 function appendLog(message) {
   const timestamp = new Date().toLocaleTimeString("zh-CN", {
@@ -5009,39 +4985,6 @@ async function syncAll() {
   appendLog("全部同步完成。");
 }
 
-document.getElementById("saveConfig").addEventListener("click", () => {
-  updateConfigFromForm();
-  persistConfig();
-  appendLog("配置已保存。");
-});
-
-document.getElementById("testConnection").addEventListener("click", async () => {
-  updateConfigFromForm();
-  persistConfig();
-  try {
-    await testConnection();
-  } catch (error) {
-    appendLog(error.message || "连接失败");
-    if (state.config.connectMode === "direct") {
-      appendLog("若出现 Failed to fetch，请切换为本地代理模式。");
-    }
-  }
-});
-
-document.getElementById("syncAll").addEventListener("click", async () => {
-  updateConfigFromForm();
-  persistConfig();
-  try {
-    await syncAll();
-  } catch (error) {
-    appendLog(error.message || "同步失败");
-  }
-});
-
-document.getElementById("clearLog").addEventListener("click", () => {
-  logEl.textContent = "";
-});
-
 drawerCloseEl.addEventListener("click", closeDrawer);
 drawerEl.addEventListener("click", (event) => {
   if (event.target === drawerEl) {
@@ -5256,21 +5199,6 @@ poSubmitEl.addEventListener("click", async () => {
   }
 });
 
-document.querySelectorAll("[data-entity]").forEach((button) => {
-  button.addEventListener("click", async () => {
-    updateConfigFromForm();
-    persistConfig();
-    const entity = button.getAttribute("data-entity");
-    try {
-      await syncEntity(entity);
-    } catch (error) {
-      appendLog(error.message || "同步失败");
-      if (state.config.connectMode === "direct") {
-        appendLog("若出现 Failed to fetch，请切换为本地代理模式。");
-      }
-    }
-  });
-});
 
 document.querySelectorAll(".menu-btn").forEach((button) => {
   button.addEventListener("click", () => {
@@ -5307,6 +5235,6 @@ initSectionInteractions();
   if (state.data.purchasePI && state.data.purchasePI.length) {
     renderSection("purchasePI", state.data.purchasePI);
   }
-  appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : " 请先配置 AutoCount API 地址。"));
-  showSection("modules");
+  appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : ""));
+  showSection("supplier");
 })();
