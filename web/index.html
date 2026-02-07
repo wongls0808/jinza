@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoCount 同步控制台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-title">AutoCount</div>
+          <div class="brand-subtitle">同步控制台</div>
+        </div>
+        <nav class="nav">
+          <button class="menu-btn" data-overlay-target="config">连接配置</button>
+          <button class="menu-btn" data-overlay-target="modules">同步模块</button>
+          <div class="menu-group">
+            <div class="menu-title">基础资料</div>
+            <button class="menu-btn" data-overlay-target="supplier">供应商</button>
+            <button class="menu-btn" data-overlay-target="customer">客户</button>
+            <button class="menu-btn" data-overlay-target="product">产品库</button>
+          </div>
+          <div class="menu-group">
+            <div class="menu-title">销售管理</div>
+            <button class="menu-btn" data-overlay-target="invoice">发票</button>
+            <button class="menu-btn" data-overlay-target="quotation">报价</button>
+            <button class="menu-btn" data-overlay-target="creditNote">贷项</button>
+          </div>
+          <div class="menu-group">
+            <div class="menu-title">采购管理</div>
+            <button class="menu-btn" data-overlay-target="purchaseOrder">采购订单</button>
+            <button class="menu-btn" data-overlay-target="purchaseInvoice">采购发票</button>
+            <button class="menu-btn" data-overlay-target="purchaseReturn">采购退货</button>
+            <button class="menu-btn" data-overlay-target="purchasePI">采购 PI 管理</button>
+          </div>
+          <div class="menu-group">
+            <div class="menu-title">Malaysia E-Invoice</div>
+            <button class="menu-btn" data-overlay-target="einvoiceSelfBilled">Self-Billed</button>
+            <button class="menu-btn" data-overlay-target="einvoiceConsolidated">Consolidated</button>
+            <button class="menu-btn" data-overlay-target="einvoiceInquiry">Document Inquiry</button>
+          </div>
+          <div class="menu-group">
+            <div class="menu-title">报表</div>
+            <button class="menu-btn" data-overlay-target="log">同步日志</button>
+          </div>
+        </nav>
+      </aside>
+
+      <main class="content">
+
+      <div id="sectionsBucket" class="sections-bucket">
+      <section id="section-config" class="card overlay-section" data-overlay-title="连接配置">
+        <h2>连接配置</h2>
+        <div class="grid">
+          <label class="field">
+            <span>API 基础地址</span>
+            <input
+              id="baseUrl"
+              type="text"
+              placeholder="https://accounting-api.autocountcloud.com"
+            />
+          </label>
+          <label class="field">
+            <span>连接模式</span>
+            <select id="connectMode">
+              <option value="direct">直连 AutoCount</option>
+              <option value="proxy">本地代理</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>代理服务地址</span>
+            <input
+              id="proxyBaseUrl"
+              type="text"
+              placeholder="http://localhost:8787"
+            />
+          </label>
+          <label class="field">
+            <span>账套 ID</span>
+            <input id="accountBookId" type="text" placeholder="ACCOUNT_BOOK_ID" />
+          </label>
+          <label class="field">
+            <span>Key ID</span>
+            <input id="keyId" type="password" placeholder="AUTOCOUNT_KEY_ID" />
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input id="apiKey" type="password" placeholder="AUTOCOUNT_API_KEY" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="saveConfig" class="btn primary">保存配置</button>
+          <button id="testConnection" class="btn">测试连接</button>
+        </div>
+      </section>
+
+      <section id="section-modules" class="card overlay-section" data-overlay-title="同步模块">
+        <div class="card-header">
+          <h2>同步模块</h2>
+          <div class="row">
+            <button id="syncAll" class="btn primary">全部同步</button>
+            <button id="clearLog" class="btn">清空日志</button>
+          </div>
+        </div>
+        <div class="modules">
+          <div class="module">
+            <div class="module-info">
+              <h3>供应商</h3>
+              <p>Creditor 列表同步</p>
+            </div>
+            <button data-entity="supplier" class="btn ghost">同步</button>
+          </div>
+          <div class="module">
+            <div class="module-info">
+              <h3>客户</h3>
+              <p>Debtor 列表同步</p>
+            </div>
+            <button data-entity="customer" class="btn ghost">同步</button>
+          </div>
+          <div class="module">
+            <div class="module-info">
+              <h3>产品库</h3>
+              <p>Product 列表同步</p>
+            </div>
+            <button data-entity="product" class="btn ghost">同步</button>
+          </div>
+          <div class="module">
+            <div class="module-info">
+              <h3>销售管理</h3>
+              <p>Invoice / Quotation / Credit Note</p>
+            </div>
+            <div class="row">
+              <button data-entity="invoice" class="btn ghost">发票</button>
+              <button data-entity="quotation" class="btn ghost">报价</button>
+              <button data-entity="creditNote" class="btn ghost">贷项</button>
+            </div>
+          </div>
+          <div class="module">
+            <div class="module-info">
+              <h3>采购管理</h3>
+              <p>Purchase Order / Invoice / Return</p>
+            </div>
+            <div class="row">
+              <button data-entity="purchaseOrder" class="btn ghost">订单</button>
+              <button data-entity="purchaseInvoice" class="btn ghost">发票</button>
+              <button data-entity="purchaseReturn" class="btn ghost">退货</button>
+            </div>
+          </div>
+          <div class="module">
+            <div class="module-info">
+              <h3>采购 PI 管理</h3>
+              <p>本地 PI 列表（不回传 AutoCount）</p>
+            </div>
+            <div class="row">
+              <button data-entity="purchasePI" class="btn ghost">PI 列表</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-log" class="card overlay-section" data-overlay-title="同步日志">
+        <div class="card-header">
+          <h2>同步日志</h2>
+          <span class="hint">直接调用 AutoCount API</span>
+        </div>
+        <div id="log" class="log"></div>
+      </section>
+
+      <section id="section-data" class="card overlay-section" data-overlay-title="数据材料">
+        <div class="card-header">
+          <h2>数据材料</h2>
+          <span class="hint">分区列表展示同步结果</span>
+        </div>
+        <div class="data-sections">
+          <div class="data-section" data-section="supplier">
+            <div class="data-header">
+              <h3>供应商</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="customer">
+            <div class="data-header">
+              <h3>客户</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="product">
+            <div class="data-header">
+              <h3>产品库</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="import-products">批量导入</button>
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="invoice">
+            <div class="data-header">
+              <h3>销售发票</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="quotation">
+            <div class="data-header">
+              <h3>销售报价</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="creditNote">
+            <div class="data-header">
+              <h3>销售贷项</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="purchaseOrder">
+            <div class="data-header">
+              <h3>采购订单</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="purchaseInvoice">
+            <div class="data-header">
+              <h3>采购发票</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="purchaseReturn">
+            <div class="data-header">
+              <h3>采购退货</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="data-section" data-section="purchasePI">
+            <div class="data-header">
+              <h3>采购 PI</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="batch">Batch Actions</button>
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Copy">⧉</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-section" data-section="einvoiceSelfBilled">
+            <div class="data-header">
+              <h3>Self-Billed Document</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-section" data-section="einvoiceConsolidated">
+            <div class="data-header">
+              <h3>Consolidated E-Invoice</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-section" data-section="einvoiceInquiry">
+            <div class="data-header">
+              <h3>Document Inquiry</h3>
+              <span class="data-count">0</span>
+            </div>
+            <div class="section-tools">
+              <div class="tools-left">
+                <button class="btn ghost" data-action="print">Print Listing</button>
+                <select class="filter-select">
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div class="tools-right">
+                <button class="icon-btn" title="Export">⤓</button>
+                <button class="icon-btn" title="Settings">⚙</button>
+                <div class="search">
+                  <input class="search-input" placeholder="Search..." />
+                </div>
+              </div>
+            </div>
+            <div class="summary-panel"></div>
+            <div class="data-table"></div>
+            <div class="section-footer">
+              <div class="page-sizes">
+                <button class="page-size" data-size="10">10</button>
+                <button class="page-size" data-size="25">25</button>
+                <button class="page-size" data-size="50">50</button>
+                <button class="page-size" data-size="100">100</button>
+              </div>
+              <div class="page-info"></div>
+              <div class="pager">
+                <button class="pager-btn" data-dir="prev">‹</button>
+                <button class="pager-btn" data-dir="next">›</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+      </div>
+      </main>
+    </div>
+
+    <div id="sectionOverlay" class="overlay hidden">
+      <div class="overlay-panel">
+        <div class="overlay-header">
+          <div>
+            <h2 id="overlayTitle"></h2>
+          </div>
+          <button id="overlayClose" class="btn ghost">关闭</button>
+        </div>
+        <div id="overlayBody" class="overlay-body"></div>
+      </div>
+    </div>
+
+    <div id="drawer" class="drawer hidden">
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <h3 id="drawerTitle">详情</h3>
+          <button id="drawerClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="drawer-tabs" id="drawerTabs"></div>
+        <div id="drawerContent" class="drawer-content"></div>
+        <pre id="drawerRaw" class="drawer-raw"></pre>
+      </div>
+    </div>
+
+    <div id="poModal" class="modal hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>创建采购PO</h3>
+          <button id="poModalClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>供应商</label>
+            <select id="poSupplier"></select>
+          </div>
+          <div class="modal-field">
+            <label>Name</label>
+            <input id="poSupplierName" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Address</label>
+            <input id="poSupplierAddress" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>采购日期</label>
+            <input id="poDate" type="date" />
+          </div>
+          <div class="modal-field">
+            <label>Purchase Location</label>
+            <select id="poLocation"></select>
+          </div>
+          <div class="modal-field">
+            <label>Credit Term</label>
+            <input id="poCreditTerm" type="text" placeholder="Net 30 days" readonly />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="poCancel" class="btn ghost">取消</button>
+          <button id="poSubmit" class="btn primary">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="productImportModal" class="modal hidden">
+      <div class="modal-panel modal-panel-lg">
+        <div class="modal-header">
+          <h3>产品批量导入</h3>
+          <button id="productImportClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>上传文件/图片</label>
+            <input id="productImportFile" type="file" accept=".csv,.txt,image/*" />
+          </div>
+          <div class="modal-field">
+            <label>识别文本</label>
+            <textarea id="productImportText" rows="6" placeholder="支持 CSV/TSV 或 OCR 文本"></textarea>
+          </div>
+          <div class="modal-grid">
+            <label class="modal-field">
+              <span>Product Type</span>
+              <select id="productImportType" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Status</span>
+              <select id="productImportStatus" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Product Category</span>
+              <select id="productImportCategory" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Product Posting</span>
+              <select id="productImportPosting" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Supplier</span>
+              <select id="productImportSupplier" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Classification Code</span>
+              <select id="productImportClass" multiple></select>
+            </label>
+            <label class="modal-field">
+              <span>Unit Type</span>
+              <select id="productImportUnitType" multiple></select>
+            </label>
+          </div>
+          <div class="modal-field">
+            <label>预览</label>
+            <div id="productImportPreview" class="import-preview"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="productImportParse" class="btn ghost">解析/识别</button>
+          <button id="productImportSubmit" class="btn primary">创建产品</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="piModal" class="modal hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>创建采购PI</h3>
+          <button id="piModalClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>采购商（供应商）</label>
+            <select id="piSupplier"></select>
+          </div>
+          <div class="modal-field">
+            <label>PI Number</label>
+            <input id="piNumber" type="text" placeholder="PI-XXXX" />
+          </div>
+          <div class="modal-field">
+            <label>Date</label>
+            <input id="piDate" type="date" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Validity Date</label>
+            <input id="piValidityDate" type="date" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Reference PO No.</label>
+            <input id="piRefPo" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Bill To</label>
+            <div class="modal-static" id="piBillTo">
+              JINZA TRADING SDN. BHD.<br />
+              2nd Floor, No. 185, Jalan Datuk Abang Abdul Rahim,<br />
+              93450 Kuching, Sarawak, Malaysia
+            </div>
+          </div>
+          <div class="modal-field">
+            <label>收货人（客户）</label>
+            <select id="piConsignee"></select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="piCancel" class="btn ghost">取消</button>
+          <button id="piSubmit" class="btn primary">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="createPiInvoiceModal" class="modal hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>创建采购发票（推送AutoCount）</h3>
+          <button id="createPiInvoiceClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>供应商</label>
+            <select id="cpiSupplier"></select>
+          </div>
+          <div class="modal-field">
+            <label>Name</label>
+            <input id="cpiSupplierName" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Address</label>
+            <input id="cpiSupplierAddress" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>发票日期</label>
+            <input id="cpiDate" type="date" />
+          </div>
+          <div class="modal-field">
+            <label>Purchase Location</label>
+            <select id="cpiLocation"></select>
+          </div>
+          <div class="modal-field">
+            <label>Credit Term</label>
+            <input id="cpiCreditTerm" type="text" placeholder="Net 30 days" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Supplier Invoice No.</label>
+            <input id="cpiSupplierInvoiceNo" type="text" placeholder="供应商发票号（选填）" />
+          </div>
+          <div class="modal-field">
+            <label>Reference (PI No.)</label>
+            <input id="cpiRefPi" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Remark</label>
+            <input id="cpiRemark" type="text" placeholder="备注（选填）" />
+          </div>
+          <div class="modal-field">
+            <label>商品明细</label>
+            <div id="cpiDetailsSummary" class="modal-static" style="font-size:12px;color:#64748b;">-</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cpiCancel" class="btn ghost">取消</button>
+          <button id="cpiSubmit" class="btn primary">创建并推送</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sectionSettingsModal" class="modal hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3 id="sectionSettingsTitle">页面设置</h3>
+          <button id="sectionSettingsClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>默认每页数量</label>
+            <select id="sectionSettingsPageSize">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <label class="modal-field">
+            <span>显示概览</span>
+            <input id="sectionSettingsSummary" type="checkbox" />
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button id="sectionSettingsCancel" class="btn ghost">取消</button>
+          <button id="sectionSettingsSave" class="btn primary">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/malaysia-postcodes@2.7.3/dist/malaysia-postcodes.min.js"></script>
+    <script src="./stamp-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
