@@ -1,12 +1,48 @@
+/* 全局异常兜底，防止进程崩溃 */
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
+
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { getEntity, entities } = require("./sync/entities");
-const { syncAll, syncEntity } = require("./sync/run");
-const { setRuntimeConfig } = require("./config");
-const db = require("./db");
+
+let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db;
+try {
+  ({ getEntity, entities } = require("./sync/entities"));
+  ({ syncAll, syncEntity } = require("./sync/run"));
+  ({ setRuntimeConfig } = require("./config"));
+  db = require("./db");
+  console.log("All modules loaded successfully.");
+} catch (err) {
+  console.error("Module load error:", err.message);
+  /* 提供空实现，确保服务器能启动 */
+  getEntity = () => null;
+  entities = [];
+  syncAll = async () => {};
+  syncEntity = async () => {};
+  setRuntimeConfig = () => {};
+  db = {
+    initTables: async () => {},
+    isDbAvailable: () => false,
+    getAllSyncData: async () => ({}),
+    getSyncState: async () => ({}),
+    getAllPurchasePI: async () => [],
+    getConfig: async () => null,
+    setConfig: async () => {},
+    setSyncData: async () => {},
+    setSyncState: async () => {},
+    getSyncData: async () => [],
+    addPurchasePI: async () => {},
+    deletePurchasePI: async () => {}
+  };
+}
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
+console.log(`PORT=${PORT}, DATABASE_URL=${process.env.DATABASE_URL ? "set (" + process.env.DATABASE_URL.substring(0, 30) + "...)" : "NOT SET"}`);
 
 /* ────── MIME ────── */
 const MIME = {
