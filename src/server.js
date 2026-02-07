@@ -146,8 +146,8 @@ async function handleApi(req, res) {
     return;
   }
 
-  /* ── 健康检查 ── */
-  if (url === "/health" && req.method === "GET") {
+  /* ── 健康检查（同时支持 /health 和 /api/health） ── */
+  if ((url === "/health" || url === "/api/health") && req.method === "GET") {
     sendJson(res, 200, { ok: true, db: db.isDbAvailable(), ts: new Date().toISOString() });
     return;
   }
