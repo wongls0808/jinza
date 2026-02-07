@@ -1,8 +1,11 @@
+/* 判断是否为远程部署环境（非 localhost 即为远程） */
+const isRemote = !["localhost", "127.0.0.1"].includes(window.location.hostname);
+
 const state = {
   config: {
     baseUrl: "",
     proxyBaseUrl: "",
-    connectMode: "direct",
+    connectMode: isRemote ? "proxy" : "direct",
     accountBookId: "",
     keyId: "",
     apiKey: ""
@@ -1421,7 +1424,8 @@ async function callAutoCount({ method, path, query, body }) {
 }
 
 async function callProxy(payload) {
-  const proxyBase = state.config.proxyBaseUrl || "http://localhost:8787";
+  /* 代理地址: 优先用配置值，否则自动使用当前页面 origin（Railway 部署时同源） */
+  const proxyBase = state.config.proxyBaseUrl || window.location.origin;
   const url = `${proxyBase.replace(/\/$/, "")}/api/proxy`;
   const response = await fetch(url, {
     method: "POST",
@@ -5286,6 +5290,10 @@ initSectionInteractions();
   if (!loaded) {
     loadConfig();
     loadSyncState();
+  }
+  /* 远程环境强制使用代理模式（避免 CORS 问题） */
+  if (isRemote && state.config.connectMode !== "proxy") {
+    state.config.connectMode = "proxy";
   }
   applyConfigToForm();
   /* 渲染已加载的各实体数据 */
