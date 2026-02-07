@@ -1227,11 +1227,71 @@ const purchaseReturnDrawerTabs = [
   }
 ];
 
-function loadConfig() {
-  const raw = localStorage.getItem("autocount-config");
-  if (!raw) {
-    return;
+/* ────── 后端 API 基址（与当前页面同源） ────── */
+function getApiBase() {
+  return window.location.origin;
+}
+
+async function apiGet(path) {
+  const resp = await fetch(getApiBase() + path);
+  if (!resp.ok) throw new Error(`API GET ${path} 失败: ${resp.status}`);
+  return resp.json();
+}
+
+async function apiPost(path, body) {
+  const resp = await fetch(getApiBase() + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) throw new Error(`API POST ${path} 失败: ${resp.status}`);
+  return resp.json();
+}
+
+async function apiDelete(path) {
+  const resp = await fetch(getApiBase() + path, { method: "DELETE" });
+  if (!resp.ok) throw new Error(`API DELETE ${path} 失败: ${resp.status}`);
+  return resp.json();
+}
+
+/* ────── 从后端加载全部持久化数据 ────── */
+async function loadAllFromBackend() {
+  try {
+    const result = await apiGet("/api/data/all");
+    if (!result.ok) throw new Error("加载失败");
+    /* 配置 */
+    if (result.config) {
+      state.config = { ...state.config, ...result.config };
+    }
+    /* 同步状态 */
+    if (result.syncState) {
+      state.syncState = result.syncState;
+    }
+    /* 同步数据 */
+    if (result.data) {
+      Object.keys(result.data).forEach((key) => {
+        state.data[key] = result.data[key];
+      });
+    }
+    /* 本地 PI 数据 */
+    if (result.purchasePI && result.purchasePI.length) {
+      state.data.purchasePI = result.purchasePI;
+    }
+    appendLog(`从数据库加载完成。`);
+    return true;
+  } catch (e) {
+    appendLog("从数据库加载失败: " + e.message + "，尝试 localStorage 回退。");
+    /* 回退到 localStorage */
+    loadConfigFromLocal();
+    loadSyncStateFromLocal();
+    return false;
   }
+}
+
+/* localStorage 回退（保留兼容性） */
+function loadConfigFromLocal() {
+  const raw = localStorage.getItem("autocount-config");
+  if (!raw) return;
   try {
     const parsed = JSON.parse(raw);
     state.config = { ...state.config, ...parsed };
@@ -1240,11 +1300,9 @@ function loadConfig() {
   }
 }
 
-function loadSyncState() {
+function loadSyncStateFromLocal() {
   const raw = localStorage.getItem("autocount-sync-state");
-  if (!raw) {
-    return;
-  }
+  if (!raw) return;
   try {
     state.syncState = JSON.parse(raw);
   } catch (error) {
@@ -1252,8 +1310,22 @@ function loadSyncState() {
   }
 }
 
-function persistSyncState() {
+/* 兼容旧调用 */
+function loadConfig() { loadConfigFromLocal(); }
+function loadSyncState() { loadSyncStateFromLocal(); }
+
+async function persistSyncState() {
   localStorage.setItem("autocount-sync-state", JSON.stringify(state.syncState));
+  /* 同时写入后端 */
+  try {
+    for (const [entity, val] of Object.entries(state.syncState)) {
+      await apiPost("/api/syncstate", {
+        entity,
+        lastSync: val.lastSync || null,
+        meta: val
+      });
+    }
+  } catch (e) { /* 静默失败 */ }
 }
 
 function applyConfigToForm() {
@@ -1265,8 +1337,12 @@ function applyConfigToForm() {
   apiKeyEl.value = state.config.apiKey || "";
 }
 
-function persistConfig() {
+async function persistConfig() {
   localStorage.setItem("autocount-config", JSON.stringify(state.config));
+  /* 同时写入后端数据库 */
+  try {
+    await apiPost("/api/config", state.config);
+  } catch (e) { /* 静默失败 */ }
 }
 
 function updateConfigFromForm() {
@@ -2998,6 +3074,13 @@ async function submitCreatePurchaseInvoice() {
       const latestDocNo =
         getFieldValue(extractRecord(latest), "docNo") || "(自动生成)";
       appendLog(`采购发票创建成功: ${latestDocNo}，已推送AutoCount`);
+      /* 持久化更新后的采购发票列表 */
+      try {
+        await apiPost("/api/data/sync", {
+          entity: "purchaseInvoice",
+          items: state.data.purchaseInvoice
+        });
+      } catch (e) { /* 静默 */ }
     } else {
       appendLog("采购发票已推送AutoCount，但未能获取回传单号");
     }
@@ -4890,8 +4973,9 @@ async function syncEntity(entityName) {
   const data = await fetchListing(entity);
   state.data[entity.name] = data;
   renderSection(entity.name, data);
+  const lastSync = data.length > 0 ? new Date().toISOString() : null;
   if (data.length > 0) {
-    state.syncState[entity.name] = { lastSync: new Date().toISOString() };
+    state.syncState[entity.name] = { lastSync };
   } else {
     const prev = state.syncState[entity.name];
     if (prev && prev.lastSync) {
@@ -4900,6 +4984,16 @@ async function syncEntity(entityName) {
     }
   }
   persistSyncState();
+  /* 持久化同步数据到后端数据库 */
+  try {
+    await apiPost("/api/data/sync", {
+      entity: entity.name,
+      items: data,
+      lastSync
+    });
+  } catch (e) {
+    appendLog(`数据持久化失败(${entity.name}): ${e.message}`);
+  }
   appendLog(`同步完成: ${entity.label} (${data.length} 条)`);
 }
 
@@ -5090,6 +5184,12 @@ piSubmitEl.addEventListener("click", async () => {
       state.data.purchasePI = state.data.purchasePI || [];
       state.data.purchasePI.unshift(pi);
       renderSection("purchasePI", state.data.purchasePI);
+      /* 持久化 PI 到后端数据库 */
+      try {
+        await apiPost("/api/pi", pi);
+      } catch (e) {
+        appendLog("PI 持久化失败: " + e.message);
+      }
       appendLog(`采购PI创建成功(本地): ${pi.docNo || "(未生成单号)"}${matchedIvNo ? " 关联IV: " + matchedIvNo : ""}`);
     }
     closePiModal();
@@ -5135,6 +5235,13 @@ poSubmitEl.addEventListener("click", async () => {
       renderSection("purchaseOrder", state.data.purchaseOrder);
       appendLog(`采购PO创建成功: ${po.docNo || "(未返回单号)"}`);
       created = true;
+      /* 持久化更新后的 PO 列表 */
+      try {
+        await apiPost("/api/data/sync", {
+          entity: "purchaseOrder",
+          items: state.data.purchaseOrder
+        });
+      } catch (e) { /* 静默 */ }
     }
   } catch (error) {
     appendLog(error.message || "采购PO创建失败");
@@ -5171,8 +5278,27 @@ document.querySelectorAll(".menu-btn").forEach((button) => {
 });
 
 initSectionInteractions();
-loadConfig();
-loadSyncState();
-applyConfigToForm();
-appendLog("前端已就绪。请先配置 AutoCount API 地址。");
-showSection("modules");
+
+/* 启动: 优先从后端数据库加载，失败则回退 localStorage */
+(async function bootstrap() {
+  appendLog("正在从数据库加载数据...");
+  const loaded = await loadAllFromBackend();
+  if (!loaded) {
+    loadConfig();
+    loadSyncState();
+  }
+  applyConfigToForm();
+  /* 渲染已加载的各实体数据 */
+  for (const entity of entities) {
+    const items = state.data[entity.name];
+    if (items && items.length) {
+      renderSection(entity.name, items);
+    }
+  }
+  /* 渲染本地 PI */
+  if (state.data.purchasePI && state.data.purchasePI.length) {
+    renderSection("purchasePI", state.data.purchasePI);
+  }
+  appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : " 请先配置 AutoCount API 地址。"));
+  showSection("modules");
+})();

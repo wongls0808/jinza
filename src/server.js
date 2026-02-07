@@ -1,16 +1,34 @@
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { getEntity, entities } = require("./sync/entities");
 const { syncAll, syncEntity } = require("./sync/run");
 const { setRuntimeConfig } = require("./config");
+const db = require("./db");
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
 
+/* ────── MIME ────── */
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".b64": "text/plain; charset=utf-8"
+};
+
+/* ────── 工具函数 ────── */
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Key-ID, API-Key"
   });
   res.end(body);
@@ -21,7 +39,7 @@ function collectBody(req) {
     let data = "";
     req.on("data", (chunk) => {
       data += chunk;
-      if (data.length > 1024 * 1024) {
+      if (data.length > 10 * 1024 * 1024) {
         reject(new Error("请求体过大"));
       }
     });
@@ -48,148 +66,257 @@ function updateRuntimeConfig(body, headers) {
   });
 }
 
-const server = http.createServer(async (req, res) => {
-  // 添加健康检查端点
-  if (req.method === "GET" && req.url === "/health") {
-    sendJson(res, 200, { 
-      ok: true, 
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      version: "0.1.0"
-    });
-    return;
+/* ────── 静态文件服务 ────── */
+const WEB_ROOT = path.join(__dirname, "..", "web");
+
+function serveStatic(req, res) {
+  let urlPath = req.url.split("?")[0];
+  if (urlPath === "/" || urlPath === "") {
+    urlPath = "/index.html";
   }
-
-  // 添加根路径响应
-  if (req.method === "GET" && req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>AutoCount Sync Service</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .card { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>AutoCount Sync Service</h1>
-            <div class="card">
-              <h2>API Endpoints</h2>
-              <ul>
-                <li><strong>GET /health</strong> - 健康检查</li>
-                <li><strong>POST /api/ping</strong> - 测试AutoCount连接</li>
-                <li><strong>POST /api/sync</strong> - 同步指定实体</li>
-                <li><strong>POST /api/sync-all</strong> - 同步所有实体</li>
-                <li><strong>POST /api/proxy</strong> - AutoCount API代理</li>
-              </ul>
-            </div>
-            <div class="card">
-              <h2>Web Interface</h2>
-              <p>访问 <a href="/web/index.html">/web/index.html</a> 使用完整Web界面</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    return;
+  const filePath = path.join(WEB_ROOT, urlPath);
+  /* 安全检查：防止路径穿越 */
+  if (!filePath.startsWith(WEB_ROOT)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return true; /* 已处理，不要再 fallback */
   }
-
-  // 静态文件服务 - 提供web目录访问
-  if (req.method === "GET" && req.url.startsWith("/web/")) {
-    const fs = require("fs");
-    const path = require("path");
-    const filePath = path.join(__dirname, "..", req.url);
-    
-    try {
-      if (fs.existsSync(filePath)) {
-        const ext = path.extname(filePath);
-        const contentType = {
-          ".html": "text/html",
-          ".css": "text/css",
-          ".js": "application/javascript",
-          ".json": "application/json",
-          ".png": "image/png",
-          ".jpg": "image/jpeg",
-          ".svg": "image/svg+xml"
-        }[ext] || "text/plain";
-
-        const content = fs.readFileSync(filePath);
-        res.writeHead(200, { "Content-Type": contentType });
-        res.end(content);
-      } else {
-        res.writeHead(404);
-        res.end("File not found");
-      }
-    } catch (error) {
-      res.writeHead(500);
-      res.end("Server error");
-    }
-    return;
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return false; /* 文件不存在，交给 API 路由 */
   }
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME[ext] || "application/octet-stream";
+  const content = fs.readFileSync(filePath);
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Cache-Control": "no-cache"
+  });
+  res.end(content);
+  return true;
+}
 
+/* ────── API 路由 ────── */
+async function handleApi(req, res) {
+  const url = req.url.split("?")[0];
+
+  /* CORS */
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Key-ID, API-Key"
     });
     res.end();
     return;
   }
 
-  if (req.method !== "POST") {
-    sendJson(res, 405, { ok: false, error: "Method Not Allowed" });
+  /* ── 健康检查 ── */
+  if (url === "/health" && req.method === "GET") {
+    sendJson(res, 200, { ok: true, db: db.isDbAvailable(), ts: new Date().toISOString() });
     return;
   }
 
-  try {
+  /* 数据库可用性检查（数据相关 API 需要数据库） */
+  const dbRequired = url.startsWith("/api/data/") || url === "/api/config" || url === "/api/syncstate" || url === "/api/pi" || url.startsWith("/api/pi/");
+  if (dbRequired && !db.isDbAvailable()) {
+    sendJson(res, 503, { ok: false, error: "数据库未连接" });
+    return;
+  }
+
+  /* ── 加载全部数据（前端启动时调用） ── */
+  if (url === "/api/data/all" && req.method === "GET") {
+    const [syncData, syncState, piList, config] = await Promise.all([
+      db.getAllSyncData(),
+      db.getSyncState(),
+      db.getAllPurchasePI(),
+      db.getConfig("autocount")
+    ]);
+    sendJson(res, 200, {
+      ok: true,
+      data: syncData,
+      syncState,
+      purchasePI: piList,
+      config: config || null
+    });
+    return;
+  }
+
+  /* ── 保存配置 ── */
+  if (url === "/api/config" && req.method === "POST") {
+    const body = await collectBody(req);
+    await db.setConfig("autocount", body);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── 获取配置 ── */
+  if (url === "/api/config" && req.method === "GET") {
+    const config = await db.getConfig("autocount");
+    sendJson(res, 200, { ok: true, config: config || null });
+    return;
+  }
+
+  /* ── 保存同步数据（单实体） ── */
+  if (url === "/api/data/sync" && req.method === "POST") {
+    const body = await collectBody(req);
+    const { entity, items, lastSync } = body;
+    if (!entity) {
+      sendJson(res, 400, { ok: false, error: "缺少 entity" });
+      return;
+    }
+    await db.setSyncData(entity, items || []);
+    if (lastSync) {
+      await db.setSyncState(entity, lastSync);
+    }
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── 获取同步数据（单实体） ── */
+  if (url.startsWith("/api/data/sync/") && req.method === "GET") {
+    const entity = url.replace("/api/data/sync/", "");
+    const items = await db.getSyncData(entity);
+    sendJson(res, 200, { ok: true, items });
+    return;
+  }
+
+  /* ── 保存同步状态 ── */
+  if (url === "/api/syncstate" && req.method === "POST") {
+    const body = await collectBody(req);
+    const { entity, lastSync, meta } = body;
+    if (!entity) {
+      sendJson(res, 400, { ok: false, error: "缺少 entity" });
+      return;
+    }
+    await db.setSyncState(entity, lastSync || null, meta || {});
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── PI 管理 ── */
+  if (url === "/api/pi" && req.method === "GET") {
+    const list = await db.getAllPurchasePI();
+    sendJson(res, 200, { ok: true, items: list });
+    return;
+  }
+
+  if (url === "/api/pi" && req.method === "POST") {
+    const body = await collectBody(req);
+    const docNo = body.docNo || (body.master && body.master.docNo) || "";
+    if (!docNo) {
+      sendJson(res, 400, { ok: false, error: "缺少 docNo" });
+      return;
+    }
+    await db.addPurchasePI(docNo, body);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (url.startsWith("/api/pi/") && req.method === "DELETE") {
+    const docNo = decodeURIComponent(url.replace("/api/pi/", ""));
+    await db.deletePurchasePI(docNo);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── AutoCount 代理 ── */
+  if (url === "/api/proxy" && req.method === "POST") {
     const payload = await collectBody(req);
     updateRuntimeConfig(payload, req.headers);
+    const { request } = require("./autocount/client");
+    const { method, path: apiPath, query, body } = payload;
+    const result = await request({ method, path: apiPath, query, body });
+    sendJson(res, 200, result);
+    return;
+  }
 
-    if (req.url === "/api/ping") {
-      await syncEntity(getEntity("companyProfile"));
-      sendJson(res, 200, { ok: true });
+  /* ── Ping ── */
+  if (url === "/api/ping" && req.method === "POST") {
+    const payload = await collectBody(req);
+    updateRuntimeConfig(payload, req.headers);
+    await syncEntity(getEntity("companyProfile"));
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── 后端同步 ── */
+  if (url === "/api/sync" && req.method === "POST") {
+    const payload = await collectBody(req);
+    updateRuntimeConfig(payload, req.headers);
+    const target = payload.entity;
+    const entity = getEntity(target);
+    if (!entity) {
+      sendJson(res, 400, { ok: false, error: "未知实体" });
       return;
     }
+    await syncEntity(entity);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
 
-    if (req.url === "/api/proxy") {
-      const { request } = require("./autocount/client");
-      const { method, path, query, body } = payload;
-      const result = await request({ method, path, query, body });
-      sendJson(res, 200, result);
+  if (url === "/api/sync-all" && req.method === "POST") {
+    const payload = await collectBody(req);
+    updateRuntimeConfig(payload, req.headers);
+    await syncAll(entities);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  sendJson(res, 404, { ok: false, error: "Not Found" });
+}
+
+/* ────── 主服务器 ────── */
+const server = http.createServer(async (req, res) => {
+  try {
+    /* 优先处理 API */
+    if (req.url.startsWith("/api/") || req.url === "/health") {
+      await handleApi(req, res);
       return;
     }
-
-    if (req.url === "/api/sync") {
-      const target = payload.entity;
-      const entity = getEntity(target);
-      if (!entity) {
-        sendJson(res, 400, { ok: false, error: "未知实体" });
-        return;
+    /* CORS preflight for any path */
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Key-ID, API-Key"
+      });
+      res.end();
+      return;
+    }
+    /* 静态文件 */
+    const served = serveStatic(req, res);
+    if (!served) {
+      /* SPA fallback: 返回 index.html */
+      const indexPath = path.join(WEB_ROOT, "index.html");
+      if (fs.existsSync(indexPath)) {
+        const content = fs.readFileSync(indexPath);
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(content);
+      } else {
+        res.writeHead(404);
+        res.end("Not Found");
       }
-      await syncEntity(entity);
-      sendJson(res, 200, { ok: true });
-      return;
     }
-
-    if (req.url === "/api/sync-all") {
-      await syncAll(entities);
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    sendJson(res, 404, { ok: false, error: "Not Found" });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: error.message || "服务错误" });
+    console.error("Request error:", error);
+    if (!res.headersSent) {
+      sendJson(res, 500, { ok: false, error: error.message || "服务错误" });
+    }
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Sync server running at http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Web interface: http://localhost:${PORT}/web/index.html`);
-});
+/* ────── 启动 ────── */
+async function start() {
+  try {
+    await db.initTables();
+    console.log("Database connected and tables ready.");
+  } catch (err) {
+    console.error("Database init failed:", err.message);
+    console.log("Server will start without database persistence.");
+  }
+  server.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+
+start();

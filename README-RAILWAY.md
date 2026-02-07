@@ -1,102 +1,112 @@
-"# Railway 部署快速指南
+# Railway 部署指南
 
-## 一键部署
+## 部署步骤
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/autocount-sync?referralCode=deploy)
-
-## 手动部署步骤
-
-### 1. 准备项目
-```bash
-git clone [你的仓库地址]
-cd jinza-os-autocount-sync
-```
-
-### 2. 推送到GitHub
+### 1. 推送到 GitHub
 ```bash
 git add .
-git commit -m "准备Railway部署"
+git commit -m "add PostgreSQL persistence"
 git push origin main
 ```
 
-### 3. 在Railway部署
+### 2. 在 Railway 部署
 1. 访问 [Railway Dashboard](https://railway.app)
-2. 点击 "New Project"
-3. 选择 "Deploy from GitHub repo"
-4. 授权并选择你的仓库
-5. Railway会自动部署
+2. 点击 "New Project" → "Deploy from GitHub repo"
+3. 选择你的仓库
+
+### 3. 添加 PostgreSQL 数据库
+1. 在 Railway 项目中点击 **"+ New"** → **"Database"** → **"Add PostgreSQL"**
+2. Railway 会自动创建 PostgreSQL 实例并注入 `DATABASE_URL` 环境变量
+3. 无需手动配置数据库连接字符串
 
 ### 4. 配置环境变量
-在Railway项目设置中，添加以下环境变量：
+在 Railway 项目的 **Variables** 中设置：
 
-**必需配置：**
-- `AUTOCOUNT_BASE_URL`: AutoCount API基础地址
-- `AUTOCOUNT_ACCOUNT_BOOK_ID`: 账套ID
+**必需（如使用后端代理模式）：**
+- `AUTOCOUNT_BASE_URL`: `https://accounting-api.autocountcloud.com`
+- `AUTOCOUNT_ACCOUNT_BOOK_ID`: 账套 ID
 - `AUTOCOUNT_KEY_ID`: API Key ID
-- `AUTOCOUNT_API_KEY`: API密钥
+- `AUTOCOUNT_API_KEY`: API 密钥
 
-**可选配置：**
-- `SYNC_OUTPUT_DIR`: 数据目录（默认：data）
-- `SYNC_MAX_PAGES`: 最大分页数（默认：500）
-- `SYNC_SAVE_HISTORY`: 保存历史记录（默认：true）
+**自动注入（无需手动设置）：**
+- `DATABASE_URL`: Railway PostgreSQL 自动注入
+- `PORT`: Railway 自动注入
 
-## 访问服务
+**可选：**
+- `DB_SSL`: 设为 `false` 如数据库不需要 SSL（Railway 默认需要）
 
-部署成功后，Railway会提供一个公开URL，例如：
-`https://your-project.up.railway.app`
+### 5. 部署
+Railway 检测到代码推送后自动部署。首次部署时会自动创建数据库表。
 
-### 可用端点：
-- `GET /` - 服务主页
-- `GET /health` - 健康检查
-- `GET /web/index.html` - Web界面
-- `POST /api/ping` - 测试AutoCount连接
-- `POST /api/sync` - 同步指定实体
-- `POST /api/sync-all` - 同步所有实体
+## 数据持久化架构
 
-## 数据持久化
+```
+┌─────────────────────────────┐
+│         浏览器前端           │
+│  (web/index.html + app.js)  │
+│                             │
+│  启动 → GET /api/data/all   │  ← 从数据库加载全部数据
+│  同步 → POST /api/data/sync │  ← 同步后写入数据库
+│  配置 → POST /api/config    │  ← 配置写入数据库
+│  PI  → POST /api/pi         │  ← PI 写入数据库
+└──────────┬──────────────────┘
+           │
+┌──────────▼──────────────────┐
+│       Node.js 后端           │
+│     (src/server.js)          │
+│                              │
+│  静态文件服务 (web/)          │
+│  AutoCount CORS 代理         │
+│  数据库 CRUD API             │
+└──────────┬───────────────────┘
+           │
+┌──────────▼──────────────────┐
+│     PostgreSQL 数据库        │
+│                              │
+│  app_config   - API 配置     │
+│  sync_state   - 同步状态     │
+│  sync_data    - 实体数据     │
+│  purchase_pi  - 本地 PI      │
+└──────────────────────────────┘
+```
 
-Railway的存储是临时的。建议：
+### 数据库表说明
 
-1. **使用Railway Volume**（推荐）
-   - 在Railway添加Volume插件
-   - 挂载到 `/app/data` 目录
+| 表名 | 用途 | 说明 |
+|------|------|------|
+| `app_config` | 存储 API 配置 | key-value 形式，JSONB |
+| `sync_state` | 各实体同步状态 | 记录最后同步时间 |
+| `sync_data` | AutoCount 同步数据 | 按实体名存储整批 JSONB |
+| `purchase_pi` | 本地 PI 数据 | 每条 PI 独立一行 |
 
-2. **配置外部存储**
-   - 使用云存储（S3、Google Cloud Storage等）
-   - 修改 `src/storage/state.js` 使用外部存储
+## API 端点
 
-## 监控和日志
-
-- **实时日志**: 在Railway控制台查看
-- **健康检查**: Railway自动监控 `/health` 端点
-- **性能监控**: Railway提供基本的性能指标
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/` | Web 界面 |
+| GET | `/health` | 健康检查 |
+| GET | `/api/data/all` | 加载全部持久化数据 |
+| POST | `/api/data/sync` | 保存同步数据（单实体） |
+| GET | `/api/config` | 获取配置 |
+| POST | `/api/config` | 保存配置 |
+| POST | `/api/syncstate` | 保存同步状态 |
+| GET | `/api/pi` | 获取所有 PI |
+| POST | `/api/pi` | 创建/更新 PI |
+| DELETE | `/api/pi/:docNo` | 删除 PI |
+| POST | `/api/proxy` | AutoCount API 代理 |
 
 ## 故障排除
 
-### 部署失败
-1. 检查 `railway.json` 配置
-2. 查看构建日志中的错误信息
-3. 确保Node.js版本兼容（需要 >= 18.0.0）
+### 数据库连接失败
+- 确认 Railway PostgreSQL 插件已添加
+- 检查 `DATABASE_URL` 环境变量是否存在
+- 查看 Railway 运行日志中的错误信息
 
-### 服务无法启动
-1. 检查环境变量是否正确配置
-2. 查看运行时日志
-3. 测试本地运行：`npm run server`
+### 刷新后数据丢失
+- 确认数据库连接正常（访问 `/health` 查看 `db: true`）
+- 打开浏览器控制台查看网络请求是否报错
+- 确认同步操作完成后日志显示 "数据持久化" 相关信息
 
-### API连接失败
-1. 验证AutoCount API凭证
-2. 检查网络连接
-3. 使用 `/api/ping` 端点测试
-
-## 扩展建议
-
-1. **添加数据库**: 集成PostgreSQL或MongoDB
-2. **定时任务**: 使用Railway的Cron Jobs
-3. **监控告警**: 集成监控服务
-4. **CDN加速**: 为静态文件配置CDN
-
-## 支持
-
-- [Railway文档](https://docs.railway.app)
-- [AutoCount API文档](https://accounting-api.autocountcloud.com/documentation/)
-- 项目问题请提交GitHub Issue"
+### 首次部署数据为空
+- 这是正常的，需要先配置 API 凭证并执行同步
+- 配置和同步数据会自动持久化到数据库
