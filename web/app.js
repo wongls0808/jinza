@@ -2221,6 +2221,15 @@ function randomValidityDate(baseDate) {
   return adjustToNextWorkday(candidate);
 }
 
+/* PO日期 = IV日期往前推 25~31 天随机，遇周末往后推到工作日 */
+function calcPoDateFromIvDate(ivDate) {
+  const base = new Date(ivDate);
+  if (Number.isNaN(base.getTime())) return new Date();
+  const offset = Math.floor(Math.random() * 7) + 25; /* 25~31 */
+  const candidate = addDays(base, -offset);
+  return adjustToNextWorkday(candidate);
+}
+
 function pickCostValue(record) {
   const keys = [
     "costPrice",
@@ -2352,9 +2361,9 @@ async function loadLocationOptions() {
 }
 
 async function openPoModal(record, invoiceItem) {
-  const defaultDate = String(getFieldValue(record, "docDate") || "")
-    .replace("T00:00:00", "")
-    .slice(0, 10);
+  const ivDateRaw = getFieldValue(record, "docDate") || "";
+  const poDate = calcPoDateFromIvDate(ivDateRaw);
+  const defaultDate = toInputDate(poDate);
   const supplierOptions = buildSupplierOptions();
   if (supplierOptions.length === 0) {
     appendLog("供应商列表为空，请先同步供应商数据");
@@ -5381,17 +5390,26 @@ async function executeBatchCreatePO() {
     return;
   }
   const creditTerm = batchPoCreditTermEl.value || "Net 30 days";
-  const toCreate = pendingBatchPoList;
   batchPoModalEl.classList.add("hidden");
 
-  appendLog(`批量创建PO: 共 ${toCreate.length} 项，供应商 ${selectedSupplier.code}，按时间顺序推送...`);
+  /* 预计算所有 PO 日期，然后按 PO 日期排序，确保推送顺序不跳号 */
+  const toCreateWithDate = pendingBatchPoList.map((entry) => {
+    const ivDateRaw = getFieldValue(entry.record, "docDate") || "";
+    const poDate = calcPoDateFromIvDate(ivDateRaw);
+    const docDate = toInputDate(poDate) || new Date().toISOString().slice(0, 10);
+    return { ...entry, _poDate: docDate, _ivDate: String(ivDateRaw).slice(0, 10) };
+  });
+  /* 按 PO 日期从旧到新排序 */
+  toCreateWithDate.sort((a, b) => a._poDate.localeCompare(b._poDate));
+
+  appendLog(`批量创建PO: 共 ${toCreateWithDate.length} 项，供应商 ${selectedSupplier.code}，按PO日期顺序推送...`);
   let success = 0;
   let fail = 0;
-  for (let i = 0; i < toCreate.length; i++) {
-    const entry = toCreate[i];
+  for (let i = 0; i < toCreateWithDate.length; i++) {
+    const entry = toCreateWithDate[i];
     const ivDocNo = getFieldValue(entry.record, "docNo") || "";
-    const docDate = String(getFieldValue(entry.record, "docDate") || "").replace(/T.*/, "").slice(0, 10) || new Date().toISOString().slice(0, 10);
-    appendLog(`[${i + 1}/${toCreate.length}] 正在创建PO: ${ivDocNo} (${docDate})`);
+    const docDate = entry._poDate;
+    appendLog(`[${i + 1}/${toCreateWithDate.length}] 正在创建PO: ${ivDocNo} (IV:${entry._ivDate} → PO:${docDate})`);
     try {
       const meta = {
         creditorCode: selectedSupplier.code,
@@ -5459,7 +5477,7 @@ async function executeBatchCreatePO() {
   try {
     await apiPost("/api/data/sync", { entity: "purchaseOrder", items: state.data.purchaseOrder });
   } catch (e) { /* 静默 */ }
-  appendLog(`批量创建PO完成: 成功 ${success}，失败 ${fail}，共 ${toCreate.length}`);
+  appendLog(`批量创建PO完成: 成功 ${success}，失败 ${fail}，共 ${toCreateWithDate.length}`);
 }
 
 /* ─── 批量创建 PI（PO → 本地PI，全自动匹配IV并生成连续PI号） ─── */
