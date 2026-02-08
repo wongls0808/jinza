@@ -101,6 +101,16 @@ if (sectionSettingsSummaryWrap) {
 }
 let pendingSettingsSection = null;
 
+/* ── 关联 IV 弹窗 ── */
+const linkIvModalEl = document.getElementById("linkIvModal");
+const linkIvCloseEl = document.getElementById("linkIvClose");
+const linkIvCancelEl = document.getElementById("linkIvCancel");
+const linkIvClearEl = document.getElementById("linkIvClear");
+const linkIvSearchEl = document.getElementById("linkIvSearch");
+const linkIvListEl = document.getElementById("linkIvList");
+let pendingLinkIvPiItem = null; /* 正在关联的 PI 原始 item */
+let pendingLinkIvPiIndex = -1; /* 在 state.data.purchasePI 中的下标 */
+
 const dataSections = new Map();
 document.querySelectorAll(".data-section").forEach((section) => {
   dataSections.set(section.dataset.section, {
@@ -2790,6 +2800,144 @@ function closePiModal() {
   pendingPiPoItem = null;
 }
 
+/* ---- 手动关联 IV 弹窗 ---- */
+function openLinkIvModal(piItem, piIndex) {
+  pendingLinkIvPiItem = piItem;
+  pendingLinkIvPiIndex = piIndex;
+  linkIvSearchEl.value = "";
+  renderLinkIvList("");
+  linkIvModalEl.classList.remove("hidden");
+  linkIvSearchEl.focus();
+}
+
+function closeLinkIvModal() {
+  linkIvModalEl.classList.add("hidden");
+  pendingLinkIvPiItem = null;
+  pendingLinkIvPiIndex = -1;
+}
+
+function renderLinkIvList(keyword) {
+  const invoiceList = state.data.invoice || [];
+  const kw = (keyword || "").toLowerCase().trim();
+  const filtered = invoiceList
+    .map((item) => {
+      const record = extractRecord(item);
+      const docNo = getFieldValue(record, "docNo") || getFieldValue(item, "docNo") || "";
+      const customerName =
+        getFieldValue(record, "debtorName") ||
+        getFieldValue(record, "companyName") ||
+        "";
+      const total = getFieldValue(record, "total") ?? getFieldValue(record, "netTotal") ?? "";
+      const docDate = formatDisplayValue(getFieldValue(record, "docDate") || "");
+      return { item, record, docNo, customerName, total, docDate };
+    })
+    .filter((entry) => {
+      if (!kw) return true;
+      return (
+        String(entry.docNo).toLowerCase().includes(kw) ||
+        String(entry.customerName).toLowerCase().includes(kw) ||
+        String(entry.total).includes(kw)
+      );
+    })
+    .slice(0, 100);
+
+  if (filtered.length === 0) {
+    linkIvListEl.innerHTML =
+      '<div style="padding:20px;text-align:center;color:#888;">未找到匹配的发票</div>';
+    return;
+  }
+
+  const html = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#16213e;position:sticky;top:0;">
+          <th style="padding:6px 10px;text-align:left;white-space:nowrap;">IV No</th>
+          <th style="padding:6px 10px;text-align:left;white-space:nowrap;">Date</th>
+          <th style="padding:6px 10px;text-align:left;">Customer</th>
+          <th style="padding:6px 10px;text-align:right;white-space:nowrap;">Total</th>
+          <th style="padding:6px 10px;text-align:center;white-space:nowrap;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered
+          .map(
+            (entry, idx) => `
+          <tr data-link-iv-idx="${idx}" style="border-bottom:1px solid #2a2a3e;cursor:pointer;" onmouseover="this.style.background='#1a1a3e'" onmouseout="this.style.background=''">
+            <td style="padding:6px 10px;white-space:nowrap;">${entry.docNo}</td>
+            <td style="padding:6px 10px;white-space:nowrap;">${entry.docDate}</td>
+            <td style="padding:6px 10px;">${entry.customerName}</td>
+            <td style="padding:6px 10px;text-align:right;">${
+              typeof entry.total === "number" ? entry.total.toFixed(2) : entry.total
+            }</td>
+            <td style="padding:6px 10px;text-align:center;">
+              <button class="btn ghost" data-link-select="${idx}" style="font-size:12px;padding:2px 8px;">选择</button>
+            </td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+  linkIvListEl.innerHTML = html;
+
+  /* 绑定选择事件 */
+  linkIvListEl.querySelectorAll("[data-link-select]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.linkSelect);
+      const entry = filtered[idx];
+      if (entry) {
+        applyLinkIv(entry.docNo, entry.customerName, entry.total);
+      }
+    });
+  });
+
+  /* 整行双击也能选择 */
+  linkIvListEl.querySelectorAll("[data-link-iv-idx]").forEach((tr) => {
+    tr.addEventListener("dblclick", () => {
+      const idx = Number(tr.dataset.linkIvIdx);
+      const entry = filtered[idx];
+      if (entry) {
+        applyLinkIv(entry.docNo, entry.customerName, entry.total);
+      }
+    });
+  });
+}
+
+async function applyLinkIv(ivNo, customerName, ivTotal) {
+  if (pendingLinkIvPiIndex < 0 || !state.data.purchasePI) {
+    closeLinkIvModal();
+    return;
+  }
+  const pi = state.data.purchasePI[pendingLinkIvPiIndex];
+  if (!pi) {
+    closeLinkIvModal();
+    return;
+  }
+  /* 更新 PI 数据中的关联字段 */
+  pi.referenceIvNo = ivNo || "";
+  pi.ivCustomerName = customerName || "";
+  pi.ivTotal = ivTotal !== undefined && ivTotal !== null ? ivTotal : "";
+  if (pi.master) {
+    pi.master.referenceIvNo = pi.referenceIvNo;
+    pi.master.ivCustomerName = pi.ivCustomerName;
+    pi.master.ivTotal = pi.ivTotal;
+  }
+  /* 重新渲染列表 */
+  renderSection("purchasePI", state.data.purchasePI);
+  /* 持久化到后端 */
+  try {
+    await apiPost("/api/pi", pi);
+    appendLog(`PI ${pi.docNo || ""} 关联IV已更新: ${ivNo || "(已清除)"}`);
+  } catch (e) {
+    appendLog("PI 关联更新持久化失败: " + e.message);
+  }
+  closeLinkIvModal();
+}
+
+async function clearLinkIv() {
+  await applyLinkIv("", "", "");
+}
+
 /* ---- 创建采购发票（推送AutoCount） ---- */
 async function openCreatePurchaseInvoiceModal(piItem) {
   pendingCpiPiItem = piItem;
@@ -4637,6 +4785,8 @@ function renderSection(entityName, items) {
       row.appendChild(cell);
     }
     const numericColumns = new Set(["totalExTax", "tax", "total", "netTotal", "localTax", "localExTax", "localNetTotal", "taxableAmt", "localTaxableAmt", "roundAdj", "finalTotal", "currencyRate"]);
+    /* PI 列表中可双击关联IV的字段 */
+    const linkIvFields = new Set(["referenceIvNo", "ivCustomerName", "ivTotal"]);
     columns.forEach(([key]) => {
       const cell = document.createElement("div");
       cell.className = "table-cell";
@@ -4648,6 +4798,19 @@ function renderSection(entityName, items) {
       } else {
         cell.textContent =
           value === undefined || value === null || value === "" ? "-" : value;
+      }
+      /* purchasePI 的 IV 相关字段：双击可手动关联 */
+      if (entityName === "purchasePI" && linkIvFields.has(key)) {
+        cell.style.cursor = "pointer";
+        cell.title = "双击关联/更换发票";
+        cell.addEventListener("dblclick", (event) => {
+          event.stopPropagation();
+          const piArr = state.data.purchasePI || [];
+          const piIdx = piArr.indexOf(item);
+          if (piIdx >= 0) {
+            openLinkIvModal(item, piIdx);
+          }
+        });
       }
       row.appendChild(cell);
     });
@@ -5070,6 +5233,19 @@ productImportSubmitEl.addEventListener("click", async () => {
   } catch (error) {
     appendLog(error.message || "产品创建失败");
   }
+});
+
+/* ── 关联 IV 弹窗事件 ── */
+linkIvCloseEl.addEventListener("click", closeLinkIvModal);
+linkIvCancelEl.addEventListener("click", closeLinkIvModal);
+linkIvModalEl.addEventListener("click", (event) => {
+  if (event.target === linkIvModalEl) {
+    closeLinkIvModal();
+  }
+});
+linkIvClearEl.addEventListener("click", () => clearLinkIv());
+linkIvSearchEl.addEventListener("input", () => {
+  renderLinkIvList(linkIvSearchEl.value);
 });
 
 piModalCloseEl.addEventListener("click", closePiModal);
