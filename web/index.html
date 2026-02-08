@@ -627,6 +627,43 @@
       </div>
     </div>
 
+    <!-- 批量创建PO - 选择供应商弹窗 -->
+    <div id="batchPoModal" class="modal hidden">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>批量创建PO - 选择供应商</h3>
+          <button id="batchPoModalClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>供应商</label>
+            <select id="batchPoSupplier"></select>
+          </div>
+          <div class="modal-field">
+            <label>Name</label>
+            <input id="batchPoSupplierName" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Address</label>
+            <input id="batchPoSupplierAddress" type="text" readonly />
+          </div>
+          <div class="modal-field">
+            <label>Purchase Location</label>
+            <select id="batchPoLocation"></select>
+          </div>
+          <div class="modal-field">
+            <label>Credit Term</label>
+            <input id="batchPoCreditTerm" type="text" value="Net 30 days" readonly />
+          </div>
+          <p id="batchPoInfo" style="margin-top:8px;color:#666;font-size:13px;"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="batchPoCancel" class="btn ghost">取消</button>
+          <button id="batchPoSubmit" class="btn primary">确认并批量创建</button>
+        </div>
+      </div>
+    </div>
+
     <div id="productImportModal" class="modal hidden">
       <div class="modal-panel modal-panel-lg">
         <div class="modal-header">

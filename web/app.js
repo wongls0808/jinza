@@ -32,6 +32,18 @@ const poSupplierAddressEl = document.getElementById("poSupplierAddress");
 const poDateEl = document.getElementById("poDate");
 const poLocationEl = document.getElementById("poLocation");
 const poCreditTermEl = document.getElementById("poCreditTerm");
+
+/* 批量创建PO弹窗 */
+const batchPoModalEl = document.getElementById("batchPoModal");
+const batchPoModalCloseEl = document.getElementById("batchPoModalClose");
+const batchPoCancelEl = document.getElementById("batchPoCancel");
+const batchPoSubmitEl = document.getElementById("batchPoSubmit");
+const batchPoSupplierEl = document.getElementById("batchPoSupplier");
+const batchPoSupplierNameEl = document.getElementById("batchPoSupplierName");
+const batchPoSupplierAddressEl = document.getElementById("batchPoSupplierAddress");
+const batchPoLocationEl = document.getElementById("batchPoLocation");
+const batchPoCreditTermEl = document.getElementById("batchPoCreditTerm");
+const batchPoInfoEl = document.getElementById("batchPoInfo");
 const productImportModalEl = document.getElementById("productImportModal");
 const productImportCloseEl = document.getElementById("productImportClose");
 const productImportFileEl = document.getElementById("productImportFile");
@@ -555,9 +567,24 @@ function getDocumentInquiryData() {
   return result;
 }
 
+/* 需要过滤 Void 状态的实体列表 */
+const voidFilterEntities = new Set([
+  "invoice", "quotation", "creditNote",
+  "purchaseOrder", "purchaseInvoice", "purchaseReturn"
+]);
+
 function getEntityData(entityName) {
   if (einvoiceSourceMap[entityName] !== undefined) return getEInvoiceData(entityName);
-  return state.data[entityName] || [];
+  const raw = state.data[entityName] || [];
+  /* 过滤掉 Status 为 Void 的记录 */
+  if (voidFilterEntities.has(entityName)) {
+    return raw.filter((item) => {
+      const r = extractRecord(item);
+      const status = String(getFieldValue(r, "status") || "").toLowerCase();
+      return status !== "void";
+    });
+  }
+  return raw;
 }
 
 /* 异步获取文档详情以读取 e-invoice 字段 */
@@ -694,6 +721,7 @@ const listColumns = {
     ["docNo", "Doc No"],
     ["docDate", "Doc Date"],
     ["debtorName", "Customer"],
+    ["salesAgent", "Agent"],
     ["currencyCode", "Currency"],
     ["total", "Total"],
     ["_createdFlag", "PO"],
@@ -810,8 +838,8 @@ const columnWidthMap = {
     noSel: "120px 2fr 100px 50px 1.2fr 110px 60px 120px"
   },
   invoice: {
-    // ☑ | DocNo | DocDate | Customer | Currency | Total | PO标识 | Status | 操作(3btn)
-    sel: "30px 110px 100px 2fr 60px 80px 40px 90px 180px"
+    // ☑ | DocNo | DocDate | Customer | Agent | Currency | Total | PO标识 | Status | 操作(3btn)
+    sel: "30px 110px 90px 2fr 80px 55px 80px 40px 70px 180px"
   },
   quotation: {
     // ☑ | DocNo | Date | CustCode | CustName | Agent | Curr | Rate | Subtotal | Tax | LTax | Total | LTotal | Status | 操作(2btn)
@@ -2412,6 +2440,9 @@ function buildPurchaseOrderInput(item, record, meta) {
     };
   });
 
+  /* 用 ref 字段保存原始发票号，方便追踪 PO 来源 */
+  const invoiceDocNo = getFieldValue(record, "docNo") || "";
+
   return {
     master: {
       docNo: null,
@@ -2427,7 +2458,8 @@ function buildPurchaseOrderInput(item, record, meta) {
       creditTerm: meta.creditTerm,
       purchaseLocation: meta.purchaseLocation,
       currencyRate: Number(getFieldValue(record, "currencyRate")) || 1,
-      inclusiveTax: false
+      inclusiveTax: false,
+      ref: invoiceDocNo || null
     },
     details: poDetails,
     saveApprove: false
@@ -3204,7 +3236,7 @@ async function submitCreatePurchaseInvoice() {
     if (latest) {
       state.data.purchaseInvoice = state.data.purchaseInvoice || [];
       state.data.purchaseInvoice.unshift(latest);
-      renderSection("purchaseInvoice", state.data.purchaseInvoice);
+      renderSection("purchaseInvoice", getEntityData("purchaseInvoice"));
       const latestDocNo =
         getFieldValue(extractRecord(latest), "docNo") || "(自动生成)";
       appendLog(`采购发票创建成功: ${latestDocNo}，已推送AutoCount`);
@@ -5256,26 +5288,33 @@ function getSelectedItems(entityName) {
   return result;
 }
 
-/* 按 docDate 升序（时间从旧到新）排序 */
+/* 按 docDate 升序（时间从旧到新），同日按 docNo 排序确保稳定 */
 function sortByDateAsc(list) {
   return [...list].sort((a, b) => {
     const da = String(getFieldValue(a.record, "docDate") || "");
     const db = String(getFieldValue(b.record, "docDate") || "");
-    return da.localeCompare(db);
+    const cmp = da.localeCompare(db);
+    if (cmp !== 0) return cmp;
+    const na = String(getFieldValue(a.record, "docNo") || "");
+    const nb = String(getFieldValue(b.record, "docNo") || "");
+    return na.localeCompare(nb);
   });
 }
 
-/* ─── 批量创建 PO（发票 → PO，自动使用第一个供应商+默认参数） ─── */
+/* ─── 批量创建 PO 暂存数据 ─── */
+let pendingBatchPoList = [];
+
+/* ─── 批量创建 PO（发票 → PO，弹窗选择供应商后按时间顺序逐个创建） ─── */
 async function batchCreatePO() {
   const selected = getSelectedItems("invoice");
   if (selected.length === 0) {
     appendLog("请先勾选要创建PO的发票");
     return;
   }
-  /* 过滤已创建 */
-  const poList = state.data.purchaseOrder || [];
+  /* 过滤已创建（使用未过滤的原始 PO 列表） */
+  const rawPoList = state.data.purchaseOrder || [];
   const existingRefs = new Set();
-  poList.forEach((po) => {
+  rawPoList.forEach((po) => {
     const r = extractRecord(po);
     const ref = getFieldValue(r, "ref") || getFieldValue(r, "sourceDocNo") || getFieldValue(r, "refDocNo") || "";
     if (ref) existingRefs.add(String(ref));
@@ -5290,7 +5329,7 @@ async function batchCreatePO() {
     appendLog("所选发票均已创建PO，无需重复创建");
     return;
   }
-  /* 准备默认供应商和 location */
+  /* 准备供应商和 location */
   const supplierOptions = buildSupplierOptions();
   if (supplierOptions.length === 0) {
     appendLog("供应商列表为空，请先同步供应商数据");
@@ -5302,36 +5341,110 @@ async function batchCreatePO() {
     return;
   }
 
-  appendLog(`批量创建PO: 共 ${toCreate.length} 项，按时间顺序推送...`);
+  /* 弹出选择供应商弹窗 */
+  pendingBatchPoList = toCreate;
+  batchPoSupplierEl.innerHTML = supplierOptions
+    .map((s) => `<option value="${s.code}">${s.code} - ${s.name}</option>`)
+    .join("");
+  const first = supplierOptions[0];
+  batchPoSupplierNameEl.value = first?.name || "";
+  batchPoSupplierAddressEl.value = first?.address || "";
+  batchPoCreditTermEl.value = first?.creditTerm || "Net 30 days";
+  batchPoLocationEl.innerHTML = locations
+    .map((l) => `<option value="${l.code}">${l.code}</option>`)
+    .join("");
+  batchPoInfoEl.textContent = `共 ${toCreate.length} 张发票待创建PO，将按日期从旧到新顺序创建`;
+  batchPoModalEl.classList.remove("hidden");
+
+  /* 供应商切换时自动填充 */
+  batchPoSupplierEl.onchange = () => {
+    const s = supplierOptions.find((x) => x.code === batchPoSupplierEl.value);
+    if (s) {
+      batchPoSupplierNameEl.value = s.name || "";
+      batchPoSupplierAddressEl.value = s.address || "";
+      batchPoCreditTermEl.value = s.creditTerm || "Net 30 days";
+    }
+  };
+}
+
+/* 批量PO弹窗确认 → 执行创建 */
+async function executeBatchCreatePO() {
+  const supplierOptions = buildSupplierOptions();
+  const selectedSupplier = supplierOptions.find((s) => s.code === batchPoSupplierEl.value);
+  if (!selectedSupplier) {
+    appendLog("请选择供应商");
+    return;
+  }
+  const location = batchPoLocationEl.value;
+  if (!location) {
+    appendLog("请选择 Location");
+    return;
+  }
+  const creditTerm = batchPoCreditTermEl.value || "Net 30 days";
+  const toCreate = pendingBatchPoList;
+  batchPoModalEl.classList.add("hidden");
+
+  appendLog(`批量创建PO: 共 ${toCreate.length} 项，供应商 ${selectedSupplier.code}，按时间顺序推送...`);
   let success = 0;
   let fail = 0;
   for (let i = 0; i < toCreate.length; i++) {
     const entry = toCreate[i];
     const ivDocNo = getFieldValue(entry.record, "docNo") || "";
-    appendLog(`[${i + 1}/${toCreate.length}] 正在创建PO: ${ivDocNo}`);
+    const docDate = String(getFieldValue(entry.record, "docDate") || "").replace(/T.*/, "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+    appendLog(`[${i + 1}/${toCreate.length}] 正在创建PO: ${ivDocNo} (${docDate})`);
     try {
-      /* 使用发票的供应商匹配，否则默认第一个 */
-      const creditorCode = getFieldValue(entry.record, "creditorCode") || "";
-      const supplier = supplierOptions.find((s) => s.code === creditorCode) || supplierOptions[0];
-      const docDate = String(getFieldValue(entry.record, "docDate") || "").replace(/T.*/, "").slice(0, 10) || new Date().toISOString().slice(0, 10);
-      const creditTerm = getFieldValue(entry.record, "creditTerm") || "Net 30 days";
-
-      /* 临时设置表单值供 createPurchaseOrderFromInvoice 使用 */
-      poSupplierEl.innerHTML = `<option value="${supplier.code}" selected>${supplier.code}</option>`;
-      poSupplierEl.value = supplier.code;
-      poSupplierNameEl.value = supplier.name || "";
-      poSupplierAddressEl.value = supplier.address || "";
-      poDateEl.value = docDate;
-      poCreditTermEl.value = creditTerm;
-      poLocationEl.innerHTML = `<option value="${locations[0].code}" selected>${locations[0].code}</option>`;
-      poLocationEl.value = locations[0].code;
-      pendingPoContext = { record: entry.record, invoiceItem: entry.item, supplierOptions, locations };
-
-      const po = await createPurchaseOrderFromInvoice(entry.item, entry.record);
-      if (po) {
+      const meta = {
+        creditorCode: selectedSupplier.code,
+        creditorName: selectedSupplier.name,
+        creditTerm,
+        purchaseLocation: location,
+        docDate,
+        address: selectedSupplier.address || null,
+        taxEntity: selectedSupplier.taxEntity || null,
+        email: selectedSupplier.email || null,
+        attention: selectedSupplier.attention || null,
+        phone1: selectedSupplier.phone1 || null,
+        fax1: selectedSupplier.fax1 || null
+      };
+      const payload = buildPurchaseOrderInput(entry.item, entry.record, meta);
+      /* 推送到 AutoCount */
+      await callWithMode({
+        method: "POST",
+        path: "/{accountBookId}/purchaseorder",
+        body: payload
+      });
+      /* 等待短暂延时确保 AutoCount 处理完毕，避免查询时还未生成 */
+      await new Promise((r) => setTimeout(r, 500));
+      /* 查询回传单号 — 通过 creditorCode + date + ref 匹配最新一条 */
+      const listing = await callWithMode({
+        method: "POST",
+        path: "/{accountBookId}/purchaseorder/listing",
+        body: {
+          page: 1,
+          filter: {
+            date: { from: `${docDate}T00:00:00`, to: `${docDate}T23:59:59` },
+            creditorCode: { value: selectedSupplier.code }
+          }
+        }
+      });
+      /* 从返回列表中找到 ref 匹配当前发票号的最新 PO */
+      let latest = null;
+      if (Array.isArray(listing?.data)) {
+        latest = listing.data.find((po) => {
+          const r = extractRecord(po);
+          return String(getFieldValue(r, "ref") || "") === String(ivDocNo);
+        });
+        if (!latest && listing.data.length > 0) {
+          latest = listing.data[0];
+        }
+      }
+      if (latest) {
         state.data.purchaseOrder = state.data.purchaseOrder || [];
-        state.data.purchaseOrder.unshift(po);
-        appendLog(`  ✓ PO 创建成功: ${extractRecord(po).docNo || getFieldValue(po, "docNo") || "(自动编号)"}`);
+        state.data.purchaseOrder.unshift(latest);
+        appendLog(`  ✓ PO 创建成功: ${extractRecord(latest).docNo || getFieldValue(latest, "docNo") || "(自动编号)"}`);
+        success++;
+      } else {
+        appendLog(`  ✓ PO 已推送，但未获取回传单号`);
         success++;
       }
     } catch (error) {
@@ -5339,10 +5452,10 @@ async function batchCreatePO() {
       fail++;
     }
   }
-  pendingPoContext = null;
+  pendingBatchPoList = [];
   /* 刷新列表 + 持久化 */
-  renderSection("purchaseOrder", state.data.purchaseOrder || []);
-  renderSection("invoice", state.data.invoice || []);
+  renderSection("purchaseOrder", getEntityData("purchaseOrder"));
+  renderSection("invoice", getEntityData("invoice"));
   try {
     await apiPost("/api/data/sync", { entity: "purchaseOrder", items: state.data.purchaseOrder });
   } catch (e) { /* 静默 */ }
@@ -5489,8 +5602,8 @@ async function batchCreatePI() {
       fail++;
     }
   }
-  renderSection("purchasePI", state.data.purchasePI || []);
-  renderSection("purchaseOrder", state.data.purchaseOrder || []);
+  renderSection("purchasePI", getEntityData("purchasePI"));
+  renderSection("purchaseOrder", getEntityData("purchaseOrder"));
   appendLog(`批量创建PI完成: 成功 ${success}，失败 ${fail}，共 ${toCreate.length}`);
 }
 
@@ -5642,12 +5755,23 @@ async function batchCreatePurchaseInvoice() {
 
       await callWithMode({ method: "POST", path: "/{accountBookId}/purchaseinvoice", body: { master, details: invoiceDetails, saveApprove: false } });
 
+      /* 等待 AutoCount 处理完毕，避免跳号 */
+      await new Promise((r) => setTimeout(r, 500));
+
       /* 查询回传单号 */
       const listing = await callWithMode({
         method: "POST", path: "/{accountBookId}/purchaseinvoice/listing",
         body: { page: 1, filter: { date: { from: `${docDate}T00:00:00`, to: `${docDate}T23:59:59` }, creditorCode: { value: supplier.code } } }
       });
-      const latest = Array.isArray(listing?.data) && listing.data.length > 0 ? listing.data[0] : null;
+      /* 找到 supplierInvoiceNo 匹配当前 PI 单号的最新记录 */
+      let latest = null;
+      if (Array.isArray(listing?.data)) {
+        latest = listing.data.find((inv) => {
+          const r = extractRecord(inv);
+          return String(getFieldValue(r, "supplierInvoiceNo") || "") === String(piDocNo);
+        });
+        if (!latest && listing.data.length > 0) latest = listing.data[0];
+      }
       if (latest) {
         state.data.purchaseInvoice = state.data.purchaseInvoice || [];
         state.data.purchaseInvoice.unshift(latest);
@@ -5661,8 +5785,8 @@ async function batchCreatePurchaseInvoice() {
       fail++;
     }
   }
-  renderSection("purchaseInvoice", state.data.purchaseInvoice || []);
-  renderSection("purchasePI", state.data.purchasePI || []);
+  renderSection("purchaseInvoice", getEntityData("purchaseInvoice"));
+  renderSection("purchasePI", getEntityData("purchasePI"));
   try {
     await apiPost("/api/data/sync", { entity: "purchaseInvoice", items: state.data.purchaseInvoice });
   } catch (e) { /* 静默 */ }
@@ -5971,7 +6095,8 @@ poSubmitEl.addEventListener("click", async () => {
     if (po) {
       state.data.purchaseOrder = state.data.purchaseOrder || [];
       state.data.purchaseOrder.unshift(po);
-      renderSection("purchaseOrder", state.data.purchaseOrder);
+      renderSection("purchaseOrder", getEntityData("purchaseOrder"));
+      renderSection("invoice", getEntityData("invoice"));
       appendLog(`采购PO创建成功: ${po.docNo || "(未返回单号)"}`);
       created = true;
       /* 持久化更新后的 PO 列表 */
@@ -5991,6 +6116,10 @@ poSubmitEl.addEventListener("click", async () => {
   }
 });
 
+/* 批量创建PO弹窗事件 */
+batchPoModalCloseEl.addEventListener("click", () => { batchPoModalEl.classList.add("hidden"); pendingBatchPoList = []; });
+batchPoCancelEl.addEventListener("click", () => { batchPoModalEl.classList.add("hidden"); pendingBatchPoList = []; });
+batchPoSubmitEl.addEventListener("click", () => { executeBatchCreatePO(); });
 
 document.querySelectorAll(".menu-btn").forEach((button) => {
   button.addEventListener("click", () => {
@@ -6016,16 +6145,17 @@ initSectionInteractions();
     state.config.connectMode = "proxy";
   }
   applyConfigToForm();
-  /* 渲染已加载的各实体数据 */
+  /* 渲染已加载的各实体数据（自动过滤 Void 状态） */
   for (const entity of entities) {
-    const items = state.data[entity.name];
+    const items = getEntityData(entity.name);
     if (items && items.length) {
       renderSection(entity.name, items);
     }
   }
   /* 渲染本地 PI */
-  if (state.data.purchasePI && state.data.purchasePI.length) {
-    renderSection("purchasePI", state.data.purchasePI);
+  const piItems = getEntityData("purchasePI");
+  if (piItems && piItems.length) {
+    renderSection("purchasePI", piItems);
   }
   appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : ""));
   showSection("supplier");
