@@ -466,107 +466,6 @@ function setActiveMenu(key) {
   });
 }
 
-/* ========== Malaysia E-Invoice 模块 ==========
- * Self-Billed Document: 独立数据，AutoCount 提交采购发票到 LHDNM 后生成的记录
- * Consolidated E-Invoice: 合并电子发票
- * Document Inquiry: 所有已提交电子发票的综合查询
- *
- * 注意：AutoCount Cloud API 不提供独立的 Self-Billed 端点，
- * e-invoice 字段存在于各文档的 master 中（invoice 有完整字段，purchaseInvoice 仅有 submitSGEInvoice）。
- * 本模块通过逐条获取文档详情来读取 e-invoice 状态。
- */
-const einvoiceSourceMap = {
-  einvoiceSelfBilled: "purchaseInvoice",
-  einvoiceConsolidated: "invoice",
-  einvoiceInquiry: null  /* Document Inquiry 综合所有来源 */
-};
-const einvoiceLabelMap = {
-  einvoiceSelfBilled: "Self-Billed Document",
-  einvoiceConsolidated: "Consolidated E-Invoice",
-  einvoiceInquiry: "Document Inquiry"
-};
-
-/* e-invoice 详情缓存: { "docType:docNo": { ...fields, _fetched: true } } */
-const einvoiceDetailCache = {};
-
-function getEInvoiceData(entityName) {
-  if (entityName === "einvoiceInquiry") {
-    /* Document Inquiry: 综合所有来源的 e-invoice 记录 */
-    return getDocumentInquiryData();
-  }
-  const sourceKey = einvoiceSourceMap[entityName];
-  if (!sourceKey) return [];
-  const sourceData = state.data[sourceKey] || [];
-
-  return sourceData.map((item) => {
-    const origMaster = item.master || item;
-    const docNo = origMaster.docNo || "";
-    const cacheKey = sourceKey + ":" + docNo;
-    const cached = einvoiceDetailCache[cacheKey];
-
-    /* 基础字段 */
-    const extra = {};
-    if (entityName === "einvoiceSelfBilled") {
-      extra._docType = "Self-Billed Invoice";
-      extra.totalExTax = origMaster.totalExTax ?? "";
-      extra.tax = origMaster.tax ?? "";
-      extra.currencyRate = origMaster.currencyRate ?? 1;
-    }
-
-    /* e-invoice 状态: 优先用缓存中实际获取到的字段 */
-    if (cached && cached._fetched) {
-      extra._eInvoiceStatus = cached.eInvoiceStatus || cached._derivedStatus || "-";
-      extra.eInvoiceUuid = cached.eInvoiceUuid || "";
-      extra.eInvoiceIssueDateTime = cached.eInvoiceIssueDateTime || "";
-      extra.eInvoiceValidatedDateTime = cached.eInvoiceValidatedDateTime || "";
-      extra.submitEInvoice = cached.submitEInvoice ? "Yes" : "No";
-    } else {
-      /* 未获取详情时从 listing 数据推导 */
-      const listStatus = origMaster.eInvoiceStatus || "";
-      if (listStatus) {
-        extra._eInvoiceStatus = listStatus;
-      } else {
-        extra._eInvoiceStatus = cached === undefined ? "..." : "-";
-      }
-      extra.submitEInvoice = origMaster.submitEInvoice ? "Yes" : "No";
-    }
-
-    const newMaster = { ...origMaster, ...extra };
-    return { ...item, ...extra, master: newMaster };
-  });
-}
-
-/* Document Inquiry: 综合 invoice + creditNote + purchaseInvoice 的 e-invoice 记录 */
-function getDocumentInquiryData() {
-  const result = [];
-  const sources = [
-    { key: "invoice", typeLabel: "Invoice" },
-    { key: "creditNote", typeLabel: "Credit Note" },
-    { key: "purchaseInvoice", typeLabel: "Purchase Invoice" }
-  ];
-  for (const { key, typeLabel } of sources) {
-    const list = state.data[key] || [];
-    for (const item of list) {
-      const origMaster = item.master || item;
-      const docNo = origMaster.docNo || "";
-      const cacheKey = key + ":" + docNo;
-      const cached = einvoiceDetailCache[cacheKey];
-
-      const extra = { _docType: typeLabel };
-      if (cached && cached._fetched) {
-        extra._eInvoiceStatus = cached.eInvoiceStatus || cached._derivedStatus || "-";
-        extra.eInvoiceUuid = cached.eInvoiceUuid || "";
-      } else {
-        const listStatus = origMaster.eInvoiceStatus || "";
-        extra._eInvoiceStatus = listStatus || (cached === undefined ? "..." : "-");
-      }
-      const newMaster = { ...origMaster, ...extra };
-      result.push({ ...item, ...extra, master: newMaster });
-    }
-  }
-  return result;
-}
-
 /* 需要过滤 Void 状态的实体列表 */
 const voidFilterEntities = new Set([
   "invoice", "quotation", "creditNote",
@@ -574,7 +473,6 @@ const voidFilterEntities = new Set([
 ]);
 
 function getEntityData(entityName) {
-  if (einvoiceSourceMap[entityName] !== undefined) return getEInvoiceData(entityName);
   const raw = state.data[entityName] || [];
   /* 过滤掉 Status 为 Void 的记录 */
   if (voidFilterEntities.has(entityName)) {
@@ -585,78 +483,6 @@ function getEntityData(entityName) {
     });
   }
   return raw;
-}
-
-/* 异步获取文档详情以读取 e-invoice 字段 */
-let einvoiceEnrichRunning = false;
-
-async function enrichEInvoiceDetails(entityName) {
-  if (einvoiceEnrichRunning) return;
-  einvoiceEnrichRunning = true;
-
-  let sourceConfigs = [];
-  if (entityName === "einvoiceSelfBilled") {
-    sourceConfigs = [{ key: "purchaseInvoice", apiPath: "/{accountBookId}/purchaseinvoice" }];
-  } else if (entityName === "einvoiceConsolidated") {
-    sourceConfigs = [{ key: "invoice", apiPath: "/{accountBookId}/invoice" }];
-  } else if (entityName === "einvoiceInquiry") {
-    sourceConfigs = [
-      { key: "invoice", apiPath: "/{accountBookId}/invoice" },
-      { key: "creditNote", apiPath: "/{accountBookId}/creditnote" },
-      { key: "purchaseInvoice", apiPath: "/{accountBookId}/purchaseinvoice" }
-    ];
-  }
-
-  let enriched = 0;
-  for (const { key, apiPath } of sourceConfigs) {
-    const list = state.data[key] || [];
-    for (const item of list) {
-      const docNo = (item.master || item).docNo;
-      if (!docNo) continue;
-      const cacheKey = key + ":" + docNo;
-      if (einvoiceDetailCache[cacheKey]) continue;
-
-      try {
-        const detail = await callWithMode({
-          method: "GET",
-          path: apiPath,
-          query: { docNo }
-        });
-        if (detail && detail.master) {
-          const m = detail.master;
-          /* 判断是否有 e-invoice 字段 */
-          const hasEInvoice = "eInvoiceStatus" in m || "eInvoiceUuid" in m;
-          let derivedStatus = "";
-          if (!hasEInvoice) {
-            /* 采购发票可能没有独立 eInvoiceStatus 字段，根据 status 推导 */
-            const s = (m.status || "").toLowerCase();
-            if (s.includes("approved")) derivedStatus = "Approved";
-          }
-          einvoiceDetailCache[cacheKey] = {
-            eInvoiceStatus: m.eInvoiceStatus || "",
-            eInvoiceUuid: m.eInvoiceUuid || "",
-            eInvoiceIssueDateTime: m.eInvoiceIssueDateTime || "",
-            eInvoiceValidatedDateTime: m.eInvoiceValidatedDateTime || "",
-            eInvoiceValidationLink: m.eInvoiceValidationLink || "",
-            submitEInvoice: !!m.submitEInvoice,
-            _fetched: true,
-            _hasEInvoice: hasEInvoice,
-            _derivedStatus: derivedStatus
-          };
-          enriched++;
-        }
-      } catch (e) {
-        einvoiceDetailCache[cacheKey] = { _fetched: true, _error: true, _derivedStatus: "" };
-      }
-      /* 每 5 条刷新列表 */
-      if (enriched > 0 && enriched % 5 === 0) {
-        renderSection(entityName, getEntityData(entityName));
-      }
-    }
-  }
-  /* 最终刷新 */
-  renderSection(entityName, getEntityData(entityName));
-  einvoiceEnrichRunning = false;
 }
 
 function showSection(key) {
@@ -670,14 +496,10 @@ function showSection(key) {
     });
     if (sectionDataTitleEl) {
       sectionDataTitleEl.textContent =
-        entityLabelMap.get(key) || einvoiceLabelMap[key] || sectionDataTitleEl.textContent;
+        entityLabelMap.get(key) || sectionDataTitleEl.textContent;
     }
     renderSection(key, getEntityData(key));
     setActiveMenu(key);
-    /* E-Invoice 模块: 异步获取文档详情以丰富 e-invoice 状态 */
-    if (einvoiceSourceMap[key] !== undefined) {
-      enrichEInvoiceDetails(key);
-    }
     return;
   }
   const targetSection = sectionMap.get(key);
@@ -787,39 +609,6 @@ const listColumns = {
     ["currencyCode", "Currency"],
     ["_createdFlag", "发票"]
   ],
-  einvoiceSelfBilled: [
-    ["_docType", "Doc. Type"],
-    ["docNo", "Doc. No."],
-    ["supplierInvoiceNo", "Supplier Invoice"],
-    ["docDate", "Date"],
-    ["creditorName", "Supplier Name"],
-    ["currencyCode", "Curr. Code"],
-    ["currencyRate", "Curr. Rate"],
-    ["totalExTax", "Subtotal (ex)"],
-    ["tax", "Tax"],
-    ["total", "Total"],
-    ["status", "Status"],
-    ["_eInvoiceStatus", "e-Invoice Status"]
-  ],
-  einvoiceConsolidated: [
-    ["docNo", "Doc No"],
-    ["docDate", "Date"],
-    ["debtorName", "Customer"],
-    ["currencyCode", "Currency"],
-    ["total", "Total"],
-    ["status", "Status"],
-    ["_eInvoiceStatus", "e-Invoice Status"]
-  ],
-  einvoiceInquiry: [
-    ["_docType", "Doc Type"],
-    ["docNo", "Doc No"],
-    ["docDate", "Date"],
-    ["currencyCode", "Currency"],
-    ["total", "Total"],
-    ["status", "Status"],
-    ["_eInvoiceStatus", "e-Invoice Status"],
-    ["eInvoiceUuid", "UUID"]
-  ]
 };
 
 /* ---------- 每种实体的列宽模板 ---------- */
@@ -865,17 +654,6 @@ const columnWidthMap = {
     // ☑ | PINo | DocDate | Supplier | RefPONo | RefIVNo | IVCustomer | IVTotal | PITotal | Currency | 发票标识 | 操作(5btn)
     sel: "30px 100px 85px 1fr 100px 100px 1fr 75px 75px 55px 40px 290px"
   },
-  einvoiceSelfBilled: {
-    // DocType | DocNo | SupplierInv | Date | SupplierName | CurrCode | CurrRate | Subtotal | Tax | Total | Status | eInvStatus | 操作
-    noSel: "100px 100px 110px 85px 1.5fr 65px 60px 80px 60px 80px 75px 90px 80px"
-  },
-  einvoiceConsolidated: {
-    noSel: "110px 95px 1.5fr 70px 80px 80px 90px 80px"
-  },
-  einvoiceInquiry: {
-    // DocType | DocNo | Date | Currency | Total | Status | eInvStatus | UUID | 操作
-    noSel: "110px 100px 85px 65px 80px 80px 90px 1fr 80px"
-  }
 };
 
 function getGridTemplate(entityName, useSelection) {
@@ -1815,12 +1593,6 @@ function getRecordKey(entityName, record, index) {
 }
 
 function getStatusValue(entityName, record) {
-  /* e-invoice 实体用 _eInvoiceStatus 字段 */
-  if (einvoiceSourceMap[entityName] !== undefined) {
-    const eStatus = getFieldValue(record, "_eInvoiceStatus") || "";
-    if (eStatus && eStatus !== "...") return String(eStatus);
-    return "Pending";
-  }
   const status = getFieldValue(record, "status");
   if (status !== undefined && status !== null && status !== "") {
     return String(status);
@@ -5885,9 +5657,8 @@ async function syncEntity(entityName) {
 
   /* 同步后，刷新依赖该实体的列表的已创建标识/派生视图 */
   const affectedMap = {
-    purchaseInvoice: ["purchasePI", "einvoiceSelfBilled"],
+    purchaseInvoice: ["purchasePI"],
     purchaseOrder: ["invoice"],
-    invoice: ["einvoiceConsolidated", "einvoiceInquiry"],
   };
   const affected = affectedMap[entity.name] || [];
   for (const affName of affected) {
