@@ -834,8 +834,8 @@ const columnWidthMap = {
     sel: "30px 110px 100px 2fr 60px 80px 90px 120px"
   },
   purchasePI: {
-    // ☑ | PINo | DocDate | Supplier | RefPONo | RefIVNo | IVCustomer | IVTotal | PITotal | Currency | 发票标识 | 操作(4btn)
-    sel: "30px 100px 85px 1fr 100px 100px 1fr 75px 75px 55px 40px 240px"
+    // ☑ | PINo | DocDate | Supplier | RefPONo | RefIVNo | IVCustomer | IVTotal | PITotal | Currency | 发票标识 | 操作(5btn)
+    sel: "30px 100px 85px 1fr 100px 100px 1fr 75px 75px 55px 40px 290px"
   },
   einvoiceSelfBilled: {
     // DocType | DocNo | SupplierInv | Date | SupplierName | CurrCode | CurrRate | Subtotal | Tax | Total | Status | eInvStatus | 操作
@@ -4877,7 +4877,7 @@ function renderSection(entityName, items) {
         ? `<button class="btn ghost" data-action="create-pi">创建PI</button>`
         : "",
       entityName === "purchasePI"
-        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button>`
+        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button><button class="btn ghost" data-action="delete-pi" style="color:#e74c3c">删除</button>`
         : ""
     ]
       .filter(Boolean)
@@ -4939,6 +4939,21 @@ function renderSection(entityName, items) {
           await openCreatePurchaseInvoiceModal(item);
         } catch (error) {
           appendLog(error.message || "打开创建采购发票弹窗失败");
+        }
+      }
+      if (action === "delete-pi" && entityName === "purchasePI") {
+        const piDocNo = (item.master?.docNo || item.docNo || "").trim();
+        if (!piDocNo) { appendLog("无法获取 PI 单号"); return; }
+        if (!confirm(`确定要删除 ${piDocNo} 吗？此操作不可恢复。`)) return;
+        try {
+          await apiDelete(`/api/pi/${encodeURIComponent(piDocNo)}`);
+          state.data.purchasePI = (state.data.purchasePI || []).filter(
+            (p) => (p.master?.docNo || p.docNo || "") !== piDocNo
+          );
+          renderSection("purchasePI", state.data.purchasePI);
+          appendLog(`已删除 PI: ${piDocNo}`);
+        } catch (e) {
+          appendLog(`删除 PI 失败: ${e.message}`);
         }
       }
     });
@@ -5022,9 +5037,50 @@ function closeSectionSettings() {
   pendingSettingsSection = null;
 }
 
+/* AutoCount 同步实体列表（排除本地 purchasePI） */
+const syncableEntities = new Set(entities.map((e) => e.name));
+
 function initSectionInteractions() {
   dataSections.forEach((section, entityName) => {
     const ui = getSectionUi(entityName);
+    /* 动态注入工具栏按钮 */
+    if (section.tools) {
+      const toolsRight = section.tools.querySelector(".tools-right");
+      if (toolsRight) {
+        /* 所有 AutoCount 同步实体：注入刷新同步按钮 */
+        if (syncableEntities.has(entityName)) {
+          const syncBtn = document.createElement("button");
+          syncBtn.className = "icon-btn";
+          syncBtn.title = "刷新同步";
+          syncBtn.textContent = "⟳";
+          syncBtn.style.fontSize = "16px";
+          syncBtn.addEventListener("click", async () => {
+            syncBtn.disabled = true;
+            syncBtn.textContent = "…";
+            try {
+              await syncEntity(entityName);
+              appendLog(`${entityName} 同步刷新完成`);
+            } catch (e) {
+              appendLog(`${entityName} 同步失败: ${e.message}`);
+            } finally {
+              syncBtn.disabled = false;
+              syncBtn.textContent = "⟳";
+            }
+          });
+          toolsRight.insertBefore(syncBtn, toolsRight.firstChild);
+        }
+      }
+      const toolsLeft = section.tools.querySelector(".tools-left");
+      if (toolsLeft && entityName === "purchasePI") {
+        /* PI 列表：注入删除选中按钮 */
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn ghost";
+        delBtn.setAttribute("data-action", "batch-delete-pi");
+        delBtn.textContent = "删除选中";
+        delBtn.style.color = "#e74c3c";
+        toolsLeft.appendChild(delBtn);
+      }
+    }
     if (section.searchInput) {
       section.searchInput.value = ui.search;
       section.searchInput.addEventListener("input", (event) => {
@@ -5090,6 +5146,11 @@ function initSectionInteractions() {
         /* 批量创建发票（PI列表） */
         if (action === "batch-create-invoice" && entityName === "purchasePI") {
           batchCreatePurchaseInvoice();
+          return;
+        }
+        /* 删除选中 PI */
+        if (action === "batch-delete-pi" && entityName === "purchasePI") {
+          batchDeletePI();
           return;
         }
         if (action === "batch") {
@@ -5608,6 +5669,46 @@ async function batchCreatePurchaseInvoice() {
   appendLog(`批量创建采购发票完成: 成功 ${success}，失败 ${fail}，共 ${toCreate.length}`);
 }
 
+/* ─── 批量删除本地 PI ─── */
+async function batchDeletePI() {
+  const selected = getSelectedItems("purchasePI");
+  if (selected.length === 0) {
+    appendLog("请先勾选要删除的PI");
+    return;
+  }
+  const docNos = selected.map((s) => {
+    const r = s.record;
+    return (getFieldValue(r, "docNo") || s.item.docNo || s.item.master?.docNo || "").trim();
+  }).filter(Boolean);
+  if (docNos.length === 0) {
+    appendLog("未找到可删除的PI单号");
+    return;
+  }
+  if (!confirm(`确定要删除选中的 ${docNos.length} 条PI吗？此操作不可恢复。`)) return;
+  let success = 0;
+  let fail = 0;
+  for (const docNo of docNos) {
+    try {
+      await apiDelete(`/api/pi/${encodeURIComponent(docNo)}`);
+      success++;
+    } catch (e) {
+      appendLog(`删除 ${docNo} 失败: ${e.message}`);
+      fail++;
+    }
+  }
+  /* 从 state 中移除 */
+  const deletedSet = new Set(docNos);
+  state.data.purchasePI = (state.data.purchasePI || []).filter((p) => {
+    const d = (p.master?.docNo || p.docNo || "").trim();
+    return !deletedSet.has(d);
+  });
+  /* 清除已选 */
+  const piUi = getSectionUi("purchasePI");
+  piUi.selected.clear();
+  renderSection("purchasePI", state.data.purchasePI);
+  appendLog(`批量删除PI完成: 成功 ${success}，失败 ${fail}`);
+}
+
 async function syncEntity(entityName) {
   const entity = getEntityConfig(entityName);
   if (!entity) {
@@ -5639,6 +5740,20 @@ async function syncEntity(entityName) {
     appendLog(`数据持久化失败(${entity.name}): ${e.message}`);
   }
   appendLog(`同步完成: ${entity.label} (${data.length} 条)`);
+
+  /* 同步后，刷新依赖该实体的列表的已创建标识/派生视图 */
+  const affectedMap = {
+    purchaseInvoice: ["purchasePI", "einvoiceSelfBilled"],
+    purchaseOrder: ["invoice"],
+    invoice: ["einvoiceConsolidated", "einvoiceInquiry"],
+  };
+  const affected = affectedMap[entity.name] || [];
+  for (const affName of affected) {
+    const affData = getEntityData(affName);
+    if (affData && affData.length) {
+      renderSection(affName, affData);
+    }
+  }
 }
 
 async function syncAll() {
