@@ -2357,6 +2357,7 @@ async function openPoModal(record, invoiceItem) {
 function closePoModal() {
   poModalEl.classList.add("hidden");
   pendingPoContext = null;
+  batchOnModalClose();
 }
 
 function getSelectedSupplier() {
@@ -2802,6 +2803,7 @@ function closePiModal() {
   piModalEl.dataset.matchedInvoiceCustomerName = "";
   piModalEl.dataset.matchedInvoiceTotal = "";
   pendingPiPoItem = null;
+  batchOnModalClose();
 }
 
 /* ---- 手动关联 IV 弹窗 ---- */
@@ -3034,6 +3036,7 @@ async function openCreatePurchaseInvoiceModal(piItem) {
 function closeCpiModal() {
   cpiModalEl.classList.add("hidden");
   pendingCpiPiItem = null;
+  batchOnModalClose();
 }
 
 function updateCpiSupplierMeta() {
@@ -5176,7 +5179,11 @@ async function fetchListing(entity) {
   return collected;
 }
 
-/* ── 批量创建 ── */
+/* ── 批量创建（队列模式：弹窗关闭后自动下一个） ── */
+
+let batchQueue = [];   /* 待处理队列 [{type, item, record, docNo}] */
+let batchTotal = 0;
+let batchDone = 0;
 
 function getSelectedItems(entityName) {
   const ui = getSectionUi(entityName);
@@ -5192,13 +5199,47 @@ function getSelectedItems(entityName) {
   return result;
 }
 
+function batchNext() {
+  if (batchQueue.length === 0) {
+    if (batchTotal > 0) {
+      appendLog(`批量创建完成: ${batchDone}/${batchTotal}`);
+      batchTotal = 0;
+      batchDone = 0;
+    }
+    return;
+  }
+  const entry = batchQueue.shift();
+  const remaining = batchQueue.length;
+  appendLog(`[批量 ${batchDone + 1}/${batchTotal}] 正在处理: ${entry.docNo || ""}（剩余 ${remaining}）`);
+  try {
+    if (entry.type === "po") {
+      openPoModal(entry.record, entry.item);
+    } else if (entry.type === "pi") {
+      openPiModal(entry.item);
+    } else if (entry.type === "cpi") {
+      openCreatePurchaseInvoiceModal(entry.item);
+    }
+  } catch (error) {
+    appendLog(`创建失败: ${error.message}`);
+    batchDone++;
+    batchNext(); /* 跳过出错的，继续下一个 */
+  }
+}
+
+/* 弹窗关闭时推进批量队列（无论提交还是取消都算完成该项） */
+function batchOnModalClose() {
+  if (batchQueue.length > 0 || batchTotal > 0) {
+    batchDone++;
+    batchNext();
+  }
+}
+
 async function batchCreatePO() {
   const selected = getSelectedItems("invoice");
   if (selected.length === 0) {
     appendLog("请先勾选要创建PO的发票");
     return;
   }
-  /* 过滤已创建PO的 */
   const poList = state.data.purchaseOrder || [];
   const existingRefs = new Set();
   poList.forEach((po) => {
@@ -5214,19 +5255,16 @@ async function batchCreatePO() {
     appendLog("所选发票均已创建PO，无需重复创建");
     return;
   }
-  appendLog(`开始批量创建PO: ${toCreate.length} 项...`);
-  let success = 0;
-  let fail = 0;
-  for (const entry of toCreate) {
-    try {
-      await openPoModal(entry.record, entry.item);
-      appendLog(`请在弹窗中完成PO创建 (${getFieldValue(entry.record, "docNo") || ""})，完成后再创建下一个`);
-      return; /* 逐个弹窗模式，一次只处理一个 */
-    } catch (error) {
-      appendLog(`PO创建失败: ${error.message}`);
-      fail++;
-    }
-  }
+  batchQueue = toCreate.map((s) => ({
+    type: "po",
+    item: s.item,
+    record: s.record,
+    docNo: getFieldValue(s.record, "docNo") || ""
+  }));
+  batchTotal = batchQueue.length;
+  batchDone = 0;
+  appendLog(`批量创建PO: 共 ${batchTotal} 项`);
+  batchNext();
 }
 
 async function batchCreatePI() {
@@ -5235,7 +5273,6 @@ async function batchCreatePI() {
     appendLog("请先勾选要创建PI的采购订单");
     return;
   }
-  /* 过滤已创建PI的 */
   const piList = state.data.purchasePI || [];
   const existingRefs = new Set();
   piList.forEach((pi) => {
@@ -5251,16 +5288,16 @@ async function batchCreatePI() {
     appendLog("所选PO均已创建PI，无需重复创建");
     return;
   }
-  appendLog(`开始批量创建PI: ${toCreate.length} 项...`);
-  for (const entry of toCreate) {
-    try {
-      await openPiModal(entry.item);
-      appendLog(`请在弹窗中完成PI创建 (${getFieldValue(entry.record, "docNo") || ""})，完成后再创建下一个`);
-      return; /* 逐个弹窗模式 */
-    } catch (error) {
-      appendLog(`PI创建失败: ${error.message}`);
-    }
-  }
+  batchQueue = toCreate.map((s) => ({
+    type: "pi",
+    item: s.item,
+    record: s.record,
+    docNo: getFieldValue(s.record, "docNo") || ""
+  }));
+  batchTotal = batchQueue.length;
+  batchDone = 0;
+  appendLog(`批量创建PI: 共 ${batchTotal} 项`);
+  batchNext();
 }
 
 async function batchCreatePurchaseInvoice() {
@@ -5269,7 +5306,6 @@ async function batchCreatePurchaseInvoice() {
     appendLog("请先勾选要创建采购发票的PI");
     return;
   }
-  /* 过滤已创建采购发票的 */
   const purchInvList = state.data.purchaseInvoice || [];
   const existingRefs = new Set();
   purchInvList.forEach((inv) => {
@@ -5285,16 +5321,16 @@ async function batchCreatePurchaseInvoice() {
     appendLog("所选PI均已创建采购发票，无需重复创建");
     return;
   }
-  appendLog(`开始批量创建采购发票: ${toCreate.length} 项...`);
-  for (const entry of toCreate) {
-    try {
-      await openCreatePurchaseInvoiceModal(entry.item);
-      appendLog(`请在弹窗中完成采购发票创建 (${getFieldValue(entry.record, "docNo") || entry.item.docNo || ""})，完成后再创建下一个`);
-      return; /* 逐个弹窗模式 */
-    } catch (error) {
-      appendLog(`采购发票创建失败: ${error.message}`);
-    }
-  }
+  batchQueue = toCreate.map((s) => ({
+    type: "cpi",
+    item: s.item,
+    record: s.record,
+    docNo: getFieldValue(s.record, "docNo") || s.item.docNo || ""
+  }));
+  batchTotal = batchQueue.length;
+  batchDone = 0;
+  appendLog(`批量创建采购发票: 共 ${batchTotal} 项`);
+  batchNext();
 }
 
 async function syncEntity(entityName) {
