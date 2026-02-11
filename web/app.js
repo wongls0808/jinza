@@ -1562,7 +1562,7 @@ function getSectionUi(entityName) {
   if (!state.ui[entityName]) {
     state.ui[entityName] = {
       page: 1,
-      pageSize: 25,
+      pageSize: 10,
       search: "",
       filter: "all",
       selected: new Set(),
@@ -4515,6 +4515,18 @@ function renderSection(entityName, items) {
     return true;
   });
 
+  /* 按 docNo 或 docDate 降序排列（最新在前） */
+  filtered.sort((a, b) => {
+    const ra = extractRecord(a);
+    const rb = extractRecord(b);
+    const na = String(getFieldValue(ra, "docNo") || "");
+    const nb = String(getFieldValue(rb, "docNo") || "");
+    if (na && nb) return nb.localeCompare(na);
+    const da = String(getFieldValue(ra, "docDate") || "");
+    const db = String(getFieldValue(rb, "docDate") || "");
+    return db.localeCompare(da);
+  });
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / ui.pageSize));
   ui.page = Math.min(ui.page, totalPages);
   const startIndex = (ui.page - 1) * ui.pageSize;
@@ -4839,7 +4851,7 @@ function openSectionSettings(entityName) {
   pendingSettingsSection = entityName;
   const entity = getEntityConfig(entityName);
   sectionSettingsTitleEl.textContent = `${entity?.label || entityName} 页面设置`;
-  sectionSettingsPageSizeEl.value = String(ui.pageSize || 25);
+  sectionSettingsPageSizeEl.value = String(ui.pageSize || 10);
   sectionSettingsSummaryEl.checked = false;
   sectionSettingsSummaryEl.disabled = true;
   sectionSettingsModalEl.classList.remove("hidden");
@@ -5948,4 +5960,20 @@ initSectionInteractions();
   }
   appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : ""));
   showSection("supplier");
+
+  /* 每 5 分钟自动同步所有 AutoCount 数据 */
+  setInterval(async () => {
+    try {
+      appendLog("自动同步: 开始...");
+      await syncAll();
+      /* 同步完成后重新渲染本地 PI（已创建标识可能变化） */
+      const piData = getEntityData("purchasePI");
+      if (piData && piData.length) {
+        renderSection("purchasePI", piData);
+      }
+      appendLog("自动同步: 完成");
+    } catch (e) {
+      appendLog(`自动同步失败: ${e.message}`);
+    }
+  }, 5 * 60 * 1000);
 })();
