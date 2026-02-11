@@ -163,19 +163,24 @@ async function handleApi(req, res) {
 
   /* ── 加载全部数据（前端启动时调用） ── */
   if (url === "/api/data/all" && req.method === "GET") {
-    const [syncData, syncState, piList, config] = await Promise.all([
-      db.getAllSyncData(),
-      db.getSyncState(),
-      db.getAllPurchasePI(),
-      db.getConfig("autocount")
-    ]);
-    sendJson(res, 200, {
-      ok: true,
-      data: syncData,
-      syncState,
-      purchasePI: piList,
-      config: config || null
-    });
+    try {
+      const [syncData, syncState, piList, config] = await Promise.all([
+        db.getAllSyncData().catch((e) => { console.error("getAllSyncData error:", e.message); return {}; }),
+        db.getSyncState().catch((e) => { console.error("getSyncState error:", e.message); return {}; }),
+        db.getAllPurchasePI().catch((e) => { console.error("getAllPurchasePI error:", e.message); return []; }),
+        db.getConfig("autocount").catch((e) => { console.error("getConfig error:", e.message); return null; })
+      ]);
+      sendJson(res, 200, {
+        ok: true,
+        data: syncData || {},
+        syncState: syncState || {},
+        purchasePI: piList || [],
+        config: config || null
+      });
+    } catch (e) {
+      console.error("/api/data/all fatal:", e.message);
+      sendJson(res, 500, { ok: false, error: e.message });
+    }
     return;
   }
 
