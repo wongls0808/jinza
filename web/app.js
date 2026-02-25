@@ -3139,8 +3139,7 @@ function buildPiPrintHtml(pi, stampSrc, baseHref) {
           <div>This ${docLabel} is issued for order confirmation</div>
           <div>and payment arrangement purposes only.</div>
           <div>It does not constitute a tax invoice or final commercial invoice.</div>
-          <div>Delivery arrangements shall be subject to the Buyer’s instructions,</div>
-          <div>including delivery to locations designated by the Buyer.</div>
+          <div>Delivery shall be arranged by Seller under DDP terms based on Buyer’s designated delivery location.</div>
         </div>
         <div class="total-box">
           <div>(All amounts are in ${currency})</div>
