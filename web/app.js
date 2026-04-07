@@ -126,6 +126,15 @@ const supplierPrintProfilePiNumberPatternEl = document.getElementById(
 const supplierPrintProfilePiNumberPreviewEl = document.getElementById(
   "supplierPrintProfilePiNumberPreview"
 );
+const supplierPrintProfilePackingFromEl = document.getElementById(
+  "supplierPrintProfilePackingFrom"
+);
+const supplierPrintProfilePiSeg1El = document.getElementById(
+  "supplierPrintProfilePiSeg1"
+);
+const supplierPrintProfilePiSeg2El = document.getElementById(
+  "supplierPrintProfilePiSeg2"
+);
 const overlayEl = document.getElementById("sectionOverlay");
 const overlayBodyEl = document.getElementById("overlayBody");
 const overlayTitleEl = document.getElementById("overlayTitle");
@@ -1764,6 +1773,35 @@ function escapeRegExp(value) {
   return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/* PI 单号分段：不允许含 “-”，避免与三段分隔符冲突 */
+function sanitizePiSegment(value, fallback) {
+  const raw = String(value ?? "").trim().toUpperCase();
+  const cleaned = raw.replace(/-/g, "").replace(/\s+/g, "");
+  if (cleaned) {
+    return cleaned;
+  }
+  const fb = String(fallback ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/-/g, "")
+    .replace(/\s+/g, "");
+  return fb || "X";
+}
+
+function deriveRelatedDocNoFromPi(piNo, kind) {
+  const s = String(piNo || "-");
+  const parts = s.split("-").filter((p) => p.length > 0);
+  if (parts.length >= 3 && /^\d{4}$/.test(parts[parts.length - 1])) {
+    const next = [...parts];
+    next[0] = kind;
+    return next.join("-");
+  }
+  if (/^PI/i.test(s)) {
+    return kind === "IV" ? s.replace(/^PI/i, "IV") : s.replace(/^PI/i, "PL");
+  }
+  return `${kind}-${s}`;
+}
+
 const STAMP_RELATIVE_PATH = "stamp.png";
 let cachedStampDataUrl = "";
 let cachedStampProcessed = "";
@@ -1847,7 +1885,18 @@ function getOrCreateSupplierPrintProfile(key) {
     profiles[key].banks = [];
   }
   if (!profiles[key].piNumberPatternId) {
-    profiles[key].piNumberPatternId = "PI-YYYY-SEQ4";
+    profiles[key].piNumberPatternId = "SEG3";
+  }
+  if (profiles[key].packingListFrom === undefined) {
+    profiles[key].packingListFrom = "Fujian, China";
+  }
+  if (profiles[key].piNumberPatternId === "SEG3") {
+    if (profiles[key].piNumberSegment1 === undefined) {
+      profiles[key].piNumberSegment1 = "PI";
+    }
+    if (profiles[key].piNumberSegment2 === undefined) {
+      profiles[key].piNumberSegment2 = key;
+    }
   }
   return profiles[key];
 }
@@ -1923,12 +1972,60 @@ function getNextPiSequenceForSupplier({ supplierCode, year, patternId }) {
   return String(maxSeq + 1).padStart(4, "0");
 }
 
+function getNextPiSequenceSeg3({ supplierCode, seg1, seg2 }) {
+  const list = state.data.purchasePI || [];
+  let maxSeq = 0;
+  const s1 = sanitizePiSegment(seg1, "PI");
+  const s2 = sanitizePiSegment(seg2, supplierCode);
+  const regex = new RegExp(
+    `^${escapeRegExp(s1)}-${escapeRegExp(s2)}-(\\d{4})$`,
+    "i"
+  );
+  list.forEach((item) => {
+    const itemSupplier = getPiSupplierCode(item);
+    if (String(itemSupplier || "") !== String(supplierCode || "")) {
+      return;
+    }
+    const record = extractRecord(item);
+    const docNo = record.docNo || item.docNo || "";
+    const match = regex.exec(String(docNo));
+    if (match) {
+      const seq = Number(match[1]) || 0;
+      maxSeq = Math.max(maxSeq, seq);
+    }
+  });
+  return String(maxSeq + 1).padStart(4, "0");
+}
+
 function buildPiNumberForSupplier({ supplierCode, year }) {
   const profile = supplierCode ? getOrCreateSupplierPrintProfile(supplierCode) : null;
-  const patternId = profile?.piNumberPatternId || "PI-YYYY-SEQ4";
+  const patternId = profile?.piNumberPatternId || "SEG3";
+  if (patternId === "SEG3") {
+    const s1 = sanitizePiSegment(profile?.piNumberSegment1, "PI");
+    const s2 = sanitizePiSegment(profile?.piNumberSegment2, supplierCode);
+    const seq = getNextPiSequenceSeg3({
+      supplierCode,
+      seg1: s1,
+      seg2: s2
+    });
+    return `${s1}-${s2}-${seq}`;
+  }
   const pattern = getPiNumberPatternById(patternId);
   const seq = getNextPiSequenceForSupplier({ supplierCode, year, patternId });
   return pattern.build({ supplierCode, year, seq });
+}
+
+function normalizePiNumberFlexible(input, supplierCode, year, fallback) {
+  const profile = supplierCode ? getOrCreateSupplierPrintProfile(supplierCode) : null;
+  const patternId = profile?.piNumberPatternId || "SEG3";
+  const trimmed = String(input || "").trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  if (patternId === "SEG3") {
+    return trimmed.toUpperCase();
+  }
+  return normalizePiNumber(input, year, fallback);
 }
 
 function readFileAsDataUrl(file) {
@@ -2025,9 +2122,18 @@ function renderSupplierPrintProfileEditor(key) {
     supplierPrintProfileStampPreviewEl.style.display = "none";
   }
   renderSupplierPrintBanksEditor(key);
+  if (supplierPrintProfilePackingFromEl) {
+    supplierPrintProfilePackingFromEl.value = profile.packingListFrom || "Fujian, China";
+  }
+  if (supplierPrintProfilePiSeg1El) {
+    supplierPrintProfilePiSeg1El.value = profile.piNumberSegment1 ?? "PI";
+  }
+  if (supplierPrintProfilePiSeg2El) {
+    supplierPrintProfilePiSeg2El.value = profile.piNumberSegment2 ?? key;
+  }
   if (supplierPrintProfilePiNumberPatternEl) {
     supplierPrintProfilePiNumberPatternEl.value =
-      profile.piNumberPatternId || "PI-YYYY-SEQ4";
+      profile.piNumberPatternId || "SEG3";
   }
   if (supplierPrintProfilePiNumberPreviewEl) {
     const preview = buildPiNumberForSupplier({
@@ -3459,16 +3565,16 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
     fax: record.deliverFax1 || "-"
   };
   const piNumber = pi.docNo || record.docNo || "-";
-  const ciNumber = String(piNumber).replace(/^PI/i, "IV");
+  const ciNumber = deriveRelatedDocNoFromPi(piNumber, "IV");
   const piBaseDate = new Date(record.docDate || pi.docDate || new Date());
   const ciDate = randomWorkdayAfter(
     Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate,
     7,
     10
   );
-  const plNumber = String(piNumber).replace(/^PI/i, "PL");
+  const plNumber = deriveRelatedDocNoFromPi(piNumber, "PL");
   const deliveryCity = resolveCustomerCity(record, shipTo);
-  const origin = { country: "China", state: "Fujian" };
+  const packingFrom = printProfile?.packingListFrom || "Fujian, China";
   const plDate = randomWorkdayAfter(ciDate, 7, 10);
   const validity = pi.validityDate
     ? formatDateShort(pi.validityDate)
@@ -3831,7 +3937,7 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
             <div class="pl-row"><span>Date:</span><span>${formatDateShort(plDate)}</span></div>
             <div class="pl-transport">
               <div class="pl-transport-title">TRANSPORT DETAILS:</div>
-              <div class="pl-row"><span>From:</span><span>${origin.state}, ${origin.country}</span></div>
+              <div class="pl-row"><span>From:</span><span>${escapeHtml(packingFrom)}</span></div>
               <div class="pl-row"><span>To:</span><span>Malaysia</span></div>
               <div class="pl-row"><span>Delivery Term:</span><span>DDP ${deliveryCity}</span></div>
             </div>
@@ -6232,8 +6338,9 @@ piSubmitEl.addEventListener("click", async () => {
     const matchedIvCustomerName = piModalEl.dataset.matchedInvoiceCustomerName || "";
     const matchedIvTotal = piModalEl.dataset.matchedInvoiceTotal || "";
     const piMeta = {
-      piNumber: normalizePiNumber(
+      piNumber: normalizePiNumberFlexible(
         piNumberEl.value,
+        supplier.code,
         piNumberEl.dataset.piYear || new Date().getFullYear(),
         piNumberEl.dataset.defaultPi || null
       ),
@@ -6382,12 +6489,54 @@ if (supplierPrintProfilePiNumberPatternEl) {
       appendLog("请先选择供应商");
       return;
     }
-    const val = String(event.target.value || "PI-YYYY-SEQ4");
+    const val = String(event.target.value || "SEG3");
     const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
     profile.piNumberPatternId = val;
     persistConfig();
     renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
     appendLog(`已更新 PI 单号格式: ${activeSupplierPrintProfileKey}`);
+  });
+}
+
+if (supplierPrintProfilePackingFromEl) {
+  supplierPrintProfilePackingFromEl.addEventListener("input", () => {
+    if (!activeSupplierPrintProfileKey) return;
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    profile.packingListFrom = supplierPrintProfilePackingFromEl.value;
+    persistConfig();
+    syncSupplierPrintProfilesJsonTextarea();
+  });
+}
+
+if (supplierPrintProfilePiSeg1El) {
+  supplierPrintProfilePiSeg1El.addEventListener("input", () => {
+    if (!activeSupplierPrintProfileKey) return;
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    profile.piNumberSegment1 = supplierPrintProfilePiSeg1El.value;
+    persistConfig();
+    if (supplierPrintProfilePiNumberPreviewEl) {
+      supplierPrintProfilePiNumberPreviewEl.textContent = buildPiNumberForSupplier({
+        supplierCode: activeSupplierPrintProfileKey,
+        year: new Date().getFullYear()
+      });
+    }
+    syncSupplierPrintProfilesJsonTextarea();
+  });
+}
+
+if (supplierPrintProfilePiSeg2El) {
+  supplierPrintProfilePiSeg2El.addEventListener("input", () => {
+    if (!activeSupplierPrintProfileKey) return;
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    profile.piNumberSegment2 = supplierPrintProfilePiSeg2El.value;
+    persistConfig();
+    if (supplierPrintProfilePiNumberPreviewEl) {
+      supplierPrintProfilePiNumberPreviewEl.textContent = buildPiNumberForSupplier({
+        supplierCode: activeSupplierPrintProfileKey,
+        year: new Date().getFullYear()
+      });
+    }
+    syncSupplierPrintProfilesJsonTextarea();
   });
 }
 

@@ -768,11 +768,36 @@
               </div>
 
               <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;">
-                <div style="font-size:12px;color:#64748b;">PI 单号格式</div>
+                <div style="font-size:12px;color:#64748b;">PACKING LIST From</div>
+                <input id="supplierPrintProfilePackingFrom" type="text" placeholder="例如：Fujian, China" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+              </div>
+
+              <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:start;">
+                <div style="font-size:12px;color:#64748b;padding-top:10px;">PI 单号（三段）</div>
+                <div style="display:grid;gap:8px;">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+                      <span>第一段（固定）</span>
+                      <input id="supplierPrintProfilePiSeg1" type="text" placeholder="如 PI" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+                    </label>
+                    <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+                      <span>第二段（自定义）</span>
+                      <input id="supplierPrintProfilePiSeg2" type="text" placeholder="如缩写/代号" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+                    </label>
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;line-height:1.45;">
+                    第三段为四位自动递增。仅统计「当前供应商 + 前两段」与历史 PI 一致的单号；前两段任一变更则从新序列开始。
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;">
+                <div style="font-size:12px;color:#64748b;">兼容旧格式</div>
                 <select id="supplierPrintProfilePiNumberPattern" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;">
-                  <option value="PI-YYYY-SEQ4">PI-YYYY-####（每供应商独立按年递增）</option>
-                  <option value="PI-SUP-YYYY-SEQ4">PI-SUP-YYYY-####（每供应商独立按年递增）</option>
-                  <option value="PI-SUP-SEQ4">PI-SUP-####（每供应商独立递增）</option>
+                  <option value="SEG3">三段式（推荐）SEG1-SEG2-####</option>
+                  <option value="PI-YYYY-SEQ4">PI-YYYY-####（旧：按年）</option>
+                  <option value="PI-SUP-YYYY-SEQ4">PI-SUP-YYYY-####（旧）</option>
+                  <option value="PI-SUP-SEQ4">PI-SUP-####（旧）</option>
                 </select>
               </div>
 
