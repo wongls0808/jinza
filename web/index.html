@@ -730,11 +730,50 @@
 
           <!-- 供应商打印模板配置（仅在供应商页面设置中显示） -->
           <div id="supplierPrintProfilesWrap" class="modal-field" style="display:none;">
-            <label>供应商 PI 打印模板（银行/公章）配置 JSON</label>
-            <div style="font-size:12px;color:#94a3b8;line-height:1.45;margin:4px 0 8px;">
-              key 使用供应商 accNo（creditorCode）。支持字段：<code>stampPath</code>（放在 web/ 下的相对路径）或 <code>stampDataUrl</code>（data:image/png;base64,...），以及 <code>banks</code> 数组。
-            </div>
-            <textarea id="supplierPrintProfilesJson" rows="10" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:12px;line-height:1.45;"></textarea>
+            <label>供应商 PI 打印模板（银行 / 公章）</label>
+
+            <div style="display:grid;gap:10px;margin-top:8px;">
+              <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;">
+                <div style="font-size:12px;color:#64748b;">选择供应商</div>
+                <select id="supplierPrintProfileSupplierSelect" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;"></select>
+              </div>
+
+              <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:start;">
+                <div style="font-size:12px;color:#64748b;padding-top:10px;">公章</div>
+                <div style="display:grid;gap:8px;">
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <input id="supplierPrintProfileStampFile" type="file" accept="image/*" />
+                    <button id="supplierPrintProfileStampClear" class="btn ghost" type="button">清除公章</button>
+                  </div>
+                  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <img id="supplierPrintProfileStampPreview" alt="stamp preview" style="max-height:72px;max-width:240px;border:1px solid #e2e8f0;border-radius:10px;padding:6px;background:#fff;display:none;" />
+                    <div id="supplierPrintProfileStampHint" style="font-size:12px;color:#94a3b8;line-height:1.4;">
+                      上传后会保存为 DataURL（写入配置），打印时自动使用该供应商公章。
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:start;">
+                <div style="font-size:12px;color:#64748b;padding-top:10px;">银行账户</div>
+                <div style="display:grid;gap:10px;">
+                  <div id="supplierPrintProfileBanksList" style="display:grid;gap:10px;"></div>
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button id="supplierPrintProfileBankAdd" class="btn ghost" type="button">新增银行账户</button>
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;line-height:1.4;">
+                    字段会用于 CI / Statement 中的 Payment Details 区块。
+                  </div>
+                </div>
+              </div>
+
+              <details style="margin-top:6px;">
+                <summary style="cursor:pointer;font-size:12px;color:#64748b;">高级：直接编辑 JSON</summary>
+                <div style="font-size:12px;color:#94a3b8;line-height:1.45;margin:6px 0 8px;">
+                  key 使用供应商 accNo（creditorCode）。支持字段：<code>stampPath</code> 或 <code>stampDataUrl</code>，以及 <code>banks</code> 数组。
+                </div>
+                <textarea id="supplierPrintProfilesJson" rows="10" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:12px;line-height:1.45;"></textarea>
+              </details>
           </div>
         </div>
         <div class="modal-footer">

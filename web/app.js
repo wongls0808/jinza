@@ -102,6 +102,24 @@ const supplierPrintProfilesWrapEl = document.getElementById(
 const supplierPrintProfilesJsonEl = document.getElementById(
   "supplierPrintProfilesJson"
 );
+const supplierPrintProfileSupplierSelectEl = document.getElementById(
+  "supplierPrintProfileSupplierSelect"
+);
+const supplierPrintProfileStampFileEl = document.getElementById(
+  "supplierPrintProfileStampFile"
+);
+const supplierPrintProfileStampClearEl = document.getElementById(
+  "supplierPrintProfileStampClear"
+);
+const supplierPrintProfileStampPreviewEl = document.getElementById(
+  "supplierPrintProfileStampPreview"
+);
+const supplierPrintProfileBanksListEl = document.getElementById(
+  "supplierPrintProfileBanksList"
+);
+const supplierPrintProfileBankAddEl = document.getElementById(
+  "supplierPrintProfileBankAdd"
+);
 const overlayEl = document.getElementById("sectionOverlay");
 const overlayBodyEl = document.getElementById("overlayBody");
 const overlayTitleEl = document.getElementById("overlayTitle");
@@ -1767,10 +1785,32 @@ const DEFAULT_SUPPLIER_PRINT_PROFILES = {
   */
 };
 
+let activeSupplierPrintProfileKey = "";
+
 function resolveSupplierPrintProfileKey(input) {
   if (!input) return "";
   const raw = typeof input === "string" ? input : "";
   return raw.trim();
+}
+
+function getSupplierPrintProfilesConfig() {
+  state.config = state.config || {};
+  const cur = state.config.supplierPrintProfiles;
+  if (!cur || typeof cur !== "object" || Array.isArray(cur)) {
+    state.config.supplierPrintProfiles = {};
+  }
+  return state.config.supplierPrintProfiles;
+}
+
+function getOrCreateSupplierPrintProfile(key) {
+  const profiles = getSupplierPrintProfilesConfig();
+  if (!profiles[key] || typeof profiles[key] !== "object") {
+    profiles[key] = {};
+  }
+  if (!Array.isArray(profiles[key].banks)) {
+    profiles[key].banks = [];
+  }
+  return profiles[key];
 }
 
 function resolvePrintProfileByCreditor(creditorCode, creditorName) {
@@ -1792,6 +1832,103 @@ function resolvePrintProfileByCreditor(creditorCode, creditorName) {
     return { key: nameKey, ...DEFAULT_SUPPLIER_PRINT_PROFILES[nameKey] };
   }
   return null;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderSupplierPrintBanksEditor(key) {
+  if (!supplierPrintProfileBanksListEl) return;
+  const profile = key ? getOrCreateSupplierPrintProfile(key) : null;
+  const banks = profile ? profile.banks || [] : [];
+  supplierPrintProfileBanksListEl.innerHTML = "";
+  if (!key) {
+    const hint = document.createElement("div");
+    hint.style.fontSize = "12px";
+    hint.style.color = "#94a3b8";
+    hint.textContent = "请先选择供应商";
+    supplierPrintProfileBanksListEl.appendChild(hint);
+    return;
+  }
+
+  banks.forEach((bank, index) => {
+    const row = document.createElement("div");
+    row.style.border = "1px solid #e2e8f0";
+    row.style.borderRadius = "12px";
+    row.style.padding = "10px";
+    row.style.display = "grid";
+    row.style.gap = "8px";
+    row.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="font-weight:600;font-size:12px;color:#334155;">银行账户 ${index + 1}</div>
+        <button class="btn ghost" type="button" data-action="remove-bank" data-index="${index}" style="color:#e11d48;">删除</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+          <span>标题</span>
+          <input data-field="label" data-index="${index}" value="${escapeHtml(bank.label || "")}" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+        </label>
+        <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+          <span>国家/地区</span>
+          <input data-field="country" data-index="${index}" value="${escapeHtml(bank.country || "")}" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+        </label>
+        <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+          <span>账户号码</span>
+          <input data-field="accountNumber" data-index="${index}" value="${escapeHtml(bank.accountNumber || "")}" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+        </label>
+        <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+          <span>账户名称</span>
+          <input data-field="accountName" data-index="${index}" value="${escapeHtml(bank.accountName || "")}" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+        </label>
+      </div>
+      <label style="display:grid;gap:4px;font-size:12px;color:#64748b;">
+        <span>银行名称</span>
+        <input data-field="bankName" data-index="${index}" value="${escapeHtml(bank.bankName || "")}" style="padding:10px 12px;border-radius:10px;border:1px solid #d9e2ec;background:#f8fafc;" />
+      </label>
+    `;
+    supplierPrintProfileBanksListEl.appendChild(row);
+  });
+}
+
+function syncSupplierPrintProfilesJsonTextarea() {
+  if (!supplierPrintProfilesJsonEl) return;
+  try {
+    supplierPrintProfilesJsonEl.value = JSON.stringify(
+      getSupplierPrintProfilesConfig(),
+      null,
+      2
+    );
+  } catch (e) {
+    supplierPrintProfilesJsonEl.value = "{}";
+  }
+}
+
+function renderSupplierPrintProfileEditor(key) {
+  activeSupplierPrintProfileKey = key || "";
+  if (!supplierPrintProfileStampPreviewEl) return;
+  if (!key) {
+    supplierPrintProfileStampPreviewEl.style.display = "none";
+    renderSupplierPrintBanksEditor("");
+    syncSupplierPrintProfilesJsonTextarea();
+    return;
+  }
+  const profile = getOrCreateSupplierPrintProfile(key);
+  const stamp = profile.stampDataUrl || profile.stampPath || "";
+  if (stamp) {
+    supplierPrintProfileStampPreviewEl.src = stamp;
+    supplierPrintProfileStampPreviewEl.style.display = "block";
+  } else {
+    supplierPrintProfileStampPreviewEl.removeAttribute("src");
+    supplierPrintProfileStampPreviewEl.style.display = "none";
+  }
+  renderSupplierPrintBanksEditor(key);
+  syncSupplierPrintProfilesJsonTextarea();
 }
 
 function getPrintBaseHref() {
@@ -4980,11 +5117,19 @@ function openSectionSettings(entityName) {
       entityName === "supplier" ? "block" : "none";
   }
   if (supplierPrintProfilesJsonEl && entityName === "supplier") {
-    const current = state.config?.supplierPrintProfiles || {};
-    try {
-      supplierPrintProfilesJsonEl.value = JSON.stringify(current, null, 2);
-    } catch (e) {
-      supplierPrintProfilesJsonEl.value = "{}";
+    syncSupplierPrintProfilesJsonTextarea();
+  }
+  if (entityName === "supplier") {
+    const options = buildSupplierOptions();
+    if (supplierPrintProfileSupplierSelectEl) {
+      supplierPrintProfileSupplierSelectEl.innerHTML = options
+        .map(
+          (s) => `<option value="${escapeHtml(s.code)}">${escapeHtml(s.code)} - ${escapeHtml(s.name)}</option>`
+        )
+        .join("");
+      const firstKey = options[0]?.code || "";
+      supplierPrintProfileSupplierSelectEl.value = firstKey;
+      renderSupplierPrintProfileEditor(firstKey);
     }
   }
   sectionSettingsModalEl.classList.remove("hidden");
@@ -4996,6 +5141,7 @@ function closeSectionSettings() {
   if (supplierPrintProfilesWrapEl) {
     supplierPrintProfilesWrapEl.style.display = "none";
   }
+  activeSupplierPrintProfileKey = "";
 }
 
 /* AutoCount 同步实体列表（排除本地 purchasePI） */
@@ -6036,6 +6182,104 @@ sectionSettingsSaveEl.addEventListener("click", () => {
   renderSection(pendingSettingsSection, state.data[pendingSettingsSection] || []);
   closeSectionSettings();
 });
+
+/* ── 供应商打印模板：可视化编辑事件 ── */
+if (supplierPrintProfileSupplierSelectEl) {
+  supplierPrintProfileSupplierSelectEl.addEventListener("change", (event) => {
+    const key = String(event.target.value || "");
+    renderSupplierPrintProfileEditor(key);
+  });
+}
+
+if (supplierPrintProfileStampFileEl) {
+  supplierPrintProfileStampFileEl.addEventListener("change", async () => {
+    const file = supplierPrintProfileStampFileEl.files?.[0];
+    if (!file) return;
+    if (!activeSupplierPrintProfileKey) {
+      appendLog("请先选择供应商");
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+      profile.stampDataUrl = dataUrl;
+      delete profile.stampPath;
+      persistConfig();
+      renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+      appendLog(`已更新公章: ${activeSupplierPrintProfileKey}`);
+    } catch (e) {
+      appendLog(e.message || "公章上传失败");
+    } finally {
+      supplierPrintProfileStampFileEl.value = "";
+    }
+  });
+}
+
+if (supplierPrintProfileStampClearEl) {
+  supplierPrintProfileStampClearEl.addEventListener("click", () => {
+    if (!activeSupplierPrintProfileKey) {
+      appendLog("请先选择供应商");
+      return;
+    }
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    delete profile.stampDataUrl;
+    delete profile.stampPath;
+    persistConfig();
+    renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+    appendLog(`已清除公章: ${activeSupplierPrintProfileKey}`);
+  });
+}
+
+if (supplierPrintProfileBankAddEl) {
+  supplierPrintProfileBankAddEl.addEventListener("click", () => {
+    if (!activeSupplierPrintProfileKey) {
+      appendLog("请先选择供应商");
+      return;
+    }
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    profile.banks = profile.banks || [];
+    profile.banks.push({
+      label: `Bank Account ${profile.banks.length + 1}`,
+      accountNumber: "",
+      accountName: "",
+      bankName: "",
+      country: "Malaysia"
+    });
+    persistConfig();
+    renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+  });
+}
+
+if (supplierPrintProfileBanksListEl) {
+  supplierPrintProfileBanksListEl.addEventListener("click", (event) => {
+    const btn = event.target.closest("button");
+    if (!btn) return;
+    if (btn.getAttribute("data-action") !== "remove-bank") return;
+    if (!activeSupplierPrintProfileKey) return;
+    const idx = Number(btn.getAttribute("data-index"));
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    if (!Array.isArray(profile.banks)) profile.banks = [];
+    if (!Number.isFinite(idx) || idx < 0 || idx >= profile.banks.length) return;
+    profile.banks.splice(idx, 1);
+    persistConfig();
+    renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+  });
+
+  supplierPrintProfileBanksListEl.addEventListener("input", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const idx = Number(input.getAttribute("data-index"));
+    const field = input.getAttribute("data-field") || "";
+    if (!activeSupplierPrintProfileKey) return;
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    if (!Array.isArray(profile.banks)) profile.banks = [];
+    if (!Number.isFinite(idx) || idx < 0 || idx >= profile.banks.length) return;
+    if (!field) return;
+    profile.banks[idx][field] = input.value;
+    persistConfig();
+    syncSupplierPrintProfilesJsonTextarea();
+  });
+}
 poSubmitEl.addEventListener("click", async () => {
   if (!pendingPoContext) {
     return;
