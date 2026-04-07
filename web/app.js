@@ -1721,9 +1721,64 @@ function formatAddressThreeLines(value) {
     .join("\n");
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const STAMP_RELATIVE_PATH = "stamp.png";
 let cachedStampDataUrl = "";
 let cachedStampProcessed = "";
+const stampProcessedCache = new Map();
+
+/*
+  供应商打印档案（最简单的按供应商出不同模板方式）：
+  - key 建议用供应商 accNo（即 creditorCode）
+  - stamp: 支持两种
+    - stampPath: 放在 web/ 下的静态文件路径（推荐，例如 "stamps/SUP001.png"）
+    - stampDataUrl: data:image/png;base64,...（不推荐直接塞很长字符串，但可用）
+  - banks: 用于替换 CI/Statement 里的银行信息
+*/
+const SUPPLIER_PRINT_PROFILES = {
+  /*
+  示例：
+  "S0001": {
+    stampPath: "stamps/S0001.png",
+    banks: [
+      {
+        label: "Bank Account 1",
+        accountNumber: "88800000000000000",
+        accountName: "XXXX CO., LTD.",
+        bankName: "OCBC BANK (MALAYSIA) BERHAD",
+        country: "Malaysia"
+      }
+    ]
+  }
+  */
+};
+
+function resolveSupplierPrintProfileKey(input) {
+  if (!input) return "";
+  const raw = typeof input === "string" ? input : "";
+  return raw.trim();
+}
+
+function resolvePrintProfileByCreditor(creditorCode, creditorName) {
+  const key = resolveSupplierPrintProfileKey(creditorCode);
+  if (key && SUPPLIER_PRINT_PROFILES[key]) {
+    return { key, ...SUPPLIER_PRINT_PROFILES[key] };
+  }
+  /* 允许用供应商名称兜底（不建议，易重名） */
+  const nameKey = resolveSupplierPrintProfileKey(creditorName);
+  if (nameKey && SUPPLIER_PRINT_PROFILES[nameKey]) {
+    return { key: nameKey, ...SUPPLIER_PRINT_PROFILES[nameKey] };
+  }
+  return null;
+}
 
 function getPrintBaseHref() {
   return window.location.href.replace(/index\.html.*$/i, "");
@@ -1774,6 +1829,22 @@ async function getStampSrc() {
     return cachedStampProcessed;
   }
   return STAMP_RELATIVE_PATH;
+}
+
+async function getStampSrcWithOverride(overrideSrc) {
+  if (!overrideSrc) {
+    return await getStampSrc();
+  }
+  const src = String(overrideSrc);
+  if (/^data:image\//i.test(src)) {
+    if (stampProcessedCache.has(src)) {
+      return stampProcessedCache.get(src);
+    }
+    const processed = await processStampDataUrl(src);
+    stampProcessedCache.set(src, processed);
+    return processed;
+  }
+  return src;
 }
 
 function extractCityFromAddress(address) {
@@ -2079,6 +2150,7 @@ function buildSupplierOptions() {
       const attention = getFieldValue(record, "attention") || "";
       const phone1 = getFieldValue(record, "phone1") || "";
       const fax1 = getFieldValue(record, "fax1") || "";
+      const printProfile = resolvePrintProfileByCreditor(code, name);
       return {
         code,
         name,
@@ -2088,7 +2160,10 @@ function buildSupplierOptions() {
         email,
         attention,
         phone1,
-        fax1
+        fax1,
+        /* 把模板/公章信息挂到供应商对象上（便于创建 PI 时带过去） */
+        printProfileKey: printProfile?.key || "",
+        printProfile: printProfile || null
       };
     })
     .filter((item) => item.code || item.name);
@@ -3080,7 +3155,7 @@ function buildDescriptionSignature(details) {
     .join("|");
 }
 
-function buildPiPrintHtml(pi, stampSrc, baseHref) {
+function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
   const record = extractRecord(pi);
   const details = pi.details || [];
   const currency = record.currencyCode || "MYR";
@@ -3126,6 +3201,25 @@ function buildPiPrintHtml(pi, stampSrc, baseHref) {
     ? formatDateShort(pi.validityDate)
     : "-";
   const referencePo = pi.referencePoNo || record.ref || "-";
+  const banks =
+    Array.isArray(printProfile?.banks) && printProfile.banks.length > 0
+      ? printProfile.banks
+      : [
+          {
+            label: "Bank Account 1",
+            accountNumber: "88800021380472790",
+            accountName: "PUTIAN GUSHU TRADING CO.,LTD.",
+            bankName: "OCBC BANK (MALAYSIA) BERHAD",
+            country: "Malaysia"
+          },
+          {
+            label: "Bank Account 2",
+            accountNumber: "00181100000015449",
+            accountName: "Alipay Malaysia",
+            bankName: "HSBC BANK MALAYSIA BERHAD",
+            country: "Malaysia"
+          }
+        ];
   const buildFooterHtml = (docLabel) => `
       <div class="amount-words">${amountWords}</div>
       <div class="total-line">
@@ -3166,20 +3260,19 @@ function buildPiPrintHtml(pi, stampSrc, baseHref) {
       <div class="ci-footer-body">
         <div class="ci-payment">
           <div class="ci-payment-title">Payment Details:</div>
+          ${banks
+            .map(
+              (b) => `
           <div class="ci-payment-block">
-            <div class="ci-payment-label">Bank Account 1:</div>
-            <div>Account Number : 88800021380472790</div>
-            <div>Account Name : PUTIAN GUSHU TRADING CO.,LTD.</div>
-            <div>Bank Name : OCBC BANK (MALAYSIA) BERHAD</div>
-            <div>Country/Region : Malaysia</div>
+            <div class="ci-payment-label">${escapeHtml(b.label || "Bank Account")}:</div>
+            <div>Account Number : ${escapeHtml(b.accountNumber || "-")}</div>
+            <div>Account Name : ${escapeHtml(b.accountName || "-")}</div>
+            <div>Bank Name : ${escapeHtml(b.bankName || "-")}</div>
+            <div>Country/Region : ${escapeHtml(b.country || "-")}</div>
           </div>
-          <div class="ci-payment-block">
-            <div class="ci-payment-label">Bank Account 2:</div>
-            <div>Account Number : 00181100000015449</div>
-            <div>Account Name : Alipay Malaysia</div>
-            <div>Bank Name : HSBC BANK MALAYSIA BERHAD</div>
-            <div>Country/Region : Malaysia</div>
-          </div>
+          `
+            )
+            .join("")}
         </div>
         <div class="ci-chop">
           <img class="stamp-img" src="${stampSrc}" alt="Company Chop" />
@@ -3540,14 +3633,16 @@ function buildPiPrintHtml(pi, stampSrc, baseHref) {
           <div>- Within 30 days after successful delivery, OR</div>
           <div>- Within 90 days from the Purchase Order date</div>
           <div class="statement-subheading">5.2 Designated Bank Accounts</div>
-          <div>Bank Account 1:</div>
-          <div>Account Number: 88800021380472790</div>
-          <div>Account Name: PUTIAN GUSHU TRADING CO.,LTD.</div>
-          <div>Bank Name: OCBC Bank (Malaysia) Berhad</div>
-          <div>Bank Account 2:</div>
-          <div>Account Number: 00181100000015449</div>
-          <div>Account Name: Alipay Malaysia</div>
-          <div>Bank Name: HSBC Bank Malaysia Berhad</div>
+          ${banks
+            .map(
+              (b) => `
+          <div>${escapeHtml(b.label || "Bank Account")}:</div>
+          <div>Account Number: ${escapeHtml(b.accountNumber || "-")}</div>
+          <div>Account Name: ${escapeHtml(b.accountName || "-")}</div>
+          <div>Bank Name: ${escapeHtml(b.bankName || "-")}</div>
+          `
+            )
+            .join("")}
         </div>
         <div class="statement-page-number">Page 1 / 2</div>
       </div>
@@ -3717,9 +3812,20 @@ async function printPurchasePi(pi) {
     return;
   }
   const baseHref = getPrintBaseHref();
-  const stampSrc = await getStampSrc();
+  const record = extractRecord(pi);
+  const creditorCode =
+    pi?.printProfileKey ||
+    record?.creditorCode ||
+    pi?.creditorCode ||
+    record?.accNo ||
+    "";
+  const creditorName = record?.creditorName || pi?.creditorName || "";
+  const profile =
+    resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
+  const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
+  const stampSrc = await getStampSrcWithOverride(stampOverride);
   printWindow.document.open();
-  printWindow.document.write(buildPiPrintHtml(pi, stampSrc, baseHref));
+  printWindow.document.write(buildPiPrintHtml(pi, stampSrc, baseHref, profile));
   printWindow.document.close();
   printWindow.focus();
   setTimeout(() => {
@@ -3797,6 +3903,8 @@ async function createPurchaseInvoiceFromPo(
     sourcePONo: docNo,
     consigneeName: payload.master.deliverContact || "",
     billToName: "JINZA TRADING SDN. BHD.",
+    /* 关键：把“供应商模板/公章档案”固化进 PI，确保后续打印不会受列表刷新影响 */
+    printProfileKey: supplierRecord?.printProfileKey || supplierRecord?.code || payload.master.creditorCode || "",
     master: payload.master,
     details: payload.details
   };
