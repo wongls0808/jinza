@@ -120,6 +120,12 @@ const supplierPrintProfileBanksListEl = document.getElementById(
 const supplierPrintProfileBankAddEl = document.getElementById(
   "supplierPrintProfileBankAdd"
 );
+const supplierPrintProfilePiNumberPatternEl = document.getElementById(
+  "supplierPrintProfilePiNumberPattern"
+);
+const supplierPrintProfilePiNumberPreviewEl = document.getElementById(
+  "supplierPrintProfilePiNumberPreview"
+);
 const overlayEl = document.getElementById("sectionOverlay");
 const overlayBodyEl = document.getElementById("overlayBody");
 const overlayTitleEl = document.getElementById("overlayTitle");
@@ -1754,6 +1760,10 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function escapeRegExp(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const STAMP_RELATIVE_PATH = "stamp.png";
 let cachedStampDataUrl = "";
 let cachedStampProcessed = "";
@@ -1787,6 +1797,32 @@ const DEFAULT_SUPPLIER_PRINT_PROFILES = {
 
 let activeSupplierPrintProfileKey = "";
 
+const PI_NUMBER_PATTERNS = [
+  {
+    id: "PI-YYYY-SEQ4",
+    label: "PI-YYYY-####",
+    yearly: true,
+    build: ({ year, seq }) => `PI-${String(year).padStart(4, "0")}-${seq}`
+  },
+  {
+    id: "PI-SUP-YYYY-SEQ4",
+    label: "PI-SUP-YYYY-####",
+    yearly: true,
+    build: ({ supplierCode, year, seq }) =>
+      `PI-${String(supplierCode)}-${String(year).padStart(4, "0")}-${seq}`
+  },
+  {
+    id: "PI-SUP-SEQ4",
+    label: "PI-SUP-####",
+    yearly: false,
+    build: ({ supplierCode, seq }) => `PI-${String(supplierCode)}-${seq}`
+  }
+];
+
+function getPiNumberPatternById(id) {
+  return PI_NUMBER_PATTERNS.find((p) => p.id === id) || PI_NUMBER_PATTERNS[0];
+}
+
 function resolveSupplierPrintProfileKey(input) {
   if (!input) return "";
   const raw = typeof input === "string" ? input : "";
@@ -1810,6 +1846,9 @@ function getOrCreateSupplierPrintProfile(key) {
   if (!Array.isArray(profiles[key].banks)) {
     profiles[key].banks = [];
   }
+  if (!profiles[key].piNumberPatternId) {
+    profiles[key].piNumberPatternId = "PI-YYYY-SEQ4";
+  }
   return profiles[key];
 }
 
@@ -1832,6 +1871,64 @@ function resolvePrintProfileByCreditor(creditorCode, creditorName) {
     return { key: nameKey, ...DEFAULT_SUPPLIER_PRINT_PROFILES[nameKey] };
   }
   return null;
+}
+
+function getPiSupplierCode(pi) {
+  const r = extractRecord(pi);
+  return (
+    pi?.printProfileKey ||
+    getFieldValue(r, "creditorCode") ||
+    pi?.creditorCode ||
+    ""
+  );
+}
+
+function getNextPiSequenceForSupplier({ supplierCode, year, patternId }) {
+  const pattern = getPiNumberPatternById(patternId);
+  const list = state.data.purchasePI || [];
+  let maxSeq = 0;
+  const safeYear = String(year).padStart(4, "0");
+  const sup = String(supplierCode || "");
+
+  const regex = (() => {
+    if (patternId === "PI-YYYY-SEQ4") {
+      return new RegExp(`^PI-${escapeRegExp(safeYear)}-(\\d{4})$`, "i");
+    }
+    if (patternId === "PI-SUP-YYYY-SEQ4") {
+      return new RegExp(
+        `^PI-${escapeRegExp(sup)}-${escapeRegExp(safeYear)}-(\\d{4})$`,
+        "i"
+      );
+    }
+    if (patternId === "PI-SUP-SEQ4") {
+      return new RegExp(`^PI-${escapeRegExp(sup)}-(\\d{4})$`, "i");
+    }
+    return new RegExp(`^PI-${escapeRegExp(safeYear)}-(\\d{4})$`, "i");
+  })();
+
+  list.forEach((item) => {
+    const itemSupplier = getPiSupplierCode(item);
+    if (String(itemSupplier || "") !== String(supplierCode || "")) {
+      return;
+    }
+    const record = extractRecord(item);
+    const docNo = record.docNo || item.docNo || "";
+    const match = regex.exec(String(docNo));
+    if (match) {
+      const seq = Number(match[1]) || 0;
+      maxSeq = Math.max(maxSeq, seq);
+    }
+  });
+
+  return String(maxSeq + 1).padStart(4, "0");
+}
+
+function buildPiNumberForSupplier({ supplierCode, year }) {
+  const profile = supplierCode ? getOrCreateSupplierPrintProfile(supplierCode) : null;
+  const patternId = profile?.piNumberPatternId || "PI-YYYY-SEQ4";
+  const pattern = getPiNumberPatternById(patternId);
+  const seq = getNextPiSequenceForSupplier({ supplierCode, year, patternId });
+  return pattern.build({ supplierCode, year, seq });
 }
 
 function readFileAsDataUrl(file) {
@@ -1928,6 +2025,17 @@ function renderSupplierPrintProfileEditor(key) {
     supplierPrintProfileStampPreviewEl.style.display = "none";
   }
   renderSupplierPrintBanksEditor(key);
+  if (supplierPrintProfilePiNumberPatternEl) {
+    supplierPrintProfilePiNumberPatternEl.value =
+      profile.piNumberPatternId || "PI-YYYY-SEQ4";
+  }
+  if (supplierPrintProfilePiNumberPreviewEl) {
+    const preview = buildPiNumberForSupplier({
+      supplierCode: key,
+      year: new Date().getFullYear()
+    });
+    supplierPrintProfilePiNumberPreviewEl.textContent = preview || "-";
+  }
   syncSupplierPrintProfilesJsonTextarea();
 }
 
@@ -2749,6 +2857,22 @@ async function openPiModal(poItem) {
   if (defaultSupplier) {
     piSupplierEl.value = defaultSupplier.code;
   }
+  /* 供应商改变时：重新生成默认 PI 单号（按供应商独立序号） */
+  if (!piSupplierEl.dataset.piSupplierListener) {
+    piSupplierEl.addEventListener("change", () => {
+      try {
+        const year = Number(piNumberEl.dataset.piYear || new Date().getFullYear());
+        const supplierCode = String(piSupplierEl.value || "");
+        const next = buildPiNumberForSupplier({ supplierCode, year });
+        piNumberEl.value = next;
+        piNumberEl.dataset.defaultPi = next;
+        piNumberEl.dataset.piSupplierCode = supplierCode;
+      } catch (e) {
+        // ignore
+      }
+    });
+    piSupplierEl.dataset.piSupplierListener = "1";
+  }
   if (matchedInvoiceCustomer) {
     piConsigneeEl.value = matchedInvoiceCustomer.accNo;
   } else {
@@ -2799,14 +2923,17 @@ async function openPiModal(poItem) {
   const piYear = Number.isNaN(basePoDate.getTime())
     ? new Date().getFullYear()
     : basePoDate.getFullYear();
-  const piPrefix = `PI-${String(piYear).padStart(4, "0")}-`;
-  const defaultPiNumber = buildPiNumberFromYear(piYear);
+  const selectedSupplierCode = String(piSupplierEl.value || "");
+  const defaultPiNumber = buildPiNumberForSupplier({
+    supplierCode: selectedSupplierCode,
+    year: piYear
+  });
   piNumberEl.value = defaultPiNumber;
   piNumberEl.dataset.defaultPi = defaultPiNumber;
-  piNumberEl.dataset.piPrefix = piPrefix;
   piNumberEl.readOnly = false;
   piNumberEl.disabled = false;
   piNumberEl.dataset.piYear = String(piYear);
+  piNumberEl.dataset.piSupplierCode = selectedSupplierCode;
   if (!piNumberEl.dataset.piListener) {
     piNumberEl.addEventListener("focus", () => {
       const val = piNumberEl.value || piNumberEl.dataset.defaultPi || "";
@@ -2814,18 +2941,13 @@ async function openPiModal(poItem) {
       piNumberEl.setSelectionRange(val.length, val.length);
     });
     piNumberEl.addEventListener("input", () => {
-      const prefix = piNumberEl.dataset.piPrefix || "PI-";
-      const raw = String(piNumberEl.value || "").toUpperCase();
-      let suffix = raw.startsWith(prefix.toUpperCase())
-        ? raw.slice(prefix.length)
-        : raw.replace(/\D/g, "");
-      suffix = suffix.replace(/\D/g, "").slice(0, 4);
-      piNumberEl.value = `${prefix}${suffix}`;
+      /* 不强制格式，只做大写（避免破坏供应商自定义编码格式） */
+      piNumberEl.value = String(piNumberEl.value || "").toUpperCase();
     });
     piNumberEl.addEventListener("blur", () => {
-      const year = piNumberEl.dataset.piYear || new Date().getFullYear();
       const fallback = piNumberEl.dataset.defaultPi || "";
-      piNumberEl.value = normalizePiNumber(piNumberEl.value, year, fallback);
+      const trimmed = String(piNumberEl.value || "").trim();
+      piNumberEl.value = trimmed ? trimmed : fallback;
     });
     piNumberEl.dataset.piListener = "1";
   }
@@ -5653,7 +5775,6 @@ async function batchCreatePI() {
       const rawPoDate = getFieldValue(entry.record, "docDate") || new Date().toISOString();
       const basePoDate = new Date(rawPoDate);
       const piYear = Number.isNaN(basePoDate.getTime()) ? new Date().getFullYear() : basePoDate.getFullYear();
-      const piNumber = buildPiNumberFromYear(piYear);
       const minPiDate = Number.isNaN(basePoDate.getTime())
         ? adjustToNextWorkday(addDays(new Date(), 7))
         : adjustToNextWorkday(addDays(basePoDate, 7));
@@ -5662,6 +5783,11 @@ async function batchCreatePI() {
       const supplierMatch = suppliers.find((s) => s.code === getFieldValue(entry.record, "creditorCode"));
       const supplier = supplierMatch || suppliers[0];
       const consignee = matchedCustomer || null;
+
+      const piNumber = buildPiNumberForSupplier({
+        supplierCode: supplier?.code || "",
+        year: piYear
+      });
 
       const piMeta = {
         piNumber,
@@ -6247,6 +6373,21 @@ if (supplierPrintProfileBankAddEl) {
     });
     persistConfig();
     renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+  });
+}
+
+if (supplierPrintProfilePiNumberPatternEl) {
+  supplierPrintProfilePiNumberPatternEl.addEventListener("change", (event) => {
+    if (!activeSupplierPrintProfileKey) {
+      appendLog("请先选择供应商");
+      return;
+    }
+    const val = String(event.target.value || "PI-YYYY-SEQ4");
+    const profile = getOrCreateSupplierPrintProfile(activeSupplierPrintProfileKey);
+    profile.piNumberPatternId = val;
+    persistConfig();
+    renderSupplierPrintProfileEditor(activeSupplierPrintProfileKey);
+    appendLog(`已更新 PI 单号格式: ${activeSupplierPrintProfileKey}`);
   });
 }
 
