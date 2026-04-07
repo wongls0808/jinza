@@ -96,6 +96,12 @@ const sectionSettingsPageSizeEl = document.getElementById(
 const sectionSettingsSummaryEl = document.getElementById(
   "sectionSettingsSummary"
 );
+const supplierPrintProfilesWrapEl = document.getElementById(
+  "supplierPrintProfilesWrap"
+);
+const supplierPrintProfilesJsonEl = document.getElementById(
+  "supplierPrintProfilesJson"
+);
 const overlayEl = document.getElementById("sectionOverlay");
 const overlayBodyEl = document.getElementById("overlayBody");
 const overlayTitleEl = document.getElementById("overlayTitle");
@@ -1743,7 +1749,7 @@ const stampProcessedCache = new Map();
     - stampDataUrl: data:image/png;base64,...（不推荐直接塞很长字符串，但可用）
   - banks: 用于替换 CI/Statement 里的银行信息
 */
-const SUPPLIER_PRINT_PROFILES = {
+const DEFAULT_SUPPLIER_PRINT_PROFILES = {
   /*
   示例：
   "S0001": {
@@ -1768,14 +1774,22 @@ function resolveSupplierPrintProfileKey(input) {
 }
 
 function resolvePrintProfileByCreditor(creditorCode, creditorName) {
+  const configured =
+    (state.config && state.config.supplierPrintProfiles) || {};
   const key = resolveSupplierPrintProfileKey(creditorCode);
-  if (key && SUPPLIER_PRINT_PROFILES[key]) {
-    return { key, ...SUPPLIER_PRINT_PROFILES[key] };
+  if (key && configured[key]) {
+    return { key, ...configured[key] };
+  }
+  if (key && DEFAULT_SUPPLIER_PRINT_PROFILES[key]) {
+    return { key, ...DEFAULT_SUPPLIER_PRINT_PROFILES[key] };
   }
   /* 允许用供应商名称兜底（不建议，易重名） */
   const nameKey = resolveSupplierPrintProfileKey(creditorName);
-  if (nameKey && SUPPLIER_PRINT_PROFILES[nameKey]) {
-    return { key: nameKey, ...SUPPLIER_PRINT_PROFILES[nameKey] };
+  if (nameKey && configured[nameKey]) {
+    return { key: nameKey, ...configured[nameKey] };
+  }
+  if (nameKey && DEFAULT_SUPPLIER_PRINT_PROFILES[nameKey]) {
+    return { key: nameKey, ...DEFAULT_SUPPLIER_PRINT_PROFILES[nameKey] };
   }
   return null;
 }
@@ -4961,12 +4975,27 @@ function openSectionSettings(entityName) {
   sectionSettingsPageSizeEl.value = String(ui.pageSize || 10);
   sectionSettingsSummaryEl.checked = false;
   sectionSettingsSummaryEl.disabled = true;
+  if (supplierPrintProfilesWrapEl) {
+    supplierPrintProfilesWrapEl.style.display =
+      entityName === "supplier" ? "block" : "none";
+  }
+  if (supplierPrintProfilesJsonEl && entityName === "supplier") {
+    const current = state.config?.supplierPrintProfiles || {};
+    try {
+      supplierPrintProfilesJsonEl.value = JSON.stringify(current, null, 2);
+    } catch (e) {
+      supplierPrintProfilesJsonEl.value = "{}";
+    }
+  }
   sectionSettingsModalEl.classList.remove("hidden");
 }
 
 function closeSectionSettings() {
   sectionSettingsModalEl.classList.add("hidden");
   pendingSettingsSection = null;
+  if (supplierPrintProfilesWrapEl) {
+    supplierPrintProfilesWrapEl.style.display = "none";
+  }
 }
 
 /* AutoCount 同步实体列表（排除本地 purchasePI） */
@@ -5979,6 +6008,23 @@ sectionSettingsModalEl.addEventListener("click", (event) => {
 sectionSettingsSaveEl.addEventListener("click", () => {
   if (!pendingSettingsSection) {
     return;
+  }
+  /* 供应商：保存打印模板档案配置 */
+  if (pendingSettingsSection === "supplier" && supplierPrintProfilesJsonEl) {
+    const raw = supplierPrintProfilesJsonEl.value || "{}";
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("必须是 JSON 对象（key 为供应商 accNo）");
+      }
+      state.config = state.config || {};
+      state.config.supplierPrintProfiles = parsed;
+      persistConfig();
+      appendLog("供应商打印模板配置已保存（将用于新建/打印 PI）");
+    } catch (e) {
+      appendLog("供应商打印模板 JSON 无效: " + (e.message || String(e)));
+      return;
+    }
   }
   const ui = getSectionUi(pendingSettingsSection);
   const pageSize = Number(sectionSettingsPageSizeEl.value);

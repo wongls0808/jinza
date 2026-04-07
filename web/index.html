@@ -727,6 +727,15 @@
             <span>显示概览</span>
             <input id="sectionSettingsSummary" type="checkbox" />
           </label>
+
+          <!-- 供应商打印模板配置（仅在供应商页面设置中显示） -->
+          <div id="supplierPrintProfilesWrap" class="modal-field" style="display:none;">
+            <label>供应商 PI 打印模板（银行/公章）配置 JSON</label>
+            <div style="font-size:12px;color:#94a3b8;line-height:1.45;margin:4px 0 8px;">
+              key 使用供应商 accNo（creditorCode）。支持字段：<code>stampPath</code>（放在 web/ 下的相对路径）或 <code>stampDataUrl</code>（data:image/png;base64,...），以及 <code>banks</code> 数组。
+            </div>
+            <textarea id="supplierPrintProfilesJson" rows="10" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:12px;line-height:1.45;"></textarea>
+          </div>
         </div>
         <div class="modal-footer">
           <button id="sectionSettingsCancel" class="btn ghost">取消</button>
