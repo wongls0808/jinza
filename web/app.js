@@ -2397,6 +2397,10 @@ function addDays(date, days) {
   return next;
 }
 
+function normalizeSupplierCode(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
 function toInputDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -2419,6 +2423,7 @@ function adjustToNextWorkday(date) {
 function getLatestDocDateForSupplier(entityName, supplierCode) {
   const list = state.data[entityName] || [];
   let latest = null;
+  const targetCode = normalizeSupplierCode(supplierCode);
   list.forEach((item) => {
     const r = extractRecord(item);
     const code =
@@ -2426,7 +2431,7 @@ function getLatestDocDateForSupplier(entityName, supplierCode) {
       getFieldValue(r, "creditorAccNo") ||
       getFieldValue(r, "accNo") ||
       "";
-    if (String(code || "") !== String(supplierCode || "")) {
+    if (normalizeSupplierCode(code) !== targetCode) {
       return;
     }
     const rawDate =
@@ -2444,6 +2449,42 @@ function getLatestDocDateForSupplier(entityName, supplierCode) {
   return latest;
 }
 
+async function fetchLatestPoDateForSupplierFromApi(supplierCode) {
+  const code = normalizeSupplierCode(supplierCode);
+  if (!code) return null;
+  try {
+    const listing = await callWithMode({
+      method: "POST",
+      path: "/{accountBookId}/purchaseorder/listing",
+      body: {
+        page: 1,
+        filter: {
+          creditorCode: { value: code }
+        }
+      }
+    });
+    const rows = Array.isArray(listing?.data) ? listing.data : [];
+    let latest = null;
+    rows.forEach((item) => {
+      const r = extractRecord(item);
+      const d =
+        getFieldValue(r, "docDate") ||
+        getFieldValue(r, "docTime") ||
+        getFieldValue(item, "docDate") ||
+        "";
+      if (!d) return;
+      const date = new Date(d);
+      if (Number.isNaN(date.getTime())) return;
+      if (!latest || date.getTime() > latest.getTime()) {
+        latest = date;
+      }
+    });
+    return latest;
+  } catch (e) {
+    return null;
+  }
+}
+
 function randomWorkdayAfter(baseDate, minDays, maxDays) {
   const range = Math.max(0, maxDays - minDays);
   const offset = Math.floor(Math.random() * (range + 1)) + minDays;
@@ -2458,8 +2499,8 @@ function randomValidityDate(baseDate) {
 }
 
 /* PO日期 = IV日期往前推 35~40 天随机，遇周末往后推到工作日。
-   为避免单号序号与日期倒挂：不得早于该供应商已有 PO 的最新日期。 */
-function calcPoDateFromIvDate(ivDate, supplierCode) {
+   为避免单号序号与日期倒挂：不得早于该供应商已有 PO 的最新日期（或外部传入下限）。 */
+function calcPoDateFromIvDate(ivDate, supplierCode, minDate) {
   const base = new Date(ivDate);
   if (Number.isNaN(base.getTime())) return new Date();
   const offset = Math.floor(Math.random() * 6) + 35; /* 35~40 */
@@ -2468,8 +2509,15 @@ function calcPoDateFromIvDate(ivDate, supplierCode) {
   const latestExisting = supplierCode
     ? getLatestDocDateForSupplier("purchaseOrder", supplierCode)
     : null;
-  if (latestExisting && next.getTime() < latestExisting.getTime()) {
-    next = adjustToNextWorkday(latestExisting);
+  const floor = (() => {
+    const arr = [latestExisting, minDate].filter(
+      (d) => d instanceof Date && !Number.isNaN(d.getTime())
+    );
+    if (arr.length === 0) return null;
+    return arr.reduce((a, b) => (a.getTime() >= b.getTime() ? a : b));
+  })();
+  if (floor && next.getTime() < floor.getTime()) {
+    next = adjustToNextWorkday(floor);
   }
   return next;
 }
@@ -5723,10 +5771,28 @@ async function executeBatchCreatePO() {
   const creditTerm = batchPoCreditTermEl.value || "Net 30 days";
   batchPoModalEl.classList.add("hidden");
 
+  /* 批量模式：先确定供应商日期硬下限（本地+远端），避免绕过保护 */
+  const localFloor = getLatestDocDateForSupplier("purchaseOrder", selectedSupplier.code);
+  const remoteFloor = await fetchLatestPoDateForSupplierFromApi(selectedSupplier.code);
+  let supplierDateFloor = (() => {
+    const arr = [localFloor, remoteFloor].filter(
+      (d) => d instanceof Date && !Number.isNaN(d.getTime())
+    );
+    if (arr.length === 0) return null;
+    return arr.reduce((a, b) => (a.getTime() >= b.getTime() ? a : b));
+  })();
+
   /* 预计算所有 PO 日期，然后按 PO 日期排序，确保推送顺序不跳号 */
   const toCreateWithDate = pendingBatchPoList.map((entry) => {
     const ivDateRaw = getFieldValue(entry.record, "docDate") || "";
-    const poDate = calcPoDateFromIvDate(ivDateRaw, selectedSupplier.code);
+    const poDate = calcPoDateFromIvDate(
+      ivDateRaw,
+      selectedSupplier.code,
+      supplierDateFloor
+    );
+    if (!supplierDateFloor || poDate.getTime() > supplierDateFloor.getTime()) {
+      supplierDateFloor = poDate;
+    }
     const docDate = toInputDate(poDate) || new Date().toISOString().slice(0, 10);
     return { ...entry, _poDate: docDate, _ivDate: String(ivDateRaw).slice(0, 10) };
   });
