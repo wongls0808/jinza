@@ -2416,6 +2416,34 @@ function adjustToNextWorkday(date) {
   return next;
 }
 
+function getLatestDocDateForSupplier(entityName, supplierCode) {
+  const list = state.data[entityName] || [];
+  let latest = null;
+  list.forEach((item) => {
+    const r = extractRecord(item);
+    const code =
+      getFieldValue(r, "creditorCode") ||
+      getFieldValue(r, "creditorAccNo") ||
+      getFieldValue(r, "accNo") ||
+      "";
+    if (String(code || "") !== String(supplierCode || "")) {
+      return;
+    }
+    const rawDate =
+      getFieldValue(r, "docDate") ||
+      getFieldValue(r, "docTime") ||
+      getFieldValue(item, "docDate") ||
+      "";
+    if (!rawDate) return;
+    const d = new Date(rawDate);
+    if (Number.isNaN(d.getTime())) return;
+    if (!latest || d.getTime() > latest.getTime()) {
+      latest = d;
+    }
+  });
+  return latest;
+}
+
 function randomWorkdayAfter(baseDate, minDays, maxDays) {
   const range = Math.max(0, maxDays - minDays);
   const offset = Math.floor(Math.random() * (range + 1)) + minDays;
@@ -2429,13 +2457,21 @@ function randomValidityDate(baseDate) {
   return adjustToNextWorkday(candidate);
 }
 
-/* PO日期 = IV日期往前推 25~31 天随机，遇周末往后推到工作日 */
-function calcPoDateFromIvDate(ivDate) {
+/* PO日期 = IV日期往前推 35~40 天随机，遇周末往后推到工作日。
+   为避免单号序号与日期倒挂：不得早于该供应商已有 PO 的最新日期。 */
+function calcPoDateFromIvDate(ivDate, supplierCode) {
   const base = new Date(ivDate);
   if (Number.isNaN(base.getTime())) return new Date();
-  const offset = Math.floor(Math.random() * 7) + 25; /* 25~31 */
+  const offset = Math.floor(Math.random() * 6) + 35; /* 35~40 */
   const candidate = addDays(base, -offset);
-  return adjustToNextWorkday(candidate);
+  let next = adjustToNextWorkday(candidate);
+  const latestExisting = supplierCode
+    ? getLatestDocDateForSupplier("purchaseOrder", supplierCode)
+    : null;
+  if (latestExisting && next.getTime() < latestExisting.getTime()) {
+    next = adjustToNextWorkday(latestExisting);
+  }
+  return next;
 }
 
 function pickCostValue(record) {
@@ -2574,7 +2610,8 @@ async function loadLocationOptions() {
 
 async function openPoModal(record, invoiceItem) {
   const ivDateRaw = getFieldValue(record, "docDate") || "";
-  const poDate = calcPoDateFromIvDate(ivDateRaw);
+  const supplierCode = String(getSelectedSupplier()?.code || "");
+  const poDate = calcPoDateFromIvDate(ivDateRaw, supplierCode);
   const defaultDate = toInputDate(poDate);
   const supplierOptions = buildSupplierOptions();
   if (supplierOptions.length === 0) {
