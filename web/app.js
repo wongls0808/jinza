@@ -5726,7 +5726,7 @@ async function executeBatchCreatePO() {
   /* 预计算所有 PO 日期，然后按 PO 日期排序，确保推送顺序不跳号 */
   const toCreateWithDate = pendingBatchPoList.map((entry) => {
     const ivDateRaw = getFieldValue(entry.record, "docDate") || "";
-    const poDate = calcPoDateFromIvDate(ivDateRaw);
+    const poDate = calcPoDateFromIvDate(ivDateRaw, selectedSupplier.code);
     const docDate = toInputDate(poDate) || new Date().toISOString().slice(0, 10);
     return { ...entry, _poDate: docDate, _ivDate: String(ivDateRaw).slice(0, 10) };
   });
