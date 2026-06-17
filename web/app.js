@@ -5086,10 +5086,20 @@ function renderSection(entityName, items) {
     return true;
   });
 
-  /* 按 docNo 或 docDate 降序排列（最新在前） */
+  /* 默认：按 docNo 或 docDate 降序排列（最新在前）
+     purchasePI：按 docDate 降序优先（符合业务查看习惯） */
   filtered.sort((a, b) => {
     const ra = extractRecord(a);
     const rb = extractRecord(b);
+    if (entityName === "purchasePI") {
+      const da = String(getFieldValue(ra, "docDate") || "");
+      const db = String(getFieldValue(rb, "docDate") || "");
+      if (da && db && da !== db) return db.localeCompare(da);
+      const na = String(getFieldValue(ra, "docNo") || "");
+      const nb = String(getFieldValue(rb, "docNo") || "");
+      if (na && nb && na !== nb) return nb.localeCompare(na);
+      return 0;
+    }
     const na = String(getFieldValue(ra, "docNo") || "");
     const nb = String(getFieldValue(rb, "docNo") || "");
     if (na && nb) return nb.localeCompare(na);
