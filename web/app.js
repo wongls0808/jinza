@@ -391,7 +391,8 @@ const fieldMap = {
     ["code", "编码"],
     ["description", "名称"],
     ["uom", "单位"],
-    ["price", "单价"],
+    ["price", "Price"],
+    ["cost", "Cost"],
     ["itemType", "类型"]
   ],
   invoice: [
@@ -574,6 +575,8 @@ const listColumns = {
     ["productName", "Product Name"],
     ["productType", "Product Type"],
     ["unit", "Unit"],
+    ["price", "Price"],
+    ["cost", "Cost"],
     ["productCategoryName", "Product Category"],
     ["classificationCode", "Classification Code"],
     ["status", "Status"]
@@ -662,8 +665,8 @@ const columnWidthMap = {
     noSel: "100px 2fr 1.2fr 60px 120px 70px 60px 50px 120px"
   },
   product: {
-    // Code | Name | Type | Unit | Category | ClassCode | Status | 操作(2btn)
-    noSel: "120px 2fr 100px 50px 1.2fr 110px 60px 120px"
+    // Code | Name | Type | Unit | Price | Cost | Category | ClassCode | Status | 操作(2btn)
+    noSel: "120px 2fr 100px 50px 80px 80px 1.2fr 110px 60px 120px"
   },
   invoice: {
     // ☑ | DocNo | DocDate | Customer | Agent | Currency | Total | PO标识 | Status | 操作(3btn)
@@ -1406,7 +1409,24 @@ function buildTableRow(entityName, item, fields) {
     if (key === "content") {
       return formatItem(item);
     }
-    const value = getFieldValue(record, key);
+    let value = getFieldValue(record, key);
+    if (entityName === "product" && key === "price") {
+      const price =
+        Number(getFieldValue(record, "price")) ||
+        Number(getFieldValue(record, "unitPrice")) ||
+        Number(getFieldValue(record, "sellingPrice"));
+      if (Number.isFinite(price)) {
+        return formatNumberFixed(price);
+      }
+      return "-";
+    }
+    if (entityName === "product" && key === "cost") {
+      const cost = pickCostValue(record);
+      if (Number.isFinite(cost)) {
+        return formatNumberFixed(cost);
+      }
+      return "-";
+    }
     if (value === undefined || value === null || value === "") {
       return "-";
     }
