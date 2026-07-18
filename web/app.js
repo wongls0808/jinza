@@ -1625,10 +1625,103 @@ function getSectionUi(entityName) {
       search: "",
       filter: "all",
       selected: new Set(),
-      showSummary: false
+      showSummary: false,
+      sortKey: "",
+      sortDir: "desc"
     };
   }
+  if (state.ui[entityName].sortKey === undefined) {
+    state.ui[entityName].sortKey = "";
+  }
+  if (state.ui[entityName].sortDir === undefined) {
+    state.ui[entityName].sortDir = "desc";
+  }
   return state.ui[entityName];
+}
+
+function getSortFieldValue(entityName, item, key, createdLookup) {
+  const record = extractRecord(item);
+  if (key === "_createdFlag") {
+    const docNo = getFieldValue(record, "docNo") || item.docNo || "";
+    return docNo && createdLookup && createdLookup.has(String(docNo)) ? 1 : 0;
+  }
+  if (entityName === "product" && key === "price") {
+    const price =
+      Number(getFieldValue(record, "price")) ||
+      Number(getFieldValue(record, "unitPrice")) ||
+      Number(getFieldValue(record, "sellingPrice"));
+    return Number.isFinite(price) ? price : null;
+  }
+  if (entityName === "product" && key === "cost") {
+    const cost = pickCostValue(record);
+    return Number.isFinite(cost) ? cost : null;
+  }
+  return getFieldValue(record, key);
+}
+
+function compareSortValues(a, b) {
+  const emptyA = a === undefined || a === null || a === "";
+  const emptyB = b === undefined || b === null || b === "";
+  if (emptyA && emptyB) return 0;
+  if (emptyA) return 1;
+  if (emptyB) return -1;
+  const numA = typeof a === "number" ? a : Number(a);
+  const numB = typeof b === "number" ? b : Number(b);
+  if (Number.isFinite(numA) && Number.isFinite(numB)) {
+    return numA - numB;
+  }
+  const dateA = Date.parse(String(a));
+  const dateB = Date.parse(String(b));
+  const looksDateA = /^\d{4}-\d{2}-\d{2}/.test(String(a)) && Number.isFinite(dateA);
+  const looksDateB = /^\d{4}-\d{2}-\d{2}/.test(String(b)) && Number.isFinite(dateB);
+  if (looksDateA && looksDateB) {
+    return dateA - dateB;
+  }
+  return String(a).localeCompare(String(b), undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+}
+
+function sortSectionItems(entityName, items, sortKey, sortDir, createdLookup) {
+  const dir = sortDir === "asc" ? 1 : -1;
+  const list = [...items];
+  list.sort((a, b) => {
+    if (sortKey) {
+      const va = getSortFieldValue(entityName, a, sortKey, createdLookup);
+      const vb = getSortFieldValue(entityName, b, sortKey, createdLookup);
+      const cmp = compareSortValues(va, vb);
+      if (cmp !== 0) return cmp * dir;
+    } else if (entityName === "purchasePI") {
+      const ra = extractRecord(a);
+      const rb = extractRecord(b);
+      const da = String(getFieldValue(ra, "docDate") || "");
+      const db = String(getFieldValue(rb, "docDate") || "");
+      if (da && db && da !== db) return db.localeCompare(da);
+      const na = String(getFieldValue(ra, "docNo") || "");
+      const nb = String(getFieldValue(rb, "docNo") || "");
+      if (na && nb && na !== nb) return nb.localeCompare(na);
+      return 0;
+    } else {
+      const ra = extractRecord(a);
+      const rb = extractRecord(b);
+      const na = String(getFieldValue(ra, "docNo") || "");
+      const nb = String(getFieldValue(rb, "docNo") || "");
+      if (na && nb && na !== nb) return nb.localeCompare(na);
+      const da = String(getFieldValue(ra, "docDate") || "");
+      const db = String(getFieldValue(rb, "docDate") || "");
+      return db.localeCompare(da);
+    }
+    /* 次要排序：docNo / productCode 保持稳定 */
+    const ra = extractRecord(a);
+    const rb = extractRecord(b);
+    const ta =
+      String(getFieldValue(ra, "docNo") || getFieldValue(ra, "productCode") || getFieldValue(ra, "accNo") || "");
+    const tb =
+      String(getFieldValue(rb, "docNo") || getFieldValue(rb, "productCode") || getFieldValue(rb, "accNo") || "");
+    return tb.localeCompare(ta);
+  });
+  return list;
 }
 
 function getRecordKey(entityName, record, index) {
@@ -5106,33 +5199,47 @@ function renderSection(entityName, items) {
     return true;
   });
 
-  /* 默认：按 docNo 或 docDate 降序排列（最新在前）
-     purchasePI：按 docDate 降序优先（符合业务查看习惯） */
-  filtered.sort((a, b) => {
-    const ra = extractRecord(a);
-    const rb = extractRecord(b);
-    if (entityName === "purchasePI") {
-      const da = String(getFieldValue(ra, "docDate") || "");
-      const db = String(getFieldValue(rb, "docDate") || "");
-      if (da && db && da !== db) return db.localeCompare(da);
-      const na = String(getFieldValue(ra, "docNo") || "");
-      const nb = String(getFieldValue(rb, "docNo") || "");
-      if (na && nb && na !== nb) return nb.localeCompare(na);
-      return 0;
-    }
-    const na = String(getFieldValue(ra, "docNo") || "");
-    const nb = String(getFieldValue(rb, "docNo") || "");
-    if (na && nb) return nb.localeCompare(na);
-    const da = String(getFieldValue(ra, "docDate") || "");
-    const db = String(getFieldValue(rb, "docDate") || "");
-    return db.localeCompare(da);
-  });
+  /* 构建"已创建"标识 lookup（排序前计算，支持按标识列排序） */
+  let createdLookup = null;
+  if (entityName === "invoice") {
+    const poList = state.data.purchaseOrder || [];
+    createdLookup = new Set();
+    poList.forEach((po) => {
+      const r = extractRecord(po);
+      const ref = getFieldValue(r, "ref") || getFieldValue(r, "sourceDocNo") || getFieldValue(r, "refDocNo") || "";
+      if (ref) createdLookup.add(String(ref));
+    });
+  } else if (entityName === "purchaseOrder") {
+    const piList = state.data.purchasePI || [];
+    createdLookup = new Set();
+    piList.forEach((pi) => {
+      const r = extractRecord(pi);
+      const ref = getFieldValue(r, "referencePoNo") || pi.referencePoNo || (pi.master && pi.master.referencePoNo) || "";
+      if (ref) createdLookup.add(String(ref));
+    });
+  } else if (entityName === "purchasePI") {
+    const purchInvList = state.data.purchaseInvoice || [];
+    createdLookup = new Set();
+    purchInvList.forEach((inv) => {
+      const r = extractRecord(inv);
+      const sn = getFieldValue(r, "supplierInvoiceNo") || "";
+      if (sn) createdLookup.add(String(sn));
+    });
+  }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ui.pageSize));
+  const sorted = sortSectionItems(
+    entityName,
+    filtered,
+    ui.sortKey,
+    ui.sortDir,
+    createdLookup
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ui.pageSize));
   ui.page = Math.min(ui.page, totalPages);
   const startIndex = (ui.page - 1) * ui.pageSize;
-  const endIndex = Math.min(filtered.length, startIndex + ui.pageSize);
-  const pageItems = filtered.slice(startIndex, endIndex);
+  const endIndex = Math.min(sorted.length, startIndex + ui.pageSize);
+  const pageItems = sorted.slice(startIndex, endIndex);
 
   section.table.innerHTML = "";
   const columns = listColumns[entityName] || getFieldDefinitions(entityName);
@@ -5164,10 +5271,29 @@ function renderSection(entityName, items) {
     cell.appendChild(headerCheckbox);
     header.appendChild(cell);
   }
-  columns.forEach(([, label]) => {
+  columns.forEach(([key, label]) => {
     const cell = document.createElement("div");
-    cell.className = "table-cell";
-    cell.textContent = label;
+    cell.className = "table-cell sortable-header";
+    const isActive = ui.sortKey === key;
+    const arrow = isActive ? (ui.sortDir === "asc" ? " ▲" : " ▼") : "";
+    cell.textContent = `${label}${arrow}`;
+    cell.title = isActive
+      ? `按 ${label} ${ui.sortDir === "asc" ? "升序" : "降序"}（点击切换）`
+      : `点击按 ${label} 排序`;
+    if (isActive) {
+      cell.classList.add("sorted");
+    }
+    cell.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (ui.sortKey === key) {
+        ui.sortDir = ui.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        ui.sortKey = key;
+        ui.sortDir = "desc";
+      }
+      ui.page = 1;
+      renderSection(entityName, getEntityData(entityName));
+    });
     header.appendChild(cell);
   });
   const actionCell = document.createElement("div");
@@ -5175,37 +5301,6 @@ function renderSection(entityName, items) {
   actionCell.textContent = "操作";
   header.appendChild(actionCell);
   section.table.appendChild(header);
-
-  /* 构建"已创建"标识 lookup（循环外一次性计算） */
-  let createdLookup = null;
-  if (entityName === "invoice") {
-    /* 发票 → 是否已创建PO：检查 PO 列表中 ref/sourceDocNo 匹配 */
-    const poList = state.data.purchaseOrder || [];
-    createdLookup = new Set();
-    poList.forEach((po) => {
-      const r = extractRecord(po);
-      const ref = getFieldValue(r, "ref") || getFieldValue(r, "sourceDocNo") || getFieldValue(r, "refDocNo") || "";
-      if (ref) createdLookup.add(String(ref));
-    });
-  } else if (entityName === "purchaseOrder") {
-    /* PO → 是否已创建PI：检查 PI 列表中 referencePoNo 匹配 */
-    const piList = state.data.purchasePI || [];
-    createdLookup = new Set();
-    piList.forEach((pi) => {
-      const r = extractRecord(pi);
-      const ref = getFieldValue(r, "referencePoNo") || pi.referencePoNo || (pi.master && pi.master.referencePoNo) || "";
-      if (ref) createdLookup.add(String(ref));
-    });
-  } else if (entityName === "purchasePI") {
-    /* PI → 是否已创建采购发票：检查采购发票列表中 supplierInvoiceNo 匹配 PI docNo */
-    const purchInvList = state.data.purchaseInvoice || [];
-    createdLookup = new Set();
-    purchInvList.forEach((inv) => {
-      const r = extractRecord(inv);
-      const sn = getFieldValue(r, "supplierInvoiceNo") || "";
-      if (sn) createdLookup.add(String(sn));
-    });
-  }
 
   pageItems.forEach((item, index) => {
     const record = extractRecord(item);
@@ -5245,7 +5340,7 @@ function renderSection(entityName, items) {
       cell.appendChild(checkbox);
       row.appendChild(cell);
     }
-    const numericColumns = new Set(["totalExTax", "tax", "total", "netTotal", "localTax", "localExTax", "localNetTotal", "taxableAmt", "localTaxableAmt", "roundAdj", "finalTotal", "currencyRate", "piTotal", "ivTotal"]);
+    const numericColumns = new Set(["totalExTax", "tax", "total", "netTotal", "localTax", "localExTax", "localNetTotal", "taxableAmt", "localTaxableAmt", "roundAdj", "finalTotal", "currencyRate", "piTotal", "ivTotal", "price", "cost"]);
     /* PI 列表中可双击关联IV的字段 */
     const linkIvFields = new Set(["referenceIvNo", "ivCustomerName", "ivTotal"]);
     columns.forEach(([key]) => {
@@ -5264,6 +5359,12 @@ function renderSection(entityName, items) {
           cell.textContent = "-";
           cell.style.color = "#666";
         }
+        row.appendChild(cell);
+        return;
+      }
+      if (entityName === "product" && (key === "price" || key === "cost")) {
+        const sortedVal = getSortFieldValue(entityName, item, key, createdLookup);
+        cell.textContent = Number.isFinite(sortedVal) ? formatNumberFixed(sortedVal) : "-";
         row.appendChild(cell);
         return;
       }
@@ -5421,11 +5522,11 @@ function renderSection(entityName, items) {
   }
 
   if (section.pageInfo) {
-    if (filtered.length === 0) {
+    if (sorted.length === 0) {
       section.pageInfo.textContent = "暂无数据";
     } else {
       section.pageInfo.textContent = `显示 ${startIndex + 1}-${endIndex} / ${
-        filtered.length
+        sorted.length
       }`;
     }
   }

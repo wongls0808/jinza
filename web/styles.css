@@ -403,6 +403,19 @@ body {
   font-weight: 600;
 }
 
+.table-cell.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table-cell.sortable-header:hover {
+  text-decoration: underline;
+}
+
+.table-cell.sortable-header.sorted {
+  color: #fff7cc;
+}
+
 .table-cell {
   min-width: 0;
   overflow: hidden;
