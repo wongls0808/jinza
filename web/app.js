@@ -4409,6 +4409,16 @@ async function printPurchasePi(pi) {
   printWindow.document.write(buildPiPrintHtml(pi, stampSrc, baseHref, profile));
   printWindow.document.close();
   printWindow.focus();
+  /* 以 PI 单号命名：另存为 PDF 时浏览器默认文件名取 document.title */
+  const rawNo =
+    (pi && pi.master && pi.master.docNo) ||
+    (pi && pi.docNo) ||
+    (record && (record.docNo || pi.docNo)) ||
+    "";
+  const safeName = String(rawNo || "PI-print")
+    .replace(/[\\/:*?"<>|\s]+/g, "_")
+    .slice(0, 80);
+  printWindow.document.title = safeName;
   setTimeout(() => {
     try {
       printWindow.print();
