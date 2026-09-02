@@ -271,3 +271,15 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--brand); 
 .modal-field input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--brand); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
 .modal-panel-lg { width: min(760px, 94vw); }
+
+/* 供应商邮件关联列表 */
+.mail-rule-row {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+.mail-rule-row select, .mail-rule-row input {
+  min-width: 0;
+}
+.mail-rule-row .btn { white-space: nowrap; }

@@ -7061,11 +7061,12 @@ function collectMailSupplierRules() {
   if (!box) return [];
   const rules = [];
   box.querySelectorAll(".mail-rule-row").forEach((row) => {
-    const code = row.getAttribute("data-code") || "";
-    const name = row.getAttribute("data-name") || "";
+    const sel = row.querySelector(".mail-rule-select");
+    const code = sel && !sel.disabled ? (sel.value || "") : "";
+    const name = (sel && sel.selectedOptions[0]) ? sel.selectedOptions[0].textContent : "";
     const to = (row.querySelector(".mail-rule-to") || {}).value || "";
     const reply = (row.querySelector(".mail-rule-reply") || {}).value || "";
-    if (code) rules.push({ supplierCode: code, supplierName: name, to: to.trim(), replyTo: reply.trim() });
+    if (code) rules.push({ supplierCode: code, supplierName: String(name || ""), to: to.trim(), replyTo: reply.trim() });
   });
   return rules;
 }
@@ -7144,9 +7145,12 @@ function renderMailSupplierRules(rules) {
 
 async function saveMailSettings() {
   try {
-    await mailApi("/api/mail/config", { method: "POST", body: { config: collectMailSettingsForm() } });
+    const form = collectMailSettingsForm();
+    await mailApi("/api/mail/config", { method: "POST", body: { config: form } });
     appendLog("邮件设置已保存。");
-    alert("邮件设置已保存 ✓");
+    /* 保存后立即把供应商关联渲染为列表，便于查看/再次编辑 */
+    renderMailSupplierRules(form.supplierRules || []);
+    alert("邮件设置已保存 ✓（供应商关联 " + (form.supplierRules || []).length + " 条）");
   } catch (e) {
     appendLog("保存邮件设置失败: " + e.message);
     alert("保存失败: " + e.message);
