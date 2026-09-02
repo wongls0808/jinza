@@ -7088,61 +7088,67 @@ function renderMailRuleList() {
   const list = $("mailRuleList");
   if (!list) return;
   const rules = getMailRules();
-  if (rules.length === 0) {
-    /* 未配置时也先显示"供应商候选列表"，便于逐户添加 */
-    const listSup = state.data.supplier || [];
-    const seen2 = {};
-    const cand = [];
-    listSup.forEach((it) => {
-      const rec = extractRecord(it);
-      const code = rec.accNo || rec.AccNo || "";
-      const name = rec.companyName || rec.CompanyName || "";
-      if (!code || seen2[code]) return;
-      seen2[code] = true;
-      cand.push({ code: code, name: name });
-    });
-    if (cand.length === 0) {
-      list.innerHTML = '<div style="font-size:12.5px;color:#94a3b8;padding:8px 4px;">暂无供应商数据（请先同步供应商）。</div>';
-      return;
-    }
-    list.innerHTML =
-      '<div style="font-size:12.5px;color:#94a3b8;padding:4px 2px 6px;">已同步供应商（点击“配置”为该供应商建立邮件关联）：</div>' +
+  const supList = state.data.supplier || [];
+  if (rules.length === 0 && supList.length === 0) {
+    list.innerHTML = '<div style="font-size:12.5px;color:#94a3b8;padding:8px 4px;">暂无供应商数据（请先同步供应商）。</div>';
+    return;
+  }
+  const used = {};
+  (rules || []).forEach((r) => { if (r.supplierCode) used[r.supplierCode] = 1; });
+  const rowHtml = (r, i) =>
+    '<div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px;">' +
+    '<strong style="min-width:80px;color:#166534;">' + escapeHtml(r.supplierCode || "") + '</strong>' +
+    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(r.supplierName || "") + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">To: ' + (r.to ? escapeHtml(r.to) : "默认") + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">Reply: ' + (r.replyTo ? escapeHtml(r.replyTo) : "PI邮箱") + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">From: ' + (r.fromName ? escapeHtml(r.fromName) : "默认") + '</span>' +
+    '<button type="button" class="btn ghost" style="padding:4px 8px;" onclick="openMailRuleEditor(' + i + ')">编辑</button>' +
+    '<button type="button" class="btn ghost" style="padding:4px 8px;color:#dc2626;" onclick="removeMailRuleAt(' + i + ')">删除</button>' +
+    '</div>';
+  let html = '';
+  if (rules.length) {
+    html += '<div style="font-size:12px;color:#64748b;padding:2px 2px 4px;">已配置关联（发送时按 PI 供应商匹配）：</div>' +
+      rules.map(rowHtml).join("") + '<div style="height:6px;"></div>';
+  }
+  const seen = {};
+  const cand = [];
+  supList.forEach((it) => {
+    const rec = extractRecord(it);
+    const code = rec.accNo || rec.AccNo || "";
+    const name = rec.companyName || rec.CompanyName || "";
+    if (!code || seen[code]) return;
+    seen[code] = 1;
+    if (!used[code]) cand.push({ code: code, name: name });
+  });
+  if (cand.length) {
+    html += '<div style="font-size:12px;color:#64748b;padding:2px 2px 4px;">未配置供应商（可点“配置”建立关联）：</div>' +
       cand.map((c) =>
-        '<div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px dashed #d5dde8;border-radius:10px;padding:6px 10px;">' +
-        '<strong style="min-width:88px;">' + escapeHtml(c.code) + '</strong>' +
+        '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px dashed #d5dde8;border-radius:10px;padding:6px 10px;">' +
+        '<strong style="min-width:80px;">' + escapeHtml(c.code) + '</strong>' +
         '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(c.name) + '</span>' +
-        '<span style="font-size:12px;color:#94a3b8;">未配置</span>' +
         '<button type="button" class="btn ghost" style="padding:4px 10px;" data-code="' + escapeHtml(c.code) + '" onclick="openMailRuleEditorForFromButton(this)">配置</button>' +
         '</div>'
       ).join("");
-    return;
   }
-  list.innerHTML = rules.map((r, i) =>
-    '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">' +
-    '<strong style="min-width:88px;color:#166534;">' + escapeHtml(r.supplierCode || "") + '</strong>' +
-    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(r.supplierName || "") + '</span>' +
-    '<span style="font-size:12px;color:#64748b;white-space:nowrap;">To: ' + (r.to ? escapeHtml(r.to) : "默认") + '</span>' +
-    '<span style="font-size:12px;color:#64748b;white-space:nowrap;">Reply: ' + (r.replyTo ? escapeHtml(r.replyTo) : "PI邮箱") + '</span>' +
-    '<button type="button" class="btn ghost" style="padding:4px 10px;" onclick="openMailRuleEditor(' + i + ')">编辑</button>' +
-    '<button type="button" class="btn ghost" style="padding:4px 10px;color:#dc2626;" onclick="removeMailRuleAt(' + i + ')">删除</button>' +
-    '</div>'
-  ).join("");
+  list.innerHTML = html;
 }
 
 function openMailRuleEditorForFromButton(btn) {
   if (!btn) return;
-  const code = btn.getAttribute("data-code") || "";
-  openMailRuleEditorFor(code);
+  openMailRuleEditorFor(btn.getAttribute("data-code") || "");
 }
+
 function openMailRuleEditorFor(code) {
   window.mailRulePrefillCode = code || "";
   openMailRuleEditor();
 }
+
 function openMailRuleEditor(idx) {
   const ed = $("mailRuleEditor");
   const edSel = $("mailRuleEditorSelect");
   const edTo = $("mailRuleEditorTo");
   const edReply = $("mailRuleEditorReply");
+  const edFrom = $("mailRuleEditorFrom");
   if (!ed || !edSel) return;
   window.mailRuleEditIndex = (idx === undefined || idx === null) ? -1 : idx;
   const rules = getMailRules();
@@ -7160,6 +7166,7 @@ function openMailRuleEditor(idx) {
   }
   edTo.value = cur ? (cur.to || "") : "";
   edReply.value = cur ? (cur.replyTo || "") : "";
+  edFrom.value = cur ? (cur.fromName || "") : "";
   ed.style.display = "grid";
   ed.scrollIntoView({ block: "nearest" });
 }
@@ -7173,12 +7180,13 @@ function saveMailRuleFromEditor() {
   const edSel = $("mailRuleEditorSelect");
   const edTo = $("mailRuleEditorTo");
   const edReply = $("mailRuleEditorReply");
+  const edFrom = $("mailRuleEditorFrom");
   if (!edSel) return;
   const code = edSel.value || "";
   if (!code) { alert("请选择供应商"); return; }
   const name = edSel.selectedOptions[0] ? edSel.selectedOptions[0].textContent : "";
   const rules = getMailRules();
-  const rec = { supplierCode: code, supplierName: String(name || ""), to: (edTo ? edTo.value : "").trim(), replyTo: (edReply ? edReply.value : "").trim() };
+  const rec = { supplierCode: code, supplierName: String(name || ""), to: (edTo ? edTo.value : "").trim(), replyTo: (edReply ? edReply.value : "").trim(), fromName: (edFrom ? edFrom.value : "").trim() };
   if (window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex]) {
     rules[window.mailRuleEditIndex] = rec;
   } else {
