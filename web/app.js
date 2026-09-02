@@ -7288,11 +7288,32 @@ async function sendPiMail(list) {
   const items = Array.isArray(list) ? list : [];
   if (items.length === 0) return;
   if (!confirm(`确认发送 ${items.length} 封 PI 邮件？\n每封按各自供应商抬头发送，附件按设置中的 PDF 版式生成。`)) return;
-  let attachStyle = "server";
+  let cfg = null;
   try {
-    const cfgR = await mailApi("/api/mail/config");
-    attachStyle = (cfgR.config && cfgR.config.attachStyle) || "server";
-  } catch (e) { /* 忽略，用默认 */ }
+    cfg = (await mailApi("/api/mail/config")).config || null;
+  } catch (e) { alert("读取邮件设置失败: " + e.message); return; }
+  const attachStyle = (cfg && cfg.attachStyle) || "browser";
+  /* 发送前逐封校验：发件账号/授权码/收件人是否齐备 */
+  const problems = [];
+  items.forEach((pi) => {
+    const rec = (pi && pi.master) || pi || {};
+    const code = rec.creditorCode || "";
+    const docNo = (pi && (pi.docNo || rec.docNo)) || "PI";
+    const rules = Array.isArray(cfg && cfg.supplierRules) ? cfg.supplierRules : [];
+    const rule = rules.find((x) => x && String(x.supplierCode) === String(code));
+    const own = rule && rule.smtp && rule.smtp.host && rule.smtp.user && rule.smtp.pass ? rule.smtp : null;
+    const s = own || (cfg && cfg.smtp) || {};
+    const g = [];
+    if (!s.host || !s.user) g.push("未配置发件账号(SMTP)");
+    else if (!s.pass) g.push(own ? "该供应商独立账号缺少授权码" : "全局发件账号缺少授权码（请在邮件设置填写并保存）");
+    const to = ((rule && rule.to) || (cfg && cfg.to) || "").trim();
+    if (!to) g.push("缺少收件人(To)");
+    if (g.length) problems.push(docNo + "[" + (code || "无供应商代码") + "] " + g.join("；"));
+  });
+  if (problems.length) {
+    alert("发送前校验未通过，请先修复：\n\n" + problems.join("\n"));
+    return;
+  }
   const pdfs = {};
   let anyPdf = false;
   if (attachStyle === "server") {
