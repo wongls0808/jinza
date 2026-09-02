@@ -40,7 +40,7 @@
           </div>
           <div class="menu-group">
             <div class="menu-title">系统</div>
-            <button class="menu-btn" id="mailSettingsBtn" onclick="openMailSettingsModal()">邮件发送设置</button>
+            <button class="menu-btn" id="mailSettingsBtn" onclick="try{openMailSettingsModal()}catch(e){alert('脚本未加载或版本过旧，请按 Ctrl+Shift+R 强制刷新后重试。\n\n'+e.message)}">邮件发送设置</button>
           </div>
         </nav>
       </aside>
@@ -894,8 +894,8 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/malaysia-postcodes@2.7.3/dist/malaysia-postcodes.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/malaysia-postcodes@2.7.3/dist/malaysia-postcodes.min.js"></script>
     <script src="./stamp-data.js"></script>
     <script src="./app.js"></script>
   </body>
