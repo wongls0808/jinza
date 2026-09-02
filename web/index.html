@@ -488,6 +488,11 @@
           <textarea id="mailBodyTemplate" rows="8" spellcheck="false"></textarea>
           <div style="font-size:11.5px;color:#94a3b8;margin-top:4px;line-height:1.5;">可用占位符: {docNo} {creditorName} {creditorCode} {attention} {docDate} {currencyCode} {piTotal} {validityDate} {referencePoNo} {sourcePONo} {ivCustomerName}</div>
         </div>
+        <div class="modal-field">
+          <label>按供应商关联（可选）——发送时该供应商优先使用此处的收件/回复设置；留空则用上方默认收件人 + PI 供应商邮箱</label>
+          <div id="mailSupplierRules" style="display:grid;gap:8px;"></div>
+          <button type="button" class="btn ghost" onclick="addMailRuleRow()">＋ 添加供应商关联</button>
+        </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
           <button id="mailTestBtn" class="btn ghost" onclick="testMailSettings()">发送测试邮件</button>
           <button id="mailSaveBtn" class="btn primary" onclick="saveMailSettings()">保存设置</button>

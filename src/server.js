@@ -322,6 +322,10 @@ async function handleApi(req, res) {
           const profile = (ac && ac.supplierPrintProfiles && ac.supplierPrintProfiles[code]) || null;
           const credName = rec.creditorName || "";
           const email = String(rec.email || "").split(/[,;，；\s]+/)[0].trim() || "";
+          /* 按供应商关联规则：优先使用该供应商的收件/回复/发件名 */
+          const rule = (Array.isArray(cfg.supplierRules) ? cfg.supplierRules : []).find((x) => x && String(x.supplierCode) === String(code));
+          const ruleTo = (rule && rule.to) || "";
+          const ruleReply = (rule && rule.replyTo) || "";
           const piTotal = pi.piTotal ?? pi.total ?? rec.piTotal ?? rec.total;
           const vars = {
             docNo,
@@ -340,10 +344,11 @@ async function handleApi(req, res) {
           const subject = "PI " + docNo + (credName ? " - " + credName : "");
           const pdf = await piPdf.renderPiPdf(pi, profile);
           const info = await mail.sendMail({
+            to: ruleTo || undefined,
             subject,
             text,
-            replyTo: email || undefined,
-            fromName: cfg.smtp && cfg.smtp.fromName,
+            replyTo: ruleReply || email || undefined,
+            fromName: (rule && rule.fromName) || (cfg.smtp && cfg.smtp.fromName),
             attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdf.toString("base64") }]
           });
           okCount++;

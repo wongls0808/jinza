@@ -7003,6 +7003,7 @@ async function populateMailSettings() {
     set("mailReplyMode", c.replyMode || "pi");
     set("mailReplyToFixed", c.replyToFixed || "");
     set("mailBodyTemplate", c.bodyTemplate || "");
+    renderMailSupplierRules(c.supplierRules || []);
     const sec = $("mailSecure"); if (sec) sec.checked = !!(s.secure || Number(s.port) === 465);
     const pass = $("mailPass"); if (pass) pass.value = "";
   } catch (e) {
@@ -7049,16 +7050,106 @@ function collectMailSettingsForm() {
     bcc: v("mailBcc"),
     replyMode: v("mailReplyMode") || "pi",
     replyToFixed: v("mailReplyToFixed"),
-    bodyTemplate: v("mailBodyTemplate")
+    bodyTemplate: v("mailBodyTemplate"),
+    supplierRules: collectMailSupplierRules()
   };
+}
+
+/* 收集"按供应商关联"行 */
+function collectMailSupplierRules() {
+  const box = $("mailSupplierRules");
+  if (!box) return [];
+  const rules = [];
+  box.querySelectorAll(".mail-rule-row").forEach((row) => {
+    const code = row.getAttribute("data-code") || "";
+    const name = row.getAttribute("data-name") || "";
+    const to = (row.querySelector(".mail-rule-to") || {}).value || "";
+    const reply = (row.querySelector(".mail-rule-reply") || {}).value || "";
+    if (code) rules.push({ supplierCode: code, supplierName: name, to: to.trim(), replyTo: reply.trim() });
+  });
+  return rules;
+}
+
+/* 供应商选项(来自已同步的供应商数据) */
+function buildMailSupplierOptions(selectedCode) {
+  const list = state.data.supplier || [];
+  const seen = {};
+  let html = '<option value="">选择供应商...</option>';
+  list.forEach((it) => {
+    const rec = extractRecord(it);
+    const code = rec.accNo || rec.AccNo || "";
+    const name = rec.companyName || rec.CompanyName || "";
+    if (!code || seen[code]) return;
+    seen[code] = true;
+    const sel = String(code) === String(selectedCode) ? " selected" : "";
+    html += '<option value="' + escapeHtml(code) + '"' + sel + ">" + escapeHtml(code) + (name ? " - " + escapeHtml(name) : "") + "</option>";
+  });
+  return html;
+}
+
+/* 新增一行供应商关联(供 HTML 按钮调用) */
+function addMailRuleRow() {
+  const box = $("mailSupplierRules");
+  if (!box) return;
+  const row = document.createElement("div");
+  row.className = "mail-rule-row";
+  row.style.cssText = "display:grid;grid-template-columns:1.2fr 1fr 1fr 56px;gap:8px;align-items:center;";
+  const noOptions = (state.data.supplier || []).length === 0;
+  row.innerHTML =
+    '<select class="mail-rule-select" style="width:100%;" onchange="syncMailRuleMeta(this)">' + buildMailSupplierOptions("") + "</select>" +
+    '<input class="mail-rule-to" placeholder="收件邮箱(留空用默认收件人)" />' +
+    '<input class="mail-rule-reply" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />' +
+    '<button type="button" class="btn ghost" style="padding:6px 8px;" onclick="removeMailRuleRow(this)" title="删除">✕</button>';
+  if (noOptions) {
+    const opt = row.querySelector("select");
+    opt.innerHTML = '<option value="">（请先同步供应商数据）</option>';
+    opt.disabled = true;
+  }
+  box.appendChild(row);
+}
+
+function syncMailRuleMeta(sel) {
+  const row = sel.closest(".mail-rule-row");
+  if (!row) return;
+  const code = sel.value || "";
+  row.setAttribute("data-code", code);
+  const opt = sel.selectedOptions[0];
+  row.setAttribute("data-name", opt ? opt.textContent : "");
+}
+
+function removeMailRuleRow(btn) {
+  const row = btn.closest(".mail-rule-row");
+  if (row) row.remove();
+}
+
+/* 按已有配置渲染规则列表 */
+function renderMailSupplierRules(rules) {
+  const box = $("mailSupplierRules");
+  if (!box) return;
+  box.innerHTML = "";
+  (Array.isArray(rules) ? rules : []).forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "mail-rule-row";
+    row.style.cssText = "display:grid;grid-template-columns:1.2fr 1fr 1fr 56px;gap:8px;align-items:center;";
+    row.setAttribute("data-code", r.supplierCode || "");
+    row.setAttribute("data-name", r.supplierName || "");
+    row.innerHTML =
+      '<select class="mail-rule-select" style="width:100%;" onchange="syncMailRuleMeta(this)">' + buildMailSupplierOptions(r.supplierCode) + "</select>" +
+      '<input class="mail-rule-to" value="' + escapeHtml(r.to || "") + '" placeholder="收件邮箱(留空用默认收件人)" />' +
+      '<input class="mail-rule-reply" value="' + escapeHtml(r.replyTo || "") + '" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />' +
+      '<button type="button" class="btn ghost" style="padding:6px 8px;" onclick="removeMailRuleRow(this)" title="删除">✕</button>';
+    box.appendChild(row);
+  });
 }
 
 async function saveMailSettings() {
   try {
     await mailApi("/api/mail/config", { method: "POST", body: { config: collectMailSettingsForm() } });
     appendLog("邮件设置已保存。");
+    alert("邮件设置已保存 ✓");
   } catch (e) {
     appendLog("保存邮件设置失败: " + e.message);
+    alert("保存失败: " + e.message);
   }
 }
 

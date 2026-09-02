@@ -56,7 +56,9 @@ async function getMailConfig() {
     replyMode: "pi",
     replyToFixed: "",
     bodyTemplate: DEFAULT_TEMPLATE,
+    supplierRules: [],
     ...cfg,
+    supplierRules: Array.isArray(cfg.supplierRules) ? cfg.supplierRules : [],
     smtp: { preset: "", host: "", port: 587, secure: false, user: "", pass: "", fromName: "AutoCount PI", ...(cfg.smtp || {}) }
   };
 }
@@ -70,7 +72,8 @@ async function saveMailConfig(cfg) {
     bcc: cfg && typeof cfg.bcc === "string" ? cfg.bcc : existing.bcc,
     replyMode: cfg && cfg.replyMode ? cfg.replyMode : existing.replyMode,
     replyToFixed: cfg && typeof cfg.replyToFixed === "string" ? cfg.replyToFixed : existing.replyToFixed,
-    bodyTemplate: cfg && typeof cfg.bodyTemplate === "string" ? cfg.bodyTemplate : existing.bodyTemplate
+    bodyTemplate: cfg && typeof cfg.bodyTemplate === "string" ? cfg.bodyTemplate : existing.bodyTemplate,
+    supplierRules: cfg && Array.isArray(cfg.supplierRules) ? cfg.supplierRules : existing.supplierRules
   };
   /* 密码为空串表示“保持不变” */
   if (merged.smtp.pass === "") merged.smtp.pass = existing.smtp.pass || "";
