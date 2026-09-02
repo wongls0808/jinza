@@ -490,8 +490,19 @@
         </div>
         <div class="modal-field">
           <label>按供应商关联（可选）——发送时该供应商优先使用此处的收件/回复设置；留空则用上方默认收件人 + PI 供应商邮箱</label>
-          <div id="mailSupplierRules" style="display:grid;gap:8px;"></div>
-          <button type="button" class="btn ghost" onclick="addMailRuleRow()">＋ 添加供应商关联</button>
+          <div id="mailRuleList" style="display:grid;gap:8px;margin-bottom:8px;"></div>
+          <div id="mailRuleEditor" style="display:none;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:10px;margin-bottom:8px;">
+            <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;width:100%;">
+              <select id="mailRuleEditorSelect" style="width:100%;"></select>
+              <input id="mailRuleEditorTo" placeholder="收件邮箱(留空用默认收件人)" />
+              <input id="mailRuleEditorReply" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button type="button" class="btn primary" onclick="saveMailRuleFromEditor()">保存此条</button>
+              <button type="button" class="btn ghost" onclick="closeMailRuleEditor()">取消</button>
+            </div>
+          </div>
+          <button type="button" class="btn ghost" onclick="openMailRuleEditor()">＋ 添加供应商关联</button>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
           <button id="mailTestBtn" class="btn ghost" onclick="testMailSettings()">发送测试邮件</button>

@@ -7003,7 +7003,8 @@ async function populateMailSettings() {
     set("mailReplyMode", c.replyMode || "pi");
     set("mailReplyToFixed", c.replyToFixed || "");
     set("mailBodyTemplate", c.bodyTemplate || "");
-    renderMailSupplierRules(c.supplierRules || []);
+    window.mailRulesTmp = Array.isArray(c.supplierRules) ? c.supplierRules.map((x) => ({ ...x })) : [];
+    renderMailRuleList();
     const sec = $("mailSecure"); if (sec) sec.checked = !!(s.secure || Number(s.port) === 465);
     const pass = $("mailPass"); if (pass) pass.value = "";
   } catch (e) {
@@ -7055,20 +7056,13 @@ function collectMailSettingsForm() {
   };
 }
 
-/* 收集"按供应商关联"行 */
+/* 供应商关联：进入=列表，新增/编辑=窗口 */
+function getMailRules() {
+  if (!window.mailRulesTmp || !Array.isArray(window.mailRulesTmp)) window.mailRulesTmp = [];
+  return window.mailRulesTmp;
+}
 function collectMailSupplierRules() {
-  const box = $("mailSupplierRules");
-  if (!box) return [];
-  const rules = [];
-  box.querySelectorAll(".mail-rule-row").forEach((row) => {
-    const sel = row.querySelector(".mail-rule-select");
-    const code = sel && !sel.disabled ? (sel.value || "") : "";
-    const name = (sel && sel.selectedOptions[0]) ? sel.selectedOptions[0].textContent : "";
-    const to = (row.querySelector(".mail-rule-to") || {}).value || "";
-    const reply = (row.querySelector(".mail-rule-reply") || {}).value || "";
-    if (code) rules.push({ supplierCode: code, supplierName: String(name || ""), to: to.trim(), replyTo: reply.trim() });
-  });
-  return rules;
+  return getMailRules();
 }
 
 /* 供应商选项(来自已同步的供应商数据) */
@@ -7088,137 +7082,82 @@ function buildMailSupplierOptions(selectedCode) {
   return html;
 }
 
-/* 新增一行供应商关联(供 HTML 按钮调用) */
-function addMailRuleRow() {
-  const box = $("mailSupplierRules");
-  if (!box) return;
-  const row = document.createElement("div");
-  row.className = "mail-rule-row";
-  row.style.cssText = "display:grid;grid-template-columns:1.2fr 1fr 1fr 56px;gap:8px;align-items:center;";
-  const noOptions = (state.data.supplier || []).length === 0;
-  row.innerHTML =
-    '<select class="mail-rule-select" style="width:100%;" onchange="syncMailRuleMeta(this)">' + buildMailSupplierOptions("") + "</select>" +
-    '<input class="mail-rule-to" placeholder="收件邮箱(留空用默认收件人)" />' +
-    '<input class="mail-rule-reply" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />' +
-    '<button type="button" class="btn ghost" style="padding:6px 8px;" onclick="removeMailRuleRow(this)" title="删除">✕</button>';
-  if (noOptions) {
-    const opt = row.querySelector("select");
-    opt.innerHTML = '<option value="">（请先同步供应商数据）</option>';
-    opt.disabled = true;
+function renderMailRuleList() {
+  const list = $("mailRuleList");
+  if (!list) return;
+  const rules = getMailRules();
+  if (rules.length === 0) {
+    list.innerHTML = '<div style="font-size:12.5px;color:#94a3b8;padding:8px 4px;">暂无供应商关联 —— 点击下方“＋ 添加供应商关联”建立（保存后此处以列表显示，可随时编辑/删除）</div>';
+    return;
   }
-  box.appendChild(row);
+  list.innerHTML = rules.map((r, i) =>
+    '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">' +
+    '<strong style="min-width:88px;color:#166534;">' + escapeHtml(r.supplierCode || "") + '</strong>' +
+    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(r.supplierName || "") + '</span>' +
+    '<span style="font-size:12px;color:#64748b;white-space:nowrap;">To: ' + (r.to ? escapeHtml(r.to) : "默认") + '</span>' +
+    '<span style="font-size:12px;color:#64748b;white-space:nowrap;">Reply: ' + (r.replyTo ? escapeHtml(r.replyTo) : "PI邮箱") + '</span>' +
+    '<button type="button" class="btn ghost" style="padding:4px 10px;" onclick="openMailRuleEditor(' + i + ')">编辑</button>' +
+    '<button type="button" class="btn ghost" style="padding:4px 10px;color:#dc2626;" onclick="removeMailRuleAt(' + i + ')">删除</button>' +
+    '</div>'
+  ).join("");
 }
 
-function syncMailRuleMeta(sel) {
-  const row = sel.closest(".mail-rule-row");
-  if (!row) return;
-  const code = sel.value || "";
-  row.setAttribute("data-code", code);
-  const opt = sel.selectedOptions[0];
-  row.setAttribute("data-name", opt ? opt.textContent : "");
-}
-
-function removeMailRuleRow(btn) {
-  const row = btn.closest(".mail-rule-row");
-  if (row) row.remove();
-}
-
-/* 按已有配置渲染规则列表 */
-function renderMailSupplierRules(rules) {
-  const box = $("mailSupplierRules");
-  if (!box) return;
-  box.innerHTML = "";
-  (Array.isArray(rules) ? rules : []).forEach((r) => {
-    const row = document.createElement("div");
-    row.className = "mail-rule-row";
-    row.style.cssText = "display:grid;grid-template-columns:1.2fr 1fr 1fr 56px;gap:8px;align-items:center;";
-    row.setAttribute("data-code", r.supplierCode || "");
-    row.setAttribute("data-name", r.supplierName || "");
-    row.innerHTML =
-      '<select class="mail-rule-select" style="width:100%;" onchange="syncMailRuleMeta(this)">' + buildMailSupplierOptions(r.supplierCode) + "</select>" +
-      '<input class="mail-rule-to" value="' + escapeHtml(r.to || "") + '" placeholder="收件邮箱(留空用默认收件人)" />' +
-      '<input class="mail-rule-reply" value="' + escapeHtml(r.replyTo || "") + '" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />' +
-      '<button type="button" class="btn ghost" style="padding:6px 8px;" onclick="removeMailRuleRow(this)" title="删除">✕</button>';
-    box.appendChild(row);
-  });
-}
-
-async function saveMailSettings() {
-  try {
-    const form = collectMailSettingsForm();
-    await mailApi("/api/mail/config", { method: "POST", body: { config: form } });
-    appendLog("邮件设置已保存。");
-    /* 保存后立即把供应商关联渲染为列表，便于查看/再次编辑 */
-    renderMailSupplierRules(form.supplierRules || []);
-    alert("邮件设置已保存 ✓（供应商关联 " + (form.supplierRules || []).length + " 条）");
-  } catch (e) {
-    appendLog("保存邮件设置失败: " + e.message);
-    alert("保存失败: " + e.message);
+function openMailRuleEditor(idx) {
+  const ed = $("mailRuleEditor");
+  const edSel = $("mailRuleEditorSelect");
+  const edTo = $("mailRuleEditorTo");
+  const edReply = $("mailRuleEditorReply");
+  if (!ed || !edSel) return;
+  window.mailRuleEditIndex = (idx === undefined || idx === null) ? -1 : idx;
+  const rules = getMailRules();
+  const cur = window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex] ? rules[window.mailRuleEditIndex] : null;
+  edSel.innerHTML = buildMailSupplierOptions(cur ? cur.supplierCode : "");
+  edSel.disabled = false;
+  if ((state.data.supplier || []).length === 0) {
+    edSel.innerHTML = '<option value="">（请先同步供应商数据）</option>';
+    edSel.disabled = true;
   }
+  edTo.value = cur ? (cur.to || "") : "";
+  edReply.value = cur ? (cur.replyTo || "") : "";
+  ed.style.display = "grid";
+  ed.scrollIntoView({ block: "nearest" });
 }
 
-async function testMailSettings() {
-  try {
-    const config = collectMailSettingsForm();
-    if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
-      appendLog("测试前请填写 SMTP 服务器 / 账号 / 授权码");
-      return;
-    }
-    appendLog("正在发送测试邮件...");
-    const r = await mailApi("/api/mail/test", { method: "POST", body: { config } });
-    appendLog("测试邮件已发送: " + (r.info && r.info.messageId ? r.info.messageId : "成功"));
-  } catch (e) {
-    appendLog("测试邮件发送失败: " + e.message);
+function closeMailRuleEditor() {
+  const ed = $("mailRuleEditor");
+  if (ed) ed.style.display = "none";
+}
+
+function saveMailRuleFromEditor() {
+  const edSel = $("mailRuleEditorSelect");
+  const edTo = $("mailRuleEditorTo");
+  const edReply = $("mailRuleEditorReply");
+  if (!edSel) return;
+  const code = edSel.value || "";
+  if (!code) { alert("请选择供应商"); return; }
+  const name = edSel.selectedOptions[0] ? edSel.selectedOptions[0].textContent : "";
+  const rules = getMailRules();
+  const rec = { supplierCode: code, supplierName: String(name || ""), to: (edTo ? edTo.value : "").trim(), replyTo: (edReply ? edReply.value : "").trim() };
+  if (window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex]) {
+    rules[window.mailRuleEditIndex] = rec;
+  } else {
+    rules.push(rec);
+  }
+  closeMailRuleEditor();
+  renderMailRuleList();
+  appendLog("供应商关联已更新（共 " + rules.length + " 条），请点下方“保存设置”写入系统");
+}
+
+function removeMailRuleAt(i) {
+  const rules = getMailRules();
+  if (i >= 0 && i < rules.length) {
+    rules.splice(i, 1);
+    renderMailRuleList();
+    appendLog("供应商关联已删除（剩余 " + rules.length + " 条），请点下方“保存设置”写入系统");
   }
 }
 
-/* ── 用"打印 PI"同款排版生成 PDF 附件(base64) ── */
-async function renderPrintHtmlToPdfBase64(htmlStr) {
-  if (!window.html2canvas || !window.jspdf) throw new Error("PDF 组件未加载，请刷新页面后重试");
-  const styleMatch = (htmlStr.match(/<style[^>]*>[\s\S]*?<\/style>/g) || []).join("\n").replace(/<\/?style[^>]*>/g, "");
-  const bodyMatch = htmlStr.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-20000px;top:0;width:794px;background:#ffffff;";
-  document.body.appendChild(host);
-  const styleEl = document.createElement("style");
-  styleEl.textContent = styleMatch;
-  document.head.appendChild(styleEl);
-  try {
-    if (bodyMatch) host.innerHTML = bodyMatch[1]; else host.innerHTML = htmlStr;
-    const imgs = Array.from(host.querySelectorAll("img"));
-    await Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : new Promise((r2) => { img.onload = r2; img.onerror = r2; }))));
-    await new Promise((r2) => setTimeout(r2, 120));
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-    const pages = Array.from(host.querySelectorAll(".page"));
-    const targets = pages.length ? pages : [host];
-    for (let i = 0; i < targets.length; i++) {
-      const canvas = await window.html2canvas(targets[i], { scale: 2, useCORS: true, backgroundColor: "#ffffff", width: 794, windowWidth: 794, logging: false });
-      if (i > 0) pdf.addPage();
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, 210, 297, undefined, "FAST");
-    }
-    const dataUri = pdf.output("datauristring");
-    return dataUri.slice(dataUri.indexOf(",") + 1);
-  } finally {
-    if (styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
-    if (host.parentNode) host.parentNode.removeChild(host);
-  }
-}
 
-/* 按打印格式生成某张 PI 的 PDF(base64) */
-async function buildPiPdfAttachmentBase64(pi) {
-  const baseHref = getPrintBaseHref();
-  const record = extractRecord(pi);
-  const creditorCode = pi?.printProfileKey || record?.creditorCode || pi?.creditorCode || record?.accNo || "";
-  const creditorName = record?.creditorName || pi?.creditorName || "";
-  const profile = resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
-  const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
-  const stampSrc = await getStampSrcWithOverride(stampOverride);
-  const htmlStr = buildPiPrintHtml(pi, stampSrc, baseHref, profile);
-  return renderPrintHtmlToPdfBase64(htmlStr);
-}
-
-/* 发送 PI 邮件：list 为 PI 原始项（state.data.purchasePI 元素） */
 async function sendPiMail(list) {
   const items = Array.isArray(list) ? list : [];
   if (items.length === 0) return;
@@ -7253,4 +7192,105 @@ function applyMailPreset(presetKey) {
   const h = $("mailHost"); if (h) h.value = p.host;
   const pt = $("mailPort"); if (pt) pt.value = String(p.port);
   const sec = $("mailSecure"); if (sec) sec.checked = !!p.secure;
+}
+
+/* 打印排版 HTML -> PDF base64 */
+async function renderPrintHtmlToPdfBase64(htmlStr) {
+  if (!window.html2canvas || !window.jspdf) throw new Error("PDF 组件未加载，请刷新页面后重试");
+  const styleMatch = (htmlStr.match(/<style[^>]*>[\s\S]*?<\/style>/g) || []).join("\n").replace(/<\/?style[^>]*>/g, "");
+  const bodyMatch = htmlStr.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-20000px;top:0;width:794px;background:#ffffff;";
+  document.body.appendChild(host);
+  const styleEl = document.createElement("style");
+  styleEl.textContent = styleMatch;
+  document.head.appendChild(styleEl);
+  try {
+    if (bodyMatch) host.innerHTML = bodyMatch[1]; else host.innerHTML = htmlStr;
+    const imgs = Array.from(host.querySelectorAll("img"));
+    await Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : new Promise((r2) => { img.onload = r2; img.onerror = r2; }))));
+    await new Promise((r2) => setTimeout(r2, 120));
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const pages = Array.from(host.querySelectorAll(".page"));
+    const targets = pages.length ? pages : [host];
+    let pageCounter = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const canvas = await window.html2canvas(targets[i], { scale: 1.5, useCORS: true, backgroundColor: "#ffffff", width: 794, windowWidth: 794, logging: false });
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const pageRatioH = (297 / 210) * imgW;
+      if (imgH <= pageRatioH * 1.03) {
+        if (pageCounter > 0) pdf.addPage();
+        const hmm = Math.min(297, (imgH / imgW) * 210);
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", 0, 0, 210, hmm, undefined, "FAST");
+        pageCounter++;
+      } else {
+        let y = 0;
+        while (y < imgH) {
+          const h1 = Math.min(pageRatioH, imgH - y);
+          if (pageCounter > 0) pdf.addPage();
+          const piece = document.createElement("canvas");
+          piece.width = imgW;
+          piece.height = Math.round(h1);
+          const ctx = piece.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, piece.width, piece.height);
+          ctx.drawImage(canvas, 0, y, imgW, h1, 0, 0, imgW, h1);
+          pdf.addImage(piece.toDataURL("image/jpeg", 0.85), "JPEG", 0, 0, 210, 297, undefined, "FAST");
+          pageCounter++;
+          y += h1;
+        }
+      }
+    }
+    const dataUri = pdf.output("datauristring");
+    return dataUri.slice(dataUri.indexOf(",") + 1);
+  } finally {
+    if (styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
+/* 按打印格式生成某张 PI 的 PDF(base64) */
+async function buildPiPdfAttachmentBase64(pi) {
+  const baseHref = getPrintBaseHref();
+  const record = extractRecord(pi);
+  const creditorCode = pi?.printProfileKey || record?.creditorCode || pi?.creditorCode || record?.accNo || "";
+  const creditorName = record?.creditorName || pi?.creditorName || "";
+  const profile = resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
+  const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
+  const stampSrc = await getStampSrcWithOverride(stampOverride);
+  const htmlStr = buildPiPrintHtml(pi, stampSrc, baseHref, profile);
+  return renderPrintHtmlToPdfBase64(htmlStr);
+}
+
+async function saveMailSettings() {
+  try {
+    const form = collectMailSettingsForm();
+    await mailApi("/api/mail/config", { method: "POST", body: { config: form } });
+    appendLog("邮件设置已保存。");
+    window.mailRulesTmp = Array.isArray(form.supplierRules) ? form.supplierRules.map((x) => ({ ...x })) : [];
+    renderMailRuleList();
+    alert("邮件设置已保存 ✓（供应商关联 " + (form.supplierRules || []).length + " 条）");
+  } catch (e) {
+    appendLog("保存邮件设置失败: " + e.message);
+    alert("保存失败: " + e.message);
+  }
+}
+
+async function testMailSettings() {
+  try {
+    const config = collectMailSettingsForm();
+    if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
+      alert("测试前请填写 SMTP 服务器 / 账号 / 授权码");
+      return;
+    }
+    appendLog("正在发送测试邮件...");
+    const r = await mailApi("/api/mail/test", { method: "POST", body: { config } });
+    appendLog("测试邮件已发送: " + (r.info && r.info.messageId ? r.info.messageId : "成功"));
+    alert("测试邮件已发送 ✓");
+  } catch (e) {
+    appendLog("测试邮件发送失败: " + e.message);
+    alert("测试邮件发送失败: " + e.message);
+  }
 }
