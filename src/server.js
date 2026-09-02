@@ -262,8 +262,8 @@ async function handleApi(req, res) {
       const body = await collectBody(req);
       const html = body && typeof body.html === "string" ? body.html : "";
       if (!html) { sendJson(res, 400, { ok: false, error: "缺少 html" }); return; }
-      const buf = await printPdf.pdfFromHtml(html);
-      sendJson(res, 200, { ok: true, bytes: buf.length, base64: buf.toString("base64") });
+      const pdfBuf = Buffer.from(await printPdf.pdfFromHtml(html));
+      sendJson(res, 200, { ok: true, bytes: pdfBuf.length, base64: pdfBuf.toString("base64") });
     } catch (e) {
       sendJson(res, 500, { ok: false, error: "打印引擎不可用: " + e.message });
     }
