@@ -75,30 +75,53 @@ async function saveMailConfig(cfg) {
     replyToFixed: cfg && typeof cfg.replyToFixed === "string" ? cfg.replyToFixed : existing.replyToFixed,
     bodyTemplate: cfg && typeof cfg.bodyTemplate === "string" ? cfg.bodyTemplate : existing.bodyTemplate,
     attachStyle: cfg && (cfg.attachStyle === "print" || cfg.attachStyle === "server" || cfg.attachStyle === "browser") ? cfg.attachStyle : (existing.attachStyle || "browser"),
-    supplierRules: cfg && Array.isArray(cfg.supplierRules) ? cfg.supplierRules : existing.supplierRules
+    supplierRules: mergeSupplierRules(existing.supplierRules, cfg && Array.isArray(cfg.supplierRules) ? cfg.supplierRules : existing.supplierRules)
   };
-  /* 密码为空串表示“保持不变” */
+  /* 全局密码为空串表示保持不变 */
   if (merged.smtp.pass === "") merged.smtp.pass = existing.smtp.pass || "";
   await db.setConfig("mail", merged);
   return merged;
 }
 
-/* 发送一封邮件。opts: {to, cc, bcc, subject, text, html, replyTo, fromName, attachments:[{filename, base64, contentType}]} */
+/* 供应商规则合并：保留未改动条目的授权码 */
+function mergeSupplierRules(prev, next) {
+  const prevList = Array.isArray(prev) ? prev : [];
+  const nextList = Array.isArray(next) ? next : [];
+  return nextList.map((r) => {
+    const nr = { ...r };
+    const old = prevList.find((x) => x && String(x.supplierCode) === String(r.supplierCode));
+    if (nr.smtp && typeof nr.smtp === "object" && old && old.smtp) {
+      nr.smtp = { ...old.smtp, ...nr.smtp };
+      if (nr.smtp.pass === "") nr.smtp.pass = old.smtp.pass || "";
+    } else if (nr.smtp && nr.smtp.pass === "") {
+      delete nr.smtp.pass;
+    }
+    return nr;
+  });
+}
+
+/* 发送一封邮件。
+ * opts: {to, cc, bcc, subject, text, html, replyTo, fromName, smtp, attachments}
+ * smtp(可选): 传入该供应商自己的 SMTP 配置 {host,port,secure,user,pass,fromName};未传则用全局配置
+ */
 async function sendMail(opts) {
   const cfg = await getMailConfig();
-  const s = cfg.smtp || {};
-  if (!s.host || !s.user) throw new Error("邮件未配置: 请先在系统设置中填写 SMTP 服务器与发件账号");
+  const useOwn = opts && opts.smtp && opts.smtp.host && opts.smtp.user && opts.smtp.pass ? opts.smtp : null;
+  const s = useOwn || cfg.smtp || {};
+  if (!s.host || !s.user) throw new Error("邮件未配置: 请先设置 SMTP 服务器与发件账号");
   if (!s.pass) throw new Error("邮件未配置: 缺少 SMTP 授权码/密码");
   const to = normalizeAddressList(opts.to || cfg.to);
   if (to.length === 0) throw new Error("缺少收件人(To)");
+  const ccList = normalizeAddressList(opts.cc || cfg.cc);
+  const bccList = normalizeAddressList(opts.bcc || cfg.bcc);
 
   const transporter = nodemailer.createTransport({
     host: s.host,
     port: Number(s.port) || 587,
     secure: s.secure === true || Number(s.port) === 465,
     auth: { user: s.user, pass: s.pass },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000
+    connectionTimeout: 20000,
+    greetingTimeout: 20000
   });
 
   const attachments = Array.isArray(opts.attachments) && opts.attachments.length
@@ -116,12 +139,12 @@ async function sendMail(opts) {
 
   const info = await transporter.sendMail({
     from: {
-      name: opts.fromName || s.fromName || s.user.split("@")[0] || "AutoCount",
+      name: opts.fromName || s.fromName || (s.user && s.user.split("@")[0]) || "AutoCount",
       address: s.user
     },
     to: to.join(", "),
-    cc: opts.cc || normalizeAddressList(cfg.cc).join(", ") || undefined,
-    bcc: normalizeAddressList(cfg.bcc).join(", ") || undefined,
+    cc: ccList.length ? ccList.join(", ") : undefined,
+    bcc: bccList.length ? bccList.join(", ") : undefined,
     subject: opts.subject || "Proforma Invoice",
     text: opts.text || "",
     html: opts.html || undefined,

@@ -7095,16 +7095,20 @@ function renderMailRuleList() {
   }
   const used = {};
   (rules || []).forEach((r) => { if (r.supplierCode) used[r.supplierCode] = 1; });
-  const rowHtml = (r, i) =>
-    '<div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px;">' +
+  const rowHtml = (r, i) => {
+    const ownS = r.smtp && r.smtp.user ? r.smtp.user : "全局账号";
+    return '<div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px;flex-wrap:wrap;">' +
     '<strong style="min-width:80px;color:#166534;">' + escapeHtml(r.supplierCode || "") + '</strong>' +
-    '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(r.supplierName || "") + '</span>' +
+    '<span style="min-width:150px;flex:1;font-size:12.5px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(r.supplierName || "") + '</span>' +
+    '<span style="font-size:11.5px;color:#b45309;white-space:nowrap;">发件: ' + escapeHtml(ownS) + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">From: ' + (r.fromName ? escapeHtml(r.fromName) : "供应商抬头") + '</span>' +
     '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">To: ' + (r.to ? escapeHtml(r.to) : "默认") + '</span>' +
-    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">Reply: ' + (r.replyTo ? escapeHtml(r.replyTo) : "PI邮箱") + '</span>' +
-    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">From: ' + (r.fromName ? escapeHtml(r.fromName) : "默认") + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">Cc: ' + (r.cc ? escapeHtml(r.cc) : "-") + '</span>' +
+    '<span style="font-size:11.5px;color:#64748b;white-space:nowrap;">模板: ' + (r.bodyTemplate ? "自定义" : "全局") + '</span>' +
     '<button type="button" class="btn ghost" style="padding:4px 8px;" onclick="openMailRuleEditor(' + i + ')">编辑</button>' +
     '<button type="button" class="btn ghost" style="padding:4px 8px;color:#dc2626;" onclick="removeMailRuleAt(' + i + ')">删除</button>' +
     '</div>';
+  };
   let html = '';
   if (rules.length) {
     html += '<div style="font-size:12px;color:#64748b;padding:2px 2px 4px;">已配置关联（发送时按 PI 供应商匹配）：</div>' +
@@ -7133,6 +7137,20 @@ function renderMailRuleList() {
   list.innerHTML = html;
 }
 
+function toggleMailRuleSmtp() {
+  const wrap = $("mailRuleSmtpWrap");
+  const own = $("mailRuleOwnSmtp");
+  if (wrap && own) wrap.style.display = own.checked ? "grid" : "none";
+}
+
+function applyMailRulePreset(key) {
+  const p = MAIL_PRESETS[key];
+  if (!p) return;
+  const h = $("mailRuleSmtpHost"); if (h) h.value = p.host;
+  const pt = $("mailRuleSmtpPort"); if (pt) pt.value = String(p.port);
+  const sc = $("mailRuleSmtpSecure"); if (sc) sc.checked = !!p.secure;
+}
+
 function openMailRuleEditorForFromButton(btn) {
   if (!btn) return;
   openMailRuleEditorFor(btn.getAttribute("data-code") || "");
@@ -7146,9 +7164,6 @@ function openMailRuleEditorFor(code) {
 function openMailRuleEditor(idx) {
   const ed = $("mailRuleEditor");
   const edSel = $("mailRuleEditorSelect");
-  const edTo = $("mailRuleEditorTo");
-  const edReply = $("mailRuleEditorReply");
-  const edFrom = $("mailRuleEditorFrom");
   if (!ed || !edSel) return;
   window.mailRuleEditIndex = (idx === undefined || idx === null) ? -1 : idx;
   const rules = getMailRules();
@@ -7164,9 +7179,25 @@ function openMailRuleEditor(idx) {
     edSel.innerHTML = '<option value="">（请先同步供应商数据）</option>';
     edSel.disabled = true;
   }
-  edTo.value = cur ? (cur.to || "") : "";
-  edReply.value = cur ? (cur.replyTo || "") : "";
-  edFrom.value = cur ? (cur.fromName || "") : "";
+  const setV = (id, v) => { const el = $(id); if (el) el.value = v === undefined || v === null ? "" : String(v); };
+  const smtp = (cur && cur.smtp) || {};
+  setV("mailRuleEditorFrom", cur ? cur.fromName || "" : "");
+  setV("mailRuleTo", cur ? cur.to || "" : "");
+  setV("mailRuleReply", cur ? cur.replyTo || "" : "");
+  setV("mailRuleCc", cur ? cur.cc || "" : "");
+  setV("mailRuleBcc", cur ? cur.bcc || "" : "");
+  setV("mailRuleBodyTemplate", cur ? cur.bodyTemplate || "" : "");
+  setV("mailRuleSmtpPreset", smtp.preset || "");
+  setV("mailRuleSmtpHost", smtp.host || "");
+  setV("mailRuleSmtpPort", smtp.port || "465");
+  setV("mailRuleSmtpUser", smtp.user || "");
+  const own = $("mailRuleOwnSmtp");
+  const secure = $("mailRuleSmtpSecure");
+  const pass = $("mailRuleSmtpPass");
+  if (own) own.checked = !!(cur && cur.smtp && cur.smtp.user);
+  if (secure) secure.checked = !!(smtp.secure || Number(smtp.port) === 465);
+  if (pass) { pass.value = ""; pass.placeholder = smtp.pass ? "已保存(留空保持不变)" : "授权码/密码"; }
+  toggleMailRuleSmtp();
   ed.style.display = "grid";
   ed.scrollIntoView({ block: "nearest" });
 }
@@ -7178,23 +7209,49 @@ function closeMailRuleEditor() {
 
 function saveMailRuleFromEditor() {
   const edSel = $("mailRuleEditorSelect");
-  const edTo = $("mailRuleEditorTo");
-  const edReply = $("mailRuleEditorReply");
-  const edFrom = $("mailRuleEditorFrom");
   if (!edSel) return;
   const code = edSel.value || "";
   if (!code) { alert("请选择供应商"); return; }
   const name = edSel.selectedOptions[0] ? edSel.selectedOptions[0].textContent : "";
+  const v = (id) => { const el = $(id); return el ? String(el.value || "").trim() : ""; };
+  const own = $("mailRuleOwnSmtp");
+  const useOwn = !!(own && own.checked);
   const rules = getMailRules();
-  const rec = { supplierCode: code, supplierName: String(name || ""), to: (edTo ? edTo.value : "").trim(), replyTo: (edReply ? edReply.value : "").trim(), fromName: (edFrom ? edFrom.value : "").trim() };
-  if (window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex]) {
-    rules[window.mailRuleEditIndex] = rec;
-  } else {
-    rules.push(rec);
+  const curIdx = window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex] ? window.mailRuleEditIndex : -1;
+  const old = curIdx >= 0 ? rules[curIdx] : null;
+  let smtp = undefined;
+  if (useOwn) {
+    const host = v("mailRuleSmtpHost");
+    const user = v("mailRuleSmtpUser");
+    const pass = v("mailRuleSmtpPass");
+    if (!host || !user) { alert("独立发件账号需填写服务器与发件账号"); return; }
+    const hadPass = !!(old && old.smtp && old.smtp.pass);
+    if (!pass && !hadPass) { alert("独立发件账号需填写授权码/密码"); return; }
+    const secEl = $("mailRuleSmtpSecure");
+    smtp = {
+      preset: v("mailRuleSmtpPreset"),
+      host: host,
+      port: Number(v("mailRuleSmtpPort")) || 465,
+      secure: !!(secEl && secEl.checked),
+      user: user,
+      pass: pass || (old && old.smtp ? old.smtp.pass : "")
+    };
   }
+  const rec = {
+    supplierCode: code,
+    supplierName: String(name || ""),
+    fromName: v("mailRuleEditorFrom"),
+    to: v("mailRuleTo"),
+    replyTo: v("mailRuleReply"),
+    cc: v("mailRuleCc"),
+    bcc: v("mailRuleBcc"),
+    bodyTemplate: v("mailRuleBodyTemplate"),
+    smtp: smtp
+  };
+  if (curIdx >= 0) rules[curIdx] = rec; else rules.push(rec);
   closeMailRuleEditor();
   renderMailRuleList();
-  appendLog("供应商关联已更新（共 " + rules.length + " 条），请点下方“保存设置”写入系统");
+  appendLog("供应商邮件档案已保存（共 " + rules.length + " 家），请点下方“保存设置”写入系统");
 }
 
 function removeMailRuleAt(i) {
@@ -7202,7 +7259,7 @@ function removeMailRuleAt(i) {
   if (i >= 0 && i < rules.length) {
     rules.splice(i, 1);
     renderMailRuleList();
-    appendLog("供应商关联已删除（剩余 " + rules.length + " 条），请点下方“保存设置”写入系统");
+    appendLog("供应商邮件档案已删除（剩余 " + rules.length + " 家），请点下方“保存设置”写入系统");
   }
 }
 

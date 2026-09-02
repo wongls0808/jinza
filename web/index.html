@@ -500,14 +500,38 @@
         <div class="modal-field">
           <label>按供应商关联（可选）——发送时该供应商优先使用此处的收件/回复设置；留空则用上方默认收件人 + PI 供应商邮箱</label>
           <div id="mailRuleList" style="display:grid;gap:8px;margin-bottom:8px;"></div>
-          <div id="mailRuleEditor" style="display:none;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:10px;margin-bottom:8px;">
-            <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:8px;width:100%;">
-              <select id="mailRuleEditorSelect" style="width:100%;"></select>
-              <input id="mailRuleEditorTo" placeholder="收件邮箱(留空用默认收件人)" />
-              <input id="mailRuleEditorReply" placeholder="回复邮箱(留空用 PI 供应商邮箱)" />
-              <input id="mailRuleEditorFrom" placeholder="发件抬头(留空用默认显示名)" />
+          <div id="mailRuleEditor" style="display:none;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:10px;margin-bottom:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">供应商
+                <select id="mailRuleEditorSelect" style="width:100%;"></select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">发件显示名(From 抬头；留空=该 PI 供应商抬头)
+                <input id="mailRuleEditorFrom" placeholder="如 YIWU FUGUI TRADING FIRM" />
+              </label>
             </div>
-            <div style="display:flex;gap:8px;margin-top:8px;">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;">
+              <input id="mailRuleOwnSmtp" type="checkbox" onchange="toggleMailRuleSmtp()" /> 该供应商使用独立发件账号（不勾选=使用全局账号发送）
+            </label>
+            <div id="mailRuleSmtpWrap" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">SMTP 预设
+                <select id="mailRuleSmtpPreset" onchange="applyMailRulePreset(this.value)"><option value="">自定义</option><option value="hotmail">Hotmail / Outlook</option><option value="gmail">Gmail</option><option value="yeahnet">Yeah.net</option><option value="qq">QQ 邮箱</option><option value="mail163">163 邮箱</option></select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">服务器<input id="mailRuleSmtpHost" placeholder="smtp.xxx.com" /></label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">端口<input id="mailRuleSmtpPort" type="number" value="465" /></label>
+              <label style="display:flex;gap:6px;align-items:flex-end;font-size:12px;padding-bottom:8px;"><input id="mailRuleSmtpSecure" type="checkbox" /> SSL</label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">发件账号<input id="mailRuleSmtpUser" placeholder="supplier@domain.com" /></label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">授权码 / 密码<input id="mailRuleSmtpPass" type="password" placeholder="留空表示保持不变" /></label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">收件 To<input id="mailRuleTo" placeholder="留空=默认收件人" /></label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">回复 Reply<input id="mailRuleReply" placeholder="留空=PI 供应商邮箱" /></label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">抄送 Cc<input id="mailRuleCc" placeholder="可选" /></label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">密送 Bcc<input id="mailRuleBcc" placeholder="可选" /></label>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">本供应商正文模板（留空=使用全局模板）
+              <textarea id="mailRuleBodyTemplate" rows="4" placeholder="支持占位符: {docNo} {creditorName} {attention} {docDate} {currencyCode} {piTotal} {validityDate} {referencePoNo}"></textarea>
+            </label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
               <button type="button" class="btn primary" onclick="saveMailRuleFromEditor()">保存此条</button>
               <button type="button" class="btn ghost" onclick="closeMailRuleEditor()">取消</button>
             </div>

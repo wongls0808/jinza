@@ -355,7 +355,9 @@ async function handleApi(req, res) {
             sourcePONo: pi.sourcePONo || rec.ref || "",
             ivCustomerName: pi.ivCustomerName || rec.ivCustomerName || ""
           };
-          const text = mail.fillTemplate(cfg.bodyTemplate, vars);
+          /* 供应商独立档案：模板/cc/bcc/发件账号均可隔离；缺省回退全局 */
+          const ruleBody = rule && rule.bodyTemplate ? rule.bodyTemplate : "";
+          const text = mail.fillTemplate(ruleBody || cfg.bodyTemplate, vars);
           const subject = docNo + (credName ? " - " + credName : "");
           /* 附件 PDF：print=用前端打印同款;server(默认)=服务端矢量 PDF(无放大) */
           const usePrint = body.usePrintPdf === true;
@@ -367,13 +369,17 @@ async function handleApi(req, res) {
             const pdf = await piPdf.renderPiPdf(pi, profile);
             pdfBase64 = pdf.toString("base64");
           }
+          const ownSmtp = rule && rule.smtp && rule.smtp.user && rule.smtp.pass ? rule.smtp : null;
           const info = await mail.sendMail({
-            to: ruleTo || undefined,
+            smtp: ownSmtp || undefined,
+            to: (rule && rule.to) || undefined,
+            cc: (rule && rule.cc) || undefined,
+            bcc: (rule && rule.bcc) || undefined,
             subject,
             text,
-            replyTo: ruleReply || email || undefined,
-            /* 发件抬头：默认用该 PI 的供应商抬头（多抬头发送），关联规则可覆盖 */
-            fromName: (rule && rule.fromName) || credName || (cfg.smtp && cfg.smtp.fromName),
+            replyTo: (rule && rule.replyTo) || email || undefined,
+            /* 发件抬头：独立账号用其显示名，否则用该 PI 供应商抬头 */
+            fromName: (rule && rule.fromName) || credName || (ownSmtp && ownSmtp.fromName) || (cfg.smtp && cfg.smtp.fromName),
             attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdfBase64 }]
           });
           okCount++;
