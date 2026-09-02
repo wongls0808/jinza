@@ -7140,7 +7140,10 @@ function renderMailRuleList() {
 function toggleMailRuleSmtp() {
   const wrap = $("mailRuleSmtpWrap");
   const own = $("mailRuleOwnSmtp");
-  if (wrap && own) wrap.style.display = own.checked ? "grid" : "none";
+  if (wrap && own) {
+    wrap.style.opacity = own.checked ? "1" : "0.55";
+    wrap.style.background = own.checked ? "#f0fdf4" : "#fffbeb";
+  }
 }
 
 function applyMailRulePreset(key) {
@@ -7215,15 +7218,19 @@ async function saveMailRuleFromEditor() {
   const name = edSel.selectedOptions[0] ? edSel.selectedOptions[0].textContent : "";
   const v = (id) => { const el = $(id); return el ? String(el.value || "").trim() : ""; };
   const own = $("mailRuleOwnSmtp");
-  const useOwn = !!(own && own.checked);
+  const smtpHostV = v("mailRuleSmtpHost");
+  const smtpUserV = v("mailRuleSmtpUser");
+  const smtpPassV = v("mailRuleSmtpPass");
+  const filledOwn = !!(smtpHostV && smtpUserV && smtpPassV);
+  const useOwn = (own && own.checked) || filledOwn;
   const rules = getMailRules();
   const curIdx = window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex] ? window.mailRuleEditIndex : -1;
   const old = curIdx >= 0 ? rules[curIdx] : null;
   let smtp = undefined;
   if (useOwn) {
-    const host = v("mailRuleSmtpHost");
-    const user = v("mailRuleSmtpUser");
-    const pass = v("mailRuleSmtpPass");
+    const host = smtpHostV;
+    const user = smtpUserV;
+    const pass = smtpPassV;
     if (!host || !user) { alert("独立发件账号需填写服务器与发件账号"); return; }
     const hadPass = !!(old && old.smtp && old.smtp.pass);
     if (!pass && !hadPass) { alert("独立发件账号需填写授权码/密码"); return; }

@@ -510,9 +510,9 @@
               </label>
             </div>
             <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;">
-              <input id="mailRuleOwnSmtp" type="checkbox" onchange="toggleMailRuleSmtp()" /> 该供应商使用独立发件账号（不勾选=使用全局账号发送）
+              <input id="mailRuleOwnSmtp" type="checkbox" onchange="toggleMailRuleSmtp()" /> 该供应商使用独立发件账号（填写下方服务器/账号/授权码即自动启用；不填则用全局账号）
             </label>
-            <div id="mailRuleSmtpWrap" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
+            <div id="mailRuleSmtpWrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#fffbeb;border:1px solid #fde68a;padding:8px;border-radius:8px;">
               <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">SMTP 预设
                 <select id="mailRuleSmtpPreset" onchange="applyMailRulePreset(this.value)"><option value="">自定义</option><option value="hotmail">Hotmail / Outlook</option><option value="gmail">Gmail</option><option value="yeahnet">Yeah.net</option><option value="qq">QQ 邮箱</option><option value="mail163">163 邮箱</option></select>
               </label>
