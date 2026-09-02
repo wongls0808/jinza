@@ -7006,10 +7006,20 @@ async function populateMailSettings() {
 }
 
 function openMailSettingsModal() {
-  const m = $("mailSettingsModal");
-  if (!m) return;
-  populateMailSettings();
-  m.classList.remove("hidden");
+  try {
+    console.log("[mail] openMailSettingsModal invoked");
+    const m = $("mailSettingsModal");
+    if (!m) {
+      alert("未找到设置面板元素 mailSettingsModal——页面可能仍是旧缓存，请按 Ctrl+Shift+R 强制刷新后再点。");
+      return;
+    }
+    m.classList.remove("hidden");
+    console.log("[mail] modal opened, hidden class removed");
+    populateMailSettings();
+  } catch (e) {
+    console.error("[mail] open error:", e);
+    alert("打开邮件设置出错: " + e.message);
+  }
 }
 function closeMailSettingsModal() {
   const m = $("mailSettingsModal");
