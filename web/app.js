@@ -7014,6 +7014,7 @@ function openMailSettingsModal() {
       return;
     }
     m.classList.remove("hidden");
+    m.style.display = "flex"; /* 兜底：强制显示，避免样式/缓存异常 */
     console.log("[mail] modal opened, hidden class removed");
     populateMailSettings();
   } catch (e) {
@@ -7023,7 +7024,7 @@ function openMailSettingsModal() {
 }
 function closeMailSettingsModal() {
   const m = $("mailSettingsModal");
-  if (m) m.classList.add("hidden");
+  if (m) { m.classList.add("hidden"); m.style.display = ""; }
 }
 
 function collectMailSettingsForm() {
