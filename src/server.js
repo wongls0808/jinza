@@ -11,12 +11,14 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db;
+let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf;
 try {
   ({ getEntity, entities } = require("./sync/entities"));
   ({ syncAll, syncEntity } = require("./sync/run"));
   ({ setRuntimeConfig } = require("./config"));
   db = require("./db");
+  mail = require("./mail");
+  piPdf = require("./pi-pdf");
   console.log("All modules loaded successfully.");
 } catch (err) {
   console.error("Module load error:", err.message);
@@ -172,7 +174,7 @@ async function handleApi(req, res) {
   }
 
   /* 数据库可用性检查（数据相关 API 需要数据库） */
-  const dbRequired = url.startsWith("/api/data/") || url === "/api/config" || url === "/api/syncstate" || url === "/api/pi" || url.startsWith("/api/pi/");
+  const dbRequired = url.startsWith("/api/data/") || url === "/api/config" || url === "/api/syncstate" || url === "/api/pi" || url.startsWith("/api/pi/") || url === "/api/mail/config" || url === "/api/mail/test" || url === "/api/mail/send" || url === "/api/mail/send-pi";
   if (dbRequired && !db.isDbAvailable()) {
     sendJson(res, 503, { ok: false, error: "数据库未连接" });
     return;
@@ -250,6 +252,108 @@ async function handleApi(req, res) {
     }
     await db.setSyncState(entity, lastSync || null, meta || {});
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── 邮件(PI 发送) ── */
+  if (url === "/api/mail/config" && req.method === "GET") {
+    try {
+      const cfg = await mail.getMailConfig();
+      const out = { ...cfg, smtp: { ...cfg.smtp, pass: cfg.smtp && cfg.smtp.pass ? "******" : "" } };
+      sendJson(res, 200, { ok: true, config: out, presets: mail.PRESETS });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
+    return;
+  }
+  if (url === "/api/mail/config" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      await mail.saveMailConfig(body.config || {});
+      sendJson(res, 200, { ok: true });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
+    return;
+  }
+  if (url === "/api/mail/test" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      if (body.config) await mail.saveMailConfig(body.config);
+      const info = await mail.sendMail({ subject: "AutoCount 邮件配置测试", text: "这是一封来自 AutoCount 同步控制台的测试邮件。\n\n收到即表示 SMTP 配置正确。" });
+      sendJson(res, 200, { ok: true, info });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
+    return;
+  }
+  if (url === "/api/mail/send" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      if (!Array.isArray(body.emails) || body.emails.length === 0) {
+        sendJson(res, 400, { ok: false, error: "缺少待发送邮件列表" });
+        return;
+      }
+      const results = [];
+      let okCount = 0;
+      for (const em of body.emails) {
+        try {
+          const info = await mail.sendMail({ to: em.to, subject: em.subject, text: em.text, replyTo: em.replyTo, fromName: em.fromName, attachments: em.attachments });
+          okCount++;
+          results.push({ docNo: em.docNo, ok: true, messageId: info.messageId });
+        } catch (e) { results.push({ docNo: em.docNo, ok: false, error: e.message }); }
+      }
+      sendJson(res, 200, { ok: true, sent: okCount, failed: results.length - okCount, results });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
+    return;
+  }
+
+  /* ── 邮件：批量发送 PI（固定收件人 + 各供应商抬头 / Reply-To + PDF 附件） ── */
+  if (url === "/api/mail/send-pi" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      const pis = Array.isArray(body.pis) ? body.pis : [];
+      if (pis.length === 0) { sendJson(res, 400, { ok: false, error: "缺少待发送的 PI 列表" }); return; }
+      const cfg = await mail.getMailConfig();
+      const ac = await db.getConfig("autocount");
+      const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; };
+      const sdate = (v) => { if (!v) return ""; const s = String(v); const m = s.match(/^\d{4}-\d{2}-\d{2}/); return m ? m[0] : s.slice(0, 10); };
+      const results = [];
+      let okCount = 0;
+      for (const pi of pis) {
+        try {
+          const rec = (pi && pi.master) || pi || {};
+          const docNo = pi.docNo || rec.docNo || "PI";
+          const code = rec.creditorCode || "";
+          const profile = (ac && ac.supplierPrintProfiles && ac.supplierPrintProfiles[code]) || null;
+          const credName = rec.creditorName || "";
+          const email = String(rec.email || "").split(/[,;，；\s]+/)[0].trim() || "";
+          const piTotal = pi.piTotal ?? pi.total ?? rec.piTotal ?? rec.total;
+          const vars = {
+            docNo,
+            creditorName: credName,
+            creditorCode: code,
+            attention: rec.attention || "",
+            docDate: sdate(rec.docDate || pi.docDate),
+            currencyCode: rec.currencyCode || pi.currencyCode || "MYR",
+            piTotal: fnum(piTotal),
+            validityDate: sdate(pi.validityDate || rec.validityDate),
+            referencePoNo: pi.referencePoNo || rec.ref || pi.sourcePONo || "",
+            sourcePONo: pi.sourcePONo || rec.ref || "",
+            ivCustomerName: pi.ivCustomerName || rec.ivCustomerName || ""
+          };
+          const text = mail.fillTemplate(cfg.bodyTemplate, vars);
+          const subject = "PI " + docNo + (credName ? " - " + credName : "");
+          const pdf = await piPdf.renderPiPdf(pi, profile);
+          const info = await mail.sendMail({
+            subject,
+            text,
+            replyTo: email || undefined,
+            fromName: cfg.smtp && cfg.smtp.fromName,
+            attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdf.toString("base64") }]
+          });
+          okCount++;
+          results.push({ docNo, ok: true, messageId: info.messageId, to: info.accepted || [] });
+        } catch (e) {
+          results.push({ docNo: (pi && pi.docNo) || "?", ok: false, error: e.message });
+        }
+      }
+      sendJson(res, 200, { ok: true, sent: okCount, failed: results.length - okCount, results });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
     return;
   }
 
