@@ -494,7 +494,8 @@ const fieldMap = {
 const entityLabelMap = new Map(entities.map((entity) => [entity.name, entity.label]));
 const sectionMap = new Map([
   ["log", document.getElementById("section-log")],
-  ["data", document.getElementById("section-data")]
+  ["data", document.getElementById("section-data")],
+  ["mailsettings", document.getElementById("mailSettingsModal")]
 ]);
 
 function setActiveMenu(key) {
@@ -6900,6 +6901,10 @@ document.querySelectorAll(".menu-btn").forEach((button) => {
     const target = button.getAttribute("data-overlay-target");
     if (target) {
       showSection(target);
+      /* 邮件设置页：进入时自动填充当前配置 */
+      if (target === "mailsettings") {
+        populateMailSettings();
+      }
     }
   });
 });
