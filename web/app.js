@@ -5418,7 +5418,7 @@ function renderSection(entityName, items) {
         ? `<button class="btn ghost" data-action="create-pi">创建PI</button>`
         : "",
       entityName === "purchasePI"
-        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button><button class="btn ghost" data-action="delete-pi" style="color:#e74c3c">删除</button>`
+        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="send-mail-pi">📧 发送</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button><button class="btn ghost" data-action="delete-pi" style="color:#e74c3c">删除</button>`
         : ""
     ]
       .filter(Boolean)
@@ -5481,6 +5481,9 @@ function renderSection(entityName, items) {
         } catch (error) {
           appendLog(error.message || "打开创建采购发票弹窗失败");
         }
+      }
+      if (action === "send-mail-pi" && entityName === "purchasePI") {
+        sendPiMail([item]);
       }
       if (action === "delete-pi" && entityName === "purchasePI") {
         const piDocNo = (item.master?.docNo || item.docNo || "").trim();
@@ -5653,6 +5656,12 @@ function initSectionInteractions() {
         delBtn.textContent = "删除选中";
         delBtn.style.color = "#e74c3c";
         toolsLeft.appendChild(delBtn);
+        /* PI 列表：发送选中邮件按钮 */
+        const mailSendBtn = document.createElement("button");
+        mailSendBtn.className = "btn ghost";
+        mailSendBtn.setAttribute("data-action", "send-mails");
+        mailSendBtn.textContent = "📧 发送选中";
+        toolsLeft.appendChild(mailSendBtn);
       }
     }
     if (section.searchInput) {
@@ -5725,6 +5734,13 @@ function initSectionInteractions() {
         /* 删除选中 PI */
         if (action === "batch-delete-pi" && entityName === "purchasePI") {
           batchDeletePI();
+          return;
+        }
+        /* 发送选中 PI 邮件 */
+        if (action === "send-mails" && entityName === "purchasePI") {
+          const sel = getSelectedItems("purchasePI");
+          if (sel.length === 0) { appendLog("请先勾选要发送邮件的 PI"); return; }
+          sendPiMail(sel.map((s) => s.item));
           return;
         }
         if (action === "batch") {
@@ -6934,4 +6950,153 @@ initSectionInteractions();
       appendLog(`自动同步失败: ${e.message}`);
     }
   }, 5 * 60 * 1000);
+})();
+
+
+/* ════════════════════════════════════════════════════════════
+ * 邮件发送 PI（配置化）：设置面板 + 单张/批量发送
+ * ════════════════════════════════════════════════════════════ */
+const MAIL_PRESETS = {
+  hotmail: { host: "smtp-mail.outlook.com", port: 587, secure: false },
+  gmail: { host: "smtp.gmail.com", port: 465, secure: true },
+  yeahnet: { host: "smtp.yeah.net", port: 465, secure: true },
+  qq: { host: "smtp.qq.com", port: 465, secure: true },
+  mail163: { host: "smtp.163.com", port: 465, secure: true }
+};
+
+async function mailApi(pathname, opts) {
+  const opt = opts || {};
+  const resp = await fetch(pathname, {
+    method: opt.method || "GET",
+    headers: opt.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: opt.body !== undefined ? JSON.stringify(opt.body) : undefined
+  });
+  let json = {};
+  try { json = await resp.json(); } catch (e) { /* ignore */ }
+  if (!resp.ok || json.ok === false) {
+    throw new Error(json.error || ("HTTP " + resp.status));
+  }
+  return json;
+}
+
+function $(id) { return document.getElementById(id); }
+
+async function populateMailSettings() {
+  try {
+    const r = await mailApi("/api/mail/config");
+    const c = r.config || {};
+    const s = c.smtp || {};
+    const set = (id, v) => { const el = $(id); if (el) el.value = v === undefined || v === null ? "" : String(v); };
+    set("mailPreset", s.preset || "");
+    set("mailHost", s.host || "");
+    set("mailPort", s.port || "465");
+    set("mailUser", s.user || "");
+    set("mailFromName", s.fromName || "");
+    set("mailTo", c.to || "");
+    set("mailCc", c.cc || "");
+    set("mailBcc", c.bcc || "");
+    set("mailReplyMode", c.replyMode || "pi");
+    set("mailReplyToFixed", c.replyToFixed || "");
+    set("mailBodyTemplate", c.bodyTemplate || "");
+    const sec = $("mailSecure"); if (sec) sec.checked = !!(s.secure || Number(s.port) === 465);
+    const pass = $("mailPass"); if (pass) pass.value = "";
+  } catch (e) {
+    appendLog("读取邮件设置失败: " + e.message);
+  }
+}
+
+function openMailSettingsModal() {
+  const m = $("mailSettingsModal");
+  if (!m) return;
+  populateMailSettings();
+  m.classList.remove("hidden");
+}
+function closeMailSettingsModal() {
+  const m = $("mailSettingsModal");
+  if (m) m.classList.add("hidden");
+}
+
+function collectMailSettingsForm() {
+  const v = (id) => { const el = $(id); return el ? el.value.trim() : ""; };
+  return {
+    smtp: {
+      preset: v("mailPreset"),
+      host: v("mailHost"),
+      port: Number(v("mailPort")) || 587,
+      secure: !!(($("mailSecure") || {}).checked),
+      user: v("mailUser"),
+      pass: v("mailPass"),
+      fromName: v("mailFromName") || "AutoCount PI"
+    },
+    to: v("mailTo"),
+    cc: v("mailCc"),
+    bcc: v("mailBcc"),
+    replyMode: v("mailReplyMode") || "pi",
+    replyToFixed: v("mailReplyToFixed"),
+    bodyTemplate: v("mailBodyTemplate")
+  };
+}
+
+async function saveMailSettings() {
+  try {
+    await mailApi("/api/mail/config", { method: "POST", body: { config: collectMailSettingsForm() } });
+    appendLog("邮件设置已保存。");
+  } catch (e) {
+    appendLog("保存邮件设置失败: " + e.message);
+  }
+}
+
+async function testMailSettings() {
+  try {
+    const config = collectMailSettingsForm();
+    if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
+      appendLog("测试前请填写 SMTP 服务器 / 账号 / 授权码");
+      return;
+    }
+    appendLog("正在发送测试邮件...");
+    const r = await mailApi("/api/mail/test", { method: "POST", body: { config } });
+    appendLog("测试邮件已发送: " + (r.info && r.info.messageId ? r.info.messageId : "成功"));
+  } catch (e) {
+    appendLog("测试邮件发送失败: " + e.message);
+  }
+}
+
+/* 发送 PI 邮件：list 为 PI 原始项（state.data.purchasePI 元素） */
+async function sendPiMail(list) {
+  const items = Array.isArray(list) ? list : [];
+  if (items.length === 0) return;
+  if (!confirm(`确认发送 ${items.length} 封 PI 邮件？
+收件人取系统设置中的默认地址，每封按各自供应商抬头发送。`)) return;
+  appendLog("正在发送 PI 邮件...");
+  try {
+    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items } });
+    const rs = r.results || [];
+    rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
+    appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));
+    if (r.sent > 0) clearSelectionAndGoFirstPage("purchasePI");
+  } catch (e) {
+    appendLog("邮件发送失败: " + e.message);
+  }
+}
+
+/* 预设联动 */
+(function initMailUi() {
+  const preset = $("mailPreset");
+  if (preset) {
+    preset.addEventListener("change", () => {
+      const p = MAIL_PRESETS[preset.value];
+      if (!p) return;
+      const h = $("mailHost"); if (h) h.value = p.host;
+      const pt = $("mailPort"); if (pt) pt.value = String(p.port);
+      const sec = $("mailSecure"); if (sec) sec.checked = !!p.secure;
+    });
+  }
+  const openBtn = $("mailSettingsBtn");
+  if (openBtn) openBtn.addEventListener("click", openMailSettingsModal);
+  const closeBtn = $("mailSettingsClose");
+  if (closeBtn) closeBtn.addEventListener("click", closeMailSettingsModal);
+  const saveBtn = $("mailSaveBtn");
+  if (saveBtn) saveBtn.addEventListener("click", saveMailSettings);
+  const testBtn = $("mailTestBtn");
+  if (testBtn) testBtn.addEventListener("click", testMailSettings);
 })();

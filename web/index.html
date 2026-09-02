@@ -38,6 +38,10 @@
             <div class="menu-title">报表</div>
             <button class="menu-btn" data-overlay-target="log">同步日志</button>
           </div>
+          <div class="menu-group">
+            <div class="menu-title">系统</div>
+            <button class="menu-btn" id="mailSettingsBtn">邮件发送设置</button>
+          </div>
         </nav>
       </aside>
 
@@ -824,6 +828,53 @@
     </div>
 
     <!-- 关联 IV 弹窗 -->
+    <div id="mailSettingsModal" class="modal hidden">
+      <div class="modal-panel modal-panel-lg">
+        <div class="modal-header">
+          <h3>邮件发送设置</h3>
+          <button id="mailSettingsClose" class="btn ghost">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <label class="modal-field"><span>SMTP 预设</span>
+              <select id="mailPreset"><option value="">自定义</option><option value="hotmail">Hotmail / Outlook</option><option value="gmail">Gmail</option><option value="yeahnet">Yeah.net</option><option value="qq">QQ 邮箱</option><option value="mail163">163 邮箱</option></select>
+            </label>
+            <label class="modal-field"><span>SMTP 服务器</span><input id="mailHost" placeholder="smtp.xxx.com" /></label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 110px 1fr;gap:12px;align-items:end;">
+            <label class="modal-field"><span>端口</span><input id="mailPort" type="number" placeholder="465" /></label>
+            <label class="modal-field" style="flex-direction:row;align-items:center;gap:6px;padding-top:16px;"><input id="mailSecure" type="checkbox" /> SSL</label>
+            <label class="modal-field"><span>发件账号</span><input id="mailUser" placeholder="you@domain.com" /></label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <label class="modal-field"><span>授权码 / 密码</span><input id="mailPass" type="password" placeholder="留空表示保持不变" /></label>
+            <label class="modal-field"><span>发件显示名</span><input id="mailFromName" placeholder="AutoCount PI" /></label>
+          </div>
+          <div class="modal-field">
+            <label>默认收件人(To)</label>
+            <textarea id="mailTo" rows="2" placeholder="sales@example.com（可多行/逗号分隔多条）"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <label class="modal-field"><span>抄送 Cc（可选）</span><input id="mailCc" /></label>
+            <label class="modal-field"><span>密送 Bcc（可选）</span><input id="mailBcc" /></label>
+            <label class="modal-field"><span>回复地址</span>
+              <select id="mailReplyMode"><option value="pi">自动:该 PI 供应商邮箱</option><option value="fixed">固定地址</option></select>
+            </label>
+          </div>
+          <label class="modal-field"><span>固定回复地址（当选择"固定地址"时使用）</span><input id="mailReplyToFixed" placeholder="contact@supplier.com" /></label>
+          <div class="modal-field">
+            <label>邮件正文模板（文本，可含占位符）</label>
+            <textarea id="mailBodyTemplate" rows="8" spellcheck="false"></textarea>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:4px;line-height:1.5;">可用占位符: {docNo} {creditorName} {creditorCode} {attention} {docDate} {currencyCode} {piTotal} {validityDate} {referencePoNo} {sourcePONo} {ivCustomerName}</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="mailTestBtn" class="btn ghost">发送测试邮件</button>
+          <button id="mailSaveBtn" class="btn primary">保存设置</button>
+        </div>
+      </div>
+    </div>
+
     <div id="linkIvModal" class="modal hidden">
       <div class="modal-panel" style="max-width:860px;">
         <div class="modal-header">

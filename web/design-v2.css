@@ -252,3 +252,22 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--brand); 
   .section-tools, .tools-left, .tools-right { flex-wrap: wrap; }
   .search-input { width: 100%; min-width: 0; }
 }
+
+
+/* ---------- 邮件设置弹窗 ---------- */
+.modal-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.modal-field label, .modal-field > span { font-weight: 600; color: #334155; }
+.modal-field input[type="text"], .modal-field input[type="password"], .modal-field input[type="number"], .modal-field input:not([type]), .modal-field select, .modal-field textarea {
+  width: 100%; box-sizing: border-box; padding: 9px 12px;
+  border-radius: 10px; border: 1px solid var(--border-strong);
+  background: #f8fafc; font: inherit; font-size: 13px; color: var(--text);
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+.modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); background: #fff;
+}
+.modal-field textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+.modal-field input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--brand); }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+.modal-panel-lg { width: min(760px, 94vw); }
