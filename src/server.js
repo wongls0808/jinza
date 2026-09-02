@@ -372,7 +372,8 @@ async function handleApi(req, res) {
             subject,
             text,
             replyTo: ruleReply || email || undefined,
-            fromName: (rule && rule.fromName) || (cfg.smtp && cfg.smtp.fromName),
+            /* 发件抬头：默认用该 PI 的供应商抬头（多抬头发送），关联规则可覆盖 */
+            fromName: (rule && rule.fromName) || credName || (cfg.smtp && cfg.smtp.fromName),
             attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdfBase64 }]
           });
           okCount++;
