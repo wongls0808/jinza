@@ -538,6 +538,10 @@ function showSection(key) {
       sectionDataTitleEl.textContent =
         entityLabelMap.get(key) || sectionDataTitleEl.textContent;
     }
+    /* 进入列表复位：回到第 1 页并清除勾选 */
+    const ui = getSectionUi(key);
+    ui.selected.clear();
+    ui.page = 1;
     renderSection(key, getEntityData(key));
     setActiveMenu(key);
     return;
@@ -5622,6 +5626,15 @@ function initSectionInteractions() {
         }
       }
       const toolsLeft = section.tools.querySelector(".tools-left");
+      if (toolsLeft && selectableEntities.has(entityName)) {
+        /* 通用：一键清除全部勾选 */
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "btn ghost";
+        clearBtn.textContent = "取消选择";
+        clearBtn.style.color = "#607d8b";
+        clearBtn.addEventListener("click", () => clearSelectionAndGoFirstPage(entityName));
+        toolsLeft.insertBefore(clearBtn, toolsLeft.firstChild);
+      }
       if (toolsLeft && entityName === "purchasePI") {
         /* PI 列表：注入删除选中按钮 */
         const delBtn = document.createElement("button");
@@ -5808,6 +5821,14 @@ function getSelectedItems(entityName) {
 }
 
 /* 按 docDate 升序（时间从旧到新），同日按 docNo 排序确保稳定 */
+/* UI 复位：清空勾选并回到第一页（进入列表 / 批量操作完成 / 同步完成后调用） */
+function clearSelectionAndGoFirstPage(entityName) {
+  const ui = getSectionUi(entityName);
+  ui.selected.clear();
+  ui.page = 1;
+  renderSection(entityName, getEntityData(entityName));
+}
+
 function sortByDateAsc(list) {
   return [...list].sort((a, b) => {
     const da = String(getFieldValue(a.record, "docDate") || "");
@@ -6006,6 +6027,7 @@ async function executeBatchCreatePO() {
     await apiPost("/api/data/sync", { entity: "purchaseOrder", items: state.data.purchaseOrder });
   } catch (e) { /* 静默 */ }
   appendLog(`批量创建PO完成: 成功 ${success}，失败 ${fail}，共 ${toCreateWithDate.length}`);
+  clearSelectionAndGoFirstPage("invoice");
 }
 
 /* ─── 批量创建 PI（PO → 本地PI，全自动匹配IV并生成连续PI号） ─── */
@@ -6155,6 +6177,7 @@ async function batchCreatePI() {
   renderSection("purchasePI", getEntityData("purchasePI"));
   renderSection("purchaseOrder", getEntityData("purchaseOrder"));
   appendLog(`批量创建PI完成: 成功 ${success}，失败 ${fail}，共 ${toCreate.length}`);
+  clearSelectionAndGoFirstPage("purchaseOrder");
 }
 
 /* ─── 批量创建采购发票（PI → AutoCount采购发票，全自动推送） ─── */
@@ -6341,6 +6364,7 @@ async function batchCreatePurchaseInvoice() {
     await apiPost("/api/data/sync", { entity: "purchaseInvoice", items: state.data.purchaseInvoice });
   } catch (e) { /* 静默 */ }
   appendLog(`批量创建采购发票完成: 成功 ${success}，失败 ${fail}，共 ${toCreate.length}`);
+  clearSelectionAndGoFirstPage("purchasePI");
 }
 
 /* ─── 批量删除本地 PI ─── */
@@ -6427,6 +6451,8 @@ async function syncEntity(entityName) {
       renderSection(affName, affData);
     }
   }
+  /* 同步完成：回到第一页并清除勾选 */
+  clearSelectionAndGoFirstPage(entity.name);
 }
 
 async function syncAll() {
@@ -6856,6 +6882,8 @@ initSectionInteractions();
 
 /* 启动: 优先从后端数据库加载，失败则回退 localStorage */
 (async function bootstrap() {
+  /* 优化：先渲染界面(列表壳+加载提示)，后端数据到达后再填充，避免等待期白屏 */
+  showSection("supplier");
   appendLog("正在从数据库加载数据...");
   const loaded = await loadAllFromBackend();
   if (!loaded) {
@@ -6880,7 +6908,6 @@ initSectionInteractions();
     renderSection("purchasePI", piItems);
   }
   appendLog("前端已就绪。" + (loaded ? " 数据已从数据库恢复。" : ""));
-  showSection("supplier");
 
   /* 每 5 分钟自动同步所有 AutoCount 数据 */
   setInterval(async () => {

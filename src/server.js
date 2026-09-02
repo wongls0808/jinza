@@ -9,6 +9,7 @@ process.on("unhandledRejection", (err) => {
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db;
 try {
@@ -63,12 +64,28 @@ const MIME = {
 /* ────── 工具函数 ────── */
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
-  res.writeHead(status, {
+  const headers = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Key-ID, API-Key"
-  });
+  };
+  /* 大响应 gzip：全量数据接口(如 /api/data/all)可压缩到约 1/5，显著加快首次加载 */
+  const accept = String((res.req && res.req.headers && res.req.headers["accept-encoding"]) || "");
+  if (body.length > 2048 && accept.includes("gzip")) {
+    zlib.gzip(body, (err, buf) => {
+      if (err || !buf) {
+        res.writeHead(status, headers);
+        res.end(body);
+        return;
+      }
+      headers["Content-Encoding"] = "gzip";
+      res.writeHead(status, headers);
+      res.end(buf);
+    });
+    return;
+  }
+  res.writeHead(status, headers);
   res.end(body);
 }
 
