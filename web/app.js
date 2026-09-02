@@ -7207,7 +7207,7 @@ function closeMailRuleEditor() {
   if (ed) ed.style.display = "none";
 }
 
-function saveMailRuleFromEditor() {
+async function saveMailRuleFromEditor() {
   const edSel = $("mailRuleEditorSelect");
   if (!edSel) return;
   const code = edSel.value || "";
@@ -7251,15 +7251,28 @@ function saveMailRuleFromEditor() {
   if (curIdx >= 0) rules[curIdx] = rec; else rules.push(rec);
   closeMailRuleEditor();
   renderMailRuleList();
-  appendLog("供应商邮件档案已保存（共 " + rules.length + " 家），请点下方“保存设置”写入系统");
+  try {
+    await persistMailSettingsNow();
+    appendLog("供应商邮件档案已保存并写入系统（共 " + rules.length + " 家）");
+    alert("已保存到系统 ✓（供应商档案 " + rules.length + " 家，可继续配置或发送）");
+  } catch (e) {
+    appendLog("保存失败: " + e.message);
+    alert("保存失败: " + e.message);
+  }
 }
 
-function removeMailRuleAt(i) {
+async function removeMailRuleAt(i) {
   const rules = getMailRules();
   if (i >= 0 && i < rules.length) {
     rules.splice(i, 1);
     renderMailRuleList();
-    appendLog("供应商邮件档案已删除（剩余 " + rules.length + " 家），请点下方“保存设置”写入系统");
+    try {
+      await persistMailSettingsNow();
+      appendLog("已删除供应商档案（剩余 " + rules.length + " 家）");
+    } catch (e) {
+      appendLog("删除后保存失败: " + e.message);
+      alert("删除后保存失败: " + e.message);
+    }
   }
 }
 
@@ -7302,8 +7315,13 @@ async function sendPiMail(list) {
     rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));
     if (r.sent > 0) clearSelectionAndGoFirstPage("purchasePI");
+    if ((r.failed || 0) > 0) {
+      const firstErr = (rs.find((it) => !it.ok) || {}).error || "未知原因";
+      alert("有 " + r.failed + " 封发送失败，第一封原因：\\n" + firstErr + "\\n\\n（详见同步日志）");
+    }
   } catch (e) {
     appendLog("邮件发送失败: " + e.message);
+    alert("邮件发送失败: " + e.message);
   }
 }
 
@@ -7398,14 +7416,19 @@ async function buildPrintPdfBase64ViaServer(pi) {
   return r.base64 || "";
 }
 
+async function persistMailSettingsNow() {
+  const form = collectMailSettingsForm();
+  await mailApi("/api/mail/config", { method: "POST", body: { config: form } });
+  window.mailRulesTmp = Array.isArray(form.supplierRules) ? form.supplierRules.map((x) => ({ ...x })) : [];
+  renderMailRuleList();
+  return form;
+}
+
 async function saveMailSettings() {
   try {
-    const form = collectMailSettingsForm();
-    await mailApi("/api/mail/config", { method: "POST", body: { config: form } });
+    const form = await persistMailSettingsNow();
     appendLog("邮件设置已保存。");
-    window.mailRulesTmp = Array.isArray(form.supplierRules) ? form.supplierRules.map((x) => ({ ...x })) : [];
-    renderMailRuleList();
-    alert("邮件设置已保存 ✓（供应商关联 " + (form.supplierRules || []).length + " 条）");
+    alert("邮件设置已保存 ✓（供应商档案 " + (form.supplierRules || []).length + " 家）");
   } catch (e) {
     appendLog("保存邮件设置失败: " + e.message);
     alert("保存失败: " + e.message);
