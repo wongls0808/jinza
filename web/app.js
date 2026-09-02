@@ -7172,15 +7172,71 @@ async function testMailSettings() {
   }
 }
 
+/* ── 用"打印 PI"同款排版生成 PDF 附件(base64) ── */
+async function renderPrintHtmlToPdfBase64(htmlStr) {
+  if (!window.html2canvas || !window.jspdf) throw new Error("PDF 组件未加载，请刷新页面后重试");
+  const styleMatch = (htmlStr.match(/<style[^>]*>[\s\S]*?<\/style>/g) || []).join("\n").replace(/<\/?style[^>]*>/g, "");
+  const bodyMatch = htmlStr.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-20000px;top:0;width:794px;background:#ffffff;";
+  document.body.appendChild(host);
+  const styleEl = document.createElement("style");
+  styleEl.textContent = styleMatch;
+  document.head.appendChild(styleEl);
+  try {
+    if (bodyMatch) host.innerHTML = bodyMatch[1]; else host.innerHTML = htmlStr;
+    const imgs = Array.from(host.querySelectorAll("img"));
+    await Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : new Promise((r2) => { img.onload = r2; img.onerror = r2; }))));
+    await new Promise((r2) => setTimeout(r2, 120));
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const pages = Array.from(host.querySelectorAll(".page"));
+    const targets = pages.length ? pages : [host];
+    for (let i = 0; i < targets.length; i++) {
+      const canvas = await window.html2canvas(targets[i], { scale: 2, useCORS: true, backgroundColor: "#ffffff", width: 794, windowWidth: 794, logging: false });
+      if (i > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, 210, 297, undefined, "FAST");
+    }
+    const dataUri = pdf.output("datauristring");
+    return dataUri.slice(dataUri.indexOf(",") + 1);
+  } finally {
+    if (styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
+/* 按打印格式生成某张 PI 的 PDF(base64) */
+async function buildPiPdfAttachmentBase64(pi) {
+  const baseHref = getPrintBaseHref();
+  const record = extractRecord(pi);
+  const creditorCode = pi?.printProfileKey || record?.creditorCode || pi?.creditorCode || record?.accNo || "";
+  const creditorName = record?.creditorName || pi?.creditorName || "";
+  const profile = resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
+  const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
+  const stampSrc = await getStampSrcWithOverride(stampOverride);
+  const htmlStr = buildPiPrintHtml(pi, stampSrc, baseHref, profile);
+  return renderPrintHtmlToPdfBase64(htmlStr);
+}
+
 /* 发送 PI 邮件：list 为 PI 原始项（state.data.purchasePI 元素） */
 async function sendPiMail(list) {
   const items = Array.isArray(list) ? list : [];
   if (items.length === 0) return;
-  if (!confirm(`确认发送 ${items.length} 封 PI 邮件？
-收件人取系统设置中的默认地址，每封按各自供应商抬头发送。`)) return;
-  appendLog("正在发送 PI 邮件...");
+  if (!confirm(`确认发送 ${items.length} 封 PI 邮件？\n收件人取系统设置中的默认地址，每封按各自供应商抬头 + 打印版 PDF 附件发送。`)) return;
+  appendLog("正在生成 PDF 附件并发送 PI 邮件...");
+  const pdfs = {};
+  for (let i = 0; i < items.length; i++) {
+    const pi = items[i];
+    const docNo = (pi && (pi.docNo || (pi.master && pi.master.docNo))) || "PI";
+    try {
+      appendLog("生成附件 " + (i + 1) + "/" + items.length + ": " + docNo + " ...");
+      pdfs[docNo] = { base64: await buildPiPdfAttachmentBase64(pi) };
+    } catch (e) {
+      appendLog("附件生成失败(" + docNo + "): " + e.message + "（将使用服务端简化 PDF）");
+    }
+  }
   try {
-    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items } });
+    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs } });
     const rs = r.results || [];
     rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));

@@ -341,15 +341,23 @@ async function handleApi(req, res) {
             ivCustomerName: pi.ivCustomerName || rec.ivCustomerName || ""
           };
           const text = mail.fillTemplate(cfg.bodyTemplate, vars);
-          const subject = "PI " + docNo + (credName ? " - " + credName : "");
-          const pdf = await piPdf.renderPiPdf(pi, profile);
+          const subject = docNo + (credName ? " - " + credName : "");
+          /* 附件 PDF：优先使用前端按打印模板生成的版本，否则服务端生成简化版 */
+          const pre = body.pdfAttachments && body.pdfAttachments[docNo];
+          let pdfBase64 = "";
+          if (pre && pre.base64) {
+            pdfBase64 = String(pre.base64);
+          } else {
+            const pdf = await piPdf.renderPiPdf(pi, profile);
+            pdfBase64 = pdf.toString("base64");
+          }
           const info = await mail.sendMail({
             to: ruleTo || undefined,
             subject,
             text,
             replyTo: ruleReply || email || undefined,
             fromName: (rule && rule.fromName) || (cfg.smtp && cfg.smtp.fromName),
-            attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdf.toString("base64") }]
+            attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdfBase64 }]
           });
           okCount++;
           results.push({ docNo, ok: true, messageId: info.messageId, to: info.accepted || [] });
