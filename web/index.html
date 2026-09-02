@@ -40,7 +40,7 @@
           </div>
           <div class="menu-group">
             <div class="menu-title">系统</div>
-            <button class="menu-btn" id="mailSettingsBtn">邮件发送设置</button>
+            <button class="menu-btn" id="mailSettingsBtn" onclick="openMailSettingsModal()">邮件发送设置</button>
           </div>
         </nav>
       </aside>
@@ -832,12 +832,12 @@
       <div class="modal-panel modal-panel-lg">
         <div class="modal-header">
           <h3>邮件发送设置</h3>
-          <button id="mailSettingsClose" class="btn ghost">关闭</button>
+          <button id="mailSettingsClose" class="btn ghost" onclick="closeMailSettingsModal()">关闭</button>
         </div>
         <div class="modal-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <label class="modal-field"><span>SMTP 预设</span>
-              <select id="mailPreset"><option value="">自定义</option><option value="hotmail">Hotmail / Outlook</option><option value="gmail">Gmail</option><option value="yeahnet">Yeah.net</option><option value="qq">QQ 邮箱</option><option value="mail163">163 邮箱</option></select>
+              <select id="mailPreset" onchange="applyMailPreset(this.value)"><option value="">自定义</option><option value="hotmail">Hotmail / Outlook</option><option value="gmail">Gmail</option><option value="yeahnet">Yeah.net</option><option value="qq">QQ 邮箱</option><option value="mail163">163 邮箱</option></select>
             </label>
             <label class="modal-field"><span>SMTP 服务器</span><input id="mailHost" placeholder="smtp.xxx.com" /></label>
           </div>
@@ -869,8 +869,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button id="mailTestBtn" class="btn ghost">发送测试邮件</button>
-          <button id="mailSaveBtn" class="btn primary">保存设置</button>
+          <button id="mailTestBtn" class="btn ghost" onclick="testMailSettings()">发送测试邮件</button>
+          <button id="mailSaveBtn" class="btn primary" onclick="saveMailSettings()">保存设置</button>
         </div>
       </div>
     </div>

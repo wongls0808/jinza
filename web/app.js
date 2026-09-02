@@ -7079,24 +7079,11 @@ async function sendPiMail(list) {
   }
 }
 
-/* 预设联动 */
-(function initMailUi() {
-  const preset = $("mailPreset");
-  if (preset) {
-    preset.addEventListener("change", () => {
-      const p = MAIL_PRESETS[preset.value];
-      if (!p) return;
-      const h = $("mailHost"); if (h) h.value = p.host;
-      const pt = $("mailPort"); if (pt) pt.value = String(p.port);
-      const sec = $("mailSecure"); if (sec) sec.checked = !!p.secure;
-    });
-  }
-  const openBtn = $("mailSettingsBtn");
-  if (openBtn) openBtn.addEventListener("click", openMailSettingsModal);
-  const closeBtn = $("mailSettingsClose");
-  if (closeBtn) closeBtn.addEventListener("click", closeMailSettingsModal);
-  const saveBtn = $("mailSaveBtn");
-  if (saveBtn) saveBtn.addEventListener("click", saveMailSettings);
-  const testBtn = $("mailTestBtn");
-  if (testBtn) testBtn.addEventListener("click", testMailSettings);
-})();
+/* 预设联动（HTML onchange 调用） */
+function applyMailPreset(presetKey) {
+  const p = MAIL_PRESETS[presetKey];
+  if (!p) return;
+  const h = $("mailHost"); if (h) h.value = p.host;
+  const pt = $("mailPort"); if (pt) pt.value = String(p.port);
+  const sec = $("mailSecure"); if (sec) sec.checked = !!p.secure;
+}
