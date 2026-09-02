@@ -57,6 +57,7 @@ async function getMailConfig() {
     replyToFixed: "",
     bodyTemplate: DEFAULT_TEMPLATE,
     supplierRules: [],
+    attachStyle: "server",
     ...cfg,
     supplierRules: Array.isArray(cfg.supplierRules) ? cfg.supplierRules : [],
     smtp: { preset: "", host: "", port: 587, secure: false, user: "", pass: "", fromName: "AutoCount PI", ...(cfg.smtp || {}) }
@@ -73,6 +74,7 @@ async function saveMailConfig(cfg) {
     replyMode: cfg && cfg.replyMode ? cfg.replyMode : existing.replyMode,
     replyToFixed: cfg && typeof cfg.replyToFixed === "string" ? cfg.replyToFixed : existing.replyToFixed,
     bodyTemplate: cfg && typeof cfg.bodyTemplate === "string" ? cfg.bodyTemplate : existing.bodyTemplate,
+    attachStyle: cfg && (cfg.attachStyle === "print" || cfg.attachStyle === "server") ? cfg.attachStyle : (existing.attachStyle || "server"),
     supplierRules: cfg && Array.isArray(cfg.supplierRules) ? cfg.supplierRules : existing.supplierRules
   };
   /* 密码为空串表示“保持不变” */

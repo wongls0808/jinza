@@ -484,6 +484,14 @@
         </div>
         <label class="modal-field"><span>固定回复地址（当选择“固定地址”时使用）</span><input id="mailReplyToFixed" placeholder="contact@supplier.com" /></label>
         <div class="modal-field">
+          <div class="modal-field">
+            <label>附件 PDF 版式</label>
+            <select id="mailAttachStyle">
+              <option value="server">标准矢量 PDF（推荐，无放大、体积小）</option>
+              <option value="print">与“打印 PI”同款排版（截图生成）</option>
+            </select>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">若打印同款出现放大/偏差，请选用标准矢量 PDF。</div>
+          </div>
           <label>邮件正文模板（文本，可含占位符）</label>
           <textarea id="mailBodyTemplate" rows="8" spellcheck="false"></textarea>
           <div style="font-size:11.5px;color:#94a3b8;margin-top:4px;line-height:1.5;">可用占位符: {docNo} {creditorName} {creditorCode} {attention} {docDate} {currencyCode} {piTotal} {validityDate} {referencePoNo} {sourcePONo} {ivCustomerName}</div>

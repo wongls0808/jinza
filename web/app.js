@@ -7003,6 +7003,7 @@ async function populateMailSettings() {
     set("mailReplyMode", c.replyMode || "pi");
     set("mailReplyToFixed", c.replyToFixed || "");
     set("mailBodyTemplate", c.bodyTemplate || "");
+    set("mailAttachStyle", c.attachStyle || "server");
     window.mailRulesTmp = Array.isArray(c.supplierRules) ? c.supplierRules.map((x) => ({ ...x })) : [];
     renderMailRuleList();
     const sec = $("mailSecure"); if (sec) sec.checked = !!(s.secure || Number(s.port) === 465);
@@ -7052,6 +7053,7 @@ function collectMailSettingsForm() {
     replyMode: v("mailReplyMode") || "pi",
     replyToFixed: v("mailReplyToFixed"),
     bodyTemplate: v("mailBodyTemplate"),
+    attachStyle: v("mailAttachStyle") || "server",
     supplierRules: collectMailSupplierRules()
   };
 }
@@ -7087,7 +7089,32 @@ function renderMailRuleList() {
   if (!list) return;
   const rules = getMailRules();
   if (rules.length === 0) {
-    list.innerHTML = '<div style="font-size:12.5px;color:#94a3b8;padding:8px 4px;">暂无供应商关联 —— 点击下方“＋ 添加供应商关联”建立（保存后此处以列表显示，可随时编辑/删除）</div>';
+    /* 未配置时也先显示"供应商候选列表"，便于逐户添加 */
+    const listSup = state.data.supplier || [];
+    const seen2 = {};
+    const cand = [];
+    listSup.forEach((it) => {
+      const rec = extractRecord(it);
+      const code = rec.accNo || rec.AccNo || "";
+      const name = rec.companyName || rec.CompanyName || "";
+      if (!code || seen2[code]) return;
+      seen2[code] = true;
+      cand.push({ code: code, name: name });
+    });
+    if (cand.length === 0) {
+      list.innerHTML = '<div style="font-size:12.5px;color:#94a3b8;padding:8px 4px;">暂无供应商数据（请先同步供应商）。</div>';
+      return;
+    }
+    list.innerHTML =
+      '<div style="font-size:12.5px;color:#94a3b8;padding:4px 2px 6px;">已同步供应商（点击“配置”为该供应商建立邮件关联）：</div>' +
+      cand.map((c) =>
+        '<div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px dashed #d5dde8;border-radius:10px;padding:6px 10px;">' +
+        '<strong style="min-width:88px;">' + escapeHtml(c.code) + '</strong>' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:#475569;">' + escapeHtml(c.name) + '</span>' +
+        '<span style="font-size:12px;color:#94a3b8;">未配置</span>' +
+        '<button type="button" class="btn ghost" style="padding:4px 10px;" data-code="' + escapeHtml(c.code) + '" onclick="openMailRuleEditorForFromButton(this)">配置</button>' +
+        '</div>'
+      ).join("");
     return;
   }
   list.innerHTML = rules.map((r, i) =>
@@ -7102,6 +7129,15 @@ function renderMailRuleList() {
   ).join("");
 }
 
+function openMailRuleEditorForFromButton(btn) {
+  if (!btn) return;
+  const code = btn.getAttribute("data-code") || "";
+  openMailRuleEditorFor(code);
+}
+function openMailRuleEditorFor(code) {
+  window.mailRulePrefillCode = code || "";
+  openMailRuleEditor();
+}
 function openMailRuleEditor(idx) {
   const ed = $("mailRuleEditor");
   const edSel = $("mailRuleEditorSelect");
@@ -7111,7 +7147,12 @@ function openMailRuleEditor(idx) {
   window.mailRuleEditIndex = (idx === undefined || idx === null) ? -1 : idx;
   const rules = getMailRules();
   const cur = window.mailRuleEditIndex >= 0 && rules[window.mailRuleEditIndex] ? rules[window.mailRuleEditIndex] : null;
-  edSel.innerHTML = buildMailSupplierOptions(cur ? cur.supplierCode : "");
+  let prefill = "";
+  if (!cur && window.mailRulePrefillCode) {
+    prefill = window.mailRulePrefillCode;
+    window.mailRulePrefillCode = "";
+  }
+  edSel.innerHTML = buildMailSupplierOptions(cur ? cur.supplierCode : prefill);
   edSel.disabled = false;
   if ((state.data.supplier || []).length === 0) {
     edSel.innerHTML = '<option value="">（请先同步供应商数据）</option>';
@@ -7161,21 +7202,31 @@ function removeMailRuleAt(i) {
 async function sendPiMail(list) {
   const items = Array.isArray(list) ? list : [];
   if (items.length === 0) return;
-  if (!confirm(`确认发送 ${items.length} 封 PI 邮件？\n收件人取系统设置中的默认地址，每封按各自供应商抬头 + 打印版 PDF 附件发送。`)) return;
-  appendLog("正在生成 PDF 附件并发送 PI 邮件...");
+  if (!confirm(`确认发送 ${items.length} 封 PI 邮件？\n每封按各自供应商抬头发送，附件按设置中的 PDF 版式生成。`)) return;
+  let attachStyle = "server";
+  try {
+    const cfgR = await mailApi("/api/mail/config");
+    attachStyle = (cfgR.config && cfgR.config.attachStyle) || "server";
+  } catch (e) { /* 忽略，用默认 */ }
+  const usePrint = attachStyle === "print";
   const pdfs = {};
-  for (let i = 0; i < items.length; i++) {
-    const pi = items[i];
-    const docNo = (pi && (pi.docNo || (pi.master && pi.master.docNo))) || "PI";
-    try {
-      appendLog("生成附件 " + (i + 1) + "/" + items.length + ": " + docNo + " ...");
-      pdfs[docNo] = { base64: await buildPiPdfAttachmentBase64(pi) };
-    } catch (e) {
-      appendLog("附件生成失败(" + docNo + "): " + e.message + "（将使用服务端简化 PDF）");
+  if (usePrint) {
+    appendLog("正在按打印排版生成 PDF 附件...");
+    for (let i = 0; i < items.length; i++) {
+      const pi = items[i];
+      const docNo = (pi && (pi.docNo || (pi.master && pi.master.docNo))) || "PI";
+      try {
+        appendLog("生成附件 " + (i + 1) + "/" + items.length + ": " + docNo + " ...");
+        pdfs[docNo] = { base64: await buildPiPdfAttachmentBase64(pi) };
+      } catch (e) {
+        appendLog("附件生成失败(" + docNo + "): " + e.message + "（将使用服务端矢量 PDF）");
+      }
     }
+  } else {
+    appendLog("正在发送 PI 邮件（附件：服务端标准矢量 PDF）...");
   }
   try {
-    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs } });
+    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: usePrint } });
     const rs = r.results || [];
     rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));

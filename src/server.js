@@ -342,10 +342,11 @@ async function handleApi(req, res) {
           };
           const text = mail.fillTemplate(cfg.bodyTemplate, vars);
           const subject = docNo + (credName ? " - " + credName : "");
-          /* 附件 PDF：优先使用前端按打印模板生成的版本，否则服务端生成简化版 */
+          /* 附件 PDF：print=用前端打印同款;server(默认)=服务端矢量 PDF(无放大) */
+          const usePrint = body.usePrintPdf === true;
           const pre = body.pdfAttachments && body.pdfAttachments[docNo];
           let pdfBase64 = "";
-          if (pre && pre.base64) {
+          if (usePrint && pre && pre.base64) {
             pdfBase64 = String(pre.base64);
           } else {
             const pdf = await piPdf.renderPiPdf(pi, profile);
