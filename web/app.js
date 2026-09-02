@@ -7003,7 +7003,7 @@ async function populateMailSettings() {
     set("mailReplyMode", c.replyMode || "pi");
     set("mailReplyToFixed", c.replyToFixed || "");
     set("mailBodyTemplate", c.bodyTemplate || "");
-    set("mailAttachStyle", c.attachStyle || "server");
+    set("mailAttachStyle", c.attachStyle || "browser");
     window.mailRulesTmp = Array.isArray(c.supplierRules) ? c.supplierRules.map((x) => ({ ...x })) : [];
     renderMailRuleList();
     const sec = $("mailSecure"); if (sec) sec.checked = !!(s.secure || Number(s.port) === 465);
@@ -7053,7 +7053,7 @@ function collectMailSettingsForm() {
     replyMode: v("mailReplyMode") || "pi",
     replyToFixed: v("mailReplyToFixed"),
     bodyTemplate: v("mailBodyTemplate"),
-    attachStyle: v("mailAttachStyle") || "server",
+    attachStyle: v("mailAttachStyle") || "browser",
     supplierRules: collectMailSupplierRules()
   };
 }
@@ -7208,25 +7208,31 @@ async function sendPiMail(list) {
     const cfgR = await mailApi("/api/mail/config");
     attachStyle = (cfgR.config && cfgR.config.attachStyle) || "server";
   } catch (e) { /* 忽略，用默认 */ }
-  const usePrint = attachStyle === "print";
   const pdfs = {};
-  if (usePrint) {
-    appendLog("正在按打印排版生成 PDF 附件...");
+  let anyPdf = false;
+  if (attachStyle === "server") {
+    appendLog("正在发送 PI 邮件（附件：服务端标准矢量 PDF）...");
+  } else {
+    appendLog(attachStyle === "browser" ? "正在模拟浏览器打印生成附件（与“另存为 PDF”一致）..." : "正在按打印排版(截图)生成附件...");
     for (let i = 0; i < items.length; i++) {
       const pi = items[i];
       const docNo = (pi && (pi.docNo || (pi.master && pi.master.docNo))) || "PI";
       try {
         appendLog("生成附件 " + (i + 1) + "/" + items.length + ": " + docNo + " ...");
-        pdfs[docNo] = { base64: await buildPiPdfAttachmentBase64(pi) };
+        let b64 = "";
+        if (attachStyle === "browser") {
+          b64 = await buildPrintPdfBase64ViaServer(pi);
+        } else {
+          b64 = await buildPiPdfAttachmentBase64(pi);
+        }
+        if (b64) { pdfs[docNo] = { base64: b64 }; anyPdf = true; }
       } catch (e) {
-        appendLog("附件生成失败(" + docNo + "): " + e.message + "（将使用服务端矢量 PDF）");
+        appendLog("附件生成失败(" + docNo + "): " + e.message + "（该封将回退为服务端矢量 PDF）");
       }
     }
-  } else {
-    appendLog("正在发送 PI 邮件（附件：服务端标准矢量 PDF）...");
   }
   try {
-    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: usePrint } });
+    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: anyPdf } });
     const rs = r.results || [];
     rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));
@@ -7303,7 +7309,7 @@ async function renderPrintHtmlToPdfBase64(htmlStr) {
 }
 
 /* 按打印格式生成某张 PI 的 PDF(base64) */
-async function buildPiPdfAttachmentBase64(pi) {
+async function buildPiPrintHtmlForPdf(pi) {
   const baseHref = getPrintBaseHref();
   const record = extractRecord(pi);
   const creditorCode = pi?.printProfileKey || record?.creditorCode || pi?.creditorCode || record?.accNo || "";
@@ -7311,8 +7317,20 @@ async function buildPiPdfAttachmentBase64(pi) {
   const profile = resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
   const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
   const stampSrc = await getStampSrcWithOverride(stampOverride);
-  const htmlStr = buildPiPrintHtml(pi, stampSrc, baseHref, profile);
+  return buildPiPrintHtml(pi, stampSrc, baseHref, profile);
+}
+
+/* 客户端截图 PDF(print 模式) */
+async function buildPiPdfAttachmentBase64(pi) {
+  const htmlStr = await buildPiPrintHtmlForPdf(pi);
   return renderPrintHtmlToPdfBase64(htmlStr);
+}
+
+/* 服务端模拟浏览器打印 PDF(browser 模式,与另存 PDF 一致) */
+async function buildPrintPdfBase64ViaServer(pi) {
+  const htmlStr = await buildPiPrintHtmlForPdf(pi);
+  const r = await mailApi("/api/mail/html-pdf", { method: "POST", body: { html: htmlStr } });
+  return r.base64 || "";
 }
 
 async function saveMailSettings() {

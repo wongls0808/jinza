@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf;
+let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf, printPdf;
 try {
   ({ getEntity, entities } = require("./sync/entities"));
   ({ syncAll, syncEntity } = require("./sync/run"));
@@ -19,6 +19,7 @@ try {
   db = require("./db");
   mail = require("./mail");
   piPdf = require("./pi-pdf");
+  printPdf = require("./print-pdf");
   console.log("All modules loaded successfully.");
 } catch (err) {
   console.error("Module load error:", err.message);
@@ -252,6 +253,20 @@ async function handleApi(req, res) {
     }
     await db.setSyncState(entity, lastSync || null, meta || {});
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* ── 模拟浏览器打印生成 PDF（打印同款附件） ── */
+  if (url === "/api/mail/html-pdf" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      const html = body && typeof body.html === "string" ? body.html : "";
+      if (!html) { sendJson(res, 400, { ok: false, error: "缺少 html" }); return; }
+      const buf = await printPdf.pdfFromHtml(html);
+      sendJson(res, 200, { ok: true, bytes: buf.length, base64: buf.toString("base64") });
+    } catch (e) {
+      sendJson(res, 500, { ok: false, error: "打印引擎不可用: " + e.message });
+    }
     return;
   }
 
