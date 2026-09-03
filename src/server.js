@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf, printPdf, imap;
+let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf, printPdf, imap, companyMod;
 try {
   ({ getEntity, entities } = require("./sync/entities"));
   ({ syncAll, syncEntity } = require("./sync/run"));
@@ -19,6 +19,7 @@ try {
   db = require("./db");
   mail = require("./mail");
   imap = require("./imap");
+  companyMod = require("./company");
   piPdf = require("./pi-pdf");
   printPdf = require("./print-pdf");
   console.log("All modules loaded successfully.");
@@ -176,7 +177,7 @@ async function handleApi(req, res) {
   }
 
   /* 数据库可用性检查（数据相关 API 需要数据库） */
-  const dbRequired = url.startsWith("/api/data/") || url === "/api/config" || url === "/api/syncstate" || url === "/api/pi" || url.startsWith("/api/pi/") || url === "/api/mail/config" || url === "/api/mail/test" || url === "/api/mail/send" || url === "/api/mail/send-pi";
+  const dbRequired = url.startsWith("/api/data/") || url === "/api/config" || url === "/api/syncstate" || url === "/api/pi" || url.startsWith("/api/pi/") || url === "/api/mail/config" || url === "/api/mail/test" || url === "/api/mail/send" || url === "/api/mail/send-pi" || url === "/api/company";
   if (dbRequired && !db.isDbAvailable()) {
     sendJson(res, 503, { ok: false, error: "数据库未连接" });
     return;
@@ -185,12 +186,13 @@ async function handleApi(req, res) {
   /* ── 加载全部数据（前端启动时调用） ── */
   if (url === "/api/data/all" && req.method === "GET") {
     try {
-      const [syncData, syncState, piList, config, sentEmails] = await Promise.all([
+      const [syncData, syncState, piList, config, sentEmails, company] = await Promise.all([
         db.getAllSyncData().catch((e) => { console.error("getAllSyncData error:", e.message); return {}; }),
         db.getSyncState().catch((e) => { console.error("getSyncState error:", e.message); return {}; }),
         db.getAllPurchasePI().catch((e) => { console.error("getAllPurchasePI error:", e.message); return []; }),
         db.getConfig("autocount").catch((e) => { console.error("getConfig error:", e.message); return null; }),
-        db.listSentEmails().catch((e) => { console.error("listSentEmails error:", e.message); return {}; })
+        db.listSentEmails().catch((e) => { console.error("listSentEmails error:", e.message); return {}; }),
+        companyMod.getCompany().catch((e) => { console.error("getCompany error:", e.message); return companyMod.DEFAULT_COMPANY; })
       ]);
       sendJson(res, 200, {
         ok: true,
@@ -198,7 +200,8 @@ async function handleApi(req, res) {
         syncState: syncState || {},
         purchasePI: piList || [],
         config: config || null,
-        sentEmails: sentEmails || {}
+        sentEmails: sentEmails || {},
+        company: company || companyMod.DEFAULT_COMPANY
       });
     } catch (e) {
       console.error("/api/data/all fatal:", e.message);
@@ -219,6 +222,21 @@ async function handleApi(req, res) {
   if (url === "/api/config" && req.method === "GET") {
     const config = await db.getConfig("autocount");
     sendJson(res, 200, { ok: true, config: config || null });
+    return;
+  }
+
+  /* ── 获取主体公司信息 ── */
+  if (url === "/api/company" && req.method === "GET") {
+    const company = await companyMod.getCompany();
+    sendJson(res, 200, { ok: true, company });
+    return;
+  }
+
+  /* ── 保存主体公司信息 ── */
+  if (url === "/api/company" && req.method === "POST") {
+    const body = await collectBody(req);
+    const company = await companyMod.saveCompany(body || {});
+    sendJson(res, 200, { ok: true, company });
     return;
   }
 
@@ -329,6 +347,7 @@ async function handleApi(req, res) {
       const replyByInbox = body.replyByInbox === true;
       const cfg = await mail.getMailConfig();
       const ac = await db.getConfig("autocount");
+      const buyerCompany = await companyMod.getCompany();
       const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; };
       const sdate = (v) => { if (!v) return ""; const s = String(v); const m = s.match(/^\d{4}-\d{2}-\d{2}/); return m ? m[0] : s.slice(0, 10); };
       const results = [];
@@ -370,7 +389,7 @@ async function handleApi(req, res) {
           if (usePrint && pre && pre.base64) {
             pdfBase64 = String(pre.base64);
           } else {
-            const pdf = await piPdf.renderPiPdf(pi, profile);
+            const pdf = await piPdf.renderPiPdf(pi, profile, buyerCompany);
             pdfBase64 = pdf.toString("base64");
           }
           const ownSmtp = rule && rule.smtp && rule.smtp.user && rule.smtp.pass ? rule.smtp : null;

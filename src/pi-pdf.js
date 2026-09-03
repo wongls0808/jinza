@@ -24,7 +24,7 @@ function shortDate(v) {
 }
 function money(v) { const n = num(v); return Math.round(n * 100) / 100; }
 
-const BUYER = {
+const DEFAULT_BUYER = {
   name: "JINZA TRADING SDN. BHD.",
   reg: "Reg. No.: 202501024394 (1625807-K) | TIN: C60122406100",
   address: "2nd Floor, No. 185\nJalan Datuk Abang Abdul Rahim,\n93450 Kuching, Sarawak, Malaysia",
@@ -41,7 +41,7 @@ function safeFilename(name) {
   return String(name || "PI").replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80);
 }
 
-function buildPage({ doc, rec, pi, details, currency, totalText, validity, banks, stampSrc, pageNo, pageCount }) {
+function buildPage({ doc, rec, pi, details, currency, totalText, validity, banks, stampSrc, pageNo, pageCount, buyer }) {
   const M = 36, W = doc.page.width - M * 2;
   let y = M;
 
@@ -51,12 +51,13 @@ function buildPage({ doc, rec, pi, details, currency, totalText, validity, banks
   doc.moveTo(M, y).lineTo(M + W, y).strokeColor("#111").lineWidth(1).stroke();
   y += 6;
 
-  const buyerName = BUYER.name;
+  const b = buyer || DEFAULT_BUYER;
+  const buyerName = b.name;
   const seller = pick(rec, ["creditorName", "companyName"]) || "-";
   doc.fontSize(11).fillColor("#111");
   doc.text(buyerName, M, y);
   doc.fontSize(8.5).fillColor("#333");
-  doc.text(BUYER.reg, M, y + 13);
+  doc.text(b.reg, M, y + 13);
   doc.text("Buyer (Bill To)", M + W - 150, y, { width: 150, align: "right" });
   doc.text(buyerName, M + W - 150, y + 13, { width: 150, align: "right" });
   y += 34;
@@ -170,7 +171,7 @@ function buildPage({ doc, rec, pi, details, currency, totalText, validity, banks
 }
 
 /* 渲染单张 PI 的 PDF，返回 Buffer */
-function renderPiPdf(pi, profile) {
+function renderPiPdf(pi, profile, buyer) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 36, autoFirstPage: false, bufferPages: true });
@@ -193,7 +194,7 @@ function renderPiPdf(pi, profile) {
       const totalPages = Math.max(1, Math.ceil((details.length || 1) / Math.max(1, Math.floor((doc.page.height - 72 - 150) / 17))));
       const bufPages = [];
       // 简化：直接单 doc 渲染，多页由 buildPage 自动 addPage
-      buildPage({ doc, rec, pi, details, currency, totalText, validity, banks, stampSrc, pageNo: 1, pageCount: totalPages });
+      buildPage({ doc, rec, pi, details, currency, totalText, validity, banks, stampSrc, pageNo: 1, pageCount: totalPages, buyer: buyer || DEFAULT_BUYER });
 
       doc.end();
     } catch (e) { reject(e); }
@@ -204,4 +205,4 @@ function calcTotal(details) {
   return (details || []).reduce((s, d) => s + num(d.qty) * num(d.unitPrice), 0);
 }
 
-module.exports = { renderPiPdf, safeFilename, calcTotal, FALLBACK_BANKS };
+module.exports = { renderPiPdf, safeFilename, calcTotal, FALLBACK_BANKS, DEFAULT_BUYER };

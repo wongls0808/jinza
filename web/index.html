@@ -41,6 +41,7 @@
           <div class="menu-group">
             <div class="menu-title">系统</div>
             <button class="menu-btn" id="mailSettingsBtn" data-overlay-target="mailsettings">邮件发送设置</button>
+            <button class="menu-btn" id="companySettingsBtn" data-overlay-target="company">主体公司信息</button>
           </div>
         </nav>
       </aside>
@@ -541,6 +542,27 @@
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
           <button id="mailTestBtn" class="btn ghost" onclick="testMailSettings()">发送测试邮件</button>
           <button id="mailSaveBtn" class="btn primary" onclick="saveMailSettings()">保存设置</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="companySettingsModal" class="card overlay-section" data-overlay-title="主体公司信息" style="display:none;">
+      <div class="card-header">
+        <h2>主体公司信息</h2>
+        <span class="hint">此处信息用于所有单证(PI / 商业发票 / 装箱单 / Statement 等)抬头，修改后统一生效</span>
+      </div>
+      <div style="display:grid;gap:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <label class="modal-field"><span>公司名称</span><input id="companyName" placeholder="如 JINZA TRADING SDN. BHD." /></label>
+          <label class="modal-field"><span>注册号 / 税号</span><input id="companyReg" placeholder="Reg. No. / TIN" /></label>
+        </div>
+        <label class="modal-field"><span>公司地址（可多行）</span><textarea id="companyAddress" rows="3" placeholder="门牌/街道/城市/邮编/国家"></textarea></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <label class="modal-field"><span>电话 / 手机</span><input id="companyTel" placeholder="Tel / Mobile" /></label>
+          <label class="modal-field"><span>邮箱</span><input id="companyEmail" placeholder="E-mail" /></label>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
+          <button id="companySaveBtn" class="btn primary" onclick="saveCompanySettings()">保存信息</button>
         </div>
       </div>
     </section>

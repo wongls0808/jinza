@@ -1,8 +1,17 @@
 /* 判断是否为远程部署环境（非 localhost 即为远程） */
 const isRemote = !["localhost", "127.0.0.1"].includes(window.location.hostname);
 
+const COMPANY_DEFAULTS = {
+  name: "JINZA TRADING SDN. BHD.",
+  reg: "Reg. No.: 202501024394 (1625807-K) | TIN: C60122406100",
+  address: "2nd Floor, No. 185\nJalan Datuk Abang Abdul Rahim,\n93450 Kuching, Sarawak, Malaysia",
+  tel: "Tel / Mobile: 018-2556898",
+  email: "E-mail: jinza.sb@gmail.com"
+};
+
 const state = {
   sentEmails: {},
+  company: { ...COMPANY_DEFAULTS },
   config: {
     baseUrl: "",
     proxyBaseUrl: "",
@@ -496,7 +505,8 @@ const entityLabelMap = new Map(entities.map((entity) => [entity.name, entity.lab
 const sectionMap = new Map([
   ["log", document.getElementById("section-log")],
   ["data", document.getElementById("section-data")],
-  ["mailsettings", document.getElementById("mailSettingsModal")]
+  ["mailsettings", document.getElementById("mailSettingsModal")],
+  ["company", document.getElementById("companySettingsModal")]
 ]);
 
 function setActiveMenu(key) {
@@ -1143,6 +1153,8 @@ async function loadAllFromBackend() {
     }
     /* 已发送邮件标记 */
     state.sentEmails = (result.sentEmails && typeof result.sentEmails === "object") ? result.sentEmails : {};
+    /* 主体公司信息 */
+    state.company = { ...COMPANY_DEFAULTS, ...(result.company || {}) };
     appendLog(`从数据库加载完成。`);
     return true;
   } catch (e) {
@@ -3748,15 +3760,13 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
   const totalAmount = Number(pi.total) || calculatePiTotal(details);
   const total = formatNumberFixed(totalAmount);
   const amountWords = formatAmountWords(totalAmount);
+  const co = state.company || COMPANY_DEFAULTS;
   const buyerInfo = {
-    name: "JINZA TRADING SDN. BHD.",
-    reg: "Reg. No.: 202501024394 (1625807-K) | TIN: C60122406100",
-    address:
-      "2nd Floor, No. 185\n" +
-      "Jalan Datuk Abang Abdul Rahim,\n" +
-      "93450 Kuching, Sarawak, Malaysia",
-    tel: "Tel / Mobile: 018-2556898",
-    email: "E-mail: jinza.sb@gmail.com"
+    name: co.name || COMPANY_DEFAULTS.name,
+    reg: co.reg || COMPANY_DEFAULTS.reg,
+    address: co.address || COMPANY_DEFAULTS.address,
+    tel: co.tel || COMPANY_DEFAULTS.tel,
+    email: co.email || COMPANY_DEFAULTS.email
   };
   const supplier = {
     name: record.creditorName || "-",
@@ -4498,7 +4508,7 @@ async function createPurchaseInvoiceFromPo(
     status: "Local",
     sourcePONo: docNo,
     consigneeName: payload.master.deliverContact || "",
-    billToName: "JINZA TRADING SDN. BHD.",
+    billToName: (state.company && state.company.name) || COMPANY_DEFAULTS.name,
     /* 关键：把“供应商模板/公章档案”固化进 PI，确保后续打印不会受列表刷新影响 */
     printProfileKey: supplierRecord?.printProfileKey || supplierRecord?.code || payload.master.creditorCode || "",
     master: payload.master,
@@ -6925,6 +6935,10 @@ document.querySelectorAll(".menu-btn").forEach((button) => {
       if (target === "mailsettings") {
         populateMailSettings();
       }
+      /* 主体公司信息：进入时填充当前值 */
+      if (target === "company") {
+        populateCompanySettings();
+      }
     }
   });
 });
@@ -7480,6 +7494,38 @@ async function saveMailSettings() {
     alert("邮件设置已保存 ✓（供应商档案 " + (form.supplierRules || []).length + " 家）");
   } catch (e) {
     appendLog("保存邮件设置失败: " + e.message);
+    alert("保存失败: " + e.message);
+  }
+}
+
+/* 主体公司信息：填充设置表单 */
+function populateCompanySettings() {
+  const co = state.company || COMPANY_DEFAULTS;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
+  set("companyName", co.name);
+  set("companyReg", co.reg);
+  set("companyAddress", co.address);
+  set("companyTel", co.tel);
+  set("companyEmail", co.email);
+}
+
+/* 主体公司信息：保存 */
+async function saveCompanySettings() {
+  const v = (id) => { const el = document.getElementById(id); return el ? el.value : ""; };
+  const body = {
+    name: v("companyName"),
+    reg: v("companyReg"),
+    address: v("companyAddress"),
+    tel: v("companyTel"),
+    email: v("companyEmail")
+  };
+  try {
+    const r = await apiPost("/api/company", body);
+    state.company = { ...(state.company || COMPANY_DEFAULTS), ...(r.company || body) };
+    appendLog("主体公司信息已保存。");
+    alert("主体公司信息已保存 ✓（所有单证抬头将统一使用此信息）");
+  } catch (e) {
+    appendLog("保存主体公司信息失败: " + e.message);
     alert("保存失败: " + e.message);
   }
 }
