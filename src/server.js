@@ -11,13 +11,14 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf, printPdf;
+let getEntity, entities, syncAll, syncEntity, setRuntimeConfig, db, mail, piPdf, printPdf, imap;
 try {
   ({ getEntity, entities } = require("./sync/entities"));
   ({ syncAll, syncEntity } = require("./sync/run"));
   ({ setRuntimeConfig } = require("./config"));
   db = require("./db");
   mail = require("./mail");
+  imap = require("./imap");
   piPdf = require("./pi-pdf");
   printPdf = require("./print-pdf");
   console.log("All modules loaded successfully.");
@@ -325,6 +326,7 @@ async function handleApi(req, res) {
       const body = await collectBody(req);
       const pis = Array.isArray(body.pis) ? body.pis : [];
       if (pis.length === 0) { sendJson(res, 400, { ok: false, error: "缺少待发送的 PI 列表" }); return; }
+      const replyByInbox = body.replyByInbox === true;
       const cfg = await mail.getMailConfig();
       const ac = await db.getConfig("autocount");
       const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; };
@@ -372,14 +374,41 @@ async function handleApi(req, res) {
             pdfBase64 = pdf.toString("base64");
           }
           const ownSmtp = rule && rule.smtp && rule.smtp.user && rule.smtp.pass ? rule.smtp : null;
+          /* 回复式发送：在发信邮箱收件箱查找对应 PO 的往来邮件并串成线程 */
+          let threadSubject = subject;
+          let inReplyTo, references;
+          if (replyByInbox) {
+            const sendSmtp = ownSmtp || (cfg && cfg.smtp) || {};
+            const poToken = vars.sourcePONo || vars.referencePoNo || "";
+            if (!poToken) {
+              results.push({ docNo, ok: false, error: "回复模式：该 PI 无 PO 号，已取消（未标记发送）" });
+              continue;
+            }
+            let thread = null;
+            try {
+              thread = await imap.findThreadMail(sendSmtp, poToken);
+            } catch (e) {
+              results.push({ docNo, ok: false, error: "回复模式：查找 PO 邮件失败（" + poToken + "）: " + e.message });
+              continue;
+            }
+            if (!thread || !thread.messageId) {
+              results.push({ docNo, ok: false, error: "回复模式：收件箱未找到主题含 " + poToken + " 的邮件，已取消（未标记发送）" });
+              continue;
+            }
+            threadSubject = thread.subject || subject;
+            inReplyTo = thread.inReplyTo;
+            references = thread.references;
+          }
           const info = await mail.sendMail({
             smtp: ownSmtp || undefined,
             to: (rule && rule.to) || undefined,
             cc: (rule && rule.cc) || undefined,
             bcc: (rule && rule.bcc) || undefined,
-            subject,
+            subject: threadSubject,
             text,
             replyTo: (rule && rule.replyTo) || email || undefined,
+            inReplyTo: inReplyTo || undefined,
+            references: references || undefined,
             /* 发件抬头：独立账号用其显示名，否则用该 PI 供应商抬头 */
             fromName: (rule && rule.fromName) || credName || (ownSmtp && ownSmtp.fromName) || (cfg.smtp && cfg.smtp.fromName),
             attachments: [{ filename: piPdf.safeFilename(docNo) + ".pdf", base64: pdfBase64 }]

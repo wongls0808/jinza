@@ -149,6 +149,8 @@ async function sendMail(opts) {
     text: opts.text || "",
     html: opts.html || undefined,
     replyTo: replyTo || undefined,
+    inReplyTo: opts.inReplyTo || undefined,
+    references: opts.references || undefined,
     attachments
   });
   return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected };

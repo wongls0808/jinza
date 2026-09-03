@@ -7308,6 +7308,7 @@ async function sendPiMail(list) {
   const items = Array.isArray(list) ? list : [];
   if (items.length === 0) return;
   if (!confirm(`确认发送 ${items.length} 封 PI 邮件？\n每封按各自供应商抬头发送，附件按设置中的 PDF 版式生成。`)) return;
+  const replyByInbox = confirm(`是否以「回复收件箱中对应 PO 邮件」的方式发送？\n\n确定 = 回复模式：系统登录发信邮箱收件箱，查找主题含该 PI 对应 PO 号的邮件并回复（主题自动为 Re: 原主题）；找不到该邮件将取消该封，且不标记已发送。\n取消 = 普通新邮件发送（主题为 PI 编号）。`);
   let cfg = null;
   try {
     cfg = (await mailApi("/api/mail/config")).config || null;
@@ -7358,7 +7359,7 @@ async function sendPiMail(list) {
     }
   }
   try {
-    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: anyPdf } });
+    const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: anyPdf, replyByInbox: replyByInbox } });
     const rs = r.results || [];
     rs.forEach((it) => { appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)); if (it.ok) state.sentEmails[it.docNo] = new Date().toISOString(); });
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));
