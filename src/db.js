@@ -81,6 +81,15 @@ async function initTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS email_log (
+      id            SERIAL PRIMARY KEY,
+      doc_no        TEXT NOT NULL UNIQUE,
+      supplier_code TEXT,
+      message_id    TEXT,
+      sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
   dbAvailable = true;
   console.log("Database tables initialized.");
 }
@@ -191,6 +200,26 @@ async function deletePurchasePI(docNo) {
 
 /* ────────────────── exports ────────────────── */
 
+/* ── 邮件发送记录(用于 PI 列表"已发送"标记) ── */
+async function markEmailSent(docNo, supplierCode, messageId) {
+  const d = getPool();
+  await d.query(
+    `INSERT INTO email_log (doc_no, supplier_code, message_id, sent_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (doc_no)
+     DO UPDATE SET supplier_code = $2, message_id = $3, sent_at = NOW()`,
+    [docNo, supplierCode || null, messageId || null]
+  );
+}
+
+async function listSentEmails() {
+  const d = getPool();
+  const { rows } = await d.query("SELECT doc_no, sent_at FROM email_log ORDER BY sent_at DESC");
+  const map = {};
+  rows.forEach((r) => { map[r.doc_no] = r.sent_at; });
+  return map;
+}
+
 module.exports = {
   getPool,
   isDbAvailable,
@@ -204,5 +233,7 @@ module.exports = {
   setSyncData,
   getAllPurchasePI,
   addPurchasePI,
-  deletePurchasePI
+  deletePurchasePI,
+  markEmailSent,
+  listSentEmails
 };

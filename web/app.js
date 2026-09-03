@@ -2,6 +2,7 @@
 const isRemote = !["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 const state = {
+  sentEmails: {},
   config: {
     baseUrl: "",
     proxyBaseUrl: "",
@@ -654,7 +655,8 @@ const listColumns = {
     ["ivTotal", "IV Total"],
     ["piTotal", "PI Total"],
     ["currencyCode", "Currency"],
-    ["_createdFlag", "发票"]
+    ["_createdFlag", "发票"],
+    ["_emailSent", "邮件"]
   ],
 };
 
@@ -699,7 +701,7 @@ const columnWidthMap = {
   },
   purchasePI: {
     // ☑ | PINo | DocDate | Supplier | RefPONo | RefIVNo | IVCustomer | IVTotal | PITotal | Currency | 发票标识 | 操作(5btn)
-    sel: "30px 100px 85px 1fr 100px 100px 1fr 75px 75px 55px 40px 290px"
+    sel: "30px 100px 85px 1fr 100px 100px 1fr 75px 75px 55px 40px 40px 290px"
   },
 };
 
@@ -1139,6 +1141,8 @@ async function loadAllFromBackend() {
     if (result.purchasePI && result.purchasePI.length) {
       state.data.purchasePI = result.purchasePI;
     }
+    /* 已发送邮件标记 */
+    state.sentEmails = (result.sentEmails && typeof result.sentEmails === "object") ? result.sentEmails : {};
     appendLog(`从数据库加载完成。`);
     return true;
   } catch (e) {
@@ -5362,6 +5366,22 @@ function renderSection(entityName, items) {
       const cell = document.createElement("div");
       cell.className = "table-cell";
       /* 特殊列: _createdFlag 已创建标识 */
+      if (key === "_emailSent") {
+        const eDocNo = getFieldValue(record, "docNo") || (item.docNo) || "";
+        const t = (state.sentEmails && state.sentEmails[eDocNo]) || "";
+        if (t) {
+          cell.textContent = "✓";
+          cell.style.color = "#16a34a";
+          cell.style.fontWeight = "bold";
+          cell.title = "已发送邮件: " + t;
+        } else {
+          cell.textContent = "-";
+          cell.style.color = "#cbd5e1";
+          cell.title = "尚未发送邮件";
+        }
+        row.appendChild(cell);
+        return;
+      }
       if (key === "_createdFlag" && createdLookup) {
         const docNo = getFieldValue(record, "docNo") || (item.docNo) || "";
         const isCreated = docNo && createdLookup.has(String(docNo));
@@ -7340,9 +7360,9 @@ async function sendPiMail(list) {
   try {
     const r = await mailApi("/api/mail/send-pi", { method: "POST", body: { pis: items, pdfAttachments: pdfs, usePrintPdf: anyPdf } });
     const rs = r.results || [];
-    rs.forEach((it) => appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)));
+    rs.forEach((it) => { appendLog((it.ok ? "📧 已发送 PI " : "📧 发送失败 PI ") + (it.docNo || "?") + (it.ok ? "" : ": " + it.error)); if (it.ok) state.sentEmails[it.docNo] = new Date().toISOString(); });
     appendLog("邮件发送完成: 成功 " + (r.sent || 0) + "，失败 " + (r.failed || 0));
-    if (r.sent > 0) clearSelectionAndGoFirstPage("purchasePI");
+    if (r.sent > 0) { renderSection("purchasePI", getEntityData("purchasePI")); clearSelectionAndGoFirstPage("purchasePI"); }
     if ((r.failed || 0) > 0) {
       const firstErr = (rs.find((it) => !it.ok) || {}).error || "未知原因";
       alert("有 " + r.failed + " 封发送失败，第一封原因：\\n" + firstErr + "\\n\\n（详见同步日志）");
