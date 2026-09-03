@@ -3098,7 +3098,8 @@ async function openPiModal(poItem) {
         }
       }
     }
-    if (!matchedInvoiceCustomer && poQty > 0) {
+    /* 数量匹配仅在 PO 明确带 IV 号(ref)时才作为兜底；无 ref 的 PO 视为“无对应 IV”，不再按数量猜测 */
+    if (!matchedInvoiceCustomer && refInvoiceNo && poQty > 0) {
       let candidates = invoiceList
         .map((item) => {
           const record = extractRecord(item);
@@ -3168,6 +3169,11 @@ async function openPiModal(poItem) {
     }
   } catch (error) {
     // ignore matching failures
+  }
+  /* 无对应 IV 的 PO：收货人回退到默认客户 AAA-000（主体公司），IV 号/客户/金额留空 */
+  if (!matchedInvoiceNo) {
+    const fallbackCustomer = customers.find((c) => c.accNo === "AAA-000");
+    if (fallbackCustomer) matchedInvoiceCustomer = fallbackCustomer;
   }
   piConsigneeEl.innerHTML = customers
     .filter((item) => item.accNo || item.companyName)
@@ -6161,7 +6167,8 @@ async function batchCreatePI() {
           if (!matchedIvCustomerName && matchedCustomer) matchedIvCustomerName = matchedCustomer.companyName || "";
         }
       }
-      if (!matchedCustomer && poQty > 0) {
+      /* 数量匹配仅在 PO 明确带 IV 号(ref)时才作为兜底；无 ref 的 PO 视为“无对应 IV”，不再按数量猜测 */
+      if (!matchedCustomer && refInvoiceNo && poQty > 0) {
         let candidates = invoiceList.map((inv) => {
           const r = extractRecord(inv);
           const invDetails = r.details || r.detail || inv.details || [];
@@ -6188,6 +6195,12 @@ async function batchCreatePI() {
             pickCandidate(scored[0]);
           }
         }
+      }
+
+      /* 无对应 IV 的 PO：收货人回退到默认客户 AAA-000（主体公司），IV 号/客户/金额留空 */
+      if (!matchedIvNo) {
+        const fallbackCustomer = customers.find((c) => c.accNo === "AAA-000");
+        if (fallbackCustomer) matchedCustomer = fallbackCustomer;
       }
 
       /* 构建PI参数（连续编号：每条创建前重新计算序列号） */
