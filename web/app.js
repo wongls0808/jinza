@@ -5840,12 +5840,27 @@ async function fetchListing(entity) {
     } else {
       body = undefined;
     }
-    const response = await callWithMode({
-      method: entity.method,
-      path: entity.path,
-      query,
-      body
-    });
+    /* 带 429 限流重试：AutoCount 每分钟最多 100 次调用 */
+    let response = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        response = await callWithMode({
+          method: entity.method,
+          path: entity.path,
+          query,
+          body
+        });
+        break;
+      } catch (e) {
+        const msg = String((e && e.message) || e || "");
+        const limited = msg.includes("429") || msg.includes("quota");
+        if (limited && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 3000 + attempt * 3000));
+          continue;
+        }
+        throw e;
+      }
+    }
 
     if (!response || !Array.isArray(response.data)) {
       break;
@@ -5860,6 +5875,10 @@ async function fetchListing(entity) {
       break;
     }
     page += 1;
+    /* 翻页间隔 700ms，遵守每分钟 100 次的 API 配额 */
+    if (page <= MAX_PAGES) {
+      await new Promise((r) => setTimeout(r, 700));
+    }
   }
 
   return collected;

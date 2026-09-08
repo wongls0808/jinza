@@ -39,6 +39,8 @@ async function paginateListing({ method, path, query, body, pageInBody = false }
       break;
     }
     page += 1;
+    /* 翻页间隔 700ms，遵守 AutoCount API 每分钟 100 次的配额 */
+    await new Promise((r) => setTimeout(r, 700));
   }
 
   return pages;
