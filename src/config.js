@@ -57,7 +57,7 @@ const baseRuntime = {
   keyId: readEnv("AUTOCOUNT_KEY_ID"),
   apiKey: readEnv("AUTOCOUNT_API_KEY"),
   outputDir: readEnv("SYNC_OUTPUT_DIR", "data"),
-  maxPages: readNumber("SYNC_MAX_PAGES", 500),
+  maxPages: readNumber("SYNC_MAX_PAGES", 1000),
   saveHistory: readBoolean("SYNC_SAVE_HISTORY", true)
 };
 

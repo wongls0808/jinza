@@ -369,7 +369,8 @@ const entities = [
   }
 ];
 
-const MAX_PAGES = 50;
+/* 同步分页上限：AutoCount listing 每页固定 100 条，此前 50 页只能拉到 5000 条产品，现提高到 1000 页（可覆盖 10 万条），超出则按 API totalCount 提前停止 */
+const MAX_PAGES = 1000;
 const MAX_ITEMS_PER_SECTION = 20;
 
 const selectableEntities = new Set([
