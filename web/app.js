@@ -285,7 +285,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -300,7 +299,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -315,7 +313,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -330,7 +327,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -345,7 +341,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -360,7 +355,6 @@ const entities = [
     paginate: true,
     pageInBody: true,
     bodyBuilder: "dateFilter",
-    fullSyncOnly: true,
     dateFilter: {
       startParam: "startDate",
       endParam: "endDate",
@@ -1352,10 +1346,15 @@ function buildDateQuery(entity) {
 }
 
 function buildDateRange(entity) {
-  const lastSync = entity.fullSyncOnly
-    ? undefined
-    : state.syncState[entity.name]?.lastSync;
-  const startDate = lastSync || entity.dateFilter?.defaultStart;
+  /* 增量同步：以上次同步时间（回退 1 小时安全窗口）作为起点，只拉取新增/更改的数据 */
+  const lastSync = state.syncState[entity.name]?.lastSync;
+  let startDate = lastSync || entity.dateFilter?.defaultStart;
+  if (lastSync) {
+    const d = new Date(lastSync);
+    if (!Number.isNaN(d.getTime())) {
+      startDate = new Date(d.getTime() - 3600000).toISOString();
+    }
+  }
   const endDate = new Date().toISOString();
   return {
     from: startDate,
@@ -5829,7 +5828,8 @@ async function fetchListing(entity) {
       body = {
         page,
         filter: {
-          date: {
+          /* 用 lastModifiedDate 过滤，可同时拉到“新增”与“修改”的单据 */
+          lastModifiedDate: {
             from: range.from,
             to: range.to
           }
@@ -5882,6 +5882,22 @@ async function fetchListing(entity) {
   }
 
   return collected;
+}
+
+/* 按唯一键合并两条实体数据（增量同步用）：新增覆盖、已有保留 */
+function mergeEntityItems(existing, incoming, entityName) {
+  if (!Array.isArray(existing) || existing.length === 0) return incoming || [];
+  if (!Array.isArray(incoming) || incoming.length === 0) return existing;
+  const map = new Map();
+  existing.forEach((item, idx) => {
+    const rec = extractRecord(item);
+    map.set(getRecordKey(entityName, rec, idx), item);
+  });
+  incoming.forEach((item, idx) => {
+    const rec = extractRecord(item);
+    map.set(getRecordKey(entityName, rec, idx), item);
+  });
+  return Array.from(map.values());
 }
 
 /* ── 批量创建（全自动：按时间顺序逐条创建，无需弹窗确认） ── */
@@ -6504,10 +6520,16 @@ async function syncEntity(entityName) {
   }
   appendLog(`开始同步: ${entity.label}`);
   const data = await fetchListing(entity);
-  state.data[entity.name] = data;
-  renderSection(entity.name, data);
-  const lastSync = data.length > 0 ? new Date().toISOString() : null;
-  if (data.length > 0) {
+  /* 增量合并：有日期过滤的实体，以上次同步时间为起点拉取，合并进已有数据（不覆盖） */
+  const wasIncremental = !!(entity.dateFilter && state.syncState[entity.name]?.lastSync);
+  const merged = wasIncremental
+    ? mergeEntityItems(state.data[entity.name], data, entity.name)
+    : data;
+  state.data[entity.name] = merged;
+  renderSection(entity.name, merged);
+  /* 增量同步时即使本次没有新数据，也推进游标（表示已同步到当前时刻），避免下次又回退全量 */
+  const lastSync = wasIncremental || data.length > 0 ? new Date().toISOString() : null;
+  if (lastSync) {
     state.syncState[entity.name] = { lastSync };
   } else {
     const prev = state.syncState[entity.name];
@@ -6521,13 +6543,13 @@ async function syncEntity(entityName) {
   try {
     await apiPost("/api/data/sync", {
       entity: entity.name,
-      items: data,
+      items: merged,
       lastSync
     });
   } catch (e) {
     appendLog(`数据持久化失败(${entity.name}): ${e.message}`);
   }
-  appendLog(`同步完成: ${entity.label} (${data.length} 条)`);
+  appendLog(`同步完成: ${entity.label} (${merged.length} 条${wasIncremental ? "，本次增量 " + data.length + " 条" : ""})`);
 
   /* 同步后，刷新依赖该实体的列表的已创建标识/派生视图 */
   const affectedMap = {
