@@ -5217,7 +5217,15 @@ function renderSection(entityName, items) {
     return;
   }
   const ui = getSectionUi(entityName);
-  const safeItems = Array.isArray(items) ? items : [];
+  let safeItems = Array.isArray(items) ? items : [];
+  /* 统一过滤 Void 状态，保证同步后与刷新后显示一致 */
+  if (voidFilterEntities.has(entityName)) {
+    safeItems = safeItems.filter((item) => {
+      const r = extractRecord(item);
+      const status = String(getFieldValue(r, "status") || "").toLowerCase();
+      return status !== "void";
+    });
+  }
   section.count.textContent = String(safeItems.length);
   updateFilterOptions(section, entityName, safeItems);
   buildSummaryPanel(section, entityName, safeItems);
