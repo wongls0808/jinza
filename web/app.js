@@ -5664,12 +5664,20 @@ function initSectionInteractions() {
         if (syncableEntities.has(entityName)) {
           const syncBtn = document.createElement("button");
           syncBtn.className = "icon-btn";
-          syncBtn.title = "单击=增量同步；双击=全量同步(补齐遗漏)";
+          syncBtn.title = "增量同步(只拉新增/修改)";
           syncBtn.textContent = "⟳";
           syncBtn.style.fontSize = "16px";
+          const fullBtn = document.createElement("button");
+          fullBtn.className = "icon-btn";
+          fullBtn.title = "全量同步(重新拉取全部，补齐遗漏)";
+          fullBtn.textContent = "⇄";
+          fullBtn.style.fontSize = "15px";
+          fullBtn.style.color = "#e67e22";
           const doSync = async (forceFull) => {
             syncBtn.disabled = true;
+            fullBtn.disabled = true;
             syncBtn.textContent = "…";
+            fullBtn.textContent = "…";
             try {
               await syncEntity(entityName, forceFull);
               appendLog(`${entityName} 同步${forceFull ? "(全量)" : ""}完成`);
@@ -5677,24 +5685,17 @@ function initSectionInteractions() {
               appendLog(`${entityName} 同步失败: ${e.message}`);
             } finally {
               syncBtn.disabled = false;
+              fullBtn.disabled = false;
               syncBtn.textContent = "⟳";
+              fullBtn.textContent = "⇄";
             }
           };
-          /* 用延时区分单击/双击，避免双击时先触发两次单击(增量)导致全量失效 */
-          let clickTimer = null;
-          syncBtn.addEventListener("click", () => {
-            if (clickTimer) {
-              clearTimeout(clickTimer);
-              clickTimer = null;
-              if (!confirm(`确认全量同步 ${entityName}？\n将清空同步游标，从最早日期重新拉取全部数据（可补齐此前遗漏的记录）。`)) return;
-              doSync(true);
-              return;
-            }
-            clickTimer = setTimeout(() => {
-              clickTimer = null;
-              doSync(false);
-            }, 260);
+          syncBtn.addEventListener("click", () => doSync(false));
+          fullBtn.addEventListener("click", async () => {
+            if (!confirm(`确认全量同步 ${entityName}？\n将清空同步游标，从最早日期重新拉取全部数据（可补齐此前遗漏的记录）。`)) return;
+            await doSync(true);
           });
+          toolsRight.insertBefore(fullBtn, toolsRight.firstChild);
           toolsRight.insertBefore(syncBtn, toolsRight.firstChild);
         }
       }
