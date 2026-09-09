@@ -5664,21 +5664,26 @@ function initSectionInteractions() {
         if (syncableEntities.has(entityName)) {
           const syncBtn = document.createElement("button");
           syncBtn.className = "icon-btn";
-          syncBtn.title = "刷新同步";
+          syncBtn.title = "单击=增量同步；双击=全量同步(补齐遗漏)";
           syncBtn.textContent = "⟳";
           syncBtn.style.fontSize = "16px";
-          syncBtn.addEventListener("click", async () => {
+          const doSync = async (forceFull) => {
             syncBtn.disabled = true;
             syncBtn.textContent = "…";
             try {
-              await syncEntity(entityName);
-              appendLog(`${entityName} 同步刷新完成`);
+              await syncEntity(entityName, forceFull);
+              appendLog(`${entityName} 同步${forceFull ? "(全量)" : ""}完成`);
             } catch (e) {
               appendLog(`${entityName} 同步失败: ${e.message}`);
             } finally {
               syncBtn.disabled = false;
               syncBtn.textContent = "⟳";
             }
+          };
+          syncBtn.addEventListener("click", () => doSync(false));
+          syncBtn.addEventListener("dblclick", async () => {
+            if (!confirm(`确认全量同步 ${entityName}？\n将清空同步游标，从最早日期重新拉取全部数据（可补齐此前遗漏的记录）。`)) return;
+            await doSync(true);
           });
           toolsRight.insertBefore(syncBtn, toolsRight.firstChild);
         }
@@ -6521,12 +6526,17 @@ async function batchDeletePI() {
   appendLog(`批量删除PI完成: 成功 ${success}，失败 ${fail}`);
 }
 
-async function syncEntity(entityName) {
+async function syncEntity(entityName, forceFull = false) {
   const entity = getEntityConfig(entityName);
   if (!entity) {
     throw new Error(`未知实体: ${entityName}`);
   }
-  appendLog(`开始同步: ${entity.label}`);
+  appendLog(`开始同步: ${entity.label}${forceFull ? "（全量）" : ""}`);
+  /* 全量同步：清空游标，从最早日期重新拉取全部数据，补齐此前遗漏的记录 */
+  if (forceFull) {
+    const prev = state.syncState[entity.name];
+    if (prev && prev.lastSync) delete prev.lastSync;
+  }
   const data = await fetchListing(entity);
   /* 增量合并：有日期过滤的实体，以上次同步时间为起点拉取，合并进已有数据（不覆盖） */
   const wasIncremental = !!(entity.dateFilter && state.syncState[entity.name]?.lastSync);
