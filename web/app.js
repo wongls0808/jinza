@@ -5838,18 +5838,21 @@ async function fetchListing(entity) {
     let body;
     if (entity.pageInBody && entity.bodyBuilder === "dateFilter") {
       const range = buildDateRange(entity);
-      /* 全量(无游标)按 docDate 过滤，覆盖全部含 Void；增量按 lastModifiedDate 过滤，拉新增/修改 */
+      /* 增量(有游标)按 lastModifiedDate 过滤拉新增/修改；全量(无游标)不带 filter，返回全部含 Void */
       const hasCursor = !!state.syncState[entity.name]?.lastSync;
-      const filterField = hasCursor ? "lastModifiedDate" : "date";
-      body = {
-        page,
-        filter: {
-          [filterField]: {
-            from: range.from,
-            to: range.to
+      if (hasCursor) {
+        body = {
+          page,
+          filter: {
+            lastModifiedDate: {
+              from: range.from,
+              to: range.to
+            }
           }
-        }
-      };
+        };
+      } else {
+        body = { page };
+      }
     } else if (entity.pageInBody) {
       body = { page };
     } else {
