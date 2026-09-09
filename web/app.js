@@ -5838,11 +5838,13 @@ async function fetchListing(entity) {
     let body;
     if (entity.pageInBody && entity.bodyBuilder === "dateFilter") {
       const range = buildDateRange(entity);
+      /* 全量(无游标)按 docDate 过滤，覆盖全部含 Void；增量按 lastModifiedDate 过滤，拉新增/修改 */
+      const hasCursor = !!state.syncState[entity.name]?.lastSync;
+      const filterField = hasCursor ? "lastModifiedDate" : "date";
       body = {
         page,
         filter: {
-          /* 用 lastModifiedDate 过滤，可同时拉到“新增”与“修改”的单据 */
-          lastModifiedDate: {
+          [filterField]: {
             from: range.from,
             to: range.to
           }
