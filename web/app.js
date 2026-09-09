@@ -5840,6 +5840,7 @@ function initSectionInteractions() {
 async function fetchListing(entity) {
   const collected = [];
   let page = 1;
+  let apiTotalCount = null;
   const queryBase = { ...(entity.query || {}) };
 
   while (page <= MAX_PAGES) {
@@ -5900,6 +5901,7 @@ async function fetchListing(entity) {
       break;
     }
     const totalCount = response.totalCount;
+    if (Number.isFinite(totalCount)) apiTotalCount = totalCount;
     if (Number.isFinite(totalCount) && collected.length >= totalCount) {
       break;
     }
@@ -5908,6 +5910,10 @@ async function fetchListing(entity) {
     if (page <= MAX_PAGES) {
       await new Promise((r) => setTimeout(r, 700));
     }
+  }
+
+  if (apiTotalCount !== null) {
+    appendLog(`${entity.label || entity.name} API 报总数 totalCount = ${apiTotalCount}（本次拉到 ${collected.length} 条）`);
   }
 
   return collected;
