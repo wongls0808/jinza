@@ -53,10 +53,23 @@ async function findThreadMail(smtp, token) {
     const lock = await client.getMailboxLock("INBOX");
     try {
       const matches = [];
-      for await (const msg of client.fetch({ subject: tok }, { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
+      const collect = (msg) => {
         const subj = (msg.envelope && msg.envelope.subject) || "";
-        if (subj.toLowerCase().indexOf(tok.toLowerCase()) < 0) continue;
+        if (subj.toLowerCase().indexOf(tok.toLowerCase()) < 0) return;
         matches.push({ uid: Number(msg.uid) || 0, envelope: msg.envelope, headers: msg.headers });
+      };
+      /* 优先 SUBJECT 搜索（gmail/yeah 等支持）；163 等服务器 SUBJECT 搜索不可靠（返回空或抛错），回退全量过滤 */
+      try {
+        for await (const msg of client.fetch({ subject: tok }, { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
+          collect(msg);
+        }
+      } catch (e) {
+        /* SUBJECT 搜索异常，走全量回退 */
+      }
+      if (matches.length === 0) {
+        for await (const msg of client.fetch("1:*", { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
+          collect(msg);
+        }
       }
       if (matches.length === 0) return null;
       matches.sort((a, b) => b.uid - a.uid);
