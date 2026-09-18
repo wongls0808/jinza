@@ -4392,45 +4392,43 @@ ${b.css}
 }
 
 async function printPurchasePi(pi) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    appendLog("无法打开打印窗口，请检查浏览器弹窗设置");
-    return;
-  }
-  const baseHref = getPrintBaseHref();
-  const record = extractRecord(pi);
-  const creditorCode =
-    pi?.printProfileKey ||
-    record?.creditorCode ||
-    pi?.creditorCode ||
-    record?.accNo ||
-    "";
-  const creditorName = record?.creditorName || pi?.creditorName || "";
-  const profile =
-    resolvePrintProfileByCreditor(creditorCode, creditorName) || null;
-  const stampOverride = profile?.stampDataUrl || profile?.stampPath || "";
-  const stampSrc = await getStampSrcWithOverride(stampOverride);
-  printWindow.document.open();
-  printWindow.document.write(buildPiPrintHtml(pi, stampSrc, baseHref, profile));
-  printWindow.document.close();
-  printWindow.focus();
-  /* 以 PI 单号命名：另存为 PDF 时浏览器默认文件名取 document.title */
-  const rawNo =
-    (pi && pi.master && pi.master.docNo) ||
-    (pi && pi.docNo) ||
-    (record && (record.docNo || pi.docNo)) ||
-    "";
-  const safeName = String(rawNo || "PI-print")
-    .replace(/[\\/:*?"<>|\s]+/g, "_")
-    .slice(0, 80);
-  printWindow.document.title = safeName;
-  setTimeout(() => {
-    try {
-      printWindow.print();
-    } catch (error) {
-      // ignore
+  try {
+    appendLog("正在生成合并 PDF（PI/CI/PL/SC）...");
+    const pack = await buildTransactionHtmlsForPdf(pi);
+    const htmls = [
+      { html: pack.piHtml },
+      { html: pack.ciHtml },
+      { html: pack.plHtml },
+      { html: pack.scHtml, footer: true }
+    ];
+    const r = await mailApi("/api/mail/html-pdf", { method: "POST", body: { htmls } });
+    if (!r || !r.base64) {
+      appendLog("PDF 生成失败：服务端未返回数据");
+      return;
     }
-  }, 100);
+    const byteChars = atob(r.base64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const rawNo =
+      (pi && pi.master && pi.master.docNo) ||
+      (pi && pi.docNo) ||
+      (extractRecord(pi) && extractRecord(pi).docNo) ||
+      "PI-print";
+    const safeName = String(rawNo).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = safeName + ".pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    appendLog("已生成合并 PDF：" + safeName + ".pdf");
+  } catch (e) {
+    appendLog("生成 PDF 失败: " + e.message);
+    alert("生成 PDF 失败: " + e.message);
+  }
 }
 
 async function createPurchaseInvoiceFromPo(
