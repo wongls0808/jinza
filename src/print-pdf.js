@@ -26,11 +26,11 @@ async function pdfFromHtml(html, opts) {
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      /* 模拟浏览器打印对话框的默认页边距 */
-      margin: opts && opts.margin
-        ? opts.margin
-        : { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
+      margin: opts && opts.margin ? opts.margin : { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
       preferCSSPageSize: false,
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate: '<div style="font-size:9px; width:100%; text-align:right; padding-right:10mm; color:#666;">Page <span class="pageNumber"></span></div>'
     });
     return pdf; /* Buffer */
   } finally {
