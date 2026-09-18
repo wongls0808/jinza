@@ -30,7 +30,11 @@ async function pdfFromHtml(html, opts) {
       margin: opts && opts.margin
         ? opts.margin
         : { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
-      preferCSSPageSize: false
+      preferCSSPageSize: false,
+      /* 页脚显示全局连续页码 Page X */
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate: '<div style="font-size:9px; width:100%; text-align:right; padding-right:10mm; color:#666;">Page <span class="pageNumber"></span></div>'
     });
     return pdf; /* Buffer */
   } finally {
