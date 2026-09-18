@@ -281,9 +281,9 @@ async function handleApi(req, res) {
   if (url === "/api/mail/html-pdf" && req.method === "POST") {
     try {
       const body = await collectBody(req);
-      const html = body && typeof body.html === "string" ? body.html : "";
-      if (!html) { sendJson(res, 400, { ok: false, error: "缺少 html" }); return; }
-      const pdfBuf = Buffer.from(await printPdf.pdfFromHtml(html));
+      const htmls = Array.isArray(body.htmls) ? body.htmls : (body && typeof body.html === "string" ? [body.html] : []);
+      if (htmls.length === 0) { sendJson(res, 400, { ok: false, error: "缺少 html" }); return; }
+      const pdfBuf = Buffer.from(await printPdf.pdfFromHtmlPack(htmls));
       sendJson(res, 200, { ok: true, bytes: pdfBuf.length, base64: pdfBuf.toString("base64") });
     } catch (e) {
       sendJson(res, 500, { ok: false, error: "打印引擎不可用: " + e.message });
