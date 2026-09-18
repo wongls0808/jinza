@@ -4329,7 +4329,6 @@ function buildPiBodies(pi, stampSrc, baseHref, printProfile) {
         .chop-label { font-weight: 700; text-align: center; width: 180px; }
         .page { page-break-after: always; }
         .page:last-child { page-break-after: auto; }
-        @page { size: A4; margin: 10mm; @bottom-right { content: "Page " counter(page); font-size: 9pt; color: #666; } }
         .statement-page { page-break-after: auto; }
 
         .doc-page-number { text-align: center; font-size: 11px; color: #444; margin-top: 8px; }
