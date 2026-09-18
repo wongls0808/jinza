@@ -3803,6 +3803,20 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
     ? formatDateShort(pi.validityDate)
     : "-";
   const referencePo = pi.referencePoNo || record.ref || "-";
+  const importResponsibility = String(pi.importResponsibility || record.importResponsibility || (printProfile && printProfile.importResponsibility) || "supplier").toLowerCase();
+  const directShipment = pi.directShipment !== false;
+  const RISK_KEYWORDS = ["USED TYRE","USED TIRE","USED VEHICLE","MOTOR VEHICLE","FIREARM","WEAPON","EXPLOSIVE","DANGEROUS CHEMICAL","CONTROLLED CHEMICAL","MEDICINE","FOOD","LIVE ANIMAL","PLANT","SEED","WASTE","SCRAP","ALCOHOL","TOBACCO","WALKIE TALKIE","RADIO TRANSMITTER","LITHIUM BATTERY"];
+  const riskFlags = [];
+  (details || []).forEach((d) => {
+    const desc = String((d && (d.description || d.itemName || d.productCode || d.productName)) || "").toUpperCase();
+    RISK_KEYWORDS.forEach((kw) => { if (desc.includes(kw) && !riskFlags.includes(kw)) riskFlags.push(kw); });
+  });
+  let importRespHtml = "<div>Import / Customs Responsibility: Handled by overseas supplier, appointed logistics provider or designated importer under the applicable delivery arrangement.</div><div>JINZA Importer of Record: No, unless otherwise expressly agreed in writing.</div>";
+  if (importResponsibility === "buyer") {
+    importRespHtml = "<div>Import / Customs Responsibility: Buyer</div><div>Import Duties / Taxes: Buyer's responsibility, if applicable.</div><div>Permits / Approvals: Buyer's responsibility where applicable.</div><div>JINZA Importer of Record: No.</div>";
+  } else if (importResponsibility === "jinza") {
+    importRespHtml = "<div>Import / Customs Responsibility: JINZA TRADING SDN. BHD.</div><div>JINZA acts as importer of record for this Sales Order.</div>";
+  }
   const banks =
     Array.isArray(printProfile?.banks) && printProfile.banks.length > 0
       ? printProfile.banks
@@ -4187,8 +4201,7 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
     })
     .join("");
 
-  const statementPagesHtml = `
-      <div class="page statement-page">
+  const statementPagesHtml = `      <div class="page statement-page">
         <div class="statement-title">STATEMENT COVER</div>
         <div class="statement-meta">
           <div><span>Reference PO No.:</span><span>${referencePo}</span></div>
@@ -4202,9 +4215,7 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
           <div>Registered Address: ${supplier.address.replace(/\n/g, ", ")}</div>
           <div>Contact Tel.: ${supplier.tel}</div>
           <div>Email: ${record.email || "-"}</div>
-        </div>
-        <div class="statement-section">
-          <div class="statement-subheading">Buyer / Importer</div>
+          <div class="statement-subheading">Buyer</div>
           <div>Company Name: ${buyerInfo.name}</div>
           <div>Business Address: ${buyerInfo.address.replace(/\n/g, ", ")}</div>
           <div>Contact Person: ${buyerInfo.attn || "-"}</div>
@@ -4212,63 +4223,77 @@ function buildPiPrintHtml(pi, stampSrc, baseHref, printProfile) {
           <div>Email: ${buyerInfo.email}</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">2. DDP Delivery Terms (INCOTERMS® 2020)</div>
-          <div>This declaration applies to all transactions designated "DDP Malaysia". Under Delivered Duty Paid (DDP) terms:</div>
-          <div>- Seller bears all import duties, SST, VAT, and related taxes.</div>
-          <div>- Seller is fully responsible for customs clearance.</div>
-          <div>- Buyer has no obligation to provide import permits (K1/K2) or import tax documentation.</div>
-          <div>- Buyer assumes no liability for import-related matters.</div>
+          <div class="statement-heading">2. Import Responsibility / Delivery Mode</div>
+          <div>Direct Shipment: ${directShipment ? "Yes" : "No"}</div>
+          ${importRespHtml}
         </div>
         <div class="statement-section">
-          <div class="statement-heading">3. Transfer of Risk and Responsibility</div>
-          <div>Risk remains with the Seller until the goods are delivered to the Buyer's designated place. Seller bears full liability for loss, damage, customs detention, delay, or misdelivery prior to final delivery.</div>
+          <div class="statement-heading">3. Importation, Direct Shipment & Regulatory Compliance</div>
+          <div class="statement-subheading">3.1 Trading Seller Status</div>
+          <div>${buyerInfo.name} acts as the trading seller of the Goods. Where the Goods are supplied under a direct-shipment or drop-shipment arrangement, ${buyerInfo.name} does not act as the importer of record, customs declarant or customs agent unless expressly agreed otherwise in writing in the applicable Sales Order.</div>
+          <div class="statement-subheading">3.2 Direct Shipment</div>
+          <div>Where applicable, the Goods may be shipped directly from an overseas supplier or other source to the Buyer&#39;s designated delivery location without first being physically received or warehoused by ${buyerInfo.name}. Such direct shipment shall not affect the contractual sale of the Goods by ${buyerInfo.name} to the Buyer.</div>
+          <div class="statement-subheading">3.3 Importation and Customs Clearance</div>
+          <div>Where importation and customs clearance are handled by an overseas supplier, logistics provider, appointed importer or other designated party, such party shall be responsible for carrying out the applicable import and customs procedures in accordance with applicable Malaysian requirements. ${buyerInfo.name} shall not be deemed to be the importer of record solely by reason of being the trading seller of the Goods.</div>
+          <div class="statement-subheading">3.4 Import Licences, Permits and Regulatory Requirements</div>
+          <div>Any mandatory import licence, permit, approval, certification, customs classification or other regulatory requirement applicable to the importation of the Goods shall be determined and complied with by the party responsible for importation and customs clearance. ${buyerInfo.name} does not warrant that any particular Goods are exempt from import licensing, permit, approval or certification requirements.</div>
+          <div class="statement-subheading">3.5 Buyer / End-User Requirements</div>
+          <div>Where any licence, permit, approval, registration, certification, declaration or supporting information is specifically required from the Buyer or end user (including by reason of the intended use of the Goods, the Buyer&#39;s industry, the Buyer&#39;s regulatory status, the place of installation or use, Free Industrial Zone (FIZ), Licensed Manufacturing Warehouse (LMW), bonded or other special customs status, or any requirement specifically applicable to the Buyer or end user), the Buyer shall provide the required information, documents and cooperation in a timely manner.</div>
+          <div class="statement-subheading">3.6 Mandatory Legal Requirements</div>
+          <div>Nothing in this Statement shall be interpreted as waiving, avoiding or overriding any mandatory requirement imposed by applicable Malaysian law or regulatory authorities. Acceptance or receipt of the Goods by the Buyer shall not constitute a waiver of any mandatory regulatory requirement.</div>
+          <div class="statement-subheading">3.7 Import Duties and Taxes</div>
+          <div>Responsibility for import duties, sales tax, customs charges and other import-related charges shall follow the applicable delivery term and/or the party responsible for importation as expressly stated in this Statement. Where this Statement expressly provides that the Buyer is responsible for importation or customs clearance, all applicable import duties, taxes, permits and related charges shall be borne by the Buyer unless otherwise agreed in writing.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">4. Customs Compliance and Tax Treatment</div>
-          <div>Seller ensures all customs declarations are truthful and accurate. Any fines or penalties arising from documentation errors are borne solely by the Seller.</div>
-          <div>Buyer may treat DDP shipments as Out-of-Scope (OOS) and issue self-billed e-invoices as required.</div>
+          <div class="statement-heading">4. Delivery Terms (INCOTERMS&#174; 2020)</div>
+          <div>Delivery shall follow the agreed INCOTERMS&#174; term stated in the applicable order. Where the agreed term is Delivered Duty Paid (DDP), the Seller or its appointed logistics provider is responsible for arranging delivery to the Buyer&#39;s designated location. Responsibility for import duties, taxes and customs formalities shall follow the party responsible for importation as stated under Section 2 (Import Responsibility), and nothing herein shall be construed as a determination that no import permit, licence or approval is required.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">5. Payment Terms</div>
-          <div class="statement-subheading">5.1 Payment Schedule</div>
+          <div class="statement-heading">5. Transfer of Risk and Responsibility</div>
+          <div>Risk remains with the Seller until the goods are delivered to the Buyer&#39;s designated place. Seller bears full liability for loss, damage, customs detention, delay, or misdelivery prior to final delivery.</div>
+        </div>
+        <div class="statement-section">
+          <div class="statement-heading">6. Customs Compliance</div>
+          <div>The party responsible for importation shall ensure that all customs declarations are truthful and accurate, and shall be responsible for the applicable customs classification, licences, permits, approvals and certifications. Any fines or penalties arising from documentation errors shall be borne by the party that submitted or was responsible for such documentation.</div>
+        </div>
+        <div class="statement-section">
+          <div class="statement-heading">7. Payment Terms</div>
+          <div class="statement-subheading">7.1 Payment Schedule</div>
           <div>Buyer shall make full payment by:</div>
           <div>- Within 30 days after successful delivery, OR</div>
           <div>- Within 90 days from the Purchase Order date</div>
-          <div class="statement-subheading">5.2 Designated Bank Accounts</div>
-          ${banks
-            .map(
-              (b) => `
+          <div class="statement-subheading">7.2 Designated Bank Accounts</div>
+          ${banks.map((b) => `
           <div>${escapeHtml(b.label || "Bank Account")}:</div>
           <div>Account Number: ${escapeHtml(b.accountNumber || "-")}</div>
           <div>Account Name: ${escapeHtml(b.accountName || "-")}</div>
           <div>Bank Name: ${escapeHtml(b.bankName || "-")}</div>
-          `
-            )
-            .join("")}
+          `).join("")}
         </div>
         <div class="statement-page-number">Page 1 / 2</div>
       </div>
       <div class="page statement-page">
         <div class="statement-section">
-          <div class="statement-heading">6. Documentation Requirements</div>
+          <div class="statement-heading">8. Documentation Requirements</div>
           <div>Seller shall provide PI, CI, PL, and delivery confirmation/tracking as applicable.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">7. Warranty of Quality</div>
+          <div class="statement-heading">9. Warranty of Quality</div>
           <div>Seller warrants goods conform to specifications and are fit for intended commercial purpose.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">8. Fundamental Breach and Remedies</div>
-          <div>Buyer may dispose of non-conforming goods at Seller's expense and withhold/refund payments for fundamental breach.</div>
+          <div class="statement-heading">10. Fundamental Breach and Remedies</div>
+          <div>Buyer may dispose of non-conforming goods at Seller&#39;s expense and withhold/refund payments for fundamental breach.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">9. Governing Law and Precedence</div>
+          <div class="statement-heading">11. Governing Law and Precedence</div>
           <div>This declaration remains valid indefinitely. If discrepancies occur, the specific PO/PI/CI shall prevail.</div>
         </div>
         <div class="statement-section">
-          <div class="statement-heading">10. Non-Binding Variables</div>
+          <div class="statement-heading">12. Non-Binding Variables</div>
           <div>This declaration excludes variable details such as item lists, quantities, prices, freight, and HS Codes.</div>
         </div>
+        ${riskFlags.length ? `<div class="statement-section"><div class="statement-heading">IMPORT COMPLIANCE REVIEW RECOMMENDED</div><div>This transaction includes item(s) that may be subject to import licensing, permit, approval or certification requirements (matched keywords: ${escapeHtml(riskFlags.join(", "))}). A compliance review is recommended. This notice does not constitute a determination that the Goods are prohibited or that any permit is required.</div></div>` : ""}
         <div class="statement-signature">
           <img class="stamp-img" src="${stampSrc}" alt="Company Chop" />
           <div class="statement-sign-line"></div>
