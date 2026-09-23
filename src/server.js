@@ -99,8 +99,8 @@ function collectBody(req) {
     let data = "";
     req.on("data", (chunk) => {
       data += chunk;
-      if (data.length > 10 * 1024 * 1024) {
-        reject(new Error("请求体过大"));
+      if (data.length > 50 * 1024 * 1024) {
+        reject(new Error("请求体过大（超过 50MB）"));
       }
     });
     req.on("end", () => {
@@ -326,6 +326,33 @@ async function handleApi(req, res) {
       }
       const results = [];
       let okCount = 0;
+      /* 批量回复模式：按发信邮箱分组，一次 IMAP 连接搜索所有 PO，缓存结果（避免每封都连接触发邮箱限流） */
+      const threadCache = new Map(); /* Map<user, Map<poToken, thread>|null> */
+      const threadCacheErr = new Map(); /* Map<user, errorMessage> */
+      if (replyByInbox) {
+        const byUser = new Map();
+        for (const pi of pis) {
+          const rec = (pi && pi.master) || pi || {};
+          const code = rec.creditorCode || "";
+          const rule = (Array.isArray(cfg.supplierRules) ? cfg.supplierRules : []).find((x) => x && String(x.supplierCode) === String(code));
+          const ownSmtp = rule && rule.smtp && rule.smtp.user && rule.smtp.pass ? rule.smtp : null;
+          const sendSmtp = ownSmtp || (cfg && cfg.smtp) || {};
+          const poToken = String(pi.referencePoNo || rec.ref || pi.sourcePONo || rec.ref || "").trim();
+          if (!poToken || !sendSmtp.user || !sendSmtp.pass) continue;
+          const key = sendSmtp.user;
+          if (!byUser.has(key)) byUser.set(key, { smtp: sendSmtp, tokens: new Set() });
+          byUser.get(key).tokens.add(poToken);
+        }
+        for (const [user, entry] of byUser) {
+          try {
+            const map = await imap.findThreadMails(entry.smtp, [...entry.tokens]);
+            threadCache.set(user, map);
+          } catch (e) {
+            threadCache.set(user, null);
+            threadCacheErr.set(user, e.message || "未知错误");
+          }
+        }
+      }
       for (const em of body.emails) {
         try {
           const info = await mail.sendMail({ to: em.to, subject: em.subject, text: em.text, replyTo: em.replyTo, fromName: em.fromName, attachments: em.attachments });
@@ -404,12 +431,12 @@ async function handleApi(req, res) {
               continue;
             }
             let thread = null;
-            try {
-              thread = await imap.findThreadMail(sendSmtp, poToken);
-            } catch (e) {
-              results.push({ docNo, ok: false, error: "回复模式：查找 PO 邮件失败（" + poToken + "）: " + e.message });
+            const cache = threadCache.get(sendSmtp.user);
+            if (cache === null) {
+              results.push({ docNo, ok: false, error: "回复模式：IMAP 搜索失败（" + (threadCacheErr.get(sendSmtp.user) || "未知错误") + "）" });
               continue;
             }
+            if (cache) thread = cache.get(poToken) || null;
             if (!thread || !thread.messageId) {
               results.push({ docNo, ok: false, error: "回复模式：收件箱未找到主题含 " + poToken + " 的邮件，已取消（未标记发送）" });
               continue;

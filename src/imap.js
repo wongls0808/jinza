@@ -112,4 +112,74 @@ async function findThreadMail(smtp, token) {
   }
 }
 
-module.exports = { findThreadMail, inferImap, replySubject, stripThreadPrefix };
+/* 批量：一次 IMAP 连接搜索多个 PO 号，返回 Map<token, thread>。
+ * 用于批量发送 PI 时避免每封都连接一次 IMAP（否则触发邮箱限流）。 */
+async function findThreadMails(smtp, tokens) {
+  const user = String((smtp && smtp.user) || "").trim();
+  const pass = String((smtp && smtp.pass) || "");
+  if (!user || !pass) throw new Error("缺少发件账号/授权码（IMAP 复用 SMTP 凭据）");
+  const toks = [...new Set((tokens || []).map(t => String(t || "").trim()).filter(Boolean))];
+  if (toks.length === 0) return new Map();
+  const imap = inferImap(user, smtp && smtp.host);
+  if (!imap.host) throw new Error("无法推断该邮箱的 IMAP 服务器: " + user);
+
+  const client = new ImapFlow({
+    host: imap.host,
+    port: imap.port,
+    secure: imap.secure,
+    auth: { user, pass },
+    logger: false,
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000
+  });
+  client.on("error", () => {});
+  try {
+    await client.connect();
+  } catch (e) {
+    throw new Error("IMAP 连接失败（" + imap.host + "）: " + (e && e.message ? e.message : (e && e.code ? e.code : "未知错误")));
+  }
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      const collected = [];
+      let uids = [];
+      try { uids = (await client.search({ all: true })) || []; } catch (e) { uids = []; }
+      const recent = Array.isArray(uids) && uids.length ? uids.slice(-300) : null;
+      if (recent && recent.length) {
+        for await (const msg of client.fetch(recent, { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
+          collected.push({
+            uid: Number(msg.uid) || 0,
+            subject: (msg.envelope && msg.envelope.subject) || "",
+            messageId: (msg.envelope && msg.envelope.messageId) || "",
+            inReplyTo: (msg.envelope && msg.envelope.inReplyTo) || "",
+            references: (msg.headers && typeof msg.headers.get === "function") ? (msg.headers.get("references") || "") : ""
+          });
+        }
+      }
+      const result = new Map();
+      for (const tok of toks) {
+        const matches = collected.filter(c => c.subject.toLowerCase().indexOf(tok.toLowerCase()) >= 0);
+        if (matches.length === 0) continue;
+        matches.sort((a, b) => b.uid - a.uid);
+        const pick = matches[0];
+        const refs = (pick.references ? String(pick.references).split(/\s+/) : [])
+          .map(s => s.trim()).filter(Boolean).filter(s => s !== pick.messageId);
+        refs.push(pick.messageId);
+        result.set(tok, {
+          subject: replySubject(pick.subject),
+          messageId: pick.messageId,
+          inReplyTo: pick.messageId,
+          references: refs.join(" ")
+        });
+      }
+      return result;
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+module.exports = { findThreadMail, findThreadMails, inferImap, replySubject, stripThreadPrefix };
