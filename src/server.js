@@ -326,6 +326,32 @@ async function handleApi(req, res) {
       }
       const results = [];
       let okCount = 0;
+      for (const em of body.emails) {
+        try {
+          const info = await mail.sendMail({ to: em.to, subject: em.subject, text: em.text, replyTo: em.replyTo, fromName: em.fromName, attachments: em.attachments });
+          okCount++;
+          results.push({ docNo: em.docNo, ok: true, messageId: info.messageId });
+        } catch (e) { results.push({ docNo: em.docNo, ok: false, error: e.message }); }
+      }
+      sendJson(res, 200, { ok: true, sent: okCount, failed: results.length - okCount, results });
+    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
+    return;
+  }
+
+  /* ── 邮件：批量发送 PI（固定收件人 + 各供应商抬头 / Reply-To + PDF 附件） ── */
+  if (url === "/api/mail/send-pi" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      const pis = Array.isArray(body.pis) ? body.pis : [];
+      if (pis.length === 0) { sendJson(res, 400, { ok: false, error: "缺少待发送的 PI 列表" }); return; }
+      const replyByInbox = body.replyByInbox === true;
+      const cfg = await mail.getMailConfig();
+      const ac = await db.getConfig("autocount");
+      const buyerCompany = await companyMod.getCompany();
+      const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; };
+      const sdate = (v) => { if (!v) return ""; const s = String(v); const m = s.match(/^\d{4}-\d{2}-\d{2}/); return m ? m[0] : s.slice(0, 10); };
+      const results = [];
+      let okCount = 0;
       /* 批量回复模式：按发信邮箱分组，一次 IMAP 连接搜索所有 PO，缓存结果（避免每封都连接触发邮箱限流） */
       const threadCache = new Map(); /* Map<user, Map<poToken, thread>|null> */
       const threadCacheErr = new Map(); /* Map<user, errorMessage> */
@@ -353,32 +379,6 @@ async function handleApi(req, res) {
           }
         }
       }
-      for (const em of body.emails) {
-        try {
-          const info = await mail.sendMail({ to: em.to, subject: em.subject, text: em.text, replyTo: em.replyTo, fromName: em.fromName, attachments: em.attachments });
-          okCount++;
-          results.push({ docNo: em.docNo, ok: true, messageId: info.messageId });
-        } catch (e) { results.push({ docNo: em.docNo, ok: false, error: e.message }); }
-      }
-      sendJson(res, 200, { ok: true, sent: okCount, failed: results.length - okCount, results });
-    } catch (e) { sendJson(res, 500, { ok: false, error: e.message }); }
-    return;
-  }
-
-  /* ── 邮件：批量发送 PI（固定收件人 + 各供应商抬头 / Reply-To + PDF 附件） ── */
-  if (url === "/api/mail/send-pi" && req.method === "POST") {
-    try {
-      const body = await collectBody(req);
-      const pis = Array.isArray(body.pis) ? body.pis : [];
-      if (pis.length === 0) { sendJson(res, 400, { ok: false, error: "缺少待发送的 PI 列表" }); return; }
-      const replyByInbox = body.replyByInbox === true;
-      const cfg = await mail.getMailConfig();
-      const ac = await db.getConfig("autocount");
-      const buyerCompany = await companyMod.getCompany();
-      const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""; };
-      const sdate = (v) => { if (!v) return ""; const s = String(v); const m = s.match(/^\d{4}-\d{2}-\d{2}/); return m ? m[0] : s.slice(0, 10); };
-      const results = [];
-      let okCount = 0;
       for (const pi of pis) {
         try {
           const rec = (pi && pi.master) || pi || {};
