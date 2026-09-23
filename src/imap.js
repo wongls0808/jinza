@@ -46,9 +46,16 @@ async function findThreadMail(smtp, token) {
     secure: imap.secure,
     auth: { user, pass },
     logger: false,
-    tls: { rejectUnauthorized: false }
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000
   });
-  await client.connect();
+  client.on("error", () => {}); /* 处理 error 事件，避免 unhandled error 崩溃 */
+  try {
+    await client.connect();
+  } catch (e) {
+    throw new Error("IMAP 连接失败（" + imap.host + "）: " + (e && e.message ? e.message : (e && e.code ? e.code : "未知错误")));
+  }
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
@@ -67,8 +74,14 @@ async function findThreadMail(smtp, token) {
         /* SUBJECT 搜索异常，走全量回退 */
       }
       if (matches.length === 0) {
-        for await (const msg of client.fetch("1:*", { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
-          collect(msg);
+        /* 全量回退：只取最近 300 封（163 等收件箱可能很大，避免全量 fetch 超时） */
+        let uids = [];
+        try { uids = (await client.search({ all: true })) || []; } catch (e) { uids = []; }
+        const recent = Array.isArray(uids) && uids.length ? uids.slice(-300) : null;
+        if (recent && recent.length) {
+          for await (const msg of client.fetch(recent, { uid: true, envelope: true, headers: ["references", "in-reply-to"] })) {
+            collect(msg);
+          }
         }
       }
       if (matches.length === 0) return null;
