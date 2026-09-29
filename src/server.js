@@ -433,17 +433,18 @@ async function handleApi(req, res) {
             let thread = null;
             const cache = threadCache.get(sendSmtp.user);
             if (cache === null) {
-              results.push({ docNo, ok: false, error: "回复模式：IMAP 搜索失败（" + (threadCacheErr.get(sendSmtp.user) || "未知错误") + "）" });
-              continue;
+              /* IMAP 连接失败（网络/限流），回退为普通发送（不回复），确保邮件能发出 */
+              console.log("回复模式：IMAP 连接失败（" + sendSmtp.user + "），PI " + docNo + " 回退为普通发送");
+            } else if (cache) {
+              thread = cache.get(poToken) || null;
+              if (!thread || !thread.messageId) {
+                results.push({ docNo, ok: false, error: "回复模式：收件箱未找到主题含 " + poToken + " 的邮件，已取消（未标记发送）" });
+                continue;
+              }
+              threadSubject = thread.subject || subject;
+              inReplyTo = thread.inReplyTo;
+              references = thread.references;
             }
-            if (cache) thread = cache.get(poToken) || null;
-            if (!thread || !thread.messageId) {
-              results.push({ docNo, ok: false, error: "回复模式：收件箱未找到主题含 " + poToken + " 的邮件，已取消（未标记发送）" });
-              continue;
-            }
-            threadSubject = thread.subject || subject;
-            inReplyTo = thread.inReplyTo;
-            references = thread.references;
           }
           const info = await mail.sendMail({
             smtp: ownSmtp || undefined,
