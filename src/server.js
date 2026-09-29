@@ -433,8 +433,9 @@ async function handleApi(req, res) {
             let thread = null;
             const cache = threadCache.get(sendSmtp.user);
             if (cache === null) {
-              /* IMAP 连接失败（网络/限流），回退为普通发送（不回复），确保邮件能发出 */
-              console.log("回复模式：IMAP 连接失败（" + sendSmtp.user + "），PI " + docNo + " 回退为普通发送");
+              /* IMAP 连接失败：回复模式至关重要，不降级、不误发，取消该封并明确提示 */
+              results.push({ docNo, ok: false, error: "回复模式：IMAP 连接失败（" + (threadCacheErr.get(sendSmtp.user) || "未知错误") + "），已取消（未标记发送）" });
+              continue;
             } else if (cache) {
               thread = cache.get(poToken) || null;
               if (!thread || !thread.messageId) {

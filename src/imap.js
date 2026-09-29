@@ -25,7 +25,7 @@ async function connectImap(smtp) {
   const imap = inferImap(user, smtp && smtp.host);
   if (!imap.host) throw new Error("无法推断该邮箱的 IMAP 服务器: " + user);
   let lastErr = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const client = new ImapFlow({
       host: imap.host,
       port: imap.port,
@@ -33,8 +33,8 @@ async function connectImap(smtp) {
       auth: { user, pass },
       logger: false,
       tls: { rejectUnauthorized: false },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000
+      connectionTimeout: 30000,
+      greetingTimeout: 30000
     });
     client.on("error", () => {});
     try {
@@ -42,7 +42,7 @@ async function connectImap(smtp) {
       return client;
     } catch (e) {
       lastErr = e;
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 3000));
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 5000));
     }
   }
   throw new Error("IMAP 连接失败（" + imap.host + "）: " + (lastErr && lastErr.message ? lastErr.message : (lastErr && lastErr.code ? lastErr.code : "未知错误")));
