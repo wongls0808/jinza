@@ -17,6 +17,37 @@ function inferImap(user, smtpHost) {
   return { host: "", port: 993, secure: true };
 }
 
+/* 建立 IMAP 连接（失败自动重试 3 次，间隔 3 秒；163 等邮箱偶发限流/连接超时） */
+async function connectImap(smtp) {
+  const user = String((smtp && smtp.user) || "").trim();
+  const pass = String((smtp && smtp.pass) || "");
+  if (!user || !pass) throw new Error("缺少发件账号/授权码（IMAP 复用 SMTP 凭据）");
+  const imap = inferImap(user, smtp && smtp.host);
+  if (!imap.host) throw new Error("无法推断该邮箱的 IMAP 服务器: " + user);
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const client = new ImapFlow({
+      host: imap.host,
+      port: imap.port,
+      secure: imap.secure,
+      auth: { user, pass },
+      logger: false,
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000
+    });
+    client.on("error", () => {});
+    try {
+      await client.connect();
+      return client;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  throw new Error("IMAP 连接失败（" + imap.host + "）: " + (lastErr && lastErr.message ? lastErr.message : (lastErr && lastErr.code ? lastErr.code : "未知错误")));
+}
+
 /* 去掉主题前缀 Re: / Fwd: / 回复 / 答复 等 */
 function stripThreadPrefix(subject) {
   return String(subject || "").replace(/^(\s*(re|fw|fwd|回复|答复)\s*[:：]\s*)+/i, "").trim();
@@ -37,25 +68,7 @@ async function findThreadMail(smtp, token) {
   if (!user || !pass) throw new Error("缺少发件账号/授权码（IMAP 复用 SMTP 凭据）");
   const tok = String(token || "").trim();
   if (!tok) throw new Error("缺少 PO 号");
-  const imap = inferImap(user, smtp && smtp.host);
-  if (!imap.host) throw new Error("无法推断该邮箱的 IMAP 服务器: " + user);
-
-  const client = new ImapFlow({
-    host: imap.host,
-    port: imap.port,
-    secure: imap.secure,
-    auth: { user, pass },
-    logger: false,
-    tls: { rejectUnauthorized: false },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000
-  });
-  client.on("error", () => {}); /* 处理 error 事件，避免 unhandled error 崩溃 */
-  try {
-    await client.connect();
-  } catch (e) {
-    throw new Error("IMAP 连接失败（" + imap.host + "）: " + (e && e.message ? e.message : (e && e.code ? e.code : "未知错误")));
-  }
+  const client = await connectImap(smtp);
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
@@ -120,25 +133,7 @@ async function findThreadMails(smtp, tokens) {
   if (!user || !pass) throw new Error("缺少发件账号/授权码（IMAP 复用 SMTP 凭据）");
   const toks = [...new Set((tokens || []).map(t => String(t || "").trim()).filter(Boolean))];
   if (toks.length === 0) return new Map();
-  const imap = inferImap(user, smtp && smtp.host);
-  if (!imap.host) throw new Error("无法推断该邮箱的 IMAP 服务器: " + user);
-
-  const client = new ImapFlow({
-    host: imap.host,
-    port: imap.port,
-    secure: imap.secure,
-    auth: { user, pass },
-    logger: false,
-    tls: { rejectUnauthorized: false },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000
-  });
-  client.on("error", () => {});
-  try {
-    await client.connect();
-  } catch (e) {
-    throw new Error("IMAP 连接失败（" + imap.host + "）: " + (e && e.message ? e.message : (e && e.code ? e.code : "未知错误")));
-  }
+  const client = await connectImap(smtp);
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
@@ -182,4 +177,4 @@ async function findThreadMails(smtp, tokens) {
   }
 }
 
-module.exports = { findThreadMail, findThreadMails, inferImap, replySubject, stripThreadPrefix };
+module.exports = { findThreadMail, findThreadMails, connectImap, inferImap, replySubject, stripThreadPrefix };
