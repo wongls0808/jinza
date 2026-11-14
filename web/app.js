@@ -3790,11 +3790,8 @@ function buildPiBodies(pi, stampSrc, baseHref, printProfile) {
   const piNumber = pi.docNo || record.docNo || "-";
   const ciNumber = deriveRelatedDocNoFromPi(piNumber, "IV");
   const piBaseDate = new Date(record.docDate || pi.docDate || new Date());
-  const ciDate = randomWorkdayAfter(
-    Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate,
-    7,
-    10
-  );
+  /* CI 日期与创建发票(PI)日期相同 */
+  const ciDate = Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate;
   const plNumber = deriveRelatedDocNoFromPi(piNumber, "PL");
   const deliveryCity = resolveCustomerCity(record, shipTo);
   const packingFrom = printProfile?.packingListFrom || "Fujian, China";
