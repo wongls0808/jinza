@@ -3242,13 +3242,15 @@ async function openPiModal(poItem) {
   }
   const rawPoDate = getFieldValue(poRecord, "docDate") || new Date().toISOString();
   const basePoDate = new Date(rawPoDate);
-  const minPiDate = Number.isNaN(basePoDate.getTime())
-    ? adjustToNextWorkday(addDays(new Date(), 7))
-    : adjustToNextWorkday(addDays(basePoDate, 7));
-  const dateValue = toInputDate(minPiDate);
+  /* PI 日期 = PO 日期 + 1~3 天随机（遇周末顺延） */
+  const piDateVal = Number.isNaN(basePoDate.getTime())
+    ? randomWorkdayAfter(new Date(), 1, 3)
+    : randomWorkdayAfter(basePoDate, 1, 3);
+  const dateValue = toInputDate(piDateVal);
   piDateEl.value = dateValue;
   piDateEl.min = dateValue;
-  const validity = randomValidityDate(minPiDate);
+  /* validityDate 固定 = PI 日期 + 30 天 */
+  const validity = addDays(piDateVal, 30);
   piValidityDateEl.value = toInputDate(validity);
   piRefPoEl.value = getFieldValue(poRecord, "docNo") || "";
   const piYear = Number.isNaN(basePoDate.getTime())
@@ -3808,7 +3810,8 @@ function buildPiBodies(pi, stampSrc, baseHref, printProfile) {
   const plNumber = deriveRelatedDocNoFromPi(piNumber, "PL");
   const deliveryCity = resolveCustomerCity(record, shipTo);
   const packingFrom = printProfile?.packingListFrom || "Fujian, China";
-  const plDate = randomWorkdayAfter(ciDate, 7, 10);
+  /* PL 日期 = PI 日期 + 3~10 天随机（遇周末顺延） */
+  const plDate = randomWorkdayAfter(piBaseDate, 3, 10);
   const validity = pi.validityDate
     ? formatDateShort(pi.validityDate)
     : "-";
@@ -6270,10 +6273,12 @@ async function batchCreatePI() {
       const rawPoDate = getFieldValue(entry.record, "docDate") || new Date().toISOString();
       const basePoDate = new Date(rawPoDate);
       const piYear = Number.isNaN(basePoDate.getTime()) ? new Date().getFullYear() : basePoDate.getFullYear();
+      /* PI 日期 = PO 日期 + 1~3 天随机（遇周末顺延） */
       const minPiDate = Number.isNaN(basePoDate.getTime())
-        ? adjustToNextWorkday(addDays(new Date(), 7))
-        : adjustToNextWorkday(addDays(basePoDate, 7));
-      const validity = randomValidityDate(minPiDate);
+        ? randomWorkdayAfter(new Date(), 1, 3)
+        : randomWorkdayAfter(basePoDate, 1, 3);
+      /* validityDate 固定 = PI 日期 + 30 天 */
+      const validity = addDays(minPiDate, 30);
 
       const supplierMatch = suppliers.find((s) => s.code === getFieldValue(entry.record, "creditorCode"));
       const supplier = supplierMatch || suppliers[0];
