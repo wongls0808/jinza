@@ -4450,6 +4450,44 @@ async function printPurchasePi(pi) {
   }
 }
 
+/* 仅打印 CI（商业发票）单份文档 */
+async function printPurchaseCi(pi) {
+  try {
+    appendLog("正在生成 CI PDF（仅商业发票）...");
+    const pack = await buildTransactionHtmlsForPdf(pi);
+    const htmls = [
+      { html: pack.ciHtml }
+    ];
+    const r = await mailApi("/api/mail/html-pdf", { method: "POST", body: { htmls } });
+    if (!r || !r.base64) {
+      appendLog("PDF 生成失败：服务端未返回数据");
+      return;
+    }
+    const byteChars = atob(r.base64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const rawNo =
+      (pi && pi.master && pi.master.docNo) ||
+      (pi && pi.docNo) ||
+      (extractRecord(pi) && extractRecord(pi).docNo) ||
+      "PI-print";
+    const safeName = String(rawNo).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = safeName + "-CI.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    appendLog("已生成 CI PDF：" + safeName + "-CI.pdf");
+  } catch (e) {
+    appendLog("生成 CI PDF 失败: " + e.message);
+    alert("生成 CI PDF 失败: " + e.message);
+  }
+}
+
 async function createPurchaseInvoiceFromPo(
   poItem,
   supplierRecord,
@@ -5464,7 +5502,7 @@ function renderSection(entityName, items) {
         ? `<button class="btn ghost" data-action="create-pi">创建PI</button>`
         : "",
       entityName === "purchasePI"
-        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="send-mail-pi">📧 发送</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button><button class="btn ghost" data-action="delete-pi" style="color:#e74c3c">删除</button>`
+        ? `<button class="btn ghost" data-action="print-pi">打印PI</button><button class="btn ghost" data-action="print-ci">打印CI</button><button class="btn ghost" data-action="send-mail-pi">📧 发送</button><button class="btn ghost" data-action="create-purchase-invoice">创建发票</button><button class="btn ghost" data-action="delete-pi" style="color:#e74c3c">删除</button>`
         : ""
     ]
       .filter(Boolean)
@@ -5524,6 +5562,9 @@ function renderSection(entityName, items) {
       }
       if (action === "print-pi" && entityName === "purchasePI") {
         printPurchasePi(item);
+      }
+      if (action === "print-ci" && entityName === "purchasePI") {
+        printPurchaseCi(item);
       }
       if (action === "create-purchase-invoice" && entityName === "purchasePI") {
         try {
