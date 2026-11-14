@@ -3790,8 +3790,21 @@ function buildPiBodies(pi, stampSrc, baseHref, printProfile) {
   const piNumber = pi.docNo || record.docNo || "-";
   const ciNumber = deriveRelatedDocNoFromPi(piNumber, "IV");
   const piBaseDate = new Date(record.docDate || pi.docDate || new Date());
-  /* CI 日期与创建发票(PI)日期相同 */
-  const ciDate = Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate;
+  /* CI 日期 = 采购发票日期：优先取关联 IV 的日期，否则回退 PI 日期 */
+  let ciDate = Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate;
+  const refIvNo = record.referenceIvNo || pi.referenceIvNo || "";
+  if (refIvNo) {
+    const invList = state.data.invoice || [];
+    const matchedIv = invList.find((inv) => {
+      const r = extractRecord(inv);
+      return String(getFieldValue(r, "docNo") || getFieldValue(inv, "docNo")) === String(refIvNo);
+    });
+    if (matchedIv) {
+      const ivDate = getFieldValue(extractRecord(matchedIv), "docDate") || "";
+      const d = new Date(ivDate);
+      if (!Number.isNaN(d.getTime())) ciDate = d;
+    }
+  }
   const plNumber = deriveRelatedDocNoFromPi(piNumber, "PL");
   const deliveryCity = resolveCustomerCity(record, shipTo);
   const packingFrom = printProfile?.packingListFrom || "Fujian, China";
