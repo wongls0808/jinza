@@ -80,6 +80,7 @@ const piDateEl = document.getElementById("piDate");
 const piValidityDateEl = document.getElementById("piValidityDate");
 const piRefPoEl = document.getElementById("piRefPo");
 let pendingPiPoItem = null;
+let pendingPiDate = null;
 const cpiModalEl = document.getElementById("createPiInvoiceModal");
 const cpiCloseEl = document.getElementById("createPiInvoiceClose");
 const cpiCancelEl = document.getElementById("cpiCancel");
@@ -2540,7 +2541,10 @@ function toInputDate(value) {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function adjustToNextWorkday(date) {
@@ -2915,7 +2919,7 @@ function buildPurchaseInvoiceInput(
 ) {
   const master = {
     docNo: piMeta?.piNumber || null,
-    docDate: poMaster.docDate || new Date().toISOString(),
+    docDate: piMeta?.docDate || poMaster.docDate || new Date().toISOString(),
     taxDate: poMaster.taxDate || poMaster.docDate || new Date().toISOString(),
     creditorCode: poMaster.creditorCode,
     creditorName: poMaster.creditorName,
@@ -3249,6 +3253,7 @@ async function openPiModal(poItem) {
   const dateValue = toInputDate(piDateVal);
   piDateEl.value = dateValue;
   piDateEl.min = dateValue;
+  pendingPiDate = dateValue;
   /* validityDate 固定 = PI 日期 + 30 天 */
   const validity = addDays(piDateVal, 30);
   piValidityDateEl.value = toInputDate(validity);
@@ -3296,6 +3301,7 @@ function closePiModal() {
   piModalEl.dataset.matchedInvoiceCustomerName = "";
   piModalEl.dataset.matchedInvoiceTotal = "";
   pendingPiPoItem = null;
+  pendingPiDate = null;
 }
 
 /* ---- 手动关联 IV 弹窗 ---- */
@@ -6291,6 +6297,7 @@ async function batchCreatePI() {
 
       const piMeta = {
         piNumber,
+        docDate: `${toInputDate(minPiDate)}T00:00:00`,
         referencePoNo: poDocNo,
         referenceIvNo: matchedIvNo,
         ivCustomerName: matchedIvCustomerName,
@@ -6753,6 +6760,7 @@ piSubmitEl.addEventListener("click", async () => {
         piNumberEl.dataset.piYear || new Date().getFullYear(),
         piNumberEl.dataset.defaultPi || null
       ),
+      docDate: pendingPiDate ? `${pendingPiDate}T00:00:00` : null,
       referencePoNo: getFieldValue(poRecord, "docNo") || null,
       referenceIvNo: matchedIvNo,
       ivCustomerName: matchedIvCustomerName,
