@@ -1932,7 +1932,7 @@ function deriveRelatedDocNoFromPi(piNo, kind) {
     return next.join("-");
   }
   if (/^PI/i.test(s)) {
-    return kind === "IV" ? s.replace(/^PI/i, "IV") : s.replace(/^PI/i, "PL");
+    return s.replace(/^PI/i, kind);
   }
   return `${kind}-${s}`;
 }
@@ -3796,7 +3796,7 @@ function buildPiBodies(pi, stampSrc, baseHref, printProfile) {
     fax: record.deliverFax1 || "-"
   };
   const piNumber = pi.docNo || record.docNo || "-";
-  const ciNumber = deriveRelatedDocNoFromPi(piNumber, "IV");
+  const ciNumber = deriveRelatedDocNoFromPi(piNumber, "CI");
   const piBaseDate = new Date(record.docDate || pi.docDate || new Date());
   /* CI 日期 = 采购发票日期：优先取关联 IV 的日期，否则回退 PI 日期 */
   let ciDate = Number.isNaN(piBaseDate.getTime()) ? new Date() : piBaseDate;
@@ -4472,16 +4472,17 @@ async function printPurchaseCi(pi) {
       (pi && pi.master && pi.master.docNo) ||
       (pi && pi.docNo) ||
       (extractRecord(pi) && extractRecord(pi).docNo) ||
-      "PI-print";
-    const safeName = String(rawNo).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80);
+      "";
+    const ciNo = rawNo ? deriveRelatedDocNoFromPi(rawNo, "CI") : "";
+    const safeName = String(ciNo || "CI-print").replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 80);
     const a = document.createElement("a");
     a.href = url;
-    a.download = safeName + "-CI.pdf";
+    a.download = safeName + ".pdf";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    appendLog("已生成 CI PDF：" + safeName + "-CI.pdf");
+    appendLog("已生成 CI PDF：" + safeName + ".pdf");
   } catch (e) {
     appendLog("生成 CI PDF 失败: " + e.message);
     alert("生成 CI PDF 失败: " + e.message);
