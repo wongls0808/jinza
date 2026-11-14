@@ -5469,9 +5469,13 @@ function renderSection(entityName, items) {
     ]
       .filter(Boolean)
       .join("");
+    const expandDetailHtml =
+      entityName === "purchasePI"
+        ? ""
+        : `<button class="btn ghost" data-action="expand">展开</button>
+      <button class="btn ghost" data-action="drawer">详情</button>`;
     actions.innerHTML = `
-      <button class="btn ghost" data-action="expand">展开</button>
-      <button class="btn ghost" data-action="drawer">详情</button>
+      ${expandDetailHtml}
       ${extraActions}
     `;
     row.appendChild(actions);
